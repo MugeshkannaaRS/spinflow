@@ -1,0 +1,46 @@
+from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy.orm import Mapped, mapped_column
+from datetime import datetime
+from app.db.base import Base, TimestampMixin, generate_uuid
+
+
+class MaintenanceLog(TimestampMixin, Base):
+    __tablename__ = "maintenance_logs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
+    machine_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    department: Mapped[str] = mapped_column(String(100), nullable=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    technician_id: Mapped[str] = mapped_column(String(36), ForeignKey("technicians.id"), nullable=True)
+    technician_name: Mapped[str] = mapped_column(String(200), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="open", index=True)
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    spare_used: Mapped[str] = mapped_column(String(500), nullable=True)
+    downtime_min: Mapped[int] = mapped_column(Integer, default=0)
+    cost: Mapped[float] = mapped_column(Float, default=0)
+
+
+class MaintenanceSchedule(Base):
+    __tablename__ = "maintenance_schedule"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    machine_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
+    frequency_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=True)
+    last_done: Mapped[str] = mapped_column(String(10), nullable=True)
+    next_due: Mapped[str] = mapped_column(String(10), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class Technician(Base):
+    __tablename__ = "technicians"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    phone: Mapped[str] = mapped_column(String(20), nullable=True)
+    specialization: Mapped[str] = mapped_column(String(200), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)

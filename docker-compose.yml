@@ -1,0 +1,116 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: spinflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: spinflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-X7k9mP2qR5vB8wN1fL4jH6cY3aE0gT8uWxZ}
+      POSTGRES_DB: spinflow_db
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U spinflow -d spinflow_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: spinflow-redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-X8kLm9pQ4rT2vB6nW1cY3zA7eR5fH0jG}"]
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-X8kLm9pQ4rT2vB6nW1cY3zA7eR5fH0jG}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: spinflow-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://spinflow:${POSTGRES_PASSWORD:-X7k9mP2qR5vB8wN1fL4jH6cY3aE0gT8uWxZ}@postgres:5432/spinflow_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-X8kLm9pQ4rT2vB6nW1cY3zA7eR5fH0jG}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: "false"
+      CORS_ORIGINS: '["https://millflow.yourdomain.com"]'
+    ports:
+      - "127.0.0.1:8002:8000"
+    volumes:
+      - backend_uploads:/app/uploads
+    command: >
+      sh -c "cd /app && python -m app.db.seed --force && alembic stamp head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --loop asyncio"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: spinflow-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:4173:4173"
+    environment:
+      VITE_API_BASE_URL: http://backend:8000
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    image: nginx:alpine
+    container_name: spinflow-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+  redis_data:
+  backend_uploads:

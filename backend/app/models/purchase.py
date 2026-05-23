@@ -1,0 +1,68 @@
+from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy.orm import Mapped, mapped_column
+from datetime import datetime
+from app.db.base import Base, TimestampMixin, generate_uuid
+
+
+class Supplier(TimestampMixin, Base):
+    __tablename__ = "suppliers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    contact_person: Mapped[str] = mapped_column(String(200), nullable=True)
+    phone: Mapped[str] = mapped_column(String(20), nullable=True)
+    email: Mapped[str] = mapped_column(String(200), nullable=True)
+    address: Mapped[str] = mapped_column(Text, nullable=True)
+    city: Mapped[str] = mapped_column(String(100), nullable=True)
+    state: Mapped[str] = mapped_column(String(100), nullable=True)
+    gstin: Mapped[str] = mapped_column(String(15), nullable=True)
+    grade: Mapped[str] = mapped_column(String(10), nullable=True)
+    status: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class CottonPurchase(TimestampMixin, Base):
+    __tablename__ = "cotton_purchases"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
+    date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    invoice_no: Mapped[str] = mapped_column(String(100), nullable=False)
+    supplier_id: Mapped[str] = mapped_column(String(36), ForeignKey("suppliers.id"), nullable=False, index=True)
+    supplier_name: Mapped[str] = mapped_column(String(200), nullable=True)
+    bales: Mapped[int] = mapped_column(Integer, nullable=False)
+    gross_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    net_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    rate_per_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    moisture: Mapped[float] = mapped_column(Float, default=0)
+    grade: Mapped[str] = mapped_column(String(10), nullable=True)
+    gst_amount: Mapped[float] = mapped_column(Float, default=0.0)
+    invoice_url: Mapped[str] = mapped_column(String(500), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+
+
+class BaleStock(Base):
+    __tablename__ = "bale_stock"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    purchase_id: Mapped[str] = mapped_column(String(36), ForeignKey("cotton_purchases.id"), nullable=False)
+    bale_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    weight_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    grade: Mapped[str] = mapped_column(String(10), nullable=True)
+    location: Mapped[str] = mapped_column(String(200), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="in-stock")
+
+
+class GRNEntry(TimestampMixin, Base):
+    __tablename__ = "grn_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    date: Mapped[str] = mapped_column(String(10), nullable=False)
+    grn_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    purchase_id: Mapped[str] = mapped_column(String(36), ForeignKey("cotton_purchases.id"), nullable=False)
+    supplier_name: Mapped[str] = mapped_column(String(200), nullable=True)
+    bales_received: Mapped[int] = mapped_column(Integer, nullable=False)
+    net_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    received_by: Mapped[str] = mapped_column(String(200), nullable=True)
+    remarks: Mapped[str] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending")

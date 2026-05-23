@@ -1,0 +1,139 @@
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+from typing import List, Optional
+from datetime import datetime, timezone
+
+from app.db.session import get_db
+from app.core.deps import get_current_user, require_module, log_audit
+from app.models.user import User
+from app.models.inventory import Lot, StockMovement, Warehouse
+from app.schemas.inventory import (
+    LotCreate, LotOut, LotListResponse,
+    WarehouseCreate, WarehouseOut,
+    StockMovementCreate, StockMovementOut,
+)
+
+router = APIRouter()
+
+
+@router.get("/inventory/lots")
+async def get_lots(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("inventory")),
+):
+    stmt = select(Lot).order_by(Lot.created_at.desc())
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(stmt)
+    items = result.scalars().all()
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+        "data": items,
+    }
+
+
+@router.get("/inventory/transfers")
+async def get_transfers(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("inventory")),
+):
+    stmt = select(StockMovement).order_by(StockMovement.created_at.desc())
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(stmt)
+    items = result.scalars().all()
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+        "data": items,
+    }
+
+
+@router.post("/inventory/transfers", response_model=StockMovementOut)
+async def create_transfer(
+    req: StockMovementCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("inventory", write=True)),
+):
+    loc = await db.execute(select(Warehouse).where(Warehouse.name == req.from_location))
+    from_wh = loc.scalar_one_or_none()
+    loc2 = await db.execute(select(Warehouse).where(Warehouse.name == req.to_location))
+    to_wh = loc2.scalar_one_or_none()
+    movement = StockMovement(
+        lot_no=req.bag_id,
+        from_location=req.from_location,
+        to_location=req.to_location,
+        quantity=0,
+        unit="kg",
+        type=req.movement_type.lower(),
+        transferred_by=current_user.name,
+    )
+    db.add(movement)
+    await db.flush()
+    return movement
+
+
+@router.post("/inventory/lots", response_model=LotOut)
+async def create_lot(
+    req: LotCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("inventory", write=True)),
+):
+    lot = Lot(
+        lot_no=req.lot_no or "",
+        type=req.count,
+        quantity=float(req.total_bags * req.bag_weight_kg),
+        total_bags=req.total_bags,
+        warehouse_id=req.warehouse_id,
+        unit="kg",
+        status="in-stock",
+        mill_id=current_user.mill_id or "",
+    )
+    db.add(lot)
+    await db.flush()
+    role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+    await log_audit(db, current_user.id, role_code, "create", "Lot", lot.id,
+                    f"Lot {lot.lot_no} created")
+    return lot
+
+
+@router.get("/inventory/warehouses")
+async def get_warehouses(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("inventory")),
+):
+    result = await db.execute(select(Warehouse).order_by(Warehouse.name))
+    return result.scalars().all()
+
+
+@router.post("/inventory/warehouses", response_model=WarehouseOut)
+async def create_warehouse(
+    req: WarehouseCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("inventory", write=True)),
+):
+    wh = Warehouse(
+        code=req.code,
+        name=req.name,
+        location=req.location,
+        capacity_bags=req.capacity_bags,
+        is_active=True,
+    )
+    db.add(wh)
+    await db.flush()
+    role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+    await log_audit(db, current_user.id, role_code, "create", "Warehouse", wh.id,
+                    f"Warehouse {wh.name} created")
+    return wh

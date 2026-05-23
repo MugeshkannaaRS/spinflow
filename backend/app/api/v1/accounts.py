@@ -1,0 +1,165 @@
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+from typing import List, Optional
+from datetime import datetime, timezone, date
+
+from app.db.session import get_db
+from app.core.deps import get_current_user, require_module
+from app.models.user import User
+from app.models.accounts import Invoice, Payment
+from app.schemas.accounts import (
+    InvoiceCreate, InvoiceOut, InvoiceListResponse,
+    PaymentCreate, PaymentOut, AccountsSummary,
+)
+from app.services.accounts_service import AccountsService
+
+router = APIRouter()
+
+
+@router.get("/accounts/invoices")
+async def get_invoices(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("accounts")),
+):
+    stmt = select(Invoice).order_by(Invoice.date.desc())
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(stmt)
+    items = result.scalars().all()
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+        "data": items,
+    }
+
+
+@router.post("/accounts/invoices", response_model=InvoiceOut)
+async def create_invoice(
+    req: InvoiceCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("accounts", write=True)),
+):
+    invoice = Invoice(
+        invoice_no=f"INV-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+        date=req.invoice_date.isoformat(),
+        customer_name=req.party_name,
+        type="sales",
+        amount=req.taxable_amount,
+        gst=req.tax_amount if hasattr(req, 'tax_amount') else 0,
+        total=req.total_amount if hasattr(req, 'total_amount') else req.taxable_amount,
+        status="draft",
+        due_date=req.due_date.isoformat() if req.due_date else None,
+    )
+    db.add(invoice)
+    await db.flush()
+    return invoice
+
+
+@router.get("/accounts/receivables")
+async def get_receivables(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("accounts")),
+):
+    stmt = select(Invoice).where(Invoice.status.in_(["posted", "overdue"])).order_by(Invoice.date.desc())
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(stmt)
+    items = result.scalars().all()
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+        "data": items,
+    }
+
+
+@router.post("/accounts/payments", response_model=PaymentOut)
+async def create_payment(
+    req: PaymentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("accounts", write=True)),
+):
+    payment = Payment(
+        invoice_id=req.invoice_id,
+        date=req.payment_date.isoformat(),
+        amount=req.amount,
+        mode=req.payment_mode,
+        reference=req.reference_no,
+        notes=req.remarks,
+    )
+    db.add(payment)
+    inv_result = await db.execute(select(Invoice).where(Invoice.id == req.invoice_id))
+    invoice = inv_result.scalar_one_or_none()
+    if invoice:
+        invoice.status = "paid"
+        invoice.paid_at = datetime.now(timezone.utc)
+    await db.flush()
+    return payment
+
+
+# ── Finance routes ──────────────────────────────────────────
+
+@router.get("/accounts/pl")
+async def get_pl(
+    mill_id: str = Query(...),
+    month: int = Query(..., ge=1, le=12),
+    year: int = Query(..., ge=2020),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("accounts")),
+):
+    svc = AccountsService(db, current_user)
+    return await svc.get_pl_statement(mill_id, month, year)
+
+
+@router.get("/accounts/receivables-ageing")
+async def get_receivables_ageing(
+    mill_id: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("accounts")),
+):
+    svc = AccountsService(db, current_user)
+    return await svc.receivables_ageing(mill_id)
+
+
+@router.get("/accounts/payables")
+async def get_payables(
+    mill_id: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("accounts")),
+):
+    svc = AccountsService(db, current_user)
+    return await svc.payables_ageing(mill_id)
+
+
+@router.get("/accounts/gst")
+async def get_gst(
+    mill_id: str = Query(...),
+    month: int = Query(..., ge=1, le=12),
+    year: int = Query(..., ge=2020),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("accounts")),
+):
+    svc = AccountsService(db, current_user)
+    return await svc.gst_summary(mill_id, month, year)
+
+
+@router.get("/accounts/cogs")
+async def get_cogs(
+    mill_id: str = Query(...),
+    date_from: date = Query(...),
+    date_to: date = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("accounts")),
+):
+    svc = AccountsService(db, current_user)
+    return await svc.get_cogs(mill_id, date_from, date_to)
