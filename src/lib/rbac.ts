@@ -122,7 +122,14 @@ export const ACCESS: Record<Role, Partial<Record<Module, true | "read">>> = {
     inventory: "read",
     reports: true,
   },
-  DISPATCH_MANAGER: { dashboard: true, dispatch: true, inventory: "read", reports: true, stock: "read", sales: "read" },
+  DISPATCH_MANAGER: {
+    dashboard: true,
+    dispatch: true,
+    inventory: "read",
+    reports: true,
+    stock: "read",
+    sales: "read",
+  },
   STORE_MANAGER: {
     dashboard: true,
     stores: true,

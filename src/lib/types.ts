@@ -99,7 +99,7 @@ export interface InventoryLot {
   status: "in-stock" | "transferred" | "dispatched";
 }
 
-export interface StockTransfer {
+export interface LegacyStockTransfer {
   id: string;
   date: string;
   lotNo: string;
@@ -111,7 +111,7 @@ export interface StockTransfer {
   status: "pending" | "completed";
 }
 
-export interface SalesOrder {
+export interface LegacySalesOrder {
   id: string;
   orderNo: string;
   customer: string;
@@ -500,7 +500,14 @@ export interface Route {
   updated_at?: string;
 }
 
-export type FGState = "WIP" | "QC_PENDING" | "SELLABLE" | "RESERVED" | "QUARANTINE" | "DISPATCHED" | "DELIVERED";
+export type FGState =
+  | "WIP"
+  | "QC_PENDING"
+  | "SELLABLE"
+  | "RESERVED"
+  | "QUARANTINE"
+  | "DISPATCHED"
+  | "DELIVERED";
 
 export type MoveType =
   | "PRODUCTION_IN"
@@ -632,7 +639,14 @@ export interface ListResponse<T> {
   data: T[];
 }
 
-export type TripStatus = "draft" | "loading" | "loaded" | "in_transit" | "arrived" | "delivered" | "cancelled";
+export type TripStatus =
+  | "draft"
+  | "loading"
+  | "loaded"
+  | "in_transit"
+  | "arrived"
+  | "delivered"
+  | "cancelled";
 export type TripItemStatus = "pending" | "loaded" | "delivered" | "wrong_destination" | "missing";
 
 export interface Trip {
@@ -704,6 +718,7 @@ export interface ScanResult {
   yarn_count?: string;
   weight_kg?: number;
   loaded_count?: number;
+  delivered_count?: number;
   planned_count?: number;
   trip_complete?: boolean;
   alert?: string;

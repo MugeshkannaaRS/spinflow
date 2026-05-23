@@ -25,9 +25,7 @@ class ScanQueueDB extends Dexie {
 
 export const scanQueueDB = new ScanQueueDB();
 
-export async function enqueueScan(
-  scan: Omit<PendingScan, "id" | "retry_count">,
-): Promise<number> {
+export async function enqueueScan(scan: Omit<PendingScan, "id" | "retry_count">): Promise<number> {
   return scanQueueDB.pendingScans.add({ ...scan, retry_count: 0 });
 }
 
@@ -39,10 +37,7 @@ export async function removeScan(id: number): Promise<void> {
   await scanQueueDB.pendingScans.delete(id);
 }
 
-export async function markScanFailed(
-  id: number,
-  error: string,
-): Promise<void> {
+export async function markScanFailed(id: number, error: string): Promise<void> {
   const scan = await scanQueueDB.pendingScans.get(id);
   if (scan) {
     await scanQueueDB.pendingScans.update(id, {
