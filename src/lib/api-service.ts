@@ -12,9 +12,12 @@ export const authApi = {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       })
       .then((r) => {
-        const u = r.data?.user ?? r.data;
-        if (!u?.id) throw new Error("Invalid login response from server");
+        const token = r.data?.access_token;
+        const u = r.data?.user;
+        if (!token || !u?.id) throw new Error("Invalid login response from server");
         return {
+          token,
+          refreshToken: r.data?.refresh_token,
           user: {
             id: u.id,
             name: u.name ?? "",
@@ -23,8 +26,6 @@ export const authApi = {
             millId: u.mill_id || "m1",
             millName: u.mill_name || "SpinFlow Coimbatore Unit-1",
           },
-          token: r.data.access_token,
-          refreshToken: r.data.refresh_token,
         };
       }),
   logout: () => api.post("/auth/logout"),
