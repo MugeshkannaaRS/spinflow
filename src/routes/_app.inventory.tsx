@@ -45,8 +45,8 @@ export const Route = createFileRoute("/_app/inventory")({
 });
 
 function InventoryPage() {
-  const user = useAuth((s) => s.user)!;
-  const canEdit = canWrite(user.role, "inventory");
+  const user = useAuth((s) => s.user);
+  const canEdit = canWrite(user?.role ?? "OPERATOR", "inventory");
   const lotsQ = useQuery({
     queryKey: ["inventory-lots"],
     queryFn: inventoryApi.getLots,
@@ -77,6 +77,8 @@ function InventoryPage() {
   const inStock = lots.filter((l) => l.status === "in-stock").length;
   const ageingLots = lots.filter((l) => l.age > 14).length;
   const lowStock = lots.filter((l) => l.quantity < 3000).length;
+
+  if (!user) return null;
 
   if (lotsQ.isLoading)
     return (

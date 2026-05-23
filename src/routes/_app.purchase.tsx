@@ -47,9 +47,9 @@ export const Route = createFileRoute("/_app/purchase")({
 });
 
 function PurchasePage() {
-  const user = useAuth((s) => s.user)!;
-  const canEdit = canWrite(user.role, "purchase");
-  const isAdmin = user.role === "SUPER_ADMIN" || user.role === "MILL_OWNER";
+  const user = useAuth((s) => s.user);
+  const canEdit = canWrite(user?.role ?? "OPERATOR", "purchase");
+  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "MILL_OWNER";
   const suppliersQ = useQuery({
     queryKey: ["suppliers"],
     queryFn: purchaseApi.getSuppliers,
@@ -113,6 +113,8 @@ function PurchasePage() {
     { key: "receivedBy" as const, label: "Received By" },
     { key: "status" as const, label: "Status" },
   ];
+
+  if (!user) return null;
 
   if (purchasesQ.isLoading)
     return (

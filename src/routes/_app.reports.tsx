@@ -35,7 +35,7 @@ export const Route = createFileRoute("/_app/reports")({
 });
 
 function ReportsPage() {
-  const user = useAuth((s) => s.user)!;
+  const user = useAuth((s) => s.user);
   const { data } = useQuery({
     queryKey: ["report-data"],
     queryFn: reportsApi.getSummary,
@@ -56,6 +56,7 @@ function ReportsPage() {
     }
   };
 
+  if (!user) return null;
   if (!data) return null;
 
   const summaryData = [

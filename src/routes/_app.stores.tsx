@@ -39,8 +39,8 @@ export const Route = createFileRoute("/_app/stores")({
 });
 
 function StoresPage() {
-  const user = useAuth((s) => s.user)!;
-  const canEdit = canWrite(user.role, "stores");
+  const user = useAuth((s) => s.user);
+  const canEdit = canWrite(user?.role ?? "OPERATOR", "stores");
   const itemsQ = useQuery({
     queryKey: ["spare-items"],
     queryFn: storesApi.getSpares,
@@ -85,6 +85,8 @@ function StoresPage() {
     { key: "department" as const, label: "Department" },
     { key: "issuedBy" as const, label: "Issued By" },
   ];
+
+  if (!user) return null;
 
   if (itemsQ.isLoading)
     return (

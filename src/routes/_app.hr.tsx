@@ -103,9 +103,9 @@ interface EmployeeRow {
 }
 
 function HRPage() {
-  const user = useAuth((s) => s.user)!;
-  const canEdit = canWrite(user.role, "hr");
-  const isAdmin = user.role === "SUPER_ADMIN" || user.role === "MILL_OWNER";
+  const user = useAuth((s) => s.user);
+  const canEdit = canWrite(user?.role ?? "OPERATOR", "hr");
+  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "MILL_OWNER";
   const empQ = useQuery({
     queryKey: ["employees"],
     queryFn: hrApi.getEmployees,
@@ -175,6 +175,8 @@ function HRPage() {
     { key: "role", label: "Role" },
     { key: "is_active", label: "Status" },
   ];
+
+  if (!user) return null;
 
   if (empQ.isLoading)
     return (
@@ -734,7 +736,7 @@ function NewLeaveDialog({ employees }: { employees: EmployeeRow[] }) {
 
 function LeaveActionDialog({ leave }: { leave: LeaveRow }) {
   const qc = useQueryClient();
-  const user = useAuth((s) => s.user)!;
+  const user = useAuth((s) => s.user);
   const [open, setOpen] = useState(false);
   const [remarks, setRemarks] = useState("");
 

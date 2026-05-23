@@ -85,8 +85,8 @@ export const Route = createFileRoute("/_app/masters")({
 });
 
 function MastersPage() {
-  const user = useAuth((s) => s.user)!;
-  const canEdit = canWrite(user.role, "masters");
+  const user = useAuth((s) => s.user);
+  const canEdit = canWrite(user?.role ?? "OPERATOR", "masters");
   const [tab, setTab] = useState("companies");
   const [search, setSearch] = useState("");
   const qcMasters = useQueryClient();
@@ -175,6 +175,8 @@ function MastersPage() {
     (Array.isArray(machinesQ.data) ? machinesQ.data : []);
   const shiftsData = Array.isArray(shiftsQ.data) ? shiftsQ.data : [];
   const warehousesData = Array.isArray(warehousesQ.data) ? warehousesQ.data : [];
+
+  if (!user) return null;
 
   return (
     <>

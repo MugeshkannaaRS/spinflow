@@ -168,7 +168,7 @@ function getQuickActions(role: string, navigate: any) {
 }
 
 function Dashboard() {
-  const user = useAuth((s) => s.user)!;
+  const user = useAuth((s) => s.user);
   const navigate = useNavigate();
   const recentActivity = useRecentActivity();
 
@@ -180,14 +180,17 @@ function Dashboard() {
     refetch,
     isRefetching,
   } = useQuery({
-    queryKey: ["dashboard-kpis", user.millId],
-    queryFn: () => dashboardApi.getKpis(user.millId),
+    queryKey: ["dashboard-kpis", user?.millId ?? ""],
+    queryFn: () => dashboardApi.getKpis(user!.millId),
+    enabled: !!user,
     refetchInterval: 60000,
     staleTime: 60_000,
     retry: 1,
   });
 
   const data = rawData ?? undefined;
+
+  if (!user) return null;
 
   if (isLoading) {
     return (

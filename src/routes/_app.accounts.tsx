@@ -40,7 +40,7 @@ export const Route = createFileRoute("/_app/accounts")({
 });
 
 function AccountsPage() {
-  const user = useAuth((s) => s.user)!;
+  const user = useAuth((s) => s.user);
   const invQ = useQuery({
     queryKey: ["invoices"],
     queryFn: accountsApi.getInvoices,
@@ -75,6 +75,8 @@ function AccountsPage() {
     .reduce((s, i) => s + (i.total ?? 0), 0);
   const outstandingTotal = (receivables as any[]).reduce((s, r) => s + (r.outstanding ?? 0), 0);
   const overdueCount = (receivables as any[]).filter((r) => r.status === "overdue").length;
+
+  if (!user) return null;
 
   if (invQ.isLoading)
     return (

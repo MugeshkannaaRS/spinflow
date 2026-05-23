@@ -49,9 +49,9 @@ export const Route = createFileRoute("/_app/production")({
 });
 
 function ProductionPage() {
-  const user = useAuth((s) => s.user)!;
-  const canEdit = canWrite(user.role, "production");
-  const isAdmin = user.role === "SUPER_ADMIN" || user.role === "MILL_OWNER";
+  const user = useAuth((s) => s.user);
+  const canEdit = canWrite(user?.role ?? "OPERATOR", "production");
+  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "MILL_OWNER";
   const machinesQ = useQuery({
     queryKey: ["machines"],
     queryFn: productionApi.getMachines,
@@ -124,6 +124,8 @@ function ProductionPage() {
     { key: "reason", label: "Reason" },
     { key: "resolved", label: "Status" },
   ];
+
+  if (!user) return null;
 
   if (machinesQ.isLoading)
     return (

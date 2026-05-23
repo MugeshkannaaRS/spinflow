@@ -37,9 +37,9 @@ export const Route = createFileRoute("/_app/dispatch")({
 });
 
 function DispatchPage() {
-  const user = useAuth((s) => s.user)!;
-  const canEdit = canWrite(user.role, "dispatch");
-  const isAdmin = user.role === "SUPER_ADMIN" || user.role === "MILL_OWNER";
+  const user = useAuth((s) => s.user);
+  const canEdit = canWrite(user?.role ?? "OPERATOR", "dispatch");
+  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "MILL_OWNER";
   const ordersQ = useQuery({
     queryKey: ["sales-orders"],
     queryFn: dispatchApi.getOrders,
@@ -74,6 +74,8 @@ function DispatchPage() {
   const pendingValue = orders
     .filter((o) => o.status === "pending")
     .reduce((s, o) => s + (o.value ?? 0), 0);
+
+  if (!user) return null;
 
   if (ordersQ.isLoading)
     return (
@@ -339,7 +341,7 @@ function StatusUpdateSelect({
   currentStatus: DispatchEntry["status"];
 }) {
   const qc = useQueryClient();
-  const user = useAuth((s) => s.user)!;
+  const user = useAuth((s) => s.user);
   const [value, setValue] = useState(currentStatus);
 
   const m = useMutation({

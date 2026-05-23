@@ -35,8 +35,8 @@ export const Route = createFileRoute("/_app/maintenance")({
 });
 
 function MaintenancePage() {
-  const user = useAuth((s) => s.user)!;
-  const canEdit = canWrite(user.role, "maintenance");
+  const user = useAuth((s) => s.user);
+  const canEdit = canWrite(user?.role ?? "OPERATOR", "maintenance");
   const maintQ = useQuery({
     queryKey: ["maintenance-tasks"],
     queryFn: maintenanceApi.getTasks,
@@ -57,6 +57,8 @@ function MaintenancePage() {
     (t) => t.status === "completed" && t.date === new Date().toISOString().slice(0, 10),
   ).length;
   const totalDownTime = tasks.reduce((s, t) => s + (t.downtimeMin ?? 0), 0);
+
+  if (!user) return null;
 
   if (maintQ.isLoading)
     return (

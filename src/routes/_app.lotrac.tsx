@@ -118,7 +118,7 @@ function OfflineBanner({
 }
 
 function LotracPage() {
-  const user = useAuth((s) => s.user)!;
+  const user = useAuth((s) => s.user);
   const search = Route.useSearch();
   const [tab, setTab] = useState(search.tab || "trips");
 
@@ -132,6 +132,8 @@ function LotracPage() {
     }
     window.history.replaceState({}, "", url.toString());
   };
+
+  if (!user) return null;
 
   return (
     <>
@@ -592,7 +594,7 @@ function NewTripSheet() {
 }
 
 function LoaderScannerTab() {
-  const user = useAuth((s) => s.user)!;
+  const user = useAuth((s) => s.user);
   const { isOnline, pendingCount, isSyncing, submitScan, syncQueue } = useOfflineScanner();
   const [selectedTripId, setSelectedTripId] = useState("");
   const [qrInput, setQrInput] = useState("");
@@ -833,7 +835,7 @@ function LoaderScannerTab() {
 }
 
 function ReceiverScannerTab() {
-  const user = useAuth((s) => s.user)!;
+  const user = useAuth((s) => s.user);
   const { isOnline, pendingCount, isSyncing, submitScan, syncQueue } = useOfflineScanner();
   const [selectedTripId, setSelectedTripId] = useState("");
   const [selectedRouteId, setSelectedRouteId] = useState("");

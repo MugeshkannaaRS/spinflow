@@ -47,9 +47,9 @@ export const Route = createFileRoute("/_app/quality")({
 });
 
 function QualityPage() {
-  const user = useAuth((s) => s.user)!;
-  const canEdit = canWrite(user.role, "quality");
-  const isAdmin = user.role === "SUPER_ADMIN" || user.role === "MILL_OWNER";
+  const user = useAuth((s) => s.user);
+  const canEdit = canWrite(user?.role ?? "OPERATOR", "quality");
+  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "MILL_OWNER";
   const testsQ = useQuery({
     queryKey: ["quality-tests"],
     queryFn: qualityApi.getTests,
@@ -92,6 +92,8 @@ function QualityPage() {
     : 0;
   const pendingLots = lots.filter((l) => l.status === "pending").length;
   const totalRejectedKg = rejections.reduce((s, r) => s + (r.quantityKg ?? 0), 0);
+
+  if (!user) return null;
 
   if (testsQ.isLoading)
     return (
@@ -541,9 +543,9 @@ function NewTestDialog() {
 
 function LotApproveAction({ lotId }: { lotId: string }) {
   const qc = useQueryClient();
-  const user = useAuth((s) => s.user)!;
+  const user = useAuth((s) => s.user);
   const m = useMutation({
-    mutationFn: () => qualityApi.approveOrReject({ id: lotId, action: "approve", by: user.name }),
+    mutationFn: () => qualityApi.approveOrReject({ id: lotId, action: "approve", by: user?.name ?? "" }),
   });
   return (
     <Button
@@ -569,9 +571,9 @@ function LotApproveAction({ lotId }: { lotId: string }) {
 
 function LotRejectAction({ lotId }: { lotId: string }) {
   const qc = useQueryClient();
-  const user = useAuth((s) => s.user)!;
+  const user = useAuth((s) => s.user);
   const m = useMutation({
-    mutationFn: () => qualityApi.approveOrReject({ id: lotId, action: "reject", by: user.name }),
+    mutationFn: () => qualityApi.approveOrReject({ id: lotId, action: "reject", by: user?.name ?? "" }),
   });
   return (
     <Button

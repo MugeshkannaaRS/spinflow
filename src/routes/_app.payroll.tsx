@@ -60,17 +60,20 @@ const STATUS_COLORS: Record<string, "default" | "secondary" | "destructive" | "o
 };
 
 function PayrollPage() {
-  const user = useAuth((s) => s.user)!;
+  const user = useAuth((s) => s.user);
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
   const [tab, setTab] = useState("months");
 
   const summaryQ = useQuery({
-    queryKey: ["payroll-summary", user.millId, year],
-    queryFn: () => payrollApi.getSummary(user.millId, year),
+    queryKey: ["payroll-summary", user?.millId ?? "", year],
+    queryFn: () => payrollApi.getSummary(user!.millId, year),
+    enabled: !!user,
     staleTime: 60_000,
     retry: 1,
   });
+
+  if (!user) return null;
 
   const summaryData = summaryQ.data ?? [];
 
@@ -207,7 +210,7 @@ function MonthSheet({
     onError: (e: any) => toast.error(e?.message ?? "Failed to mark paid"),
   });
 
-  const sameUser = pm && user.id === pm.processed_by;
+  const sameUser = pm && user?.id === pm.processed_by;
   const [exporting, setExporting] = useState<string | null>(null);
 
   const handleExport = async (type: string, fn: () => Promise<void>) => {
