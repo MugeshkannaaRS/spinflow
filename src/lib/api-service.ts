@@ -11,18 +11,22 @@ export const authApi = {
       .post("/auth/login", new URLSearchParams({ username: email, password }), {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
       })
-      .then((r) => ({
-        user: {
-          id: r.data.user.id,
-          name: r.data.user.name,
-          email: r.data.user.email,
-          role: r.data.user.role as Role,
-          millId: r.data.user.mill_id || "m1",
-          millName: r.data.user.mill_name || "SpinFlow Coimbatore Unit-1",
-        },
-        token: r.data.access_token,
-        refreshToken: r.data.refresh_token,
-      })),
+      .then((r) => {
+        const u = r.data?.user ?? r.data;
+        if (!u?.id) throw new Error("Invalid login response from server");
+        return {
+          user: {
+            id: u.id,
+            name: u.name ?? "",
+            email: u.email ?? "",
+            role: (u.role ?? "OPERATOR") as Role,
+            millId: u.mill_id || "m1",
+            millName: u.mill_name || "SpinFlow Coimbatore Unit-1",
+          },
+          token: r.data.access_token,
+          refreshToken: r.data.refresh_token,
+        };
+      }),
   logout: () => api.post("/auth/logout"),
   refresh: (refreshToken: string) =>
     api.post("/auth/refresh", { refresh_token: refreshToken }).then((r) => r.data),
