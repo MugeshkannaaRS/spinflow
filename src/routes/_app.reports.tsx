@@ -36,12 +36,13 @@ export const Route = createFileRoute("/_app/reports")({
 
 function ReportsPage() {
   const user = useAuth((s) => s.user);
-  const { data } = useQuery({
+  const query = useQuery({
     queryKey: ["report-data"],
     queryFn: reportsApi.getSummary,
     staleTime: 60_000,
     retry: 1,
   });
+  const { data } = query;
   const [exporting, setExporting] = useState<string | null>(null);
 
   const handleExport = async (type: string, fn: () => Promise<void>) => {
@@ -57,24 +58,38 @@ function ReportsPage() {
   };
 
   if (!user) return null;
-  if (
-    !data?.productionSummary ||
-    !data?.qualitySummary ||
-    !data?.dispatchSummary ||
-    !data?.financialSummary
-  )
-    return null;
+
+  if (query.isLoading)
+    return (
+      <>
+        <Topbar title="Reports & Analytics" subtitle="Loading..." />
+        <div className="p-6 text-sm text-muted-foreground">Loading data…</div>
+      </>
+    );
+
+  if (query.isError || !data?.productionSummary || !data?.qualitySummary || !data?.dispatchSummary || !data?.financialSummary)
+    return (
+      <>
+        <Topbar title="Reports & Analytics" subtitle="Error" />
+        <div className="p-6 text-sm text-destructive">Failed to load report data. Please refresh.</div>
+      </>
+    );
+
+  const prod = data.productionSummary;
+  const qual = data.qualitySummary;
+  const disp = data.dispatchSummary;
+  const fin = data.financialSummary;
 
   const summaryData = [
     {
       name: "Production",
-      value: data.productionSummary.totalProduced,
-      target: data.productionSummary.totalTarget,
+      value: prod.totalProduced ?? 0,
+      target: prod.totalTarget ?? 0,
       unit: "kg",
     },
-    { name: "Efficiency", value: data.productionSummary.avgEfficiency, target: 85, unit: "%" },
-    { name: "Pass Rate", value: data.qualitySummary.passRate, target: 95, unit: "%" },
-    { name: "Waste", value: data.productionSummary.wastePercent, target: 3, unit: "%" },
+    { name: "Efficiency", value: prod.avgEfficiency ?? 0, target: 85, unit: "%" },
+    { name: "Pass Rate", value: qual.passRate ?? 0, target: 95, unit: "%" },
+    { name: "Waste", value: prod.wastePercent ?? 0, target: 3, unit: "%" },
   ];
 
   return (
@@ -135,10 +150,10 @@ function ReportsPage() {
                 </div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
                   <TrendingUp className="size-5 text-primary" />
-                  {(data.productionSummary.totalProduced / 1000).toFixed(1)}T
+                  {((prod.totalProduced ?? 0) / 1000).toFixed(1)}T
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  vs {(data.productionSummary.totalTarget / 1000).toFixed(1)}T target
+                  vs {((prod.totalTarget ?? 0) / 1000).toFixed(1)}T target
                 </div>
               </CardContent>
             </Card>
@@ -147,10 +162,10 @@ function ReportsPage() {
                 <div className="text-xs uppercase text-muted-foreground font-medium">Quality</div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
                   <FlaskConical className="size-5 text-success" />
-                  {data.qualitySummary.passRate}% pass
+                  {qual.passRate ?? 0}% pass
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {data.qualitySummary.testsConducted} tests conducted
+                  {qual.testsConducted ?? 0} tests conducted
                 </div>
               </CardContent>
             </Card>
@@ -159,11 +174,10 @@ function ReportsPage() {
                 <div className="text-xs uppercase text-muted-foreground font-medium">Dispatch</div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
                   <Truck className="size-5 text-primary" />
-                  {data.dispatchSummary.delivered} delivered
+                  {disp.delivered ?? 0} delivered
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  {data.dispatchSummary.pending} pending · {data.dispatchSummary.inTransit} in
-                  transit
+                  {disp.pending ?? 0} pending · {disp.inTransit ?? 0} in transit
                 </div>
               </CardContent>
             </Card>
@@ -172,10 +186,10 @@ function ReportsPage() {
                 <div className="text-xs uppercase text-muted-foreground font-medium">Financial</div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
                   <IndianRupee className="size-5 text-primary" />₹
-                  {(data.financialSummary.salesTotal / 10000000).toFixed(2)}Cr
+                  {((fin.salesTotal ?? 0) / 10000000).toFixed(2)}Cr
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  GST: ₹{(data.financialSummary.gstCollected / 100000).toFixed(2)}L
+                  GST: ₹{((fin.gstCollected ?? 0) / 100000).toFixed(2)}L
                 </div>
               </CardContent>
             </Card>
@@ -279,7 +293,7 @@ function ReportsPage() {
                     Sales (Total)
                   </div>
                   <div className="text-xl font-semibold mt-1">
-                    ₹{(data.financialSummary.salesTotal / 100000).toFixed(2)}L
+                    ₹{((fin.salesTotal ?? 0) / 100000).toFixed(2)}L
                   </div>
                 </div>
                 <div className="rounded-lg border p-4">
@@ -287,7 +301,7 @@ function ReportsPage() {
                     Purchases
                   </div>
                   <div className="text-xl font-semibold mt-1">
-                    ₹{(data.financialSummary.purchaseTotal / 100000).toFixed(2)}L
+                    ₹{((fin.purchaseTotal ?? 0) / 100000).toFixed(2)}L
                   </div>
                 </div>
                 <div className="rounded-lg border p-4">
@@ -295,7 +309,7 @@ function ReportsPage() {
                     Receivables
                   </div>
                   <div className="text-xl font-semibold mt-1 text-destructive">
-                    ₹{(data.financialSummary.receivablesOutstanding / 100000).toFixed(2)}L
+                    ₹{((fin.receivablesOutstanding ?? 0) / 100000).toFixed(2)}L
                   </div>
                 </div>
                 <div className="rounded-lg border p-4">
@@ -303,7 +317,7 @@ function ReportsPage() {
                     GST Collected
                   </div>
                   <div className="text-xl font-semibold mt-1">
-                    ₹{(data.financialSummary.gstCollected / 100000).toFixed(2)}L
+                    ₹{((fin.gstCollected ?? 0) / 100000).toFixed(2)}L
                   </div>
                 </div>
               </div>
