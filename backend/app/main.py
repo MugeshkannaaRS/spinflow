@@ -44,7 +44,7 @@ app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.parsed_cors_origins,
-    allow_origin_regex=r"^https://.*\.ngrok(?:-free)?\.dev$",
+    allow_origin_regex=r"^https://(.*\.ngrok(?:-free)?\.dev|.*\.onrender\.com)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -57,7 +57,9 @@ app.add_middleware(
         "127.0.0.1",
         "::1",
         "spinflow.local",
+        "spinflow.onrender.com",
         "*.spinflow.in",
+        "*.onrender.com",
         "*.ngrok.io",
         "*.ngrok-free.dev",
     ],

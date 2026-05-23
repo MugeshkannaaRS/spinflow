@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://:X8kLm9pQ4rT2vB6nW1cY3zA7eR5fH0jG@localhost:6379/0"
 
     # CORS — production only, no wildcard; allow local dev and ngrok during development
-    CORS_ORIGINS: str = "https://millflow.yourdomain.com,http://localhost:5173,http://127.0.0.1:5173,https://*.ngrok.io,https://*.ngrok-free.dev"
+    CORS_ORIGINS: str = "https://spinflow.onrender.com,http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173,https://*.ngrok.io,https://*.ngrok-free.dev"
 
     @property
     def parsed_cors_origins(self) -> List[str]:
