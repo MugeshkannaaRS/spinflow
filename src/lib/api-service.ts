@@ -67,7 +67,7 @@ export const inventoryApi = {
 
 // Dispatch
 export const dispatchApi = {
-  getOrders: () => api.get("/dispatch/orders").then((r) => r.data),
+  getOrders: () => api.get("/dispatch/orders").then(extractList),
   createOrder: (data: any) => api.post("/dispatch/orders", data).then((r) => r.data),
   updateStatus: (id: string, data: any) =>
     api.put(`/dispatch/orders/${id}/status`, data).then((r) => r.data),
@@ -75,10 +75,10 @@ export const dispatchApi = {
 
 // Purchase
 export const purchaseApi = {
-  getPurchases: () => api.get("/purchase/purchases").then((r) => r.data),
+  getPurchases: () => api.get("/purchase/purchases").then(extractList),
   createPurchase: (data: any) => api.post("/purchase/purchases", data).then((r) => r.data),
-  getSuppliers: () => api.get("/purchase/suppliers").then((r) => r.data),
-  getGRNs: () => api.get("/purchase/grns").then((r) => r.data),
+  getSuppliers: () => api.get("/purchase/suppliers").then(extractList),
+  getGRNs: () => api.get("/purchase/grns").then(extractList),
 };
 
 // Stores
@@ -107,8 +107,8 @@ export const hrApi = {
 
 // Accounts
 export const accountsApi = {
-  getInvoices: () => api.get("/accounts/invoices").then((r) => r.data),
-  getReceivables: () => api.get("/accounts/receivables").then((r) => r.data),
+  getInvoices: () => api.get("/accounts/invoices").then(extractList),
+  getReceivables: () => api.get("/accounts/receivables").then(extractList),
 };
 
 // Maintenance
@@ -151,7 +151,7 @@ export const usersApi = {
 
 // Audit
 export const auditApi = {
-  getLogs: (params?: any) => api.get("/audit/logs", { params }).then((r) => r.data),
+  getLogs: (params?: any) => api.get("/audit/logs", { params }).then(extractList),
 };
 
 // Stock Ledger

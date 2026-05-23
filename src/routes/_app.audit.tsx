@@ -46,6 +46,21 @@ function AuditPage() {
     setFilteredLogs(logs);
   }, [logs]);
 
+  if (logsQ.isLoading)
+    return (
+      <>
+        <Topbar title="Audit Logs" subtitle="Loading..." />
+        <div className="p-6 text-sm text-muted-foreground">Loading data…</div>
+      </>
+    );
+  if (logsQ.isError)
+    return (
+      <>
+        <Topbar title="Audit Logs" subtitle="Error" />
+        <div className="p-6 text-sm text-destructive">Error loading data.</div>
+      </>
+    );
+
   const totalLogs = logs.length;
   const loginActions = logs.filter((l) => l.action === "login" || l.action === "logout").length;
   const createActions = logs.filter((l) => l.action === "create").length;

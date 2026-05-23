@@ -57,7 +57,13 @@ function ReportsPage() {
   };
 
   if (!user) return null;
-  if (!data) return null;
+  if (
+    !data?.productionSummary ||
+    !data?.qualitySummary ||
+    !data?.dispatchSummary ||
+    !data?.financialSummary
+  )
+    return null;
 
   const summaryData = [
     {
