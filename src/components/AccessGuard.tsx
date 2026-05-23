@@ -18,8 +18,8 @@ export function AccessGuard({ module, children }: AccessGuardProps) {
       <AlertTriangle className="size-10" />
       <p className="text-lg font-medium">Access Restricted</p>
       <p className="text-sm text-center max-w-md">
-        Your role ({user.role}) does not have access to this module.
-        Contact your administrator if you need access.
+        Your role ({user.role}) does not have access to this module. Contact your administrator if
+        you need access.
       </p>
     </div>
   );

@@ -22,8 +22,8 @@ export function ModuleStub({
             </div>
             <h2 className="text-xl font-semibold tracking-tight">Module ready for build-out</h2>
             <p className="text-sm text-muted-foreground mt-2">
-              Auth, RBAC and module-level access are already wired. Build this module
-              with the patterns from the Production module.
+              Auth, RBAC and module-level access are already wired. Build this module with the
+              patterns from the Production module.
             </p>
             <div className="mt-6 grid grid-cols-2 gap-2 text-left">
               {features.map((f) => (

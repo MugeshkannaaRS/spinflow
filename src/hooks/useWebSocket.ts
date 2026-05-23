@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuth } from "@/stores/auth";
 
@@ -52,7 +51,9 @@ export function useWebSocket() {
   >(null);
   const [notifications, setNotifications] = useState<NotificationPayload[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [lastWrongDestination, setLastWrongDestination] = useState<WrongDestinationPayload | null>(null);
+  const [lastWrongDestination, setLastWrongDestination] = useState<WrongDestinationPayload | null>(
+    null,
+  );
 
   const wsRef = useRef<WebSocket | null>(null);
   const isMountedRef = useRef(true);
@@ -123,9 +124,7 @@ export function useWebSocket() {
             id:
               data.id || data.dispatch_no || data.lot_no || data.machine_code || String(Date.now()),
             title: data.type,
-            message:
-              data.message || data.reason || data.item || JSON.stringify(data).
-                slice(0, 200),
+            message: data.message || data.reason || data.item || JSON.stringify(data).slice(0, 200),
             type: "info",
             module: (data.type || "").split(".")[0],
             created_at: new Date().toISOString(),

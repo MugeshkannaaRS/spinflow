@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usersApi } from "@/lib/api-service";
 import { ROLES, ROLE_LABELS } from "@/lib/rbac";
+import type { Role } from "@/lib/rbac";
+import { AccessGuard } from "@/components/AccessGuard";
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -58,7 +60,6 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Role } from "@/lib/rbac";
 
 export const Route = createFileRoute("/_app/users")({
   head: () => ({ meta: [{ title: "Users & Roles — SpinFlow ERP" }] }),
@@ -69,7 +70,8 @@ const ROLE_DESCRIPTIONS: Record<string, string> = {
   SUPER_ADMIN: "Full system access. Create users, manage masters, configure all modules.",
   MILL_OWNER: "View reports, stock, sales. Read-only access to other modules.",
   GENERAL_MANAGER: "Manage production, quality, dispatch, maintenance. View HR/accounts read-only.",
-  PRODUCTION_MANAGER: "Shift entries, machine management, downtime logging. View quality/inventory.",
+  PRODUCTION_MANAGER:
+    "Shift entries, machine management, downtime logging. View quality/inventory.",
   QUALITY_MANAGER: "Quality tests, lot approvals, CSP tracking. View production/inventory.",
   DISPATCH_MANAGER: "Trips, loading, delivery confirmation. View inventory/stock/sales.",
   STORE_MANAGER: "Store inventory, spare parts, stock management. View purchases.",
@@ -99,7 +101,15 @@ const ROLE_BADGE_COLORS: Record<string, string> = {
   AUDITOR: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400",
 };
 
-const INITIAL_FORM = { full_name: "", email: "", password: "", confirmPassword: "", role: "SUPERVISOR" as string, department: "", mobile: "" };
+const INITIAL_FORM = {
+  full_name: "",
+  email: "",
+  password: "",
+  confirmPassword: "",
+  role: "SUPERVISOR" as string,
+  department: "",
+  mobile: "",
+};
 
 function generatePassword() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
@@ -110,7 +120,12 @@ function generatePassword() {
 
 function UsersPage() {
   const qc = useQueryClient();
-  const usersQ = useQuery({ queryKey: ["system-users"], queryFn: usersApi.list });
+  const usersQ = useQuery({
+    queryKey: ["system-users"],
+    queryFn: usersApi.list,
+    staleTime: 60_000,
+    retry: 1,
+  });
   const users: any[] = usersQ.data ?? [];
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -233,7 +248,9 @@ function UsersPage() {
             <SheetHeader>
               <SheetTitle>{editingUser ? "Edit User" : "Create New User"}</SheetTitle>
               <SheetDescription>
-                {editingUser ? "Update user details and role." : "Fill in the details to create a new user."}
+                {editingUser
+                  ? "Update user details and role."
+                  : "Fill in the details to create a new user."}
               </SheetDescription>
             </SheetHeader>
             <div className="space-y-4 mt-6">
@@ -292,7 +309,11 @@ function UsersPage() {
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground cursor-pointer"
                         onClick={() => setShowConfirmPwd(!showConfirmPwd)}
                       >
-                        {showConfirmPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        {showConfirmPwd ? (
+                          <EyeOff className="size-4" />
+                        ) : (
+                          <Eye className="size-4" />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -300,16 +321,15 @@ function UsersPage() {
               )}
               <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
-                <Select
-                  value={form.role}
-                  onValueChange={(v) => setForm({ ...form, role: v })}
-                >
+                <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
                   <SelectTrigger id="role">
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(ROLES).map(([key, val]) => (
-                      <SelectItem key={key} value={key}>{val.label}</SelectItem>
+                    {ROLES.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {ROLE_LABELS[role]}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -343,7 +363,11 @@ function UsersPage() {
               <Button
                 className="w-full cursor-pointer"
                 onClick={handleSubmit}
-                disabled={createMutation.isPending || updateMutation.isPending || !!(!editingUser && form.password !== form.confirmPassword)}
+                disabled={
+                  createMutation.isPending ||
+                  updateMutation.isPending ||
+                  !!(!editingUser && form.password !== form.confirmPassword)
+                }
               >
                 {editingUser ? "Update User" : "Create User"}
               </Button>
@@ -352,11 +376,13 @@ function UsersPage() {
         </Sheet>
       </Topbar>
       <AccessGuard module="users">
-        <div className="p-6 space-y-6">
-          <div className="grid gap-4 md:grid-cols-4">
+        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Users</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total Users
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{users.length}</div>
@@ -364,7 +390,9 @@ function UsersPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Active Users</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Active Users
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{activeUsers}</div>
@@ -380,7 +408,9 @@ function UsersPage() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Inactive</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Inactive
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{users.length - activeUsers}</div>
@@ -393,96 +423,106 @@ function UsersPage() {
               <CardTitle>All Users</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.length === 0 && (
+              <div className="w-full overflow-x-auto">
+                <Table className="min-w-[640px] w-full">
+                  <TableHeader>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                        No users found. Create your first user.
-                      </TableCell>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  )}
-                  {users.map((user: any) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.full_name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>
-                        <Badge className={cn("font-medium", ROLE_BADGE_COLORS[user.role] ?? "")}>
-                          {ROLES[user.role]?.label ?? user.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{user.department ?? "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant={user.is_active ? "default" : "secondary"}>
-                          {user.is_active ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEdit(user)}
-                            title="Edit"
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => deactivateMutation.mutate(user.id)}
-                            title={user.is_active ? "Deactivate" : "Reactivate"}
-                          >
-                            {user.is_active ? <ToggleRight className="size-4 text-destructive" /> : <ToggleLeft className="size-4 text-green-600" />}
-                          </Button>
-                          {user.is_active && (
+                  </TableHeader>
+                  <TableBody>
+                    {users.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                          No users found. Create your first user.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {users.map((user: any) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.full_name}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>
+                          <Badge className={cn("font-medium", ROLE_BADGE_COLORS[user.role] ?? "")}>
+                            {ROLE_LABELS[user.role as Role] ?? user.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{user.department ?? "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant={user.is_active ? "default" : "secondary"}>
+                            {user.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleResetPwd(user)}
-                              title="Reset Password"
+                              onClick={() => openEdit(user)}
+                              title="Edit"
                             >
-                              <KeyRound className="size-4" />
+                              <Pencil className="size-4" />
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => deactivateMutation.mutate(user.id)}
+                              title={user.is_active ? "Deactivate" : "Reactivate"}
+                            >
+                              {user.is_active ? (
+                                <ToggleRight className="size-4 text-destructive" />
+                              ) : (
+                                <ToggleLeft className="size-4 text-green-600" />
+                              )}
+                            </Button>
+                            {user.is_active && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleResetPwd(user)}
+                                title="Reset Password"
+                              >
+                                <KeyRound className="size-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </div>
 
         <Dialog open={!!successDialog} onOpenChange={(open) => !open && setSuccessDialog(null)}>
-          <DialogContent>
+          <DialogContent className="w-full max-w-lg mx-4 overflow-y-auto max-h-[90vh]">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Check className="size-5 text-green-600" />
                 User Created Successfully
               </DialogTitle>
-              <DialogDescription>
-                Share these credentials with the user.
-              </DialogDescription>
+              <DialogDescription>Share these credentials with the user.</DialogDescription>
             </DialogHeader>
             {successDialog && (
               <div className="space-y-3 mt-2">
                 <div>
                   <Label>Email</Label>
                   <div className="flex items-center gap-2 mt-1">
-                    <code className="flex-1 px-3 py-2 rounded bg-muted text-sm">{successDialog.user.email ?? successDialog.user.email}</code>
-                    <Button variant="outline" size="icon" onClick={() => copyToClipboard(successDialog.user.email)}>
+                    <code className="flex-1 px-3 py-2 rounded bg-muted text-sm">
+                      {successDialog.user.email ?? successDialog.user.email}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => copyToClipboard(successDialog.user.email)}
+                    >
                       <Copy className="size-4" />
                     </Button>
                   </div>
@@ -490,8 +530,14 @@ function UsersPage() {
                 <div>
                   <Label>Password</Label>
                   <div className="flex items-center gap-2 mt-1">
-                    <code className="flex-1 px-3 py-2 rounded bg-muted text-sm">{successDialog.password}</code>
-                    <Button variant="outline" size="icon" onClick={() => copyToClipboard(successDialog.password)}>
+                    <code className="flex-1 px-3 py-2 rounded bg-muted text-sm">
+                      {successDialog.password}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => copyToClipboard(successDialog.password)}
+                    >
                       <Copy className="size-4" />
                     </Button>
                   </div>
@@ -506,7 +552,7 @@ function UsersPage() {
         </Dialog>
 
         <Dialog open={!!resetDialog} onOpenChange={(open) => !open && setResetDialog(null)}>
-          <DialogContent>
+          <DialogContent className="w-full max-w-lg mx-4 overflow-y-auto max-h-[90vh]">
             <DialogHeader>
               <DialogTitle>Reset Password</DialogTitle>
               <DialogDescription>
@@ -518,8 +564,14 @@ function UsersPage() {
                 <div>
                   <Label>New Password</Label>
                   <div className="flex items-center gap-2 mt-1">
-                    <code className="flex-1 px-3 py-2 rounded bg-muted text-sm">{resetDialog.password}</code>
-                    <Button variant="outline" size="icon" onClick={() => copyToClipboard(resetDialog.password)}>
+                    <code className="flex-1 px-3 py-2 rounded bg-muted text-sm">
+                      {resetDialog.password}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => copyToClipboard(resetDialog.password)}
+                    >
                       <Copy className="size-4" />
                     </Button>
                   </div>
@@ -528,7 +580,10 @@ function UsersPage() {
                   <Button variant="outline" className="flex-1" onClick={() => setResetDialog(null)}>
                     Cancel
                   </Button>
-                  <Button className="flex-1" onClick={() => confirmResetPwd(resetDialog.user.id, resetDialog.password)}>
+                  <Button
+                    className="flex-1"
+                    onClick={() => confirmResetPwd(resetDialog.user.id, resetDialog.password)}
+                  >
                     Confirm Reset
                   </Button>
                 </div>

@@ -1,11 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import {
-  LayoutDashboard,
-  MapPin,
-  Factory,
-  FlaskConical,
-  Grid3X3,
-} from "lucide-react";
+import { LayoutDashboard, MapPin, Factory, FlaskConical, Grid3X3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [

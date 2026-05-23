@@ -72,9 +72,16 @@ export function FileUpload({
   return (
     <div className="space-y-2">
       <div
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
         onDragLeave={() => setDragging(false)}
-        onDrop={(e) => { e.preventDefault(); setDragging(false); handleFiles(e.dataTransfer.files); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          handleFiles(e.dataTransfer.files);
+        }}
         onClick={() => inputRef.current?.click()}
         className={cn(
           "border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-colors",
@@ -94,9 +101,7 @@ export function FileUpload({
           disabled={disabled}
         />
         <Upload className="size-5 mx-auto mb-1 text-muted-foreground" />
-        <p className="text-xs text-muted-foreground">
-          Drop files here or click to browse
-        </p>
+        <p className="text-xs text-muted-foreground">Drop files here or click to browse</p>
         <p className="text-[10px] text-muted-foreground/60 mt-0.5">
           PDF, CSV, Excel, images (max 10MB)
         </p>
@@ -112,13 +117,14 @@ export function FileUpload({
               >
                 <Icn className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate flex-1">{f.file.name}</span>
-                <span className="text-muted-foreground shrink-0">
-                  {formatSize(f.file.size)}
-                </span>
+                <span className="text-muted-foreground shrink-0">{formatSize(f.file.size)}</span>
                 {!disabled && (
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); removeFile(f.id); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile(f.id);
+                    }}
                     className="shrink-0 text-muted-foreground hover:text-destructive"
                   >
                     <X className="size-3" />

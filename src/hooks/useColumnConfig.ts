@@ -53,8 +53,7 @@ export function useColumnConfig(module: string, tableKey: string) {
   });
 
   const mutation = useMutation({
-    mutationFn: (columns: ColumnDef[]) =>
-      saveColumnConfig(millId, module, tableKey, columns),
+    mutationFn: (columns: ColumnDef[]) => saveColumnConfig(millId, module, tableKey, columns),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["column-config", millId, module, tableKey] });
     },
@@ -62,7 +61,10 @@ export function useColumnConfig(module: string, tableKey: string) {
 
   const columns = query.data ?? [];
   const visibleKeys = new Set(
-    columns.filter((c) => c.visible).sort((a, b) => a.order - b.order).map((c) => c.key),
+    columns
+      .filter((c) => c.visible)
+      .sort((a, b) => a.order - b.order)
+      .map((c) => c.key),
   );
 
   return {

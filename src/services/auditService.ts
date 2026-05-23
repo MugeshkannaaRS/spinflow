@@ -13,5 +13,7 @@ export interface AuditLog {
 }
 
 export function getRecentAuditLogs(params: { limit?: number; module?: string }) {
-  return api.get("/audit/logs", { params }).then((r) => r.data as { data: AuditLog[]; total: number });
+  return api
+    .get("/audit/logs", { params })
+    .then((r) => r.data as { data: AuditLog[]; total: number });
 }

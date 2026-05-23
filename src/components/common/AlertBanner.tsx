@@ -81,7 +81,13 @@ export function AlertBanner() {
     <div className="fixed top-0 left-0 right-0 z-50 flex flex-col items-center pt-2 pointer-events-none">
       <div className="w-full max-w-2xl space-y-2 pointer-events-auto">
         {wrongDestAlerts.map((alert) => {
-          const p = alert.payload as { trip_no?: string; bag_no?: string; lot_no?: string; expected_route?: string; actual_route?: string };
+          const p = alert.payload as {
+            trip_no?: string;
+            bag_no?: string;
+            lot_no?: string;
+            expected_route?: string;
+            actual_route?: string;
+          };
           return (
             <div
               key={alert.id}

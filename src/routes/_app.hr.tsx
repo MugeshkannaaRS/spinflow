@@ -6,6 +6,7 @@ import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -49,8 +50,15 @@ import { FileUpload, type UploadedFile } from "@/components/ui/file-upload";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import {
-  Plus, Users, CalendarCheck, Clock, UserCheck, CheckCircle2, XCircle,
-  ClipboardCheck, UserPlus
+  Plus,
+  Users,
+  CalendarCheck,
+  Clock,
+  UserCheck,
+  CheckCircle2,
+  XCircle,
+  ClipboardCheck,
+  UserPlus,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/hr")({
@@ -98,9 +106,24 @@ function HRPage() {
   const user = useAuth((s) => s.user)!;
   const canEdit = canWrite(user.role, "hr");
   const isAdmin = user.role === "SUPER_ADMIN" || user.role === "MILL_OWNER";
-  const empQ = useQuery({ queryKey: ["employees"], queryFn: hrApi.getEmployees });
-  const attQ = useQuery({ queryKey: ["attendance"], queryFn: hrApi.getAttendance });
-  const leaveQ = useQuery({ queryKey: ["leave-requests"], queryFn: hrApi.getLeaves });
+  const empQ = useQuery({
+    queryKey: ["employees"],
+    queryFn: hrApi.getEmployees,
+    staleTime: 60_000,
+    retry: 1,
+  });
+  const attQ = useQuery({
+    queryKey: ["attendance"],
+    queryFn: hrApi.getAttendance,
+    staleTime: 60_000,
+    retry: 1,
+  });
+  const leaveQ = useQuery({
+    queryKey: ["leave-requests"],
+    queryFn: hrApi.getLeaves,
+    staleTime: 60_000,
+    retry: 1,
+  });
 
   const employees: EmployeeRow[] = empQ.data ?? [];
   const attendance: AttendanceRow[] = attQ.data ?? [];
@@ -114,9 +137,15 @@ function HRPage() {
   const { visibleKeys: leaveVk } = useColumnConfig("hr", "leaves");
   const { visibleKeys: empVk } = useColumnConfig("hr", "employees");
 
-  useEffect(() => { setAttFiltered(attendance); }, [attendance]);
-  useEffect(() => { setLeaveFiltered(leaves); }, [leaves]);
-  useEffect(() => { setEmpFiltered(employees); }, [employees]);
+  useEffect(() => {
+    setAttFiltered((attQ.data ?? []) as AttendanceRow[]);
+  }, [attQ.data]);
+  useEffect(() => {
+    setLeaveFiltered((leaveQ.data ?? []) as LeaveRow[]);
+  }, [leaveQ.data]);
+  useEffect(() => {
+    setEmpFiltered((empQ.data ?? []) as EmployeeRow[]);
+  }, [empQ.data]);
 
   const activeEmployees = employees.filter((e) => e.is_active).length;
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -124,9 +153,7 @@ function HRPage() {
     (a) => a.date === todayStr && a.status === "present",
   ).length;
   const pendingLeaves = leaves.filter((l) => l.status === "pending").length;
-  const todayAbsent = attendance.filter(
-    (a) => a.date === todayStr && a.status === "absent",
-  ).length;
+  const todayAbsent = attendance.filter((a) => a.date === todayStr && a.status === "absent").length;
 
   const attColumns = [
     { key: "date", label: "Date" },
@@ -149,6 +176,21 @@ function HRPage() {
     { key: "is_active", label: "Status" },
   ];
 
+  if (empQ.isLoading)
+    return (
+      <>
+        <Topbar title="Human Resources" subtitle="Loading..." />
+        <div className="p-6 text-sm text-muted-foreground">Loading data…</div>
+      </>
+    );
+  if (empQ.isError)
+    return (
+      <>
+        <Topbar title="Human Resources" subtitle="Error" />
+        <div className="p-6 text-sm text-destructive">Error loading data.</div>
+      </>
+    );
+
   return (
     <>
       <Topbar
@@ -156,193 +198,269 @@ function HRPage() {
         subtitle="Attendance, shift allocation, leave management & payroll"
       />
       <AccessGuard module="hr">
-        <div className="p-6 space-y-6">
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardContent className="p-5">
-              <div className="text-xs uppercase text-muted-foreground font-medium">Active Employees</div>
-              <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                <Users className="size-5 text-primary" />
-                {activeEmployees}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-5">
-              <div className="text-xs uppercase text-muted-foreground font-medium">Present Today</div>
-              <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                <UserCheck className="size-5 text-success" />
-                {todayPresent}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-5">
-              <div className="text-xs uppercase text-muted-foreground font-medium">Pending Leaves</div>
-              <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                <CalendarCheck className="size-5 text-warning" />
-                {pendingLeaves}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-5">
-              <div className="text-xs uppercase text-muted-foreground font-medium">Absent Today</div>
-              <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                <Clock className="size-5 text-destructive" />
-                {todayAbsent}
-              </div>
-            </CardContent>
-          </Card>
+        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+            <Card>
+              <CardContent className="p-5">
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Active Employees
+                </div>
+                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
+                  <Users className="size-5 text-primary" />
+                  {activeEmployees}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5">
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Present Today
+                </div>
+                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
+                  <UserCheck className="size-5 text-success" />
+                  {todayPresent}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5">
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Pending Leaves
+                </div>
+                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
+                  <CalendarCheck className="size-5 text-warning" />
+                  {pendingLeaves}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5">
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Absent Today
+                </div>
+                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
+                  <Clock className="size-5 text-destructive" />
+                  {todayAbsent}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Tabs defaultValue="attendance">
+            <TabsList>
+              <TabsTrigger value="attendance">Attendance</TabsTrigger>
+              <TabsTrigger value="leaves">Leave Requests</TabsTrigger>
+              <TabsTrigger value="employees">Employees</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="attendance">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">Daily Attendance</CardTitle>
+                  <div className="flex gap-1">
+                    {isAdmin && <ColumnConfigurator module="hr" tableKey="attendance" />}
+                    {canEdit && <MarkAttendanceSheet employees={employees} />}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ExcelColumnFilter
+                    data={attendance}
+                    onFilter={setAttFiltered}
+                    columns={attColumns}
+                  />
+                  <div className="w-full overflow-x-auto">
+                    <Table className="min-w-[640px] w-full">
+                      <TableHeader>
+                        <TableRow>
+                          {attVk.has("date") && <TableHead>Date</TableHead>}
+                          {attVk.has("employee_name") && <TableHead>Employee</TableHead>}
+                          {attVk.has("department") && <TableHead>Department</TableHead>}
+                          {attVk.has("shift") && <TableHead>Shift</TableHead>}
+                          {attVk.has("status") && <TableHead>Status</TableHead>}
+                          {attVk.has("check_in") && <TableHead>Check In</TableHead>}
+                          {attVk.has("check_out") && <TableHead>Check Out</TableHead>}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {attFiltered.map((a) => (
+                          <TableRow key={a.id}>
+                            {attVk.has("date") && (
+                              <TableCell className="text-sm">{a.date}</TableCell>
+                            )}
+                            {attVk.has("employee_name") && (
+                              <TableCell className="font-medium">{a.employee_name}</TableCell>
+                            )}
+                            {attVk.has("department") && <TableCell>{a.department}</TableCell>}
+                            {attVk.has("shift") && (
+                              <TableCell>
+                                <Badge variant="outline">{a.shift}</Badge>
+                              </TableCell>
+                            )}
+                            {attVk.has("status") && (
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    a.status === "present"
+                                      ? "default"
+                                      : a.status === "absent"
+                                        ? "destructive"
+                                        : a.status === "half-day"
+                                          ? "secondary"
+                                          : "outline"
+                                  }
+                                >
+                                  {a.status}
+                                </Badge>
+                              </TableCell>
+                            )}
+                            {attVk.has("check_in") && <TableCell>{a.check_in}</TableCell>}
+                            {attVk.has("check_out") && <TableCell>{a.check_out}</TableCell>}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="leaves">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">Leave Requests</CardTitle>
+                  <div className="flex gap-1">
+                    {isAdmin && <ColumnConfigurator module="hr" tableKey="leaves" />}
+                    {canEdit && <NewLeaveDialog employees={employees} />}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ExcelColumnFilter
+                    data={leaves}
+                    onFilter={setLeaveFiltered}
+                    columns={leaveColumns}
+                  />
+                  <div className="w-full overflow-x-auto">
+                    <Table className="min-w-[640px] w-full">
+                      <TableHeader>
+                        <TableRow>
+                          {leaveVk.has("employee_name") && <TableHead>Employee</TableHead>}
+                          {leaveVk.has("department") && <TableHead>Department</TableHead>}
+                          {leaveVk.has("from_date") && <TableHead>From</TableHead>}
+                          {leaveVk.has("to_date") && <TableHead>To</TableHead>}
+                          {leaveVk.has("leave_type") && <TableHead>Type</TableHead>}
+                          {leaveVk.has("reason") && <TableHead>Reason</TableHead>}
+                          {leaveVk.has("status") && <TableHead>Status</TableHead>}
+                          {leaveVk.has("status") && <TableHead>Actions</TableHead>}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {leaveFiltered.map((l) => (
+                          <TableRow key={l.id}>
+                            {leaveVk.has("employee_name") && (
+                              <TableCell className="font-medium">{l.employee_name}</TableCell>
+                            )}
+                            {leaveVk.has("department") && <TableCell>{l.department}</TableCell>}
+                            {leaveVk.has("from_date") && (
+                              <TableCell className="text-sm">{l.from_date}</TableCell>
+                            )}
+                            {leaveVk.has("to_date") && (
+                              <TableCell className="text-sm">{l.to_date}</TableCell>
+                            )}
+                            {leaveVk.has("leave_type") && (
+                              <TableCell>
+                                <Badge variant="outline">{l.leave_type}</Badge>
+                              </TableCell>
+                            )}
+                            {leaveVk.has("reason") && (
+                              <TableCell className="max-w-[200px] truncate">{l.reason}</TableCell>
+                            )}
+                            {leaveVk.has("status") && (
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    l.status === "approved"
+                                      ? "default"
+                                      : l.status === "rejected"
+                                        ? "destructive"
+                                        : "secondary"
+                                  }
+                                >
+                                  {l.status}
+                                </Badge>
+                              </TableCell>
+                            )}
+                            {leaveVk.has("status") && (
+                              <TableCell>
+                                {l.status === "pending" && canEdit && (
+                                  <LeaveActionDialog leave={l} />
+                                )}
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="employees">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">Employee Directory</CardTitle>
+                  <div className="flex gap-1">
+                    {isAdmin && <ColumnConfigurator module="hr" tableKey="employees" />}
+                    {canEdit && <AddEmployeeSheet />}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ExcelColumnFilter
+                    data={employees}
+                    onFilter={setEmpFiltered}
+                    columns={empColumns}
+                  />
+                  <div className="w-full overflow-x-auto">
+                    <Table className="min-w-[640px] w-full">
+                      <TableHeader>
+                        <TableRow>
+                          {empVk.has("code") && <TableHead>Code</TableHead>}
+                          {empVk.has("name") && <TableHead>Name</TableHead>}
+                          {empVk.has("department") && <TableHead>Department</TableHead>}
+                          {empVk.has("role") && <TableHead>Role</TableHead>}
+                          {empVk.has("phone") && <TableHead>Phone</TableHead>}
+                          {empVk.has("is_active") && <TableHead>Status</TableHead>}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {empFiltered.map((e) => (
+                          <TableRow key={e.id}>
+                            {empVk.has("code") && (
+                              <TableCell className="font-mono text-xs">{e.code}</TableCell>
+                            )}
+                            {empVk.has("name") && (
+                              <TableCell className="font-medium">{e.name}</TableCell>
+                            )}
+                            {empVk.has("department") && <TableCell>{e.department}</TableCell>}
+                            {empVk.has("role") && <TableCell>{e.role}</TableCell>}
+                            {empVk.has("phone") && <TableCell>{e.phone}</TableCell>}
+                            {empVk.has("is_active") && (
+                              <TableCell>
+                                <Badge variant={e.is_active ? "default" : "secondary"}>
+                                  {e.is_active ? "active" : "inactive"}
+                                </Badge>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
-
-        <Tabs defaultValue="attendance">
-          <TabsList>
-            <TabsTrigger value="attendance">Attendance</TabsTrigger>
-            <TabsTrigger value="leaves">Leave Requests</TabsTrigger>
-            <TabsTrigger value="employees">Employees</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="attendance">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base">Daily Attendance</CardTitle>
-                <div className="flex gap-1">
-                  {isAdmin && <ColumnConfigurator module="hr" tableKey="attendance" />}
-                  {canEdit && <MarkAttendanceSheet employees={employees} />}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ExcelColumnFilter data={attendance} onFilter={setAttFiltered} columns={attColumns} />
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {attVk.has("date") && <TableHead>Date</TableHead>}
-                      {attVk.has("employee_name") && <TableHead>Employee</TableHead>}
-                      {attVk.has("department") && <TableHead>Department</TableHead>}
-                      {attVk.has("shift") && <TableHead>Shift</TableHead>}
-                      {attVk.has("status") && <TableHead>Status</TableHead>}
-                      {attVk.has("check_in") && <TableHead>Check In</TableHead>}
-                      {attVk.has("check_out") && <TableHead>Check Out</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {attFiltered.map((a) => (
-                      <TableRow key={a.id}>
-                        {attVk.has("date") && <TableCell className="text-sm">{a.date}</TableCell>}
-                        {attVk.has("employee_name") && <TableCell className="font-medium">{a.employee_name}</TableCell>}
-                        {attVk.has("department") && <TableCell>{a.department}</TableCell>}
-                        {attVk.has("shift") && <TableCell><Badge variant="outline">{a.shift}</Badge></TableCell>}
-                        {attVk.has("status") && <TableCell>
-                          <Badge variant={a.status === "present" ? "default" : a.status === "absent" ? "destructive" : a.status === "half-day" ? "secondary" : "outline"}>
-                            {a.status}
-                          </Badge>
-                        </TableCell>}
-                        {attVk.has("check_in") && <TableCell>{a.check_in}</TableCell>}
-                        {attVk.has("check_out") && <TableCell>{a.check_out}</TableCell>}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="leaves">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base">Leave Requests</CardTitle>
-                <div className="flex gap-1">
-                  {isAdmin && <ColumnConfigurator module="hr" tableKey="leaves" />}
-                  {canEdit && <NewLeaveDialog employees={employees} />}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ExcelColumnFilter data={leaves} onFilter={setLeaveFiltered} columns={leaveColumns} />
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {leaveVk.has("employee_name") && <TableHead>Employee</TableHead>}
-                      {leaveVk.has("department") && <TableHead>Department</TableHead>}
-                      {leaveVk.has("from_date") && <TableHead>From</TableHead>}
-                      {leaveVk.has("to_date") && <TableHead>To</TableHead>}
-                      {leaveVk.has("leave_type") && <TableHead>Type</TableHead>}
-                      {leaveVk.has("reason") && <TableHead>Reason</TableHead>}
-                      {leaveVk.has("status") && <TableHead>Status</TableHead>}
-                      {leaveVk.has("status") && <TableHead>Actions</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {leaveFiltered.map((l) => (
-                      <TableRow key={l.id}>
-                        {leaveVk.has("employee_name") && <TableCell className="font-medium">{l.employee_name}</TableCell>}
-                        {leaveVk.has("department") && <TableCell>{l.department}</TableCell>}
-                        {leaveVk.has("from_date") && <TableCell className="text-sm">{l.from_date}</TableCell>}
-                        {leaveVk.has("to_date") && <TableCell className="text-sm">{l.to_date}</TableCell>}
-                        {leaveVk.has("leave_type") && <TableCell><Badge variant="outline">{l.leave_type}</Badge></TableCell>}
-                        {leaveVk.has("reason") && <TableCell className="max-w-[200px] truncate">{l.reason}</TableCell>}
-                        {leaveVk.has("status") && <TableCell>
-                          <Badge variant={l.status === "approved" ? "default" : l.status === "rejected" ? "destructive" : "secondary"}>
-                            {l.status}
-                          </Badge>
-                        </TableCell>}
-                        {leaveVk.has("status") && <TableCell>
-                          {l.status === "pending" && canEdit && (
-                            <LeaveActionDialog leave={l} />
-                          )}
-                        </TableCell>}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="employees">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-base">Employee Directory</CardTitle>
-                <div className="flex gap-1">
-                  {isAdmin && <ColumnConfigurator module="hr" tableKey="employees" />}
-                  {canEdit && <AddEmployeeSheet />}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ExcelColumnFilter data={employees} onFilter={setEmpFiltered} columns={empColumns} />
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {empVk.has("code") && <TableHead>Code</TableHead>}
-                      {empVk.has("name") && <TableHead>Name</TableHead>}
-                      {empVk.has("department") && <TableHead>Department</TableHead>}
-                      {empVk.has("role") && <TableHead>Role</TableHead>}
-                      {empVk.has("phone") && <TableHead>Phone</TableHead>}
-                      {empVk.has("is_active") && <TableHead>Status</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {empFiltered.map((e) => (
-                      <TableRow key={e.id}>
-                        {empVk.has("code") && <TableCell className="font-mono text-xs">{e.code}</TableCell>}
-                        {empVk.has("name") && <TableCell className="font-medium">{e.name}</TableCell>}
-                        {empVk.has("department") && <TableCell>{e.department}</TableCell>}
-                        {empVk.has("role") && <TableCell>{e.role}</TableCell>}
-                        {empVk.has("phone") && <TableCell>{e.phone}</TableCell>}
-                        {empVk.has("is_active") && <TableCell>
-                          <Badge variant={e.is_active ? "default" : "secondary"}>
-                            {e.is_active ? "active" : "inactive"}
-                          </Badge>
-                        </TableCell>}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
       </AccessGuard>
     </>
   );
@@ -363,9 +481,7 @@ function MarkAttendanceSheet({ employees }: { employees: EmployeeRow[] }) {
   );
 
   const filteredEmps = useMemo(
-    () => deptFilter === "all"
-      ? employees
-      : employees.filter((e) => e.department === deptFilter),
+    () => (deptFilter === "all" ? employees : employees.filter((e) => e.department === deptFilter)),
     [employees, deptFilter],
   );
 
@@ -426,11 +542,15 @@ function MarkAttendanceSheet({ employees }: { employees: EmployeeRow[] }) {
             <div className="space-y-1.5">
               <Label>Department</Label>
               <Select value={deptFilter} onValueChange={setDeptFilter}>
-                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Departments</SelectItem>
                   {departments.map((d) => (
-                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                    <SelectItem key={d} value={d}>
+                      {d}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -438,38 +558,44 @@ function MarkAttendanceSheet({ employees }: { employees: EmployeeRow[] }) {
           </div>
 
           <div className="border rounded-md max-h-80 overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8">#</TableHead>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredEmps.map((emp, i) => (
-                  <TableRow key={emp.id}>
-                    <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
-                    <TableCell className="font-medium">{emp.name}</TableCell>
-                    <TableCell>{emp.department}</TableCell>
-                    <TableCell>
-                      <Select
-                        value={records[emp.id] ?? "present"}
-                        onValueChange={(v) => setRecords((prev) => ({ ...prev, [emp.id]: v }))}
-                      >
-                        <SelectTrigger className="w-32 h-8"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {STATUS_OPTIONS.map((s) => (
-                            <SelectItem key={s} value={s}>{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
+            <div className="w-full overflow-x-auto">
+              <Table className="min-w-[640px] w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8">#</TableHead>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filteredEmps.map((emp, i) => (
+                    <TableRow key={emp.id}>
+                      <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
+                      <TableCell className="font-medium">{emp.name}</TableCell>
+                      <TableCell>{emp.department}</TableCell>
+                      <TableCell>
+                        <Select
+                          value={records[emp.id] ?? "present"}
+                          onValueChange={(v) => setRecords((prev) => ({ ...prev, [emp.id]: v }))}
+                        >
+                          <SelectTrigger className="w-32 h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATUS_OPTIONS.map((s) => (
+                              <SelectItem key={s} value={s}>
+                                {s}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </div>
         <SheetFooter>
@@ -532,8 +658,13 @@ function NewLeaveDialog({ employees }: { employees: EmployeeRow[] }) {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Employee</Label>
-              <Select value={form.employee_id} onValueChange={(v) => setForm({ ...form, employee_id: v })}>
-                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+              <Select
+                value={form.employee_id}
+                onValueChange={(v) => setForm({ ...form, employee_id: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select employee" />
+                </SelectTrigger>
                 <SelectContent>
                   {employees.map((emp) => (
                     <SelectItem key={emp.id} value={emp.id}>
@@ -545,8 +676,13 @@ function NewLeaveDialog({ employees }: { employees: EmployeeRow[] }) {
             </div>
             <div className="space-y-1.5">
               <Label>Leave Type</Label>
-              <Select value={form.leave_type} onValueChange={(v) => setForm({ ...form, leave_type: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={form.leave_type}
+                onValueChange={(v) => setForm({ ...form, leave_type: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="CL">Casual Leave (CL)</SelectItem>
                   <SelectItem value="SL">Sick Leave (SL)</SelectItem>
@@ -557,11 +693,19 @@ function NewLeaveDialog({ employees }: { employees: EmployeeRow[] }) {
             </div>
             <div className="space-y-1.5">
               <Label>From date</Label>
-              <Input type="date" value={form.from_date} onChange={(e) => setForm({ ...form, from_date: e.target.value })} />
+              <Input
+                type="date"
+                value={form.from_date}
+                onChange={(e) => setForm({ ...form, from_date: e.target.value })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>To date</Label>
-              <Input type="date" value={form.to_date} onChange={(e) => setForm({ ...form, to_date: e.target.value })} />
+              <Input
+                type="date"
+                value={form.to_date}
+                onChange={(e) => setForm({ ...form, to_date: e.target.value })}
+              />
             </div>
             <div className="space-y-1.5 col-span-2">
               <Label>Reason</Label>
@@ -595,23 +739,25 @@ function LeaveActionDialog({ leave }: { leave: LeaveRow }) {
   const [remarks, setRemarks] = useState("");
 
   const approveM = useMutation({
-    mutationFn: () => hrApi.approveOrRejectLeave({
-      id: leave.id,
-      leave_id: leave.id,
-      action: "approved",
-      approved_by: user.name,
-      remarks,
-    }),
+    mutationFn: () =>
+      hrApi.approveOrRejectLeave({
+        id: leave.id,
+        leave_id: leave.id,
+        action: "approved",
+        approved_by: user.name,
+        remarks,
+      }),
   });
 
   const rejectM = useMutation({
-    mutationFn: () => hrApi.approveOrRejectLeave({
-      id: leave.id,
-      leave_id: leave.id,
-      action: "rejected",
-      approved_by: user.name,
-      remarks,
-    }),
+    mutationFn: () =>
+      hrApi.approveOrRejectLeave({
+        id: leave.id,
+        leave_id: leave.id,
+        action: "rejected",
+        approved_by: user.name,
+        remarks,
+      }),
   });
 
   const handleAction = (action: "approved" | "rejected") => {
@@ -646,10 +792,18 @@ function LeaveActionDialog({ leave }: { leave: LeaveRow }) {
         </DialogHeader>
         <div className="space-y-3 py-2">
           <div className="text-sm space-y-1">
-            <p><strong>Employee:</strong> {leave.employee_name}</p>
-            <p><strong>Type:</strong> {leave.leave_type}</p>
-            <p><strong>From:</strong> {leave.from_date} <strong>To:</strong> {leave.to_date}</p>
-            <p><strong>Reason:</strong> {leave.reason}</p>
+            <p>
+              <strong>Employee:</strong> {leave.employee_name}
+            </p>
+            <p>
+              <strong>Type:</strong> {leave.leave_type}
+            </p>
+            <p>
+              <strong>From:</strong> {leave.from_date} <strong>To:</strong> {leave.to_date}
+            </p>
+            <p>
+              <strong>Reason:</strong> {leave.reason}
+            </p>
           </div>
           <div className="space-y-1.5">
             <Label>Remarks (optional)</Label>
@@ -657,7 +811,11 @@ function LeaveActionDialog({ leave }: { leave: LeaveRow }) {
           </div>
         </div>
         <DialogFooter className="gap-2">
-          <Button variant="destructive" onClick={() => handleAction("rejected")} disabled={rejectM.isPending}>
+          <Button
+            variant="destructive"
+            onClick={() => handleAction("rejected")}
+            disabled={rejectM.isPending}
+          >
             {rejectM.isPending ? "…" : "Reject"}
           </Button>
           <Button onClick={() => handleAction("approved")} disabled={approveM.isPending}>
@@ -669,7 +827,15 @@ function LeaveActionDialog({ leave }: { leave: LeaveRow }) {
   );
 }
 
-const DEPARTMENTS = ["Spinning", "Weaving", "Processing", "Packaging", "Maintenance", "Stores", "Admin"];
+const DEPARTMENTS = [
+  "Spinning",
+  "Weaving",
+  "Processing",
+  "Packaging",
+  "Maintenance",
+  "Stores",
+  "Admin",
+];
 const SHIFTS = ["A", "B", "C", "General"];
 
 function AddEmployeeSheet() {
@@ -742,11 +908,18 @@ function AddEmployeeSheet() {
           </div>
           <div className="space-y-1.5">
             <Label>Department *</Label>
-            <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
-              <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+            <Select
+              value={form.department}
+              onValueChange={(v) => setForm({ ...form, department: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select department" />
+              </SelectTrigger>
               <SelectContent>
                 {DEPARTMENTS.map((d) => (
-                  <SelectItem key={d} value={d}>{d}</SelectItem>
+                  <SelectItem key={d} value={d}>
+                    {d}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -762,25 +935,41 @@ function AddEmployeeSheet() {
           <div className="space-y-1.5">
             <Label>Shift</Label>
             <Select value={form.shift} onValueChange={(v) => setForm({ ...form, shift: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 {SHIFTS.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
             <Label>Date of Joining</Label>
-            <Input type="date" value={form.date_of_joining} onChange={(e) => setForm({ ...form, date_of_joining: e.target.value })} />
+            <Input
+              type="date"
+              value={form.date_of_joining}
+              onChange={(e) => setForm({ ...form, date_of_joining: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Phone</Label>
-            <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            <Input
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Daily Wage</Label>
-            <Input type="number" min={0} value={form.daily_wage} onChange={(e) => setForm({ ...form, daily_wage: Number(e.target.value) })} />
+            <Input
+              type="number"
+              min={0}
+              value={form.daily_wage}
+              onChange={(e) => setForm({ ...form, daily_wage: Number(e.target.value) })}
+            />
           </div>
           <SheetFooter>
             <Button type="submit" disabled={m.isPending}>

@@ -34,7 +34,8 @@ const ROLE_CONTENT: Record<string, RoleContent> = {
   },
   PRODUCTION_MANAGER: {
     title: "You manage production data",
-    description: "Your job: Log shift production entries, approve operator entries, manage machines",
+    description:
+      "Your job: Log shift production entries, approve operator entries, manage machines",
     steps: [
       "Monitor daily production across all departments on the Dashboard",
       "Review and approve shift production entries submitted by Supervisors",
@@ -164,10 +165,7 @@ export function RoleGuide() {
 
   if (!user) return null;
 
-  const roleLabel =
-    user.role === "SUPERVISOR"
-      ? "SUPERVISOR"
-      : user.role;
+  const roleLabel = user.role === "SUPERVISOR" ? "SUPERVISOR" : user.role;
 
   const content = ROLE_CONTENT[roleLabel];
   if (!content) return null;
@@ -185,7 +183,10 @@ export function RoleGuide() {
           variant="ghost"
           size="icon"
           className="size-7 shrink-0 -mt-1 -mr-2"
-          onClick={() => { localStorage.setItem(storageKey, "1"); setDismissed(true); }}
+          onClick={() => {
+            localStorage.setItem(storageKey, "1");
+            setDismissed(true);
+          }}
         >
           <X className="size-4" />
         </Button>

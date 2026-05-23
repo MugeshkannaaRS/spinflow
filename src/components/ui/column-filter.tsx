@@ -74,7 +74,10 @@ export function ColumnFilter<T extends Record<string, unknown>>({
       {hasFilter && (
         <button
           type="button"
-          onClick={() => { setFilters({}); onFilter(data); }}
+          onClick={() => {
+            setFilters({});
+            onFilter(data);
+          }}
           className="text-xs text-muted-foreground hover:text-foreground underline"
         >
           Clear all

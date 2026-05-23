@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { api } from "@/lib/api";
 import type { Role } from "@/lib/rbac";
 
@@ -8,20 +7,22 @@ const extractList = (r: any) => (r.data && Array.isArray(r.data.data) ? r.data.d
 // Auth
 export const authApi = {
   login: (email: string, password: string) =>
-    api.post("/auth/login", new URLSearchParams({ username: email, password }), {
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    }).then((r) => ({
-      user: {
-        id: r.data.user.id,
-        name: r.data.user.name,
-        email: r.data.user.email,
-        role: r.data.user.role as Role,
-        millId: r.data.user.mill_id || "m1",
-        millName: r.data.user.mill_name || "SpinFlow Coimbatore Unit-1",
-      },
-      token: r.data.access_token,
-      refreshToken: r.data.refresh_token,
-    })),
+    api
+      .post("/auth/login", new URLSearchParams({ username: email, password }), {
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      })
+      .then((r) => ({
+        user: {
+          id: r.data.user.id,
+          name: r.data.user.name,
+          email: r.data.user.email,
+          role: r.data.user.role as Role,
+          millId: r.data.user.mill_id || "m1",
+          millName: r.data.user.mill_name || "SpinFlow Coimbatore Unit-1",
+        },
+        token: r.data.access_token,
+        refreshToken: r.data.refresh_token,
+      })),
   logout: () => api.post("/auth/logout"),
   refresh: (refreshToken: string) =>
     api.post("/auth/refresh", { refresh_token: refreshToken }).then((r) => r.data),
@@ -84,15 +85,19 @@ export const storesApi = {
 
 // HR
 export const hrApi = {
-  getEmployees: () => api.get("/hr/employees").then((r) => "data" in r.data ? r.data.data : r.data),
+  getEmployees: () =>
+    api.get("/hr/employees").then((r) => ("data" in r.data ? r.data.data : r.data)),
   createEmployee: (data: any) => api.post("/hr/employees", data).then((r) => r.data),
-  getAttendance: () => api.get("/hr/attendance").then((r) => "data" in r.data ? r.data.data : r.data),
+  getAttendance: () =>
+    api.get("/hr/attendance").then((r) => ("data" in r.data ? r.data.data : r.data)),
   createAttendance: (data: any) => api.post("/hr/attendance", data).then((r) => r.data),
   createBulkAttendance: (data: any) => api.post("/hr/attendance/bulk", data).then((r) => r.data),
-  updateAttendance: (id: string, data: any) => api.patch(`/hr/attendance/${id}`, data).then((r) => r.data),
-  getLeaves: () => api.get("/hr/leaves").then((r) => "data" in r.data ? r.data.data : r.data),
+  updateAttendance: (id: string, data: any) =>
+    api.patch(`/hr/attendance/${id}`, data).then((r) => r.data),
+  getLeaves: () => api.get("/hr/leaves").then((r) => ("data" in r.data ? r.data.data : r.data)),
   createLeave: (data: any) => api.post("/hr/leaves", data).then((r) => r.data),
-  approveOrRejectLeave: (data: any) => api.put(`/hr/leaves/${data.id}/action`, data).then((r) => r.data),
+  approveOrRejectLeave: (data: any) =>
+    api.put(`/hr/leaves/${data.id}/action`, data).then((r) => r.data),
 };
 
 // Accounts
@@ -111,7 +116,8 @@ export const maintenanceApi = {
 // Dashboard
 export const dashboardApi = {
   getKpis: (millId: string) => api.get(`/dashboard/kpis?mill_id=${millId}`).then((r) => r.data),
-  getSetupStatus: (millId: string) => api.get(`/dashboard/setup-status?mill_id=${millId}`).then((r) => r.data),
+  getSetupStatus: (millId: string) =>
+    api.get(`/dashboard/setup-status?mill_id=${millId}`).then((r) => r.data),
 };
 
 // Reports
@@ -134,7 +140,8 @@ export const usersApi = {
   create: (data: any) => api.post("/users", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/users/${id}`, data).then((r) => r.data),
   deactivate: (id: string) => api.patch(`/users/${id}/deactivate`).then((r) => r.data),
-  resetPassword: (id: string, data: any) => api.patch(`/users/${id}/reset-password`, data).then((r) => r.data),
+  resetPassword: (id: string, data: any) =>
+    api.patch(`/users/${id}/reset-password`, data).then((r) => r.data),
 };
 
 // Audit
@@ -149,7 +156,9 @@ export const stockApi = {
   getLotHistory: (lotId: string, limit?: number) =>
     api.get(`/stock/lot/${lotId}/history`, { params: { limit } }).then((r) => r.data),
   getLotBalance: (lotId: string, warehouseId: string) =>
-    api.get(`/stock/lot/${lotId}/balance`, { params: { warehouse_id: warehouseId } }).then((r) => r.data),
+    api
+      .get(`/stock/lot/${lotId}/balance`, { params: { warehouse_id: warehouseId } })
+      .then((r) => r.data),
 };
 
 // Sales Orders
@@ -171,12 +180,18 @@ export const loTracApi = {
   getTrip: (tripId: string) => api.get(`/trips/${tripId}`).then((r) => r.data),
   startLoading: (tripId: string) => api.post(`/trips/${tripId}/start-loading`).then((r) => r.data),
   loaderScan: (tripId: string, qrString: string, deviceInfo?: string) =>
-    api.post(`/trips/${tripId}/loader-scan`, { qr_string: qrString, device_info: deviceInfo }).then((r) => r.data),
+    api
+      .post(`/trips/${tripId}/loader-scan`, { qr_string: qrString, device_info: deviceInfo })
+      .then((r) => r.data),
   depart: (tripId: string) => api.post(`/trips/${tripId}/depart`).then((r) => r.data),
   receiverScan: (tripId: string, qrString: string, scannedRouteId?: string, deviceInfo?: string) =>
-    api.post(`/trips/${tripId}/receiver-scan`, {
-      qr_string: qrString, scanned_route_id: scannedRouteId, device_info: deviceInfo,
-    }).then((r) => r.data),
+    api
+      .post(`/trips/${tripId}/receiver-scan`, {
+        qr_string: qrString,
+        scanned_route_id: scannedRouteId,
+        device_info: deviceInfo,
+      })
+      .then((r) => r.data),
   confirmPod: (tripId: string, notes?: string) =>
     api.post(`/trips/${tripId}/confirm-pod`, { notes }).then((r) => r.data),
   getScanLog: (tripId: string) => api.get(`/trips/${tripId}/scan-log`).then((r) => r.data),
@@ -189,12 +204,12 @@ export const payrollApi = {
     api.get("/payroll/months", { params: { mill_id: millId, year } }).then((r) => r.data),
   process: (data: { mill_id: string; month: number; year: number }) =>
     api.post("/payroll/months/process", data).then((r) => r.data),
-  approve: (id: string) =>
-    api.post(`/payroll/months/${id}/approve`).then((r) => r.data),
-  markPaid: (id: string) =>
-    api.post(`/payroll/months/${id}/mark-paid`).then((r) => r.data),
+  approve: (id: string) => api.post(`/payroll/months/${id}/approve`).then((r) => r.data),
+  markPaid: (id: string) => api.post(`/payroll/months/${id}/mark-paid`).then((r) => r.data),
   getPayslips: (id: string, dept?: string) =>
-    api.get(`/payroll/months/${id}/payslips`, { params: dept ? { department: dept } : {} }).then((r) => r.data),
+    api
+      .get(`/payroll/months/${id}/payslips`, { params: dept ? { department: dept } : {} })
+      .then((r) => r.data),
   getEmployeePayslip: (empId: string, month: number, year: number) =>
     api.get(`/payroll/employees/${empId}/payslip`, { params: { month, year } }).then((r) => r.data),
   getSummary: (millId: string, year: number) =>
@@ -212,7 +227,9 @@ export const financeApi = {
   getGST: (millId: string, month: number, year: number) =>
     api.get("/accounts/gst", { params: { mill_id: millId, month, year } }).then((r) => r.data),
   getCOGS: (millId: string, dateFrom: string, dateTo: string) =>
-    api.get("/accounts/cogs", { params: { mill_id: millId, date_from: dateFrom, date_to: dateTo } }).then((r) => r.data),
+    api
+      .get("/accounts/cogs", { params: { mill_id: millId, date_from: dateFrom, date_to: dateTo } })
+      .then((r) => r.data),
 };
 
 // Masters
@@ -221,44 +238,63 @@ export const mastersApi = {
     api.get("/masters/companies", { params: { page, page_size: pageSize } }).then((r) => r.data),
   getCompany: (id: string) => api.get(`/masters/companies/${id}`).then((r) => r.data),
   createCompany: (data: any) => api.post("/masters/companies", data).then((r) => r.data),
-  updateCompany: (id: string, data: any) => api.patch(`/masters/companies/${id}`, data).then((r) => r.data),
+  updateCompany: (id: string, data: any) =>
+    api.patch(`/masters/companies/${id}`, data).then((r) => r.data),
 
   getMills: (companyId?: string, page = 1, pageSize = 20) =>
-    api.get("/masters/mills", { params: { company_id: companyId, page, page_size: pageSize } }).then((r) => r.data),
+    api
+      .get("/masters/mills", { params: { company_id: companyId, page, page_size: pageSize } })
+      .then((r) => r.data),
   getMill: (id: string) => api.get(`/masters/mills/${id}`).then((r) => r.data),
   createMill: (data: any) => api.post("/masters/mills", data).then((r) => r.data),
-  updateMill: (id: string, data: any) => api.patch(`/masters/mills/${id}`, data).then((r) => r.data),
+  updateMill: (id: string, data: any) =>
+    api.patch(`/masters/mills/${id}`, data).then((r) => r.data),
 
   getDepartments: (millId?: string, page = 1, pageSize = 20) =>
-    api.get("/masters/departments", { params: { mill_id: millId, page, page_size: pageSize } }).then((r) => r.data),
+    api
+      .get("/masters/departments", { params: { mill_id: millId, page, page_size: pageSize } })
+      .then((r) => r.data),
   getDepartment: (id: string) => api.get(`/masters/departments/${id}`).then((r) => r.data),
   createDepartment: (data: any) => api.post("/masters/departments", data).then((r) => r.data),
-  updateDepartment: (id: string, data: any) => api.patch(`/masters/departments/${id}`, data).then((r) => r.data),
+  updateDepartment: (id: string, data: any) =>
+    api.patch(`/masters/departments/${id}`, data).then((r) => r.data),
 
   getYarnCounts: (millId?: string, page = 1, pageSize = 20) =>
-    api.get("/masters/yarn-counts", { params: { mill_id: millId, page, page_size: pageSize } }).then((r) => r.data),
+    api
+      .get("/masters/yarn-counts", { params: { mill_id: millId, page, page_size: pageSize } })
+      .then((r) => r.data),
   getYarnCount: (id: string) => api.get(`/masters/yarn-counts/${id}`).then((r) => r.data),
   createYarnCount: (data: any) => api.post("/masters/yarn-counts", data).then((r) => r.data),
-  updateYarnCount: (id: string, data: any) => api.patch(`/masters/yarn-counts/${id}`, data).then((r) => r.data),
+  updateYarnCount: (id: string, data: any) =>
+    api.patch(`/masters/yarn-counts/${id}`, data).then((r) => r.data),
 
   getCustomers: (millId?: string, page = 1, pageSize = 20) =>
-    api.get("/masters/customers", { params: { mill_id: millId, page, page_size: pageSize } }).then((r) => r.data),
+    api
+      .get("/masters/customers", { params: { mill_id: millId, page, page_size: pageSize } })
+      .then((r) => r.data),
   getCustomer: (id: string) => api.get(`/masters/customers/${id}`).then((r) => r.data),
   createCustomer: (data: any) => api.post("/masters/customers", data).then((r) => r.data),
-  updateCustomer: (id: string, data: any) => api.patch(`/masters/customers/${id}`, data).then((r) => r.data),
+  updateCustomer: (id: string, data: any) =>
+    api.patch(`/masters/customers/${id}`, data).then((r) => r.data),
   deactivateCustomer: (id: string) => api.delete(`/masters/customers/${id}`).then((r) => r.data),
 
   getVehicles: (millId?: string, page = 1, pageSize = 20) =>
-    api.get("/masters/vehicles", { params: { mill_id: millId, page, page_size: pageSize } }).then((r) => r.data),
+    api
+      .get("/masters/vehicles", { params: { mill_id: millId, page, page_size: pageSize } })
+      .then((r) => r.data),
   getVehicle: (id: string) => api.get(`/masters/vehicles/${id}`).then((r) => r.data),
   createVehicle: (data: any) => api.post("/masters/vehicles", data).then((r) => r.data),
-  updateVehicle: (id: string, data: any) => api.patch(`/masters/vehicles/${id}`, data).then((r) => r.data),
+  updateVehicle: (id: string, data: any) =>
+    api.patch(`/masters/vehicles/${id}`, data).then((r) => r.data),
 
   getRoutes: (millId?: string, page = 1, pageSize = 20) =>
-    api.get("/masters/routes", { params: { mill_id: millId, page, page_size: pageSize } }).then((r) => r.data),
+    api
+      .get("/masters/routes", { params: { mill_id: millId, page, page_size: pageSize } })
+      .then((r) => r.data),
   getRoute: (id: string) => api.get(`/masters/routes/${id}`).then((r) => r.data),
   createRoute: (data: any) => api.post("/masters/routes", data).then((r) => r.data),
-  updateRoute: (id: string, data: any) => api.patch(`/masters/routes/${id}`, data).then((r) => r.data),
+  updateRoute: (id: string, data: any) =>
+    api.patch(`/masters/routes/${id}`, data).then((r) => r.data),
 };
 
 function downloadBlob(url: string, filename: string) {
@@ -289,22 +325,34 @@ export const exportApi = {
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     const qs = params.toString();
-    return exportDownload(`/exports/production/pdf${qs ? `?${qs}` : ""}`, `production_${new Date().toISOString().slice(0, 10)}.pdf`);
+    return exportDownload(
+      `/exports/production/pdf${qs ? `?${qs}` : ""}`,
+      `production_${new Date().toISOString().slice(0, 10)}.pdf`,
+    );
   },
   productionXlsx: (dateFrom?: string, dateTo?: string) => {
     const params = new URLSearchParams();
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     const qs = params.toString();
-    return exportDownload(`/exports/production/xlsx${qs ? `?${qs}` : ""}`, `production_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    return exportDownload(
+      `/exports/production/xlsx${qs ? `?${qs}` : ""}`,
+      `production_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
   },
   payrollPdf: (payrollMonthId: string, employeeId?: string) => {
     const params = new URLSearchParams({ payroll_month_id: payrollMonthId });
     if (employeeId) params.set("employee_id", employeeId);
-    return exportDownload(`/exports/payroll/pdf?${params.toString()}`, `payroll_${payrollMonthId.slice(0, 8)}.pdf`);
+    return exportDownload(
+      `/exports/payroll/pdf?${params.toString()}`,
+      `payroll_${payrollMonthId.slice(0, 8)}.pdf`,
+    );
   },
   payrollXlsx: (payrollMonthId: string) => {
-    return exportDownload(`/exports/payroll/xlsx?payroll_month_id=${payrollMonthId}`, `payroll_${payrollMonthId.slice(0, 8)}.xlsx`);
+    return exportDownload(
+      `/exports/payroll/xlsx?payroll_month_id=${payrollMonthId}`,
+      `payroll_${payrollMonthId.slice(0, 8)}.xlsx`,
+    );
   },
   dispatchPdf: (status?: string, dateFrom?: string, dateTo?: string) => {
     const params = new URLSearchParams();
@@ -312,10 +360,16 @@ export const exportApi = {
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     const qs = params.toString();
-    return exportDownload(`/exports/dispatch/pdf${qs ? `?${qs}` : ""}`, `dispatch_${new Date().toISOString().slice(0, 10)}.pdf`);
+    return exportDownload(
+      `/exports/dispatch/pdf${qs ? `?${qs}` : ""}`,
+      `dispatch_${new Date().toISOString().slice(0, 10)}.pdf`,
+    );
   },
   gstXlsx: (month: number, year: number) => {
-    return exportDownload(`/exports/gst/xlsx?month=${month}&year=${year}`, `gst_${year}_${String(month).padStart(2, "0")}.xlsx`);
+    return exportDownload(
+      `/exports/gst/xlsx?month=${month}&year=${year}`,
+      `gst_${year}_${String(month).padStart(2, "0")}.xlsx`,
+    );
   },
 };
 
@@ -325,12 +379,13 @@ export const uploadApi = {
     fd.append("entity_type", entityType);
     fd.append("entity_id", entityId);
     fd.append("file", file);
-    return api.post("/upload", fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-    }).then((r) => r.data);
+    return api
+      .post("/upload", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
   },
   listAttachments: (entityType: string, entityId: string) =>
     api.get(`/attachments/${entityType}/${entityId}`).then((r) => r.data),
-  deleteAttachment: (id: string) =>
-    api.delete(`/attachments/${id}`).then((r) => r.data),
+  deleteAttachment: (id: string) => api.delete(`/attachments/${id}`).then((r) => r.data),
 };

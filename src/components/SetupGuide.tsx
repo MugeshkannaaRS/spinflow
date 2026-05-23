@@ -26,14 +26,54 @@ const STEPS: Array<{
   description: string;
   to: string;
 }> = [
-  { key: "departments", title: "Add Departments", description: "Create departments like Blowroom, Carding, Ring Frame, etc.", to: "/masters?tab=departments" },
-  { key: "machines", title: "Add Machines", description: "Register all machines with counts and specifications", to: "/masters?tab=machines" },
-  { key: "shifts", title: "Add Shifts", description: "Define shift timings (General, A, B, C)", to: "/masters?tab=shifts" },
-  { key: "employees", title: "Add Employees", description: "Add employee records with designations and contact info", to: "/hr?tab=employees" },
-  { key: "users", title: "Create User Accounts", description: "Create login accounts and assign roles", to: "/users" },
-  { key: "suppliers", title: "Add Suppliers", description: "Register cotton suppliers with grade and contact details", to: "/purchase?tab=suppliers" },
-  { key: "customers", title: "Add Customers", description: "Add customer companies for yarn sales", to: "/masters?tab=customers" },
-  { key: "warehouses", title: "Add Warehouses", description: "Set up warehouse locations for stock management", to: "/masters?tab=warehouses" },
+  {
+    key: "departments",
+    title: "Add Departments",
+    description: "Create departments like Blowroom, Carding, Ring Frame, etc.",
+    to: "/masters?tab=departments",
+  },
+  {
+    key: "machines",
+    title: "Add Machines",
+    description: "Register all machines with counts and specifications",
+    to: "/masters?tab=machines",
+  },
+  {
+    key: "shifts",
+    title: "Add Shifts",
+    description: "Define shift timings (General, A, B, C)",
+    to: "/masters?tab=shifts",
+  },
+  {
+    key: "employees",
+    title: "Add Employees",
+    description: "Add employee records with designations and contact info",
+    to: "/hr?tab=employees",
+  },
+  {
+    key: "users",
+    title: "Create User Accounts",
+    description: "Create login accounts and assign roles",
+    to: "/users",
+  },
+  {
+    key: "suppliers",
+    title: "Add Suppliers",
+    description: "Register cotton suppliers with grade and contact details",
+    to: "/purchase?tab=suppliers",
+  },
+  {
+    key: "customers",
+    title: "Add Customers",
+    description: "Add customer companies for yarn sales",
+    to: "/masters?tab=customers",
+  },
+  {
+    key: "warehouses",
+    title: "Add Warehouses",
+    description: "Set up warehouse locations for stock management",
+    to: "/masters?tab=warehouses",
+  },
 ];
 
 export function SetupGuide() {
@@ -73,7 +113,9 @@ export function SetupGuide() {
   return (
     <Card className="border-primary/20">
       <CardHeader>
-        <CardTitle className="text-lg">🚀 Setup Checklist — Complete these steps to go live</CardTitle>
+        <CardTitle className="text-lg">
+          🚀 Setup Checklist — Complete these steps to go live
+        </CardTitle>
         <CardDescription>Follow in order. Each step unlocks the next.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -108,7 +150,14 @@ export function SetupGuide() {
               <div className="flex flex-col items-center gap-3 py-4 text-center">
                 <CheckCircle2 className="size-10 text-success" />
                 <p className="text-base font-medium">✅ Setup complete! You're ready to go live.</p>
-                <Button variant="outline" size="sm" onClick={() => { localStorage.setItem(storageKey, "1"); setDismissed(true); }}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    localStorage.setItem(storageKey, "1");
+                    setDismissed(true);
+                  }}
+                >
                   Dismiss
                 </Button>
               </div>
@@ -134,7 +183,9 @@ export function SetupGuide() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium ${done ? "text-muted-foreground line-through" : ""}`}>
+                        <p
+                          className={`text-sm font-medium ${done ? "text-muted-foreground line-through" : ""}`}
+                        >
                           {step.title}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">{step.description}</p>

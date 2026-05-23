@@ -97,11 +97,7 @@ export function useOfflineScanner() {
           }
           return result;
         } catch (e: any) {
-          if (
-            e.code === "ERR_NETWORK" ||
-            e.message?.includes("Network Error") ||
-            !e.response
-          ) {
+          if (e.code === "ERR_NETWORK" || e.message?.includes("Network Error") || !e.response) {
             // network error — fall through to offline
           } else {
             throw e;
@@ -142,11 +138,7 @@ export function useOfflineScanner() {
 
       try {
         if (scan.scan_type === "loader") {
-          await loTracApi.loaderScan(
-            scan.trip_id,
-            scan.qr_string,
-            scan.device_info,
-          );
+          await loTracApi.loaderScan(scan.trip_id, scan.qr_string, scan.device_info);
         } else {
           await loTracApi.receiverScan(
             scan.trip_id,
@@ -158,11 +150,7 @@ export function useOfflineScanner() {
         await removeScan(scan.id!);
         synced++;
       } catch (e: any) {
-        if (
-          e.code === "ERR_NETWORK" ||
-          e.message?.includes("Network Error") ||
-          !e.response
-        ) {
+        if (e.code === "ERR_NETWORK" || e.message?.includes("Network Error") || !e.response) {
           break;
         }
 

@@ -9,16 +9,17 @@ import { ArrowUpDown, X } from "lucide-react";
 interface ColumnDef {
   key: string;
   label: string;
+  placeholder?: string;
 }
 
-interface ExcelColumnFilterProps<T extends Record<string, unknown>> {
+interface ExcelColumnFilterProps<T = any> {
   data: T[];
   onFilter: (filtered: T[]) => void;
   columns: ColumnDef[];
   getValue?: (item: T, key: string) => string;
 }
 
-export function ExcelColumnFilter<T extends Record<string, unknown>>({
+export function ExcelColumnFilter<T = any>({
   data,
   onFilter,
   columns,
@@ -208,10 +209,7 @@ function ColumnFilterDropdown({
               key={val}
               className="flex items-center gap-2 px-1 py-0.5 rounded hover:bg-muted cursor-pointer text-xs"
             >
-              <Checkbox
-                checked={selected.has(val)}
-                onCheckedChange={() => onToggle(val)}
-              />
+              <Checkbox checked={selected.has(val)} onCheckedChange={() => onToggle(val)} />
               <span className="truncate">{val}</span>
             </label>
           ))}

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { ROLE_LABELS } from "@/lib/rbac";
+import { ROLE_LABELS, type Role } from "@/lib/rbac";
 import { Factory } from "lucide-react";
 import { toast } from "sonner";
 
@@ -32,6 +32,8 @@ function LoginPage() {
   const setAuth = useAuth((s) => s.login);
   const [email, setEmail] = useState("admin@spinflow.in");
   const [password, setPassword] = useState("Admin@1234");
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const isLockedOut = failedAttempts >= 5;
 
   const m = useMutation({
     mutationFn: () => authApi.login(email, password),
@@ -67,9 +69,7 @@ function LoginPage() {
             audit-ready, QR-traceable.
           </p>
         </div>
-        <div className="text-xs text-sidebar-foreground/60">
-          v1.0 · SpinFlow ERP
-        </div>
+        <div className="text-xs text-sidebar-foreground/60">v1.0 · SpinFlow ERP</div>
       </div>
 
       <div className="flex items-center justify-center p-6 lg:p-12 bg-background">
@@ -81,16 +81,26 @@ function LoginPage() {
             </p>
           </div>
 
+          {isLockedOut && (
+            <div className="rounded-md bg-destructive/10 border border-destructive/30 p-3 text-sm text-destructive">
+              Too many failed attempts. Please refresh the page to try again.
+            </div>
+          )}
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              if (isLockedOut) return;
               m.mutate(undefined, {
                 onSuccess: (r) => {
+                  setFailedAttempts(0);
                   setAuth(r.user, r.token);
                   toast.success(`Welcome, ${r.user.name}`);
                   navigate({ to: "/dashboard" });
                 },
-                onError: (e: Error) => toast.error(e.message),
+                onError: (e: Error) => {
+                  setFailedAttempts((n) => n + 1);
+                  toast.error(e.message);
+                },
               });
             }}
             className="space-y-4"
@@ -115,7 +125,7 @@ function LoginPage() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={m.isPending}>
+            <Button type="submit" className="w-full" disabled={m.isPending || isLockedOut}>
               {m.isPending ? "Signing in…" : "Sign in"}
             </Button>
           </form>
@@ -147,7 +157,9 @@ function LoginPage() {
                     }}
                     className="w-full text-left py-2 hover:bg-accent rounded px-2 -mx-2 transition-colors"
                   >
-                    <div className="text-sm font-medium">{ROLE_LABELS[d.role]}</div>
+                    <div className="text-sm font-medium">
+                      {ROLE_LABELS[d.role as Role] ?? d.role}
+                    </div>
                     <div className="text-xs text-muted-foreground">{d.email}</div>
                   </button>
                 ))}

@@ -16,13 +16,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -44,8 +38,18 @@ export const Route = createFileRoute("/_app/payroll")({
 });
 
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 const STATUS_COLORS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -64,6 +68,8 @@ function PayrollPage() {
   const summaryQ = useQuery({
     queryKey: ["payroll-summary", user.millId, year],
     queryFn: () => payrollApi.getSummary(user.millId, year),
+    staleTime: 60_000,
+    retry: 1,
   });
 
   const summaryData = summaryQ.data ?? [];
@@ -72,86 +78,101 @@ function PayrollPage() {
     <>
       <Topbar title="Payroll" subtitle="Monthly payroll processing & payslips" />
       <AccessGuard module="payroll">
-        <div className="p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <Label className="shrink-0">Year</Label>
-          <Select
-            value={String(year)}
-            onValueChange={(v) => setYear(Number(v))}
-          >
-            <SelectTrigger className="w-28">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[currentYear, currentYear - 1, currentYear - 2].map((y) => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          <div className="flex items-center gap-3">
+            <Label className="shrink-0">Year</Label>
+            <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+              <SelectTrigger className="w-28">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {[currentYear, currentYear - 1, currentYear - 2].map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList>
-            <TabsTrigger value="months">Monthly Payroll</TabsTrigger>
-            <TabsTrigger value="payslips">Payslips</TabsTrigger>
-          </TabsList>
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList>
+              <TabsTrigger value="months">Monthly Payroll</TabsTrigger>
+              <TabsTrigger value="payslips">Payslips</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="months">
-            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {MONTHS.map((name, idx) => {
-                const m = idx + 1;
-                const pm = summaryData.find((s: any) => s.month === m);
-                return (
-                  <Card key={m} className="relative">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold text-sm">{name}</span>
-                        {pm ? (
-                          <Badge variant={STATUS_COLORS[pm.status] ?? "outline"}>
-                            {pm.status}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline">—</Badge>
-                        )}
-                      </div>
-                      {pm ? (
-                        <div className="space-y-1 text-sm text-muted-foreground">
-                          <div className="flex justify-between">
-                            <span>Net</span>
-                            <span className="font-medium text-foreground">₹{pm.total_net.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Employees</span>
-                            <span>{pm.total_employees}</span>
-                          </div>
+            <TabsContent value="months">
+              <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+                {MONTHS.map((name, idx) => {
+                  const m = idx + 1;
+                  const pm = summaryData.find((s: any) => s.month === m);
+                  return (
+                    <Card key={m} className="relative">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-semibold text-sm">{name}</span>
+                          {pm ? (
+                            <Badge variant={STATUS_COLORS[pm.status] ?? "outline"}>
+                              {pm.status}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">—</Badge>
+                          )}
                         </div>
-                      ) : (
-                        <div className="text-xs text-muted-foreground">Not processed</div>
-                      )}
-                      <div className="mt-3">
-                        <MonthSheet millId={user.millId} month={m} year={year} pm={pm} user={user} />
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </TabsContent>
+                        {pm ? (
+                          <div className="space-y-1 text-sm text-muted-foreground">
+                            <div className="flex justify-between">
+                              <span>Net</span>
+                              <span className="font-medium text-foreground">
+                                ₹{pm.total_net.toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Employees</span>
+                              <span>{pm.total_employees}</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-xs text-muted-foreground">Not processed</div>
+                        )}
+                        <div className="mt-3">
+                          <MonthSheet
+                            millId={user.millId}
+                            month={m}
+                            year={year}
+                            pm={pm}
+                            user={user}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </TabsContent>
 
-          <TabsContent value="payslips">
-            <PayslipsTab millId={user.millId} year={year} />
-          </TabsContent>
-        </Tabs>
-      </div>
+            <TabsContent value="payslips">
+              <PayslipsTab millId={user.millId} year={year} />
+            </TabsContent>
+          </Tabs>
+        </div>
       </AccessGuard>
     </>
   );
 }
 
 function MonthSheet({
-  millId, month, year, pm, user,
+  millId,
+  month,
+  year,
+  pm,
+  user,
 }: {
-  millId: string; month: number; year: number; pm: any; user: any;
+  millId: string;
+  month: number;
+  year: number;
+  pm: any;
+  user: any;
 }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -210,19 +231,42 @@ function MonthSheet({
       </SheetTrigger>
       <SheetContent>
         <SheetHeader>
-          <SheetTitle>{MONTHS[month - 1]} {year}</SheetTitle>
+          <SheetTitle>
+            {MONTHS[month - 1]} {year}
+          </SheetTitle>
         </SheetHeader>
         <div className="mt-6 space-y-4">
           {pm ? (
             <>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span>Status</span><Badge>{pm.status}</Badge></div>
-                <div className="flex justify-between"><span>Gross</span><span>₹{pm.total_gross.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span>Deductions</span><span className="text-destructive">₹{pm.total_deductions.toLocaleString()}</span></div>
-                <div className="flex justify-between font-semibold"><span>Net</span><span>₹{pm.total_net.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span>PF</span><span>₹{pm.total_pf.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span>ESIC</span><span>₹{pm.total_esic.toLocaleString()}</span></div>
-                <div className="flex justify-between"><span>Employees</span><span>{pm.total_employees}</span></div>
+                <div className="flex justify-between">
+                  <span>Status</span>
+                  <Badge>{pm.status}</Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span>Gross</span>
+                  <span>₹{pm.total_gross.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Deductions</span>
+                  <span className="text-destructive">₹{pm.total_deductions.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between font-semibold">
+                  <span>Net</span>
+                  <span>₹{pm.total_net.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>PF</span>
+                  <span>₹{pm.total_pf.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>ESIC</span>
+                  <span>₹{pm.total_esic.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Employees</span>
+                  <span>{pm.total_employees}</span>
+                </div>
               </div>
               <div className="space-y-2 mt-4">
                 {pm.status === "draft" && (
@@ -279,7 +323,11 @@ function MonthSheet({
                     onClick={() => handleExport("PDF", () => exportApi.payrollPdf(pm.id))}
                     disabled={exporting !== null}
                   >
-                    {exporting === "PDF" ? <Loader2 className="size-3 animate-spin mr-1" /> : <Download className="size-3 mr-1" />}
+                    {exporting === "PDF" ? (
+                      <Loader2 className="size-3 animate-spin mr-1" />
+                    ) : (
+                      <Download className="size-3 mr-1" />
+                    )}
                     PDF
                   </Button>
                   <Button
@@ -289,7 +337,11 @@ function MonthSheet({
                     onClick={() => handleExport("XLSX", () => exportApi.payrollXlsx(pm.id))}
                     disabled={exporting !== null}
                   >
-                    {exporting === "XLSX" ? <Loader2 className="size-3 animate-spin mr-1" /> : <Download className="size-3 mr-1" />}
+                    {exporting === "XLSX" ? (
+                      <Loader2 className="size-3 animate-spin mr-1" />
+                    ) : (
+                      <Download className="size-3 mr-1" />
+                    )}
                     XLSX
                   </Button>
                 </div>
@@ -319,6 +371,8 @@ function PayslipsTab({ millId, year }: { millId: string; year: number }) {
   const monthsQ = useQuery({
     queryKey: ["payroll-summary", millId, year],
     queryFn: () => payrollApi.getSummary(millId, year),
+    staleTime: 60_000,
+    retry: 1,
   });
 
   const pm = (monthsQ.data ?? []).find((s: any) => s.month === Number(month));
@@ -328,6 +382,8 @@ function PayslipsTab({ millId, year }: { millId: string; year: number }) {
     queryKey: ["payslips", payrollMonthId, dept],
     queryFn: () => payrollApi.getPayslips(payrollMonthId, dept || undefined),
     enabled: !!payrollMonthId,
+    staleTime: 60_000,
+    retry: 1,
   });
 
   const payslips = payslipsQ.data ?? [];
@@ -344,7 +400,9 @@ function PayslipsTab({ millId, year }: { millId: string; year: number }) {
               </SelectTrigger>
               <SelectContent>
                 {MONTHS.map((n, i) => (
-                  <SelectItem key={i + 1} value={String(i + 1)}>{n}</SelectItem>
+                  <SelectItem key={i + 1} value={String(i + 1)}>
+                    {n}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -359,11 +417,7 @@ function PayslipsTab({ millId, year }: { millId: string; year: number }) {
             />
           </div>
           <div className="self-end ml-auto">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => toast.info("Export coming soon")}
-            >
+            <Button size="sm" variant="outline" onClick={() => toast.info("Export coming soon")}>
               Export
             </Button>
           </div>
@@ -373,42 +427,52 @@ function PayslipsTab({ millId, year }: { millId: string; year: number }) {
         {!payrollMonthId ? (
           <p className="text-sm text-muted-foreground">Payroll not yet processed for this month</p>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Emp Code</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Dept</TableHead>
-                <TableHead className="text-right">Present</TableHead>
-                <TableHead className="text-right">OT Hrs</TableHead>
-                <TableHead className="text-right">Gross</TableHead>
-                <TableHead className="text-right">PF</TableHead>
-                <TableHead className="text-right">ESIC</TableHead>
-                <TableHead className="text-right">Net</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {payslips.map((p: any) => (
-                <TableRow key={p.id}>
-                  <TableCell className="font-mono text-xs">{p.employee_code}</TableCell>
-                  <TableCell className="font-medium">{p.employee_name}</TableCell>
-                  <TableCell>{p.department}</TableCell>
-                  <TableCell className="text-right">{p.present_days}</TableCell>
-                  <TableCell className="text-right">{p.overtime_hours}</TableCell>
-                  <TableCell className="text-right">₹{p.gross_wage.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">₹{p.pf_employee.toLocaleString()}</TableCell>
-                  <TableCell className="text-right">₹{p.esic_employee.toLocaleString()}</TableCell>
-                  <TableCell className="text-right font-medium">₹{p.net_wage.toLocaleString()}</TableCell>
-                  <TableCell>
-                    <Badge variant={p.status === "paid" ? "default" : "secondary"}>
-                      {p.status}
-                    </Badge>
-                  </TableCell>
+          <div className="w-full overflow-x-auto">
+            <Table className="min-w-[640px] w-full">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Emp Code</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Dept</TableHead>
+                  <TableHead className="text-right">Present</TableHead>
+                  <TableHead className="text-right">OT Hrs</TableHead>
+                  <TableHead className="text-right">Gross</TableHead>
+                  <TableHead className="text-right">PF</TableHead>
+                  <TableHead className="text-right">ESIC</TableHead>
+                  <TableHead className="text-right">Net</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {payslips.map((p: any) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-mono text-xs">{p.employee_code}</TableCell>
+                    <TableCell className="font-medium">{p.employee_name}</TableCell>
+                    <TableCell>{p.department}</TableCell>
+                    <TableCell className="text-right">{p.present_days}</TableCell>
+                    <TableCell className="text-right">{p.overtime_hours}</TableCell>
+                    <TableCell className="text-right">
+                      ₹{(p.gross_wage ?? 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      ₹{(p.pf_employee ?? 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      ₹{(p.esic_employee ?? 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      ₹{(p.net_wage ?? 0).toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={p.status === "paid" ? "default" : "secondary"}>
+                        {p.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </CardContent>
     </Card>

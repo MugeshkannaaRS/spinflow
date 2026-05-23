@@ -28,9 +28,7 @@ export function ColumnConfigurator({ module, tableKey }: ColumnConfiguratorProps
   };
 
   const toggleVisible = (key: string) => {
-    setLocalCols((prev) =>
-      prev.map((c) => (c.key === key ? { ...c, visible: !c.visible } : c)),
-    );
+    setLocalCols((prev) => prev.map((c) => (c.key === key ? { ...c, visible: !c.visible } : c)));
   };
 
   const moveUp = (index: number) => {
@@ -99,11 +97,10 @@ export function ColumnConfigurator({ module, tableKey }: ColumnConfiguratorProps
                 key={col.key}
                 className="flex items-center gap-2 px-2 py-1.5 rounded border hover:bg-muted/50"
               >
-                <Checkbox
-                  checked={col.visible}
-                  onCheckedChange={() => toggleVisible(col.key)}
-                />
-                <span className={`flex-1 text-sm ${col.visible ? "" : "text-muted-foreground line-through"}`}>
+                <Checkbox checked={col.visible} onCheckedChange={() => toggleVisible(col.key)} />
+                <span
+                  className={`flex-1 text-sm ${col.visible ? "" : "text-muted-foreground line-through"}`}
+                >
                   {col.label}
                 </span>
                 <div className="flex gap-0.5">

@@ -17,9 +17,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const toggle = useCallback(() => setOpen((v) => !v), []);
   const close = useCallback(() => setOpen(false), []);
   return (
-    <SidebarContext.Provider value={{ open, toggle, close }}>
-      {children}
-    </SidebarContext.Provider>
+    <SidebarContext.Provider value={{ open, toggle, close }}>{children}</SidebarContext.Provider>
   );
 }
 

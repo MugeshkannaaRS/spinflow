@@ -91,7 +91,15 @@ function NotificationsDropdown() {
   );
 }
 
-export function Topbar({ title, subtitle, children }: { title: string; subtitle?: string; children?: React.ReactNode }) {
+export function Topbar({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children?: React.ReactNode;
+}) {
   const { user } = useAuth();
   const { toggle } = useSidebar();
   return (

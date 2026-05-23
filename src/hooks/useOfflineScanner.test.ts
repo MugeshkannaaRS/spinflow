@@ -124,7 +124,14 @@ describe("useOfflineScanner", () => {
   it("syncQueue calls API for each pending scan and removes on success", async () => {
     mockGetPendingScans.mockResolvedValue([
       { id: 1, trip_id: "t1", scan_type: "loader", qr_string: "qr1", retry_count: 0 },
-      { id: 2, trip_id: "t2", scan_type: "receiver", qr_string: "qr2", scanned_route_id: "r1", retry_count: 0 },
+      {
+        id: 2,
+        trip_id: "t2",
+        scan_type: "receiver",
+        qr_string: "qr2",
+        scanned_route_id: "r1",
+        retry_count: 0,
+      },
     ]);
     (loTracApi.loaderScan as any).mockResolvedValue({ result: "success" });
     (loTracApi.receiverScan as any).mockResolvedValue({ result: "success" });

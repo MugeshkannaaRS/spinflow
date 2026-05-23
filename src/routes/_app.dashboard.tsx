@@ -120,7 +120,11 @@ function getQuickActions(role: string, navigate: any) {
       break;
     case "QUALITY_MANAGER":
       actions.push(
-        { label: "New Quality Test", icon: FlaskConical, onClick: () => navigate({ to: "/quality" }) },
+        {
+          label: "New Quality Test",
+          icon: FlaskConical,
+          onClick: () => navigate({ to: "/quality" }),
+        },
         { label: "CSP Report", icon: FileText, onClick: () => navigate({ to: "/reports" }) },
       );
       break;
@@ -158,9 +162,7 @@ function getQuickActions(role: string, navigate: any) {
       );
       break;
     default:
-      actions.push(
-        { label: "Dashboard", icon: TrendingUp, onClick: () => navigate({ to: "/" }) },
-      );
+      actions.push({ label: "Dashboard", icon: TrendingUp, onClick: () => navigate({ to: "/" }) });
   }
   return actions;
 }
@@ -170,10 +172,19 @@ function Dashboard() {
   const navigate = useNavigate();
   const recentActivity = useRecentActivity();
 
-  const { data: rawData, isLoading, isError, error, refetch, isRefetching } = useQuery({
+  const {
+    data: rawData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isRefetching,
+  } = useQuery({
     queryKey: ["dashboard-kpis", user.millId],
     queryFn: () => dashboardApi.getKpis(user.millId),
     refetchInterval: 60000,
+    staleTime: 60_000,
+    retry: 1,
   });
 
   const data = rawData ?? undefined;
@@ -182,7 +193,7 @@ function Dashboard() {
     return (
       <>
         <Topbar title="Dashboard" subtitle="Loading..." />
-        <div className="p-6 space-y-6">
+        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <Card key={i}>
@@ -243,7 +254,7 @@ function Dashboard() {
           </Button>
         </div>
       </Topbar>
-      <div className="p-6 space-y-6">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {user.role === "SUPER_ADMIN" || user.role === "MILL_OWNER" ? <SetupGuide /> : null}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Kpi
@@ -301,7 +312,10 @@ function Dashboard() {
                 {`${Math.round((safeData.productionToday / Math.max(safeData.productionTarget, 1)) * 100)}%`}
               </div>
               <Progress
-                value={Math.min((safeData.productionToday / Math.max(safeData.productionTarget, 1)) * 100, 100)}
+                value={Math.min(
+                  (safeData.productionToday / Math.max(safeData.productionTarget, 1)) * 100,
+                  100,
+                )}
                 className="mt-3 h-2"
               />
             </CardContent>
@@ -318,7 +332,13 @@ function Dashboard() {
               <h3 className="text-sm font-medium text-muted-foreground mb-3">Quick Actions</h3>
               <div className="flex flex-wrap gap-2">
                 {qa.map((a) => (
-                  <Button key={a.label} variant="outline" size="sm" onClick={a.onClick} className="gap-1.5">
+                  <Button
+                    key={a.label}
+                    variant="outline"
+                    size="sm"
+                    onClick={a.onClick}
+                    className="gap-1.5"
+                  >
                     <a.icon className="size-4" />
                     {a.label}
                     <ArrowRight className="size-3" />
