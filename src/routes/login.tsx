@@ -30,7 +30,7 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuth((s) => s.login);
-  const [email, setEmail] = useState("admin@spinflow.in");
+  const [email, setEmail] = useState("admin@mill.spinflow");
   const [password, setPassword] = useState("Admin@1234");
   const [failedAttempts, setFailedAttempts] = useState(0);
   const isLockedOut = failedAttempts >= 5;
@@ -40,14 +40,7 @@ function LoginPage() {
   });
 
   const demos = [
-    { id: "u1", email: "admin@spinflow.in", role: "SUPER_ADMIN" },
-    { id: "u2", email: "owner@spinflow.in", role: "MILL_OWNER" },
-    { id: "u3", email: "gm@spinflow.in", role: "GENERAL_MANAGER" },
-    { id: "u4", email: "production@spinflow.in", role: "PRODUCTION_MANAGER" },
-    { id: "u5", email: "quality@spinflow.in", role: "QUALITY_MANAGER" },
-    { id: "u6", email: "dispatch@spinflow.in", role: "DISPATCH_MANAGER" },
-    { id: "u7", email: "supervisor@spinflow.in", role: "SUPERVISOR" },
-    { id: "u8", email: "operator@spinflow.in", role: "MACHINE_OPERATOR" },
+    { id: "u1", email: "admin@mill.spinflow", role: "SUPER_ADMIN" },
   ];
 
   return (
@@ -141,7 +134,7 @@ function LoginPage() {
                     key={d.id}
                     type="button"
                     onClick={() => {
-                      setEmail(d.email);
+                      setEmail("admin@mill.spinflow");
                       setPassword("Admin@1234");
                       // Auto-submit after setting credentials
                       setTimeout(() => {
