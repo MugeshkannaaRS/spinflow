@@ -127,7 +127,38 @@ export const dashboardApi = {
 
 // Reports
 export const reportsApi = {
-  getSummary: () => api.get("/reports/summary").then((r) => r.data),
+  getSummary: () =>
+    api.get("/reports/summary").then((r) => {
+      const d = r.data;
+      const ps = d.production_summary ?? {};
+      const qs = d.quality_summary ?? {};
+      const ds = d.dispatch_summary ?? {};
+      const fs = d.financial_summary ?? {};
+      return {
+        productionSummary: {
+          totalProduced: ps.total_produced ?? 0,
+          totalTarget: ps.total_target ?? 0,
+          avgEfficiency: ps.avg_efficiency ?? 0,
+          wastePercent: ps.waste_percent ?? 0,
+        },
+        qualitySummary: {
+          testsConducted: qs.tests_conducted ?? 0,
+          passRate: qs.pass_rate ?? 0,
+          failRate: qs.fail_rate ?? 0,
+        },
+        dispatchSummary: {
+          pending: ds.pending ?? 0,
+          inTransit: ds.in_transit ?? 0,
+          delivered: ds.delivered ?? 0,
+        },
+        financialSummary: {
+          salesTotal: fs.sales_total ?? 0,
+          purchaseTotal: fs.purchase_total ?? 0,
+          gstCollected: fs.gst_collected ?? 0,
+          receivablesOutstanding: fs.receivables_outstanding ?? 0,
+        },
+      };
+    }),
 };
 
 // QR System
