@@ -24,7 +24,12 @@ async def get_spares(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores")),
 ):
+    scope = await get_mill_scope(current_user)
     stmt = select(Spare)
+    if scope["mill_id"]:
+        stmt = stmt.where(Spare.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Spare.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
@@ -66,7 +71,12 @@ async def get_issues(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores")),
 ):
+    scope = await get_mill_scope(current_user)
     stmt = select(SpareIssue).order_by(SpareIssue.created_at.desc())
+    if scope["mill_id"]:
+        stmt = stmt.where(SpareIssue.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, SpareIssue.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)

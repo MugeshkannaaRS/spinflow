@@ -42,6 +42,10 @@ class User(TimestampMixin, SoftDeleteMixin, Base):
     role_rel = relationship("Role", back_populates="users")
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
 
+    @property
+    def role(self):
+        return self.role_rel.code if self.role_rel else None
+
 
 class UserSession(Base):
     __tablename__ = "user_sessions"

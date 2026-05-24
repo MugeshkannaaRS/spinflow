@@ -10,6 +10,7 @@ class Spare(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
     category: Mapped[str] = mapped_column(String(100), nullable=True)
     stock: Mapped[float] = mapped_column(Float, default=0)
     min_stock: Mapped[float] = mapped_column(Float, default=0)
@@ -24,6 +25,7 @@ class SpareIssue(TimestampMixin, Base):
     __tablename__ = "spare_issues"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     spare_id: Mapped[str] = mapped_column(String(36), ForeignKey("spares.id"), nullable=False, index=True)
     spare_code: Mapped[str] = mapped_column(String(50), nullable=True)

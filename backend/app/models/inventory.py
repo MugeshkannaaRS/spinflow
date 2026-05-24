@@ -85,6 +85,7 @@ class Warehouse(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
     location: Mapped[str] = mapped_column(String(200), nullable=True)
     capacity_bags: Mapped[int] = mapped_column(Integer, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

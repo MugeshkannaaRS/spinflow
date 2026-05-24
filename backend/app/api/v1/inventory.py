@@ -127,7 +127,13 @@ async def get_warehouses(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory")),
 ):
-    result = await db.execute(select(Warehouse).order_by(Warehouse.name))
+    scope = await get_mill_scope(current_user)
+    query = select(Warehouse).order_by(Warehouse.name)
+    if scope["mill_id"]:
+        query = query.where(Warehouse.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        query = query.join(Mill, Warehouse.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(query)
     return result.scalars().all()
 
 

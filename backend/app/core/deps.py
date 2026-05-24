@@ -57,12 +57,12 @@ def require_module(module: str, write: bool = False):
 
 
 async def get_mill_scope(current_user: User = Depends(get_current_user)):
-    """Returns scope dict to filter by: mill_id, company_id, or None for SUPER_ADMIN"""
-    if current_user.role == "SUPER_ADMIN":
-        return {"mill_id": None, "company_id": None}
-    if current_user.role == "MILL_OWNER":
-        return {"mill_id": None, "company_id": current_user.company_id}
-    return {"mill_id": current_user.mill_id, "company_id": current_user.company_id}
+    role_name = current_user.role
+    if role_name == "SUPER_ADMIN":
+        return {"mill_id": None, "company_id": None, "role": role_name}
+    if role_name == "MILL_OWNER":
+        return {"mill_id": None, "company_id": current_user.company_id, "role": role_name}
+    return {"mill_id": current_user.mill_id, "company_id": current_user.company_id, "role": role_name}
 
 
 async def log_audit(

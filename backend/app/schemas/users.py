@@ -11,6 +11,7 @@ class UserCreate(BaseModel):
     role: str
     department: Optional[str] = None
     mobile: Optional[str] = None
+    mill_id: Optional[str] = None
 
     @field_validator("password")
     @classmethod
