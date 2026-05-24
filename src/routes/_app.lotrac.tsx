@@ -382,7 +382,7 @@ function NewTripSheet() {
   const routes = routesQ.data?.data ?? [];
   const customers = customersQ.data?.data ?? [];
   const orders = ordersQ.data?.data ?? [];
-  const bags = bagsQ.data ?? [];
+  const bags = bagsQ.data?.data ?? [];
 
   const m = useMutation({
     mutationFn: (data: any) => loTracApi.createTrip(data),

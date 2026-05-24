@@ -1432,11 +1432,11 @@ function QualityDashTab() {
     );
   }
 
-  const catData = Object.entries(s.bales_by_category as Record<string, number>)
+  const catData = Object.entries(s.bales_by_category ?? {})
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([cat, count]) => ({ cat, count, fill: CATEGORY_COLORS[cat] ?? "#64748b" }));
 
-  const supplierData = (s.supplier_stats as any[])
+  const supplierData = ((s.supplier_stats ?? []) as any[])
     .sort((a, b) => b.bale_count - a.bale_count)
     .slice(0, 10)
     .map((s: any) => ({
@@ -1519,7 +1519,7 @@ function QualityDashTab() {
         </Card>
       </div>
 
-      {(s.lot_stats as any[]).length > 1 && (
+      {((s.lot_stats ?? []) as any[]).length > 1 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-sm">Lot-wise Quality (Avg MIC)</CardTitle>
@@ -1535,7 +1535,7 @@ function QualityDashTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(s.lot_stats as any[]).map((l: any) => (
+                  {((s.lot_stats ?? []) as any[]).map((l: any) => (
                     <TableRow key={l.lot_number}>
                       <TableCell className="font-mono">{l.lot_number}</TableCell>
                       <TableCell className="text-right">{l.bale_count}</TableCell>
