@@ -94,6 +94,7 @@ export const hrApi = {
   getEmployees: () =>
     api.get("/hr/employees").then((r) => ("data" in r.data ? r.data.data : r.data)),
   createEmployee: (data: any) => api.post("/hr/employees", data).then((r) => r.data),
+  bulkCreateEmployees: (data: any) => api.post("/hr/employees/bulk", data).then((r) => r.data),
   getAttendance: () =>
     api.get("/hr/attendance").then((r) => ("data" in r.data ? r.data.data : r.data)),
   createAttendance: (data: any) => api.post("/hr/attendance", data).then((r) => r.data),

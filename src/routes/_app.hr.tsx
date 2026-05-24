@@ -1,3 +1,4 @@
+import * as XLSX from "xlsx";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { hrApi, uploadApi } from "@/lib/api-service";
@@ -59,6 +60,8 @@ import {
   XCircle,
   ClipboardCheck,
   UserPlus,
+  Upload,
+  Download,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/hr")({
@@ -413,6 +416,7 @@ function HRPage() {
                   <CardTitle className="text-base">Employee Directory</CardTitle>
                   <div className="flex gap-1">
                     {isAdmin && <ColumnConfigurator module="hr" tableKey="employees" />}
+                    {canEdit && <ImportEmployeeDialog />}
                     {canEdit && <AddEmployeeSheet />}
                   </div>
                 </CardHeader>
@@ -822,6 +826,210 @@ function LeaveActionDialog({ leave }: { leave: LeaveRow }) {
           </Button>
           <Button onClick={() => handleAction("approved")} disabled={approveM.isPending}>
             {approveM.isPending ? "…" : "Approve"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function downloadEmployeeTemplate() {
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([
+    ["Employee Code", "Full Name", "Department", "Designation", "Shift (A/B/C/General)", "Date of Joining (DD/MM/YYYY)", "Phone", "Daily Wage"],
+    ["EMP001", "Ravi Kumar", "Spinning", "Operator", "A", "01/06/2024", "9876543210", "500"],
+  ]);
+  XLSX.utils.book_append_sheet(wb, ws, "Employees");
+  XLSX.writeFile(wb, "employee_import_template.xlsx");
+}
+
+interface EmpImportRow {
+  employee_code: string;
+  full_name: string;
+  department: string;
+  designation: string;
+  shift: string;
+  date_of_joining: string;
+  phone: string;
+  daily_wage: string;
+  _error?: string;
+}
+
+function parseEmployeeRow(row: any[]): EmpImportRow | null {
+  const employee_code = String(row[0] ?? "").trim();
+  const full_name = String(row[1] ?? "").trim();
+  const department = String(row[2] ?? "").trim();
+  if (!employee_code && !full_name) return null;
+  return {
+    employee_code,
+    full_name,
+    department,
+    designation: String(row[3] ?? "").trim(),
+    shift: String(row[4] ?? "").trim(),
+    date_of_joining: String(row[5] ?? "").trim(),
+    phone: String(row[6] ?? "").trim(),
+    daily_wage: String(row[7] ?? "").trim(),
+    _error: !employee_code
+      ? "Missing employee code"
+      : !full_name
+        ? "Missing full name"
+        : !department
+          ? "Missing department"
+          : !["A", "B", "C", "General", "G"].includes(String(row[4] ?? "").trim())
+            ? `Invalid shift: ${String(row[4] ?? "")}`
+            : undefined,
+  };
+}
+
+function ImportEmployeeDialog() {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<EmpImportRow[]>([]);
+  const [fileName, setFileName] = useState("");
+
+  const m = useMutation({
+    mutationFn: (items: any[]) => hrApi.bulkCreateEmployees({ items }),
+  });
+
+  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const wb = XLSX.read(ev.target?.result, { type: "array" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      const parsed = raw.slice(1).map(parseEmployeeRow).filter((r): r is EmpImportRow => r !== null);
+      setRows(parsed);
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = "";
+  }
+
+  async function handleConfirm() {
+    const valid = rows.filter((r) => !r._error);
+    if (!valid.length) return;
+    const items = valid.map((r) => ({
+      employee_code: r.employee_code,
+      full_name: r.full_name,
+      department: r.department,
+      designation: r.designation,
+      shift: r.shift || "General",
+      date_of_joining: r.date_of_joining || null,
+      phone: r.phone || null,
+      daily_wage: r.daily_wage ? parseFloat(r.daily_wage) : null,
+    }));
+    try {
+      const res = await m.mutateAsync(items);
+      if (res.errors?.length) {
+        toast.error(`Import failed: ${res.errors[0]}`);
+      } else {
+        toast.success(`${res.created} employee(s) imported successfully`);
+        qc.invalidateQueries({ queryKey: ["employees"] });
+        setOpen(false);
+        setRows([]);
+        setFileName("");
+      }
+    } catch {
+      toast.error("Failed to import employees");
+    }
+  }
+
+  const validCount = rows.filter((r) => !r._error).length;
+  const errorCount = rows.filter((r) => !!r._error).length;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">
+          <Upload className="size-4 mr-1" />
+          Import Excel
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Import Employees from Excel</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <Button size="sm" variant="outline" onClick={downloadEmployeeTemplate}>
+              <Download className="size-4 mr-1" />
+              Download Template
+            </Button>
+            <label className="cursor-pointer">
+              <Button size="sm" asChild>
+                <span>
+                  <Upload className="size-4 mr-1" />
+                  {fileName ? fileName : "Choose File"}
+                </span>
+              </Button>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={handleFile}
+              />
+            </label>
+            {rows.length > 0 && (
+              <span className="text-sm text-muted-foreground">
+                {validCount} valid, {errorCount} errors
+              </span>
+            )}
+          </div>
+
+          {rows.length > 0 && (
+            <div className="border rounded-md max-h-80 overflow-auto">
+              <Table className="min-w-[900px] w-full text-xs">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8">#</TableHead>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Designation</TableHead>
+                    <TableHead>Shift</TableHead>
+                    <TableHead>DOJ</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Daily Wage</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.slice(0, 50).map((r, i) => (
+                    <TableRow key={i} className={r._error ? "bg-destructive/10" : ""}>
+                      <TableCell>{i + 1}</TableCell>
+                      <TableCell className="font-mono">{r.employee_code}</TableCell>
+                      <TableCell>{r.full_name}</TableCell>
+                      <TableCell>{r.department}</TableCell>
+                      <TableCell>{r.designation}</TableCell>
+                      <TableCell>{r.shift}</TableCell>
+                      <TableCell>{r.date_of_joining}</TableCell>
+                      <TableCell>{r.phone}</TableCell>
+                      <TableCell>{r.daily_wage}</TableCell>
+                      <TableCell>
+                        {r._error ? (
+                          <span className="text-destructive">{r._error}</span>
+                        ) : (
+                          <span className="text-green-600">OK</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { setOpen(false); setRows([]); setFileName(""); }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirm}
+            disabled={validCount === 0 || m.isPending}
+          >
+            {m.isPending ? "Importing…" : `Import ${validCount} Employee(s)`}
           </Button>
         </DialogFooter>
       </DialogContent>

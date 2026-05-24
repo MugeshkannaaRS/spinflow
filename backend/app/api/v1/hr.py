@@ -12,6 +12,7 @@ from app.schemas.hr import (
     EmployeeCreate, EmployeeOut, EmployeeUpdate,
     AttendanceCreate, AttendanceOut, AttendanceBulkCreate, AttendanceSummary,
     LeaveRequestCreate, LeaveRequestOut, LeaveActionRequest,
+    EmployeeBulkCreate, EmployeeBulkResponse,
 )
 
 router = APIRouter()
@@ -59,6 +60,55 @@ async def create_employee(
     db.add(emp)
     await db.flush()
     return emp
+
+
+@router.post("/hr/employees/bulk", response_model=EmployeeBulkResponse)
+async def bulk_create_employees(
+    req: EmployeeBulkCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("hr", write=True)),
+):
+    _SHIFT_MAP = {"General": "G", "A": "A", "B": "B", "C": "C", "G": "G"}
+    employees_to_add: List[Employee] = []
+    errors: List[str] = []
+    for i, item in enumerate(req.items, start=1):
+        row_label = f"Row {i} ({item.employee_code or 'no code'})"
+        if not item.employee_code or not item.full_name or not item.department:
+            errors.append(f"{row_label}: missing required field (code, name, or department)")
+            continue
+        shift = _SHIFT_MAP.get(item.shift, None)
+        if not shift:
+            errors.append(f"{row_label}: invalid shift '{item.shift}', must be A/B/C/General")
+            continue
+        doj_str = None
+        if item.date_of_joining:
+            try:
+                from datetime import datetime as dt
+                doj_str = dt.strptime(item.date_of_joining.strip(), "%d/%m/%Y").strftime("%Y-%m-%d")
+            except ValueError:
+                errors.append(f"{row_label}: invalid date format '{item.date_of_joining}', expected DD/MM/YYYY")
+                continue
+        employees_to_add.append(Employee(
+            code=item.employee_code.strip(),
+            name=item.full_name.strip(),
+            department=item.department.strip(),
+            role=item.designation.strip() if item.designation else None,
+            shift=shift,
+            doj=doj_str,
+            phone=item.phone.strip() if item.phone else None,
+            daily_wage=item.daily_wage or 0.0,
+            is_active=True,
+        ))
+    if errors:
+        return EmployeeBulkResponse(created=0, errors=errors)
+    for emp in employees_to_add:
+        db.add(emp)
+    try:
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        return EmployeeBulkResponse(created=0, errors=[f"Database error: {str(exc)}"])
+    return EmployeeBulkResponse(created=len(employees_to_add), errors=[])
 
 
 @router.get("/hr/attendance")

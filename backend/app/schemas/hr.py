@@ -149,3 +149,23 @@ class LeaveRequestOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class EmployeeBulkItem(BaseModel):
+    employee_code: str
+    full_name: str
+    department: str
+    designation: str
+    shift: str
+    date_of_joining: Optional[str] = None
+    phone: Optional[str] = None
+    daily_wage: Optional[float] = None
+
+
+class EmployeeBulkCreate(BaseModel):
+    items: List[EmployeeBulkItem]
+
+
+class EmployeeBulkResponse(BaseModel):
+    created: int
+    errors: List[str]
