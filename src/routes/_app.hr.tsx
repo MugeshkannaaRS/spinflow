@@ -17,6 +17,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/DataTable";
+import type { ColDef } from "@/components/ui/DataTable";
+import { ImportButton } from "@/components/ui/ImportButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,9 +47,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { ExcelColumnFilter } from "@/components/ui/excel-column-filter";
-import { ColumnConfigurator } from "@/components/ui/column-configurator";
-import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { FileUpload, type UploadedFile } from "@/components/ui/file-upload";
 import { cn } from "@/lib/utils";
 import { useState, useMemo, useEffect, useRef } from "react";
@@ -133,52 +133,11 @@ function HRPage() {
   const attendance: AttendanceRow[] = attQ.data ?? [];
   const leaves: LeaveRow[] = leaveQ.data ?? [];
 
-  const [attFiltered, setAttFiltered] = useState<AttendanceRow[]>([]);
-  const [leaveFiltered, setLeaveFiltered] = useState<LeaveRow[]>([]);
-  const [empFiltered, setEmpFiltered] = useState<EmployeeRow[]>([]);
-
-  const { visibleKeys: attVk } = useColumnConfig("hr", "attendance");
-  const { visibleKeys: leaveVk } = useColumnConfig("hr", "leaves");
-  const { visibleKeys: empVk } = useColumnConfig("hr", "employees");
-
-  useEffect(() => {
-    setAttFiltered((attQ.data ?? []) as AttendanceRow[]);
-  }, [attQ.data]);
-  useEffect(() => {
-    setLeaveFiltered((leaveQ.data ?? []) as LeaveRow[]);
-  }, [leaveQ.data]);
-  useEffect(() => {
-    setEmpFiltered((empQ.data ?? []) as EmployeeRow[]);
-  }, [empQ.data]);
-
   const activeEmployees = employees.filter((e) => e.is_active).length;
   const todayStr = new Date().toISOString().slice(0, 10);
-  const todayPresent = attendance.filter(
-    (a) => a.date === todayStr && a.status === "present",
-  ).length;
+  const todayPresent = attendance.filter((a) => a.date === todayStr && a.status === "present").length;
   const pendingLeaves = leaves.filter((l) => l.status === "pending").length;
   const todayAbsent = attendance.filter((a) => a.date === todayStr && a.status === "absent").length;
-
-  const attColumns = [
-    { key: "date", label: "Date" },
-    { key: "employee_name", label: "Employee" },
-    { key: "department", label: "Department" },
-    { key: "shift", label: "Shift" },
-    { key: "status", label: "Status" },
-  ];
-  const leaveColumns = [
-    { key: "employee_name", label: "Employee" },
-    { key: "department", label: "Department" },
-    { key: "leave_type", label: "Type" },
-    { key: "status", label: "Status" },
-  ];
-  const empColumns = [
-    { key: "code", label: "Code" },
-    { key: "name", label: "Name" },
-    { key: "department", label: "Department" },
-    { key: "role", label: "Role" },
-    { key: "is_active", label: "Status" },
-  ];
 
   if (!user) return null;
 
@@ -263,69 +222,49 @@ function HRPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Daily Attendance</CardTitle>
-                  <div className="flex gap-1">
-                    {isAdmin && <ColumnConfigurator module="hr" tableKey="attendance" />}
-                    {canEdit && <MarkAttendanceSheet employees={employees} />}
-                  </div>
+                  {canEdit && <MarkAttendanceSheet employees={employees} />}
                 </CardHeader>
                 <CardContent>
-                  <ExcelColumnFilter
+                  <DataTable
+                    tableId="hr_attendance"
+                    columns={[
+                      { key: "date", label: "Date", type: "date" },
+                      { key: "employee_name", label: "Employee", render: (a: any) => <span className="font-medium">{a.employee_name}</span> },
+                      { key: "department", label: "Department", type: "status" },
+                      { key: "shift", label: "Shift", type: "status", render: (a: any) => <Badge variant="outline">{a.shift}</Badge> },
+                      {
+                        key: "status",
+                        label: "Status",
+                        type: "status",
+                        render: (a: any) => (
+                          <Badge variant={a.status === "present" ? "default" : a.status === "absent" ? "destructive" : a.status === "half-day" ? "secondary" : "outline"}>
+                            {a.status}
+                          </Badge>
+                        ),
+                      },
+                      { key: "check_in", label: "Check In" },
+                      { key: "check_out", label: "Check Out" },
+                    ] satisfies ColDef[]}
                     data={attendance}
-                    onFilter={setAttFiltered}
-                    columns={attColumns}
+                    loading={attQ.isLoading}
+                    rowKey={(a) => a.id}
+                    exportFilename="attendance"
+                    toolbar={
+                      canEdit ? (
+                        <ImportButton
+                          label="Import"
+                          endpoint="/hr/attendance/bulk-import"
+                          templateCols={[
+                            { key: "employee_code", label: "Employee Code", required: true, candidates: ["code", "emp code", "employee code"] },
+                            { key: "date", label: "Date (DD/MM/YYYY)", required: true, type: "date", candidates: ["date", "attendance date"] },
+                            { key: "status", label: "Status (P/A/H/L)", required: true, candidates: ["status", "present", "attendance"] },
+                          ]}
+                          exampleRow={{ employee_code: "EMP001", date: "01/01/2025", status: "P" }}
+                          onSuccess={() => attQ.refetch()}
+                        />
+                      ) : undefined
+                    }
                   />
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-[640px] w-full">
-                      <TableHeader>
-                        <TableRow>
-                          {attVk.has("date") && <TableHead>Date</TableHead>}
-                          {attVk.has("employee_name") && <TableHead>Employee</TableHead>}
-                          {attVk.has("department") && <TableHead>Department</TableHead>}
-                          {attVk.has("shift") && <TableHead>Shift</TableHead>}
-                          {attVk.has("status") && <TableHead>Status</TableHead>}
-                          {attVk.has("check_in") && <TableHead>Check In</TableHead>}
-                          {attVk.has("check_out") && <TableHead>Check Out</TableHead>}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {attFiltered.map((a) => (
-                          <TableRow key={a.id}>
-                            {attVk.has("date") && (
-                              <TableCell className="text-sm">{a.date}</TableCell>
-                            )}
-                            {attVk.has("employee_name") && (
-                              <TableCell className="font-medium">{a.employee_name}</TableCell>
-                            )}
-                            {attVk.has("department") && <TableCell>{a.department}</TableCell>}
-                            {attVk.has("shift") && (
-                              <TableCell>
-                                <Badge variant="outline">{a.shift}</Badge>
-                              </TableCell>
-                            )}
-                            {attVk.has("status") && (
-                              <TableCell>
-                                <Badge
-                                  variant={
-                                    a.status === "present"
-                                      ? "default"
-                                      : a.status === "absent"
-                                        ? "destructive"
-                                        : a.status === "half-day"
-                                          ? "secondary"
-                                          : "outline"
-                                  }
-                                >
-                                  {a.status}
-                                </Badge>
-                              </TableCell>
-                            )}
-                            {attVk.has("check_in") && <TableCell>{a.check_in}</TableCell>}
-                            {attVk.has("check_out") && <TableCell>{a.check_out}</TableCell>}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -334,79 +273,35 @@ function HRPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Leave Requests</CardTitle>
-                  <div className="flex gap-1">
-                    {isAdmin && <ColumnConfigurator module="hr" tableKey="leaves" />}
-                    {canEdit && <NewLeaveDialog employees={employees} />}
-                  </div>
+                  {canEdit && <NewLeaveDialog employees={employees} />}
                 </CardHeader>
                 <CardContent>
-                  <ExcelColumnFilter
+                  <DataTable
+                    tableId="hr_leaves"
+                    columns={[
+                      { key: "employee_name", label: "Employee", render: (l: any) => <span className="font-medium">{l.employee_name}</span> },
+                      { key: "department", label: "Department", type: "status" },
+                      { key: "from_date", label: "From", type: "date" },
+                      { key: "to_date", label: "To", type: "date" },
+                      { key: "leave_type", label: "Type", type: "status", render: (l: any) => <Badge variant="outline">{l.leave_type}</Badge> },
+                      { key: "reason", label: "Reason", className: "max-w-xs truncate" },
+                      {
+                        key: "status",
+                        label: "Status",
+                        type: "status",
+                        render: (l: any) => (
+                          <Badge variant={l.status === "approved" ? "default" : l.status === "rejected" ? "destructive" : "secondary"}>
+                            {l.status}
+                          </Badge>
+                        ),
+                      },
+                    ] satisfies ColDef[]}
                     data={leaves}
-                    onFilter={setLeaveFiltered}
-                    columns={leaveColumns}
+                    loading={leaveQ.isLoading}
+                    rowKey={(l) => l.id}
+                    exportFilename="leaves"
+                    actions={(l) => l.status === "pending" && canEdit ? <LeaveActionDialog leave={l} /> : null}
                   />
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-[640px] w-full">
-                      <TableHeader>
-                        <TableRow>
-                          {leaveVk.has("employee_name") && <TableHead>Employee</TableHead>}
-                          {leaveVk.has("department") && <TableHead>Department</TableHead>}
-                          {leaveVk.has("from_date") && <TableHead>From</TableHead>}
-                          {leaveVk.has("to_date") && <TableHead>To</TableHead>}
-                          {leaveVk.has("leave_type") && <TableHead>Type</TableHead>}
-                          {leaveVk.has("reason") && <TableHead>Reason</TableHead>}
-                          {leaveVk.has("status") && <TableHead>Status</TableHead>}
-                          {leaveVk.has("status") && <TableHead>Actions</TableHead>}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {leaveFiltered.map((l) => (
-                          <TableRow key={l.id}>
-                            {leaveVk.has("employee_name") && (
-                              <TableCell className="font-medium">{l.employee_name}</TableCell>
-                            )}
-                            {leaveVk.has("department") && <TableCell>{l.department}</TableCell>}
-                            {leaveVk.has("from_date") && (
-                              <TableCell className="text-sm">{l.from_date}</TableCell>
-                            )}
-                            {leaveVk.has("to_date") && (
-                              <TableCell className="text-sm">{l.to_date}</TableCell>
-                            )}
-                            {leaveVk.has("leave_type") && (
-                              <TableCell>
-                                <Badge variant="outline">{l.leave_type}</Badge>
-                              </TableCell>
-                            )}
-                            {leaveVk.has("reason") && (
-                              <TableCell className="max-w-[200px] truncate">{l.reason}</TableCell>
-                            )}
-                            {leaveVk.has("status") && (
-                              <TableCell>
-                                <Badge
-                                  variant={
-                                    l.status === "approved"
-                                      ? "default"
-                                      : l.status === "rejected"
-                                        ? "destructive"
-                                        : "secondary"
-                                  }
-                                >
-                                  {l.status}
-                                </Badge>
-                              </TableCell>
-                            )}
-                            {leaveVk.has("status") && (
-                              <TableCell>
-                                {l.status === "pending" && canEdit && (
-                                  <LeaveActionDialog leave={l} />
-                                )}
-                              </TableCell>
-                            )}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -416,53 +311,56 @@ function HRPage() {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Employee Directory</CardTitle>
                   <div className="flex gap-1">
-                    {isAdmin && <ColumnConfigurator module="hr" tableKey="employees" />}
                     {canEdit && <ImportEmployeeDialog />}
                     {canEdit && <AddEmployeeSheet />}
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <ExcelColumnFilter
+                  <DataTable
+                    tableId="hr_employees"
+                    columns={[
+                      { key: "code", label: "Code", className: "font-mono text-xs" },
+                      { key: "name", label: "Name", render: (e: any) => <span className="font-medium">{e.name}</span> },
+                      { key: "department", label: "Department", type: "status" },
+                      { key: "role", label: "Designation" },
+                      { key: "phone", label: "Phone" },
+                      { key: "shift", label: "Shift", type: "status" },
+                      {
+                        key: "is_active",
+                        label: "Status",
+                        type: "status",
+                        render: (e: any) => (
+                          <Badge variant={e.is_active ? "default" : "secondary"}>
+                            {e.is_active ? "active" : "inactive"}
+                          </Badge>
+                        ),
+                      },
+                    ] satisfies ColDef[]}
                     data={employees}
-                    onFilter={setEmpFiltered}
-                    columns={empColumns}
+                    loading={empQ.isLoading}
+                    rowKey={(e) => e.id}
+                    exportFilename="employees"
+                    toolbar={
+                      canEdit ? (
+                        <ImportButton
+                          label="Import"
+                          endpoint="/hr/employees/bulk"
+                          templateCols={[
+                            { key: "employee_code", label: "Employee Code", required: true, candidates: ["code", "emp code", "employee code", "id"] },
+                            { key: "full_name", label: "Full Name", required: true, candidates: ["name", "full name", "employee name"] },
+                            { key: "department", label: "Department", required: true, candidates: ["department", "dept", "division"] },
+                            { key: "designation", label: "Designation", required: true, candidates: ["designation", "position", "title"] },
+                            { key: "shift", label: "Shift (A/B/C/General)", required: true, candidates: ["shift", "shift type"] },
+                            { key: "date_of_joining", label: "Date of Joining (DD/MM/YYYY)", type: "date", candidates: ["doj", "date of joining", "joining date"] },
+                            { key: "phone", label: "Phone", candidates: ["phone", "mobile", "contact"] },
+                            { key: "daily_wage", label: "Daily Wage", type: "number", candidates: ["daily wage", "wage", "salary"] },
+                          ]}
+                          exampleRow={{ employee_code: "EMP001", full_name: "Ravi Kumar", department: "Spinning", designation: "Operator", shift: "A", date_of_joining: "01/01/2024", phone: "9876543210", daily_wage: "500" }}
+                          onSuccess={() => empQ.refetch()}
+                        />
+                      ) : undefined
+                    }
                   />
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-[640px] w-full">
-                      <TableHeader>
-                        <TableRow>
-                          {empVk.has("code") && <TableHead>Code</TableHead>}
-                          {empVk.has("name") && <TableHead>Name</TableHead>}
-                          {empVk.has("department") && <TableHead>Department</TableHead>}
-                          {empVk.has("role") && <TableHead>Role</TableHead>}
-                          {empVk.has("phone") && <TableHead>Phone</TableHead>}
-                          {empVk.has("is_active") && <TableHead>Status</TableHead>}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {empFiltered.map((e) => (
-                          <TableRow key={e.id}>
-                            {empVk.has("code") && (
-                              <TableCell className="font-mono text-xs">{e.code}</TableCell>
-                            )}
-                            {empVk.has("name") && (
-                              <TableCell className="font-medium">{e.name}</TableCell>
-                            )}
-                            {empVk.has("department") && <TableCell>{e.department}</TableCell>}
-                            {empVk.has("role") && <TableCell>{e.role}</TableCell>}
-                            {empVk.has("phone") && <TableCell>{e.phone}</TableCell>}
-                            {empVk.has("is_active") && (
-                              <TableCell>
-                                <Badge variant={e.is_active ? "default" : "secondary"}>
-                                  {e.is_active ? "active" : "inactive"}
-                                </Badge>
-                              </TableCell>
-                            )}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

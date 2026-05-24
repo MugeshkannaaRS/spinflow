@@ -27,9 +27,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { ExcelColumnFilter } from "@/components/ui/excel-column-filter";
-import { ColumnConfigurator } from "@/components/ui/column-configurator";
-import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { DataTable } from "@/components/ui/DataTable";
+import type { ColDef } from "@/components/ui/DataTable";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid } from "lucide-react";
@@ -440,7 +439,6 @@ function ShiftGrid() {
 function ProductionPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "production");
-  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "MILL_OWNER";
   const machinesQ = useQuery({
     queryKey: ["machines"],
     queryFn: productionApi.getMachines,
@@ -464,24 +462,6 @@ function ProductionPage() {
   const shifts = (shiftsQ.data?.data ?? shiftsQ.data ?? []) as any[];
   const downtime = (downQ.data?.data ?? downQ.data ?? []) as any[];
 
-  const [machineFiltered, setMachineFiltered] = useState<any[]>([]);
-  const [shiftFiltered, setShiftFiltered] = useState<any[]>([]);
-  const [downFiltered, setDownFiltered] = useState<any[]>([]);
-
-  useEffect(() => {
-    setMachineFiltered((machinesQ.data?.data ?? machinesQ.data ?? []) as any[]);
-  }, [machinesQ.data]);
-  useEffect(() => {
-    setShiftFiltered((shiftsQ.data?.data ?? shiftsQ.data ?? []) as any[]);
-  }, [shiftsQ.data]);
-  useEffect(() => {
-    setDownFiltered((downQ.data?.data ?? downQ.data ?? []) as any[]);
-  }, [downQ.data]);
-
-  const { visibleKeys: mvk } = useColumnConfig("production", "machines");
-  const { visibleKeys: svk } = useColumnConfig("production", "shifts");
-  const { visibleKeys: dvk } = useColumnConfig("production", "downtime");
-
   const totalProduced = machines.reduce(
     (s: number, m: any) => s + (m.produced_kg ?? m.producedKg ?? 0),
     0,
@@ -494,25 +474,6 @@ function ProductionPage() {
   const breakdown = machines.filter(
     (m: any) => (m.current_status ?? m.status) === "breakdown",
   ).length;
-
-  const machineColumns = [
-    { key: "code", label: "Code" },
-    { key: "department", label: "Department" },
-    { key: "status", label: "Status" },
-  ];
-  const shiftColumns = [
-    { key: "date", label: "Date" },
-    { key: "shift", label: "Shift" },
-    { key: "machineCode", label: "Machine" },
-    { key: "operator", label: "Operator" },
-    { key: "department", label: "Department" },
-    { key: "status", label: "Status" },
-  ];
-  const downColumns = [
-    { key: "machineCode", label: "Machine" },
-    { key: "reason", label: "Reason" },
-    { key: "resolved", label: "Status" },
-  ];
 
   if (!user) return null;
 
@@ -614,223 +575,71 @@ function ProductionPage() {
 
             <TabsContent value="machines">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-base">Machine Status</CardTitle>
-                  {isAdmin && <ColumnConfigurator module="production" tableKey="machines" />}
-                </CardHeader>
+                <CardHeader><CardTitle className="text-base">Machine Status</CardTitle></CardHeader>
                 <CardContent>
-                  <ExcelColumnFilter
+                  <DataTable
+                    tableId="production_machines"
+                    columns={[
+                      { key: "code", label: "Code", className: "font-mono text-xs" },
+                      { key: "department", label: "Department", type: "status" },
+                      { key: "target_kg", label: "Target (kg)", render: (m: any) => ((m.target_kg ?? m.targetKg) ?? 0).toLocaleString() },
+                      { key: "produced_kg", label: "Produced (kg)", render: (m: any) => ((m.produced_kg ?? m.producedKg) ?? 0).toLocaleString() },
+                      { key: "efficiency", label: "Efficiency", render: (m: any) => <span className={(m.efficiency ?? 0) >= 85 ? "text-green-600 font-medium" : (m.efficiency ?? 0) >= 70 ? "" : "text-destructive font-medium"}>{m.efficiency ?? 0}%</span> },
+                      { key: "current_status", label: "Status", type: "status", render: (m: any) => <Badge variant={(m.current_status ?? m.status) === "running" ? "default" : (m.current_status ?? m.status) === "breakdown" ? "destructive" : "secondary"}>{m.current_status ?? m.status}</Badge> },
+                    ] satisfies ColDef[]}
                     data={machines}
-                    onFilter={setMachineFiltered}
-                    columns={machineColumns}
+                    loading={machinesQ.isLoading}
+                    rowKey={(m: any) => m.id}
+                    exportFilename="machines"
                   />
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-[640px] w-full">
-                      <TableHeader>
-                        <TableRow>
-                          {mvk.has("code") && <TableHead>Code</TableHead>}
-                          {mvk.has("department") && <TableHead>Department</TableHead>}
-                          {mvk.has("status") && <TableHead>Status</TableHead>}
-                          {mvk.has("targetKg") && (
-                            <TableHead className="text-right">Target (kg)</TableHead>
-                          )}
-                          {mvk.has("producedKg") && (
-                            <TableHead className="text-right">Produced (kg)</TableHead>
-                          )}
-                          {mvk.has("efficiency") && (
-                            <TableHead className="text-right">Efficiency</TableHead>
-                          )}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {machineFiltered.map((m) => (
-                          <TableRow key={m.id}>
-                            {mvk.has("code") && (
-                              <TableCell className="font-mono text-xs">{m.code}</TableCell>
-                            )}
-                            {mvk.has("department") && <TableCell>{m.department}</TableCell>}
-                            {mvk.has("status") && (
-                              <TableCell>
-                                <Badge
-                                  variant={
-                                    (m.current_status ?? m.status) === "running"
-                                      ? "default"
-                                      : (m.current_status ?? m.status) === "breakdown"
-                                        ? "destructive"
-                                        : "secondary"
-                                  }
-                                >
-                                  {m.current_status ?? m.status}
-                                </Badge>
-                              </TableCell>
-                            )}
-                            {mvk.has("targetKg") && (
-                              <TableCell className="text-right">
-                                {(m.target_kg ?? m.targetKg)?.toLocaleString?.() ??
-                                  m.target_kg ??
-                                  m.targetKg}
-                              </TableCell>
-                            )}
-                            {mvk.has("producedKg") && (
-                              <TableCell className="text-right">
-                                {(m.produced_kg ?? m.producedKg)?.toLocaleString?.() ??
-                                  m.produced_kg ??
-                                  m.producedKg}
-                              </TableCell>
-                            )}
-                            {mvk.has("efficiency") && (
-                              <TableCell className="text-right">
-                                <span
-                                  className={
-                                    (m.efficiency ?? 0) >= 85
-                                      ? "text-success font-medium"
-                                      : (m.efficiency ?? 0) >= 70
-                                        ? ""
-                                        : "text-destructive font-medium"
-                                  }
-                                >
-                                  {m.efficiency ?? 0}%
-                                </span>
-                              </TableCell>
-                            )}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
             <TabsContent value="shifts">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-base">Shift Production Entries</CardTitle>
-                  {isAdmin && <ColumnConfigurator module="production" tableKey="shifts" />}
-                </CardHeader>
+                <CardHeader><CardTitle className="text-base">Shift Production Entries</CardTitle></CardHeader>
                 <CardContent>
-                  <ExcelColumnFilter
+                  <DataTable
+                    tableId="production_shifts"
+                    columns={[
+                      { key: "date", label: "Date", type: "date" },
+                      { key: "shift", label: "Shift", render: (s: any) => <Badge variant="outline">{s.shift}</Badge> },
+                      { key: "machineCode", label: "Machine", className: "font-mono text-xs" },
+                      { key: "department", label: "Department", type: "status" },
+                      { key: "operator", label: "Operator" },
+                      { key: "count", label: "Count" },
+                      { key: "producedKg", label: "Produced", render: (s: any) => `${s.producedKg} kg` },
+                      { key: "wasteKg", label: "Waste", render: (s: any) => <span className="text-muted-foreground">{s.wasteKg} kg</span> },
+                      { key: "status", label: "Status", type: "status", render: (s: any) => <Badge variant={s.status === "approved" ? "default" : s.status === "rejected" ? "destructive" : "secondary"}>{s.status === "approved" && <CheckCircle2 className="size-3 mr-1 inline" />}{s.status}</Badge> },
+                    ] satisfies ColDef[]}
                     data={shifts}
-                    onFilter={setShiftFiltered}
-                    columns={shiftColumns}
+                    loading={shiftsQ.isLoading}
+                    rowKey={(s: any) => s.id}
+                    exportFilename="shift_entries"
                   />
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-[640px] w-full">
-                      <TableHeader>
-                        <TableRow>
-                          {svk.has("date") && <TableHead>Date</TableHead>}
-                          {svk.has("shift") && <TableHead>Shift</TableHead>}
-                          {svk.has("machineCode") && <TableHead>Machine</TableHead>}
-                          {svk.has("department") && <TableHead>Department</TableHead>}
-                          {svk.has("operator") && <TableHead>Operator</TableHead>}
-                          {svk.has("count") && <TableHead>Count</TableHead>}
-                          {svk.has("producedKg") && (
-                            <TableHead className="text-right">Produced</TableHead>
-                          )}
-                          {svk.has("wasteKg") && (
-                            <TableHead className="text-right">Waste</TableHead>
-                          )}
-                          {svk.has("status") && <TableHead>Status</TableHead>}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {shiftFiltered.map((s) => (
-                          <TableRow key={s.id}>
-                            {svk.has("date") && <TableCell className="text-sm">{s.date}</TableCell>}
-                            {svk.has("shift") && (
-                              <TableCell>
-                                <Badge variant="outline">{s.shift}</Badge>
-                              </TableCell>
-                            )}
-                            {svk.has("machineCode") && (
-                              <TableCell className="font-mono text-xs">{s.machineCode}</TableCell>
-                            )}
-                            {svk.has("department") && <TableCell>{s.department}</TableCell>}
-                            {svk.has("operator") && <TableCell>{s.operator}</TableCell>}
-                            {svk.has("count") && <TableCell>{s.count}</TableCell>}
-                            {svk.has("producedKg") && (
-                              <TableCell className="text-right">{s.producedKg} kg</TableCell>
-                            )}
-                            {svk.has("wasteKg") && (
-                              <TableCell className="text-right text-muted-foreground">
-                                {s.wasteKg} kg
-                              </TableCell>
-                            )}
-                            {svk.has("status") && (
-                              <TableCell>
-                                <Badge
-                                  variant={
-                                    s.status === "approved"
-                                      ? "default"
-                                      : s.status === "rejected"
-                                        ? "destructive"
-                                        : "secondary"
-                                  }
-                                >
-                                  {s.status === "approved" && (
-                                    <CheckCircle2 className="size-3 mr-1" />
-                                  )}
-                                  {s.status}
-                                </Badge>
-                              </TableCell>
-                            )}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
             <TabsContent value="downtime">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-base">Downtime Logs</CardTitle>
-                  {isAdmin && <ColumnConfigurator module="production" tableKey="downtime" />}
-                </CardHeader>
+                <CardHeader><CardTitle className="text-base">Downtime Logs</CardTitle></CardHeader>
                 <CardContent>
-                  <ExcelColumnFilter
+                  <DataTable
+                    tableId="production_downtime"
+                    columns={[
+                      { key: "machineCode", label: "Machine", className: "font-mono text-xs" },
+                      { key: "reason", label: "Reason" },
+                      { key: "startedAt", label: "Started" },
+                      { key: "durationMin", label: "Duration", render: (d: any) => `${d.durationMin} min` },
+                      { key: "resolved", label: "Status", type: "status", render: (d: any) => <Badge variant={d.resolved ? "default" : "destructive"}>{d.resolved ? "Resolved" : "Open"}</Badge> },
+                    ] satisfies ColDef[]}
                     data={downtime}
-                    onFilter={setDownFiltered}
-                    columns={downColumns}
+                    loading={downQ.isLoading}
+                    rowKey={(d: any) => d.id}
+                    exportFilename="downtime_logs"
                   />
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-[640px] w-full">
-                      <TableHeader>
-                        <TableRow>
-                          {dvk.has("machineCode") && <TableHead>Machine</TableHead>}
-                          {dvk.has("reason") && <TableHead>Reason</TableHead>}
-                          {dvk.has("startedAt") && <TableHead>Started</TableHead>}
-                          {dvk.has("durationMin") && (
-                            <TableHead className="text-right">Duration</TableHead>
-                          )}
-                          {dvk.has("resolved") && <TableHead>Status</TableHead>}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {downFiltered.map((d) => (
-                          <TableRow key={d.id}>
-                            {dvk.has("machineCode") && (
-                              <TableCell className="font-mono text-xs">{d.machineCode}</TableCell>
-                            )}
-                            {dvk.has("reason") && <TableCell>{d.reason}</TableCell>}
-                            {dvk.has("startedAt") && <TableCell>{d.startedAt}</TableCell>}
-                            {dvk.has("durationMin") && (
-                              <TableCell className="text-right">{d.durationMin} min</TableCell>
-                            )}
-                            {dvk.has("resolved") && (
-                              <TableCell>
-                                <Badge variant={d.resolved ? "default" : "destructive"}>
-                                  {d.resolved ? "Resolved" : "Open"}
-                                </Badge>
-                              </TableCell>
-                            )}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

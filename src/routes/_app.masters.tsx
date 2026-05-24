@@ -7,15 +7,9 @@ import { AccessGuard } from "@/components/AccessGuard";
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/DataTable";
+import type { ColDef } from "@/components/ui/DataTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,7 +31,7 @@ import {
 } from "@/components/ui/sheet";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { Plus, Search, Settings, ChevronLeft, ChevronRight, Blocks } from "lucide-react";
+import { Plus, Search, Settings, Blocks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type {
   Company,
@@ -486,161 +480,92 @@ function MasterTable<T = any>({
   onDeactivate?: (id: string) => void;
   extraActions?: (item: T) => React.ReactElement;
 }) {
-  const [page, setPage] = useState(1);
-  const [editing, setEditing] = useState<T | null>(null);
   const [adding, setAdding] = useState(false);
-  const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(data.length / pageSize));
-  const paged = data.slice((page - 1) * pageSize, page * pageSize);
+  const tableId = `masters_${title.toLowerCase().replace(/\s+/g, "_")}`;
+
+  const colDefs: ColDef<T>[] = [
+    ...columns.map((col) => ({
+      key: col.key,
+      label: col.label,
+      render: (item: T) => <span>{formatValue((item as any)[col.key])}</span>,
+    } as ColDef<T>)),
+    ...(!noStatus
+      ? [{
+          key: "_status",
+          label: "Status",
+          filterable: false,
+          render: (item: T) => {
+            const row = item as any;
+            if (activeKey === "current_status")
+              return (
+                <Badge variant={row[activeKey] === "running" ? "default" : row[activeKey] === "idle" ? "secondary" : "outline"}>
+                  {String(row[activeKey] ?? "unknown")}
+                </Badge>
+              );
+            if (activeKey)
+              return (
+                <Badge variant={row[activeKey] ? "default" : "secondary"}>
+                  {row[activeKey] ? "Active" : "Inactive"}
+                </Badge>
+              );
+            return <span className="text-muted-foreground">-</span>;
+          },
+        } as ColDef<T>]
+      : []),
+  ];
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">
-          {title} ({data.length})
-        </CardTitle>
+        <CardTitle className="text-base">{title} ({data.length})</CardTitle>
         {canEdit && (
-          <Sheet
-            open={adding && true}
-            onOpenChange={(o) => {
-              if (!o) setAdding(false);
-            }}
-          >
+          <Sheet open={adding} onOpenChange={(o) => { if (!o) setAdding(false); }}>
             <SheetTrigger asChild>
               <Button size="sm" onClick={() => setAdding(true)}>
                 <Plus className="size-4 mr-1" /> Add {title.slice(0, -1)}
               </Button>
             </SheetTrigger>
             <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-              <SheetHeader>
-                <SheetTitle>Add {title.slice(0, -1)}</SheetTitle>
-              </SheetHeader>
+              <SheetHeader><SheetTitle>Add {title.slice(0, -1)}</SheetTitle></SheetHeader>
               <div className="mt-4">{onAdd}</div>
             </SheetContent>
           </Sheet>
         )}
       </CardHeader>
       <CardContent>
-        <div className="w-full overflow-x-auto">
-          <Table className="min-w-[640px] w-full">
-            <TableHeader>
-              <TableRow>
-                {columns.map((col) => (
-                  <TableHead key={col.key}>{col.label}</TableHead>
-                ))}
-                <TableHead>Status</TableHead>
-                {canEdit && <TableHead className="w-24">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paged.map((item) => {
-                const row = item as any;
-                const id = String(row.id ?? "");
-                return (
-                  <TableRow key={id}>
-                    {columns.map((col) => (
-                      <TableCell key={col.key}>{formatValue(row[col.key])}</TableCell>
-                    ))}
-                    <TableCell>
-                      {noStatus ? (
-                        <span className="text-muted-foreground">-</span>
-                      ) : activeKey === "current_status" ? (
-                        <Badge
-                          variant={
-                            row[activeKey] === "running"
-                              ? "default"
-                              : row[activeKey] === "idle"
-                                ? "secondary"
-                                : "outline"
-                          }
-                        >
-                          {String(row[activeKey] ?? "unknown")}
-                        </Badge>
-                      ) : activeKey ? (
-                        <Badge variant={row[activeKey] ? "default" : "secondary"}>
-                          {row[activeKey] ? "Active" : "Inactive"}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    {(canEdit || extraActions) && (
-                      <TableCell>
-                        <div className="flex gap-1">
-                          {canEdit && (
-                            <Sheet>
-                              <SheetTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setEditing(item)}
-                                >
-                                  Edit
-                                </Button>
-                              </SheetTrigger>
-                              <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-                                <SheetHeader>
-                                  <SheetTitle>Edit {title.slice(0, -1)}</SheetTitle>
-                                </SheetHeader>
-                                <div className="mt-4">{onEdit(item)}</div>
-                              </SheetContent>
-                            </Sheet>
-                          )}
-                          {extraActions?.(item)}
-                          {canEdit && onDeactivate && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-destructive"
-                              onClick={() => onDeactivate(id)}
-                            >
-                              Deactivate
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                );
-              })}
-              {paged.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={columns.length + 2}
-                    className="text-center text-muted-foreground py-8"
-                  >
-                    No entries found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between pt-4 text-sm text-muted-foreground">
-            <span>
-              Page {page} of {totalPages}
-            </span>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-              >
-                <ChevronLeft className="size-4" /> Previous
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={page >= totalPages}
-                onClick={() => setPage(page + 1)}
-              >
-                Next <ChevronRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        )}
+        <DataTable
+          tableId={tableId}
+          columns={colDefs}
+          data={data}
+          loading={false}
+          rowKey={(item: any) => String(item.id ?? "")}
+          exportFilename={title.toLowerCase().replace(/\s+/g, "_")}
+          actions={(canEdit || extraActions) ? (item: T) => {
+            const row = item as any;
+            const id = String(row.id ?? "");
+            return (
+              <div className="flex gap-1">
+                {canEdit && (
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button size="sm" variant="outline">Edit</Button>
+                    </SheetTrigger>
+                    <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+                      <SheetHeader><SheetTitle>Edit {title.slice(0, -1)}</SheetTitle></SheetHeader>
+                      <div className="mt-4">{onEdit(item)}</div>
+                    </SheetContent>
+                  </Sheet>
+                )}
+                {extraActions?.(item)}
+                {canEdit && onDeactivate && (
+                  <Button size="sm" variant="outline" className="text-destructive" onClick={() => onDeactivate(id)}>
+                    Deactivate
+                  </Button>
+                )}
+              </div>
+            );
+          } : undefined}
+        />
       </CardContent>
     </Card>
   );

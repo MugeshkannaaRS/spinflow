@@ -7,14 +7,6 @@ import { AccessGuard } from "@/components/AccessGuard";
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,11 +19,13 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ExcelColumnFilter } from "@/components/ui/excel-column-filter";
 import { FileUpload, type UploadedFile } from "@/components/ui/file-upload";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { DataTable } from "@/components/ui/DataTable";
+import { ImportButton } from "@/components/ui/ImportButton";
+import type { ColDef } from "@/components/ui/DataTable";
 import { toast } from "sonner";
-import { Plus, Warehouse, AlertTriangle, ArrowDownToLine, Package } from "lucide-react";
+import { Plus, Warehouse, AlertTriangle, Package } from "lucide-react";
 
 export const Route = createFileRoute("/_app/stores")({
   head: () => ({ meta: [{ title: "Stores — SpinFlow ERP" }] }),
@@ -41,118 +35,60 @@ export const Route = createFileRoute("/_app/stores")({
 function StoresPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "stores");
-  const itemsQ = useQuery({
-    queryKey: ["spare-items"],
-    queryFn: storesApi.getSpares,
-    staleTime: 60_000,
-    retry: 1,
-  });
-  const issuesQ = useQuery({
-    queryKey: ["issue-notes"],
-    queryFn: storesApi.getIssues,
-    staleTime: 60_000,
-    retry: 1,
-  });
+  const itemsQ = useQuery({ queryKey: ["spare-items"], queryFn: storesApi.getSpares, staleTime: 60_000, retry: 1 });
+  const issuesQ = useQuery({ queryKey: ["issue-notes"], queryFn: storesApi.getIssues, staleTime: 60_000, retry: 1 });
 
   const items: any[] = itemsQ.data ?? [];
   const issues: any[] = issuesQ.data ?? [];
-
-  const [itemFiltered, setItemFiltered] = useState<any[]>([]);
-  const [issueFiltered, setIssueFiltered] = useState<any[]>([]);
-
-  useEffect(() => {
-    setItemFiltered(itemsQ.data ?? []);
-  }, [itemsQ.data]);
-  useEffect(() => {
-    setIssueFiltered(issuesQ.data ?? []);
-  }, [issuesQ.data]);
 
   const totalItems = items.length;
   const lowStockItems = items.filter((i) => i.stock <= i.minStock).length;
   const totalStock = items.reduce((s, i) => s + (i.stock ?? 0), 0);
   const reorderItems = items.filter((i) => i.stock < i.minStock * 0.5).length;
 
-  const itemColumns = [
-    { key: "code" as const, label: "Code" },
-    { key: "name" as const, label: "Name" },
-    { key: "category" as const, label: "Category" },
-    { key: "vendor" as const, label: "Vendor" },
-  ];
-  const issueColumns = [
-    { key: "date" as const, label: "Date" },
-    { key: "itemCode" as const, label: "Item" },
-    { key: "issuedTo" as const, label: "Issued To" },
-    { key: "department" as const, label: "Department" },
-    { key: "issuedBy" as const, label: "Issued By" },
-  ];
-
   if (!user) return null;
+  if (itemsQ.isLoading) return (<><Topbar title="Stores & Spares" subtitle="Loading..." /><div className="p-6 text-sm text-muted-foreground">Loading data…</div></>);
+  if (itemsQ.isError) return (<><Topbar title="Stores & Spares" subtitle="Error" /><div className="p-6 text-sm text-destructive">Error loading data.</div></>);
 
-  if (itemsQ.isLoading)
-    return (
-      <>
-        <Topbar title="Stores & Spares" subtitle="Loading..." />
-        <div className="p-6 text-sm text-muted-foreground">Loading data…</div>
-      </>
-    );
-  if (itemsQ.isError)
-    return (
-      <>
-        <Topbar title="Stores & Spares" subtitle="Error" />
-        <div className="p-6 text-sm text-destructive">Error loading data.</div>
-      </>
-    );
+  const itemCols: ColDef[] = [
+    { key: "code", label: "Code", className: "font-mono text-xs" },
+    { key: "name", label: "Name", render: (i: any) => <span className="font-medium">{i.name}</span> },
+    { key: "category", label: "Category", type: "status", render: (i: any) => <Badge variant="outline">{i.category}</Badge> },
+    { key: "stock", label: "Stock", render: (i: any) => <span className="font-medium">{i.stock}</span> },
+    { key: "minStock", label: "Min Stock", className: "text-muted-foreground" },
+    { key: "unit", label: "Unit", type: "status" },
+    { key: "location", label: "Location" },
+    { key: "vendor", label: "Vendor" },
+    {
+      key: "status", label: "Status", type: "status", filterable: false,
+      render: (i: any) => i.stock <= i.minStock ? (
+        <Badge variant={i.stock < i.minStock * 0.5 ? "destructive" : "secondary"}>
+          {i.stock < i.minStock * 0.5 ? "Reorder" : "Low"}
+        </Badge>
+      ) : <Badge variant="default">OK</Badge>,
+    },
+  ];
+
+  const issueCols: ColDef[] = [
+    { key: "date", label: "Date", type: "date" },
+    { key: "itemCode", label: "Item", className: "font-mono text-xs" },
+    { key: "quantity", label: "Qty" },
+    { key: "issuedTo", label: "Issued To" },
+    { key: "department", label: "Department", type: "status" },
+    { key: "purpose", label: "Purpose", className: "max-w-xs truncate" },
+    { key: "issuedBy", label: "Issued By" },
+  ];
 
   return (
     <>
-      <Topbar
-        title="Stores & Spares"
-        subtitle="Spare inventory, reorder alerts, issue notes & vendor management"
-      />
+      <Topbar title="Stores & Spares" subtitle="Spare inventory, reorder alerts, issue notes & vendor management" />
       <AccessGuard module="stores">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">
-                  Spare Items
-                </div>
-                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <Package className="size-5 text-primary" />
-                  {totalItems}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">
-                  Total Stock
-                </div>
-                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <Warehouse className="size-5 text-success" />
-                  {totalStock} units
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">
-                  Low Stock Items
-                </div>
-                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <AlertTriangle className="size-5 text-warning" />
-                  {lowStockItems}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">
-                  Needs Reorder
-                </div>
-                <div className="text-2xl font-semibold mt-2">{reorderItems}</div>
-              </CardContent>
-            </Card>
+            <Card><CardContent className="p-5"><div className="text-xs uppercase text-muted-foreground font-medium">Spare Items</div><div className="text-2xl font-semibold mt-2 flex items-center gap-2"><Package className="size-5 text-primary" />{totalItems}</div></CardContent></Card>
+            <Card><CardContent className="p-5"><div className="text-xs uppercase text-muted-foreground font-medium">Total Stock</div><div className="text-2xl font-semibold mt-2 flex items-center gap-2"><Warehouse className="size-5 text-green-600" />{totalStock} units</div></CardContent></Card>
+            <Card><CardContent className="p-5"><div className="text-xs uppercase text-muted-foreground font-medium">Low Stock Items</div><div className="text-2xl font-semibold mt-2 flex items-center gap-2"><AlertTriangle className="size-5 text-amber-500" />{lowStockItems}</div></CardContent></Card>
+            <Card><CardContent className="p-5"><div className="text-xs uppercase text-muted-foreground font-medium">Needs Reorder</div><div className="text-2xl font-semibold mt-2">{reorderItems}</div></CardContent></Card>
           </div>
 
           <Tabs defaultValue="inventory">
@@ -163,61 +99,34 @@ function StoresPage() {
 
             <TabsContent value="inventory">
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Spare Parts & Consumables</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle className="text-base">Spare Parts & Consumables</CardTitle></CardHeader>
                 <CardContent>
-                  <ExcelColumnFilter
+                  <DataTable
+                    tableId="stores_spares"
+                    columns={itemCols}
                     data={items}
-                    onFilter={setItemFiltered}
-                    columns={itemColumns}
+                    loading={itemsQ.isLoading}
+                    rowKey={(i) => i.id}
+                    exportFilename="spare_inventory"
+                    toolbar={
+                      canEdit ? (
+                        <ImportButton
+                          label="Import"
+                          endpoint="/stores/spares/bulk"
+                          templateCols={[
+                            { key: "item_code", label: "Spare Code", required: true, candidates: ["code", "spare code", "item code"] },
+                            { key: "name", label: "Name", required: true, candidates: ["name", "item name", "spare name"] },
+                            { key: "category", label: "Category", required: true, candidates: ["category", "type"] },
+                            { key: "unit", label: "Unit", required: true, candidates: ["unit", "uom"] },
+                            { key: "reorder_level", label: "Min Stock", type: "number", candidates: ["min stock", "reorder", "minimum"] },
+                            { key: "current_stock", label: "Max Stock", type: "number", candidates: ["max stock", "stock", "quantity"] },
+                          ]}
+                          exampleRow={{ item_code: "SP001", name: "Bearing 6205", category: "Bearings", unit: "Nos", reorder_level: "5", current_stock: "20" }}
+                          onSuccess={() => itemsQ.refetch()}
+                        />
+                      ) : undefined
+                    }
                   />
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-[640px] w-full">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Code</TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Category</TableHead>
-                          <TableHead className="text-right">Stock</TableHead>
-                          <TableHead className="text-right">Min Stock</TableHead>
-                          <TableHead>Unit</TableHead>
-                          <TableHead>Location</TableHead>
-                          <TableHead>Vendor</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {itemFiltered.map((i) => (
-                          <TableRow key={i.id}>
-                            <TableCell className="font-mono text-xs">{i.code}</TableCell>
-                            <TableCell className="font-medium">{i.name}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{i.category}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right font-medium">{i.stock}</TableCell>
-                            <TableCell className="text-right text-muted-foreground">
-                              {i.minStock}
-                            </TableCell>
-                            <TableCell>{i.unit}</TableCell>
-                            <TableCell>{i.location}</TableCell>
-                            <TableCell className="text-sm">{i.vendor}</TableCell>
-                            <TableCell>
-                              {i.stock <= i.minStock ? (
-                                <Badge
-                                  variant={i.stock < i.minStock * 0.5 ? "destructive" : "secondary"}
-                                >
-                                  {i.stock < i.minStock * 0.5 ? "Reorder" : "Low"}
-                                </Badge>
-                              ) : (
-                                <Badge variant="default">OK</Badge>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -229,41 +138,7 @@ function StoresPage() {
                   {canEdit && <NewIssueNoteDialog />}
                 </CardHeader>
                 <CardContent>
-                  <ExcelColumnFilter
-                    data={issues}
-                    onFilter={setIssueFiltered}
-                    columns={issueColumns}
-                  />
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-[640px] w-full">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Item</TableHead>
-                          <TableHead className="text-right">Qty</TableHead>
-                          <TableHead>Issued To</TableHead>
-                          <TableHead>Department</TableHead>
-                          <TableHead>Purpose</TableHead>
-                          <TableHead>Issued By</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {issueFiltered.map((n) => (
-                          <TableRow key={n.id}>
-                            <TableCell className="text-sm">{n.date}</TableCell>
-                            <TableCell>
-                              <span className="font-mono text-xs">{n.itemCode}</span> — {n.itemName}
-                            </TableCell>
-                            <TableCell className="text-right font-medium">{n.quantity}</TableCell>
-                            <TableCell>{n.issuedTo}</TableCell>
-                            <TableCell>{n.department}</TableCell>
-                            <TableCell className="max-w-[200px] truncate">{n.purpose}</TableCell>
-                            <TableCell>{n.issuedBy}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  <DataTable tableId="stores_issues" columns={issueCols} data={issues} loading={issuesQ.isLoading} rowKey={(n) => n.id} exportFilename="issue_notes" />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -279,209 +154,63 @@ function NewIssueNoteDialog() {
   const [open, setOpen] = useState(false);
   const [requiredErrors, setRequiredErrors] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<UploadedFile[]>([]);
-  const [form, setForm] = useState({
-    date: new Date().toISOString().slice(0, 10),
-    itemCode: "",
-    itemName: "",
-    quantity: 0,
-    issuedTo: "",
-    department: "",
-    purpose: "",
-    issuedBy: "",
-  });
+  const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), itemCode: "", itemName: "", quantity: 0, issuedTo: "", department: "", purpose: "", issuedBy: "" });
 
-  const reqFields = [
-    "date",
-    "itemCode",
-    "itemName",
-    "quantity",
-    "issuedTo",
-    "department",
-    "issuedBy",
-  ] as const;
-  const allFilled = reqFields.every((f) => {
-    const v = form[f];
-    if (typeof v === "number") return v > 0;
-    return typeof v === "string" && v.trim().length > 0;
-  });
+  const reqFields = ["date", "itemCode", "itemName", "quantity", "issuedTo", "department", "issuedBy"] as const;
+  const allFilled = reqFields.every((f) => { const v = (form as any)[f]; return typeof v === "number" ? v > 0 : typeof v === "string" && v.trim().length > 0; });
 
   const m = useMutation({
     mutationFn: async () => {
       const entry = await storesApi.createIssue(form);
-      if (files.length > 0) {
-        await Promise.all(files.map((f) => uploadApi.upload("stores_issue", entry.id, f.file)));
-      }
+      if (files.length > 0) await Promise.all(files.map((f) => uploadApi.upload("stores_issue", entry.id, f.file)));
       return entry;
     },
   });
 
-  const handleCreateIssue = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const errors: Record<string, string> = {};
-    reqFields.forEach((f) => {
-      const v = form[f];
-      if (typeof v === "number" ? v <= 0 : !v || (typeof v === "string" && !v.trim())) {
-        errors[f] = "This field is required";
-      }
-    });
+    reqFields.forEach((f) => { const v = (form as any)[f]; if (typeof v === "number" ? v <= 0 : !v || !v.trim()) errors[f] = "Required"; });
     setRequiredErrors(errors);
     if (Object.keys(errors).length > 0) return;
-    m.mutate(undefined, {
-      onSuccess: () => {
-        toast.success("Issue note created");
-        qc.invalidateQueries({ queryKey: ["issue-notes"] });
-        qc.invalidateQueries({ queryKey: ["spare-items"] });
-        setFiles([]);
-        setOpen(false);
-      },
-    });
+    m.mutate(undefined, { onSuccess: () => { toast.success("Issue note created"); qc.invalidateQueries({ queryKey: ["issue-notes"] }); qc.invalidateQueries({ queryKey: ["spare-items"] }); setFiles([]); setOpen(false); } });
   };
+
+  const fi = (key: keyof typeof form, type?: string) => ({
+    value: String((form as any)[key]),
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => { setForm({ ...form, [key]: type === "number" ? +e.target.value : e.target.value }); setRequiredErrors((p) => ({ ...p, [key]: "" })); },
+    className: requiredErrors[key as string] ? "border-destructive" : "",
+  });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="size-4 mr-1" />
-          New issue
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger asChild><Button size="sm"><Plus className="size-4 mr-1" />New issue</Button></DialogTrigger>
       <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>New issue note</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleCreateIssue} className="space-y-3">
+        <DialogHeader><DialogTitle>New issue note</DialogTitle></DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
+            {(["date", "itemCode", "itemName", "issuedTo", "department", "issuedBy"] as const).map((key) => (
+              <div key={key} className="space-y-1.5">
+                <Label>{key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase())} <span className="text-destructive">*</span></Label>
+                <Input type={key === "date" ? "date" : "text"} {...fi(key)} />
+                {requiredErrors[key] && <p className="text-xs text-destructive">{requiredErrors[key]}</p>}
+              </div>
+            ))}
             <div className="space-y-1.5">
-              <Label>
-                Date <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                type="date"
-                value={form.date}
-                onChange={(e) => {
-                  setForm({ ...form, date: e.target.value });
-                  setRequiredErrors((prev) => ({ ...prev, date: "" }));
-                }}
-                className={requiredErrors.date ? "border-destructive" : ""}
-              />
-              {requiredErrors.date && (
-                <p className="text-sm text-destructive">{requiredErrors.date}</p>
-              )}
+              <Label>Quantity <span className="text-destructive">*</span></Label>
+              <Input type="number" {...fi("quantity", "number")} />
+              {requiredErrors.quantity && <p className="text-xs text-destructive">{requiredErrors.quantity}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>
-                Item code <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                value={form.itemCode}
-                onChange={(e) => {
-                  setForm({ ...form, itemCode: e.target.value });
-                  setRequiredErrors((prev) => ({ ...prev, itemCode: "" }));
-                }}
-                className={requiredErrors.itemCode ? "border-destructive" : ""}
-              />
-              {requiredErrors.itemCode && (
-                <p className="text-sm text-destructive">{requiredErrors.itemCode}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                Item name <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                value={form.itemName}
-                onChange={(e) => {
-                  setForm({ ...form, itemName: e.target.value });
-                  setRequiredErrors((prev) => ({ ...prev, itemName: "" }));
-                }}
-                className={requiredErrors.itemName ? "border-destructive" : ""}
-              />
-              {requiredErrors.itemName && (
-                <p className="text-sm text-destructive">{requiredErrors.itemName}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                Quantity <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                type="number"
-                value={form.quantity}
-                onChange={(e) => {
-                  setForm({ ...form, quantity: +e.target.value });
-                  setRequiredErrors((prev) => ({ ...prev, quantity: "" }));
-                }}
-                className={requiredErrors.quantity ? "border-destructive" : ""}
-              />
-              {requiredErrors.quantity && (
-                <p className="text-sm text-destructive">{requiredErrors.quantity}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                Issued to <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                value={form.issuedTo}
-                onChange={(e) => {
-                  setForm({ ...form, issuedTo: e.target.value });
-                  setRequiredErrors((prev) => ({ ...prev, issuedTo: "" }));
-                }}
-                className={requiredErrors.issuedTo ? "border-destructive" : ""}
-              />
-              {requiredErrors.issuedTo && (
-                <p className="text-sm text-destructive">{requiredErrors.issuedTo}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                Department <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                value={form.department}
-                onChange={(e) => {
-                  setForm({ ...form, department: e.target.value });
-                  setRequiredErrors((prev) => ({ ...prev, department: "" }));
-                }}
-                className={requiredErrors.department ? "border-destructive" : ""}
-              />
-              {requiredErrors.department && (
-                <p className="text-sm text-destructive">{requiredErrors.department}</p>
-              )}
+              <Label>Purpose</Label>
+              <Input value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} />
             </div>
             <div className="space-y-1.5 col-span-2">
-              <Label>Purpose</Label>
-              <Input
-                value={form.purpose}
-                onChange={(e) => setForm({ ...form, purpose: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                Issued by <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                value={form.issuedBy}
-                onChange={(e) => {
-                  setForm({ ...form, issuedBy: e.target.value });
-                  setRequiredErrors((prev) => ({ ...prev, issuedBy: "" }));
-                }}
-                className={requiredErrors.issuedBy ? "border-destructive" : ""}
-              />
-              {requiredErrors.issuedBy && (
-                <p className="text-sm text-destructive">{requiredErrors.issuedBy}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
               <Label>Attachment</Label>
               <FileUpload files={files} onFilesChange={setFiles} multiple={false} />
             </div>
           </div>
-          <DialogFooter>
-            <Button type="submit" disabled={m.isPending || !allFilled}>
-              {m.isPending ? "Saving…" : "Create issue note"}
-            </Button>
-          </DialogFooter>
+          <DialogFooter><Button type="submit" disabled={m.isPending || !allFilled}>{m.isPending ? "Saving…" : "Create issue note"}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

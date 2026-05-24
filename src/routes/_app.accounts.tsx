@@ -6,15 +6,9 @@ import { AccessGuard } from "@/components/AccessGuard";
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/DataTable";
+import type { ColDef } from "@/components/ui/DataTable";
 import {
   Select,
   SelectContent,
@@ -23,8 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { useState, useEffect } from "react";
-import { ExcelColumnFilter } from "@/components/ui/excel-column-filter";
+import { useState } from "react";
 import {
   Receipt,
   IndianRupee,
@@ -56,16 +49,6 @@ function AccountsPage() {
 
   const invoices: any[] = invQ.data ?? [];
   const receivables: any[] = recvQ.data ?? [];
-
-  const [filteredInvoices, setFilteredInvoices] = useState<any[]>([]);
-  const [filteredReceivables, setFilteredReceivables] = useState<any[]>([]);
-
-  useEffect(() => {
-    setFilteredInvoices(invQ.data ?? []);
-  }, [invQ.data]);
-  useEffect(() => {
-    setFilteredReceivables(recvQ.data ?? []);
-  }, [recvQ.data]);
 
   const totalSales = invoices
     .filter((i) => i.type === "sales")
@@ -160,161 +143,48 @@ function AccountsPage() {
                   <CardTitle className="text-base">GST Invoices</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ExcelColumnFilter
-                    data={invoices}
-                    onFilter={setFilteredInvoices}
+                  <DataTable
+                    tableId="accounts_invoices"
                     columns={[
-                      {
-                        key: "invoiceNo" as const,
-                        label: "Invoice No",
-                        placeholder: "Filter invoice...",
-                      },
-                      { key: "date" as const, label: "Date", placeholder: "Filter date..." },
-                      {
-                        key: "customer" as const,
-                        label: "Customer / Supplier",
-                        placeholder: "Filter customer...",
-                      },
-                      { key: "type" as const, label: "Type", placeholder: "Filter type..." },
-                      { key: "status" as const, label: "Status", placeholder: "Filter status..." },
-                    ]}
+                      { key: "invoiceNo", label: "Invoice No", className: "font-mono text-xs" },
+                      { key: "date", label: "Date", type: "date" },
+                      { key: "customer", label: "Customer / Supplier", render: (inv: any) => <span className="font-medium">{inv.customer}</span> },
+                      { key: "type", label: "Type", type: "status", render: (inv: any) => <Badge variant={inv.type === "sales" ? "default" : "secondary"}>{inv.type}</Badge> },
+                      { key: "amount", label: "Amount", render: (inv: any) => `₹${(inv.amount ?? 0).toLocaleString()}` },
+                      { key: "gst", label: "GST", render: (inv: any) => `₹${(inv.gst ?? 0).toLocaleString()}` },
+                      { key: "total", label: "Total", render: (inv: any) => <span className="font-medium">₹{(inv.total ?? 0).toLocaleString()}</span> },
+                      { key: "status", label: "Status", type: "status", render: (inv: any) => <Badge variant={inv.status === "paid" ? "default" : inv.status === "overdue" ? "destructive" : inv.status === "posted" ? "secondary" : "outline"}>{inv.status}</Badge> },
+                    ] satisfies ColDef[]}
+                    data={invoices}
+                    loading={invQ.isLoading}
+                    rowKey={(inv) => inv.id}
+                    exportFilename="invoices"
                   />
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-[640px] w-full">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Invoice No</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Customer / Supplier</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                          <TableHead className="text-right">GST</TableHead>
-                          <TableHead className="text-right">Total</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredInvoices.map((inv) => (
-                          <TableRow key={inv.id}>
-                            <TableCell className="font-mono text-xs">{inv.invoiceNo}</TableCell>
-                            <TableCell className="text-sm">{inv.date}</TableCell>
-                            <TableCell className="font-medium">{inv.customer}</TableCell>
-                            <TableCell>
-                              <Badge variant={inv.type === "sales" ? "default" : "secondary"}>
-                                {inv.type}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              ₹{(inv.amount ?? 0).toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              ₹{(inv.gst ?? 0).toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-right font-medium">
-                              ₹{(inv.total ?? 0).toLocaleString()}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  inv.status === "paid"
-                                    ? "default"
-                                    : inv.status === "overdue"
-                                      ? "destructive"
-                                      : inv.status === "posted"
-                                        ? "secondary"
-                                        : "outline"
-                                }
-                              >
-                                {inv.status}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
             <TabsContent value="receivables">
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Outstanding Receivables</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle className="text-base">Outstanding Receivables</CardTitle></CardHeader>
                 <CardContent>
-                  <ExcelColumnFilter
-                    data={receivables as any[]}
-                    onFilter={setFilteredReceivables}
+                  <DataTable
+                    tableId="accounts_receivables"
                     columns={[
-                      {
-                        key: "customer" as const,
-                        label: "Customer",
-                        placeholder: "Filter customer...",
-                      },
-                      {
-                        key: "invoiceNo" as const,
-                        label: "Invoice",
-                        placeholder: "Filter invoice...",
-                      },
-                      { key: "status" as const, label: "Status", placeholder: "Filter status..." },
-                    ]}
+                      { key: "customer", label: "Customer", render: (r: any) => <span className="font-medium">{r.customer}</span> },
+                      { key: "invoiceNo", label: "Invoice", className: "font-mono text-xs" },
+                      { key: "date", label: "Date", type: "date" },
+                      { key: "dueDate", label: "Due Date", type: "date" },
+                      { key: "amount", label: "Amount", render: (r: any) => `₹${(r.amount ?? 0).toLocaleString()}` },
+                      { key: "outstanding", label: "Outstanding", render: (r: any) => <span className="font-medium text-destructive">₹{(r.outstanding ?? 0).toLocaleString()}</span> },
+                      { key: "status", label: "Status", type: "status", render: (r: any) => <Badge variant={r.status === "paid" ? "default" : r.status === "overdue" ? "destructive" : "secondary"}>{r.status === "paid" && <CheckCircle2 className="size-3 mr-1 inline" />}{r.status}</Badge> },
+                      { key: "daysOverdue", label: "Days Overdue", render: (r: any) => r.daysOverdue > 0 ? <span className="text-destructive font-medium">{r.daysOverdue}d</span> : "—" },
+                    ] satisfies ColDef[]}
+                    data={receivables as any[]}
+                    loading={recvQ.isLoading}
+                    rowKey={(r) => r.id}
+                    exportFilename="receivables"
                   />
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-[640px] w-full">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Customer</TableHead>
-                          <TableHead>Invoice</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Due Date</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                          <TableHead className="text-right">Outstanding</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Days Overdue</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredReceivables.map((r) => (
-                          <TableRow key={r.id}>
-                            <TableCell className="font-medium">{r.customer}</TableCell>
-                            <TableCell className="font-mono text-xs">{r.invoiceNo}</TableCell>
-                            <TableCell className="text-sm">{r.date}</TableCell>
-                            <TableCell className="text-sm">{r.dueDate}</TableCell>
-                            <TableCell className="text-right">
-                              ₹{(r.amount ?? 0).toLocaleString()}
-                            </TableCell>
-                            <TableCell className="text-right font-medium text-destructive">
-                              ₹{(r.outstanding ?? 0).toLocaleString()}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  r.status === "paid"
-                                    ? "default"
-                                    : r.status === "overdue"
-                                      ? "destructive"
-                                      : "secondary"
-                                }
-                              >
-                                {r.status === "paid" && <CheckCircle2 className="size-3 mr-1" />}
-                                {r.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {r.daysOverdue > 0 ? (
-                                <span className="text-destructive font-medium">
-                                  {r.daysOverdue}d
-                                </span>
-                              ) : (
-                                "—"
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

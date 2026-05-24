@@ -24,8 +24,9 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ExcelColumnFilter } from "@/components/ui/excel-column-filter";
-import { useState, useRef, useEffect } from "react";
+import { DataTable } from "@/components/ui/DataTable";
+import type { ColDef } from "@/components/ui/DataTable";
+import { useState, useRef } from "react";
 import {
   Select,
   SelectContent,
@@ -345,21 +346,8 @@ function MaintenancePage() {
   const schedules: any[] = schedulesQ.data ?? [];
   const parameters: any[] = paramsQ.data ?? [];
 
-  const [filteredTasks, setFilteredTasks] = useState<any[]>([]);
-  const [filteredSchedules, setFilteredSchedules] = useState<any[]>([]);
-  const [filteredParams, setFilteredParams] = useState<any[]>([]);
   const [scheduleImportOpen, setScheduleImportOpen] = useState(false);
   const [paramImportOpen, setParamImportOpen] = useState(false);
-
-  useEffect(() => {
-    setFilteredTasks(maintQ.data ?? []);
-  }, [maintQ.data]);
-  useEffect(() => {
-    setFilteredSchedules(schedulesQ.data ?? []);
-  }, [schedulesQ.data]);
-  useEffect(() => {
-    setFilteredParams(paramsQ.data ?? []);
-  }, [paramsQ.data]);
 
   const scheduleMutation = useMutation({
     mutationFn: (rows: Record<string, string>[]) =>
@@ -489,101 +477,27 @@ function MaintenancePage() {
             {/* ── Tasks tab ── */}
             <TabsContent value="tasks">
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Maintenance Tasks</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle className="text-base">Maintenance Tasks</CardTitle></CardHeader>
                 <CardContent>
-                  <ExcelColumnFilter
-                    data={tasks}
-                    onFilter={setFilteredTasks}
+                  <DataTable
+                    tableId="maintenance_tasks"
                     columns={[
-                      { key: "date" as const, label: "Date", placeholder: "Filter date..." },
-                      { key: "type" as const, label: "Type", placeholder: "Filter type..." },
-                      {
-                        key: "machineCode" as const,
-                        label: "Machine",
-                        placeholder: "Filter machine...",
-                      },
-                      {
-                        key: "department" as const,
-                        label: "Department",
-                        placeholder: "Filter dept...",
-                      },
-                      {
-                        key: "technician" as const,
-                        label: "Technician",
-                        placeholder: "Filter tech...",
-                      },
-                      { key: "spareUsed" as const, label: "Spare", placeholder: "Filter spare..." },
-                      { key: "status" as const, label: "Status", placeholder: "Filter status..." },
-                    ]}
+                      { key: "date", label: "Date", type: "date" },
+                      { key: "type", label: "Type", render: (t: any) => <Badge variant={t.type === "breakdown" ? "destructive" : t.type === "preventive" ? "default" : "secondary"}>{t.type}</Badge> },
+                      { key: "machineCode", label: "Machine", className: "font-mono text-xs" },
+                      { key: "department", label: "Department", type: "status" },
+                      { key: "description", label: "Description", className: "max-w-[250px] truncate" },
+                      { key: "technician", label: "Technician" },
+                      { key: "downtimeMin", label: "Downtime", render: (t: any) => `${t.downtimeMin} min` },
+                      { key: "spareUsed", label: "Spare", render: (t: any) => t.spareUsed || "—" },
+                      { key: "status", label: "Status", type: "status", render: (t: any) => <Badge variant={t.status === "completed" ? "default" : t.status === "in-progress" ? "secondary" : "destructive"}>{t.status}</Badge> },
+                    ] satisfies ColDef[]}
+                    data={tasks}
+                    loading={maintQ.isLoading}
+                    rowKey={(t: any) => t.id}
+                    exportFilename="maintenance_tasks"
+                    actions={canEdit ? (t: any) => t.status !== "completed" ? <StatusSelect taskId={t.id} currentStatus={t.status} /> : null : undefined}
                   />
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-[640px] w-full">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Machine</TableHead>
-                          <TableHead>Department</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Technician</TableHead>
-                          <TableHead className="text-right">Downtime</TableHead>
-                          <TableHead>Spare</TableHead>
-                          <TableHead>Status</TableHead>
-                          {canEdit && <TableHead>Actions</TableHead>}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredTasks.map((t) => (
-                          <TableRow key={t.id}>
-                            <TableCell className="text-sm">{t.date}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  t.type === "breakdown"
-                                    ? "destructive"
-                                    : t.type === "preventive"
-                                      ? "default"
-                                      : "secondary"
-                                }
-                              >
-                                {t.type}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="font-mono text-xs">{t.machineCode}</TableCell>
-                            <TableCell>{t.department}</TableCell>
-                            <TableCell className="max-w-[250px] truncate">
-                              {t.description}
-                            </TableCell>
-                            <TableCell>{t.technician}</TableCell>
-                            <TableCell className="text-right">{t.downtimeMin} min</TableCell>
-                            <TableCell className="text-sm">{t.spareUsed || "—"}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  t.status === "completed"
-                                    ? "default"
-                                    : t.status === "in-progress"
-                                      ? "secondary"
-                                      : "destructive"
-                                }
-                              >
-                                {t.status}
-                              </Badge>
-                            </TableCell>
-                            {canEdit && (
-                              <TableCell>
-                                {t.status !== "completed" && (
-                                  <StatusSelect taskId={t.id} currentStatus={t.status} />
-                                )}
-                              </TableCell>
-                            )}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -601,78 +515,23 @@ function MaintenancePage() {
                   )}
                 </CardHeader>
                 <CardContent>
-                  {schedulesQ.isLoading ? (
-                    <div className="py-4 text-sm text-muted-foreground">Loading schedules…</div>
-                  ) : (
-                    <>
-                      <ExcelColumnFilter
-                        data={schedules}
-                        onFilter={setFilteredSchedules}
-                        columns={[
-                          {
-                            key: "machine_code" as const,
-                            label: "Machine",
-                            placeholder: "Filter machine...",
-                          },
-                          { key: "type" as const, label: "Type", placeholder: "Filter type..." },
-                          {
-                            key: "description" as const,
-                            label: "Description",
-                            placeholder: "Filter...",
-                          },
-                        ]}
-                      />
-                      <div className="w-full overflow-x-auto">
-                        <Table className="min-w-[640px] w-full">
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Machine Code</TableHead>
-                              <TableHead>Type</TableHead>
-                              <TableHead>Frequency (days)</TableHead>
-                              <TableHead>Last Done</TableHead>
-                              <TableHead>Next Due</TableHead>
-                              <TableHead>Description</TableHead>
-                              <TableHead>Active</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredSchedules.length === 0 ? (
-                              <TableRow>
-                                <TableCell
-                                  colSpan={7}
-                                  className="text-center text-sm text-muted-foreground py-8"
-                                >
-                                  No schedules yet. Use "Import Schedule" to upload from Excel.
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              filteredSchedules.map((s) => (
-                                <TableRow key={s.id}>
-                                  <TableCell className="font-mono text-xs">
-                                    {s.machine_code}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="secondary">{s.type}</Badge>
-                                  </TableCell>
-                                  <TableCell>{s.frequency_days}</TableCell>
-                                  <TableCell className="text-sm">{s.last_done || "—"}</TableCell>
-                                  <TableCell className="text-sm">{s.next_due || "—"}</TableCell>
-                                  <TableCell className="max-w-[300px] truncate text-sm">
-                                    {s.description}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant={s.is_active ? "default" : "secondary"}>
-                                      {s.is_active ? "Active" : "Inactive"}
-                                    </Badge>
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </>
-                  )}
+                  <DataTable
+                    tableId="maintenance_schedules"
+                    columns={[
+                      { key: "machine_code", label: "Machine Code", className: "font-mono text-xs" },
+                      { key: "type", label: "Type", render: (s: any) => <Badge variant="secondary">{s.type}</Badge> },
+                      { key: "frequency_days", label: "Frequency (days)" },
+                      { key: "last_done", label: "Last Done", render: (s: any) => s.last_done || "—" },
+                      { key: "next_due", label: "Next Due", render: (s: any) => s.next_due || "—" },
+                      { key: "description", label: "Description", className: "max-w-[300px] truncate" },
+                      { key: "is_active", label: "Active", render: (s: any) => <Badge variant={s.is_active ? "default" : "secondary"}>{s.is_active ? "Active" : "Inactive"}</Badge> },
+                    ] satisfies ColDef[]}
+                    data={schedules}
+                    loading={schedulesQ.isLoading}
+                    rowKey={(s: any) => s.id}
+                    exportFilename="pm_schedules"
+                    emptyMessage='No schedules yet. Use "Import Schedule" to upload from Excel.'
+                  />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -690,78 +549,22 @@ function MaintenancePage() {
                   )}
                 </CardHeader>
                 <CardContent>
-                  {paramsQ.isLoading ? (
-                    <div className="py-4 text-sm text-muted-foreground">Loading parameters…</div>
-                  ) : (
-                    <>
-                      <ExcelColumnFilter
-                        data={parameters}
-                        onFilter={setFilteredParams}
-                        columns={[
-                          {
-                            key: "machine_code" as const,
-                            label: "Machine",
-                            placeholder: "Filter machine...",
-                          },
-                          {
-                            key: "parameter_name" as const,
-                            label: "Parameter",
-                            placeholder: "Filter...",
-                          },
-                          { key: "unit" as const, label: "Unit", placeholder: "Filter unit..." },
-                        ]}
-                      />
-                      <div className="w-full overflow-x-auto">
-                        <Table className="min-w-[640px] w-full">
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Machine Code</TableHead>
-                              <TableHead>Parameter Name</TableHead>
-                              <TableHead className="text-right">Standard Value</TableHead>
-                              <TableHead className="text-right">Min</TableHead>
-                              <TableHead className="text-right">Max</TableHead>
-                              <TableHead>Unit</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredParams.length === 0 ? (
-                              <TableRow>
-                                <TableCell
-                                  colSpan={6}
-                                  className="text-center text-sm text-muted-foreground py-8"
-                                >
-                                  No parameters yet. Use "Import Parameters" to upload from Excel.
-                                </TableCell>
-                              </TableRow>
-                            ) : (
-                              filteredParams.map((p) => (
-                                <TableRow key={p.id}>
-                                  <TableCell className="font-mono text-xs">
-                                    {p.machine_code}
-                                  </TableCell>
-                                  <TableCell className="font-medium text-sm">
-                                    {p.parameter_name}
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    {p.standard_value || "—"}
-                                  </TableCell>
-                                  <TableCell className="text-right text-muted-foreground">
-                                    {p.min_value || "—"}
-                                  </TableCell>
-                                  <TableCell className="text-right text-muted-foreground">
-                                    {p.max_value || "—"}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline">{p.unit || "—"}</Badge>
-                                  </TableCell>
-                                </TableRow>
-                              ))
-                            )}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </>
-                  )}
+                  <DataTable
+                    tableId="maintenance_parameters"
+                    columns={[
+                      { key: "machine_code", label: "Machine Code", className: "font-mono text-xs" },
+                      { key: "parameter_name", label: "Parameter Name", render: (p: any) => <span className="font-medium">{p.parameter_name}</span> },
+                      { key: "standard_value", label: "Standard Value", render: (p: any) => p.standard_value || "—" },
+                      { key: "min_value", label: "Min", render: (p: any) => <span className="text-muted-foreground">{p.min_value || "—"}</span> },
+                      { key: "max_value", label: "Max", render: (p: any) => <span className="text-muted-foreground">{p.max_value || "—"}</span> },
+                      { key: "unit", label: "Unit", render: (p: any) => <Badge variant="outline">{p.unit || "—"}</Badge> },
+                    ] satisfies ColDef[]}
+                    data={parameters}
+                    loading={paramsQ.isLoading}
+                    rowKey={(p: any) => p.id}
+                    exportFilename="machine_parameters"
+                    emptyMessage='No parameters yet. Use "Import Parameters" to upload from Excel.'
+                  />
                 </CardContent>
               </Card>
             </TabsContent>

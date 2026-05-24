@@ -7,25 +7,10 @@ import { AccessGuard } from "@/components/AccessGuard";
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -34,8 +19,9 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useState, useEffect } from "react";
-import { ExcelColumnFilter } from "@/components/ui/excel-column-filter";
+import { useState } from "react";
+import { DataTable } from "@/components/ui/DataTable";
+import type { ColDef } from "@/components/ui/DataTable";
 import { toast } from "sonner";
 import { Plus, Boxes, ArrowRightLeft, AlertTriangle, Package } from "lucide-react";
 
@@ -47,31 +33,11 @@ export const Route = createFileRoute("/_app/inventory")({
 function InventoryPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "inventory");
-  const lotsQ = useQuery({
-    queryKey: ["inventory-lots"],
-    queryFn: inventoryApi.getLots,
-    staleTime: 60_000,
-    retry: 1,
-  });
-  const transfersQ = useQuery({
-    queryKey: ["stock-transfers"],
-    queryFn: inventoryApi.getTransfers,
-    staleTime: 60_000,
-    retry: 1,
-  });
+  const lotsQ = useQuery({ queryKey: ["inventory-lots"], queryFn: inventoryApi.getLots, staleTime: 60_000, retry: 1 });
+  const transfersQ = useQuery({ queryKey: ["stock-transfers"], queryFn: inventoryApi.getTransfers, staleTime: 60_000, retry: 1 });
 
   const lots: any[] = lotsQ.data ?? [];
   const transfers: any[] = transfersQ.data ?? [];
-
-  const [filteredLots, setFilteredLots] = useState<any[]>([]);
-  const [filteredTransfers, setFilteredTransfers] = useState<any[]>([]);
-
-  useEffect(() => {
-    setFilteredLots(lotsQ.data ?? []);
-  }, [lotsQ.data]);
-  useEffect(() => {
-    setFilteredTransfers(transfersQ.data ?? []);
-  }, [transfersQ.data]);
 
   const totalStock = lots.reduce((s, l) => s + (l.quantity ?? 0), 0);
   const inStock = lots.filter((l) => l.status === "in-stock").length;
@@ -79,72 +45,51 @@ function InventoryPage() {
   const lowStock = lots.filter((l) => l.quantity < 3000).length;
 
   if (!user) return null;
+  if (lotsQ.isLoading) return (<><Topbar title="Inventory" subtitle="Loading..." /><div className="p-6 text-sm text-muted-foreground">Loading data…</div></>);
+  if (lotsQ.isError) return (<><Topbar title="Inventory" subtitle="Error" /><div className="p-6 text-sm text-destructive">Error loading data.</div></>);
 
-  if (lotsQ.isLoading)
-    return (
-      <>
-        <Topbar title="Inventory" subtitle="Loading..." />
-        <div className="p-6 text-sm text-muted-foreground">Loading data…</div>
-      </>
-    );
-  if (lotsQ.isError)
-    return (
-      <>
-        <Topbar title="Inventory" subtitle="Error" />
-        <div className="p-6 text-sm text-destructive">Error loading data.</div>
-      </>
-    );
+  const lotCols: ColDef[] = [
+    { key: "lotNo", label: "Lot No", className: "font-mono text-xs" },
+    { key: "type", label: "Type", type: "status", render: (l: any) => <Badge variant="outline">{l.type}</Badge> },
+    { key: "department", label: "Department", type: "status" },
+    { key: "quantity", label: "Qty (kg)", render: (l: any) => <span className="text-right">{(l.quantity ?? 0).toLocaleString()}</span> },
+    { key: "location", label: "Location", type: "status" },
+    {
+      key: "grade", label: "Grade", type: "status",
+      render: (l: any) => (
+        <Badge variant={l.grade === "A+" || l.grade === "A" ? "default" : l.grade === "B" ? "secondary" : "destructive"}>{l.grade}</Badge>
+      ),
+    },
+    { key: "producedDate", label: "Produced" },
+    { key: "age", label: "Age (d)", render: (l: any) => <span className={l.age > 14 ? "text-destructive font-medium" : ""}>{l.age}</span> },
+    {
+      key: "status", label: "Status", type: "status",
+      render: (l: any) => (
+        <Badge variant={l.status === "in-stock" ? "default" : l.status === "transferred" ? "secondary" : "outline"}>{l.status}</Badge>
+      ),
+    },
+  ];
+
+  const transferCols: ColDef[] = [
+    { key: "date", label: "Date", type: "date" },
+    { key: "lotNo", label: "Lot No", className: "font-mono text-xs" },
+    { key: "fromLocation", label: "From", type: "status" },
+    { key: "toLocation", label: "To", type: "status", render: (t: any) => <span><ArrowRightLeft className="size-3 inline mr-1 text-muted-foreground" />{t.toLocation}</span> },
+    { key: "quantity", label: "Qty", render: (t: any) => `${t.quantity} ${t.unit}` },
+    { key: "transferredBy", label: "By" },
+    { key: "status", label: "Status", type: "status", render: (t: any) => <Badge variant={t.status === "completed" ? "default" : "secondary"}>{t.status}</Badge> },
+  ];
 
   return (
     <>
-      <Topbar
-        title="Inventory"
-        subtitle="Lot tracking, godown stock, transfers & ageing analysis"
-      />
+      <Topbar title="Inventory" subtitle="Lot tracking, godown stock, transfers & ageing analysis" />
       <AccessGuard module="inventory">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">
-                  Total Stock
-                </div>
-                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <Package className="size-5 text-primary" />
-                  {totalStock.toLocaleString()} kg
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">
-                  Lots In Stock
-                </div>
-                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <Boxes className="size-5 text-success" />
-                  {inStock}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">
-                  Ageing (&gt;14d)
-                </div>
-                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <AlertTriangle className="size-5 text-warning" />
-                  {ageingLots}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">
-                  Low Stock Lots
-                </div>
-                <div className="text-2xl font-semibold mt-2">{lowStock}</div>
-              </CardContent>
-            </Card>
+            <Card><CardContent className="p-5"><div className="text-xs uppercase text-muted-foreground font-medium">Total Stock</div><div className="text-2xl font-semibold mt-2 flex items-center gap-2"><Package className="size-5 text-primary" />{totalStock.toLocaleString()} kg</div></CardContent></Card>
+            <Card><CardContent className="p-5"><div className="text-xs uppercase text-muted-foreground font-medium">Lots In Stock</div><div className="text-2xl font-semibold mt-2 flex items-center gap-2"><Boxes className="size-5 text-green-600" />{inStock}</div></CardContent></Card>
+            <Card><CardContent className="p-5"><div className="text-xs uppercase text-muted-foreground font-medium">Ageing (&gt;14d)</div><div className="text-2xl font-semibold mt-2 flex items-center gap-2"><AlertTriangle className="size-5 text-amber-500" />{ageingLots}</div></CardContent></Card>
+            <Card><CardContent className="p-5"><div className="text-xs uppercase text-muted-foreground font-medium">Low Stock Lots</div><div className="text-2xl font-semibold mt-2">{lowStock}</div></CardContent></Card>
           </div>
 
           <Tabs defaultValue="lots">
@@ -155,94 +100,9 @@ function InventoryPage() {
 
             <TabsContent value="lots">
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Inventory Lots</CardTitle>
-                </CardHeader>
+                <CardHeader><CardTitle className="text-base">Inventory Lots</CardTitle></CardHeader>
                 <CardContent>
-                  <ExcelColumnFilter
-                    data={lots}
-                    onFilter={setFilteredLots}
-                    columns={[
-                      { key: "lotNo" as const, label: "Lot No", placeholder: "Filter lot..." },
-                      { key: "type" as const, label: "Type", placeholder: "Filter type..." },
-                      {
-                        key: "department" as const,
-                        label: "Department",
-                        placeholder: "Filter dept...",
-                      },
-                      {
-                        key: "location" as const,
-                        label: "Location",
-                        placeholder: "Filter location...",
-                      },
-                      { key: "grade" as const, label: "Grade", placeholder: "Filter grade..." },
-                      { key: "status" as const, label: "Status", placeholder: "Filter status..." },
-                    ]}
-                  />
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-[640px] w-full">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Lot No</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Department</TableHead>
-                          <TableHead className="text-right">Qty</TableHead>
-                          <TableHead>Location</TableHead>
-                          <TableHead>Grade</TableHead>
-                          <TableHead>Produced</TableHead>
-                          <TableHead className="text-right">Age (d)</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredLots.map((l) => (
-                          <TableRow key={l.id}>
-                            <TableCell className="font-mono text-xs">{l.lotNo}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{l.type}</Badge>
-                            </TableCell>
-                            <TableCell>{l.department}</TableCell>
-                            <TableCell className="text-right">
-                              {(l.quantity ?? 0).toLocaleString()}
-                            </TableCell>
-                            <TableCell>{l.location}</TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  l.grade === "A+" || l.grade === "A"
-                                    ? "default"
-                                    : l.grade === "B"
-                                      ? "secondary"
-                                      : "destructive"
-                                }
-                              >
-                                {l.grade}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-sm">{l.producedDate}</TableCell>
-                            <TableCell className="text-right">
-                              <span className={l.age > 14 ? "text-destructive font-medium" : ""}>
-                                {l.age}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={
-                                  l.status === "in-stock"
-                                    ? "default"
-                                    : l.status === "transferred"
-                                      ? "secondary"
-                                      : "outline"
-                                }
-                              >
-                                {l.status}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  <DataTable tableId="inventory_lots" columns={lotCols} data={lots} loading={lotsQ.isLoading} rowKey={(l) => l.id} exportFilename="inventory_lots" />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -254,63 +114,7 @@ function InventoryPage() {
                   {canEdit && <NewTransferDialog />}
                 </CardHeader>
                 <CardContent>
-                  <ExcelColumnFilter
-                    data={transfers}
-                    onFilter={setFilteredTransfers}
-                    columns={[
-                      { key: "date" as const, label: "Date", placeholder: "Filter date..." },
-                      { key: "lotNo" as const, label: "Lot", placeholder: "Filter lot..." },
-                      {
-                        key: "fromLocation" as const,
-                        label: "From",
-                        placeholder: "Filter from...",
-                      },
-                      { key: "toLocation" as const, label: "To", placeholder: "Filter to..." },
-                      {
-                        key: "transferredBy" as const,
-                        label: "By",
-                        placeholder: "Filter transferred by...",
-                      },
-                      { key: "status" as const, label: "Status", placeholder: "Filter status..." },
-                    ]}
-                  />
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-[640px] w-full">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Lot</TableHead>
-                          <TableHead>From</TableHead>
-                          <TableHead>To</TableHead>
-                          <TableHead className="text-right">Qty</TableHead>
-                          <TableHead>By</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredTransfers.map((t) => (
-                          <TableRow key={t.id}>
-                            <TableCell className="text-sm">{t.date}</TableCell>
-                            <TableCell className="font-mono text-xs">{t.lotNo}</TableCell>
-                            <TableCell>{t.fromLocation}</TableCell>
-                            <TableCell>
-                              <ArrowRightLeft className="size-3 inline mr-1 text-muted-foreground" />
-                              {t.toLocation}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {t.quantity} {t.unit}
-                            </TableCell>
-                            <TableCell>{t.transferredBy}</TableCell>
-                            <TableCell>
-                              <Badge variant={t.status === "completed" ? "default" : "secondary"}>
-                                {t.status}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                  <DataTable tableId="stock_transfers" columns={transferCols} data={transfers} loading={transfersQ.isLoading} rowKey={(t) => t.id} exportFilename="stock_transfers" />
                 </CardContent>
               </Card>
             </TabsContent>
@@ -325,190 +129,49 @@ function NewTransferDialog() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [requiredErrors, setRequiredErrors] = useState<Record<string, string>>({});
-  const [form, setForm] = useState({
-    date: new Date().toISOString().slice(0, 10),
-    lotNo: "",
-    fromLocation: "",
-    toLocation: "",
-    quantity: 0,
-    unit: "kg",
-    transferredBy: "",
-    status: "pending" as const,
-  });
+  const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), lotNo: "", fromLocation: "", toLocation: "", quantity: 0, unit: "kg", transferredBy: "", status: "pending" as const });
 
-  const reqFields = [
-    "date",
-    "lotNo",
-    "fromLocation",
-    "toLocation",
-    "quantity",
-    "unit",
-    "transferredBy",
-  ] as const;
-  const allFilled = reqFields.every((f) => {
-    const v = form[f];
-    if (typeof v === "number") return v > 0;
-    return typeof v === "string" && v.trim().length > 0;
-  });
+  const reqFields = ["date", "lotNo", "fromLocation", "toLocation", "quantity", "unit", "transferredBy"] as const;
+  const allFilled = reqFields.every((f) => { const v = (form as any)[f]; return typeof v === "number" ? v > 0 : typeof v === "string" && v.trim().length > 0; });
 
-  const m = useMutation({
-    mutationFn: () => inventoryApi.createTransfer(form),
-  });
+  const m = useMutation({ mutationFn: () => inventoryApi.createTransfer(form) });
 
-  const handleCreateTransfer = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const errors: Record<string, string> = {};
-    reqFields.forEach((f) => {
-      const v = form[f];
-      if (typeof v === "number" ? v <= 0 : !v || (typeof v === "string" && !v.trim())) {
-        errors[f] = "This field is required";
-      }
-    });
+    reqFields.forEach((f) => { const v = (form as any)[f]; if (typeof v === "number" ? v <= 0 : !v || !v.trim()) errors[f] = "Required"; });
     setRequiredErrors(errors);
     if (Object.keys(errors).length > 0) return;
-    m.mutate(undefined, {
-      onSuccess: () => {
-        toast.success("Stock transfer created");
-        qc.invalidateQueries({ queryKey: ["stock-transfers"] });
-        setOpen(false);
-      },
-    });
+    m.mutate(undefined, { onSuccess: () => { toast.success("Stock transfer created"); qc.invalidateQueries({ queryKey: ["stock-transfers"] }); setOpen(false); } });
   };
+
+  const f = (key: keyof typeof form) => ({
+    value: String((form as any)[key]),
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => { setForm({ ...form, [key]: key === "quantity" ? +e.target.value : e.target.value }); setRequiredErrors((p) => ({ ...p, [key]: "" })); },
+    className: requiredErrors[key] ? "border-destructive" : "",
+  });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="size-4 mr-1" />
-          New transfer
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger asChild><Button size="sm"><Plus className="size-4 mr-1" />New transfer</Button></DialogTrigger>
       <DialogContent className="w-full max-w-lg mx-4 overflow-y-auto max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle>New stock transfer</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleCreateTransfer} className="space-y-3">
+        <DialogHeader><DialogTitle>New stock transfer</DialogTitle></DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
+            {(["date", "lotNo", "fromLocation", "toLocation", "unit", "transferredBy"] as const).map((key) => (
+              <div key={key} className="space-y-1.5">
+                <Label>{key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase())} <span className="text-destructive">*</span></Label>
+                <Input type={key === "date" ? "date" : "text"} {...f(key)} />
+                {requiredErrors[key] && <p className="text-xs text-destructive">{requiredErrors[key]}</p>}
+              </div>
+            ))}
             <div className="space-y-1.5">
-              <Label>
-                Date <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                type="date"
-                value={form.date}
-                onChange={(e) => {
-                  setForm({ ...form, date: e.target.value });
-                  setRequiredErrors((prev) => ({ ...prev, date: "" }));
-                }}
-                className={requiredErrors.date ? "border-destructive" : ""}
-              />
-              {requiredErrors.date && (
-                <p className="text-sm text-destructive">{requiredErrors.date}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                Lot No <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                value={form.lotNo}
-                onChange={(e) => {
-                  setForm({ ...form, lotNo: e.target.value });
-                  setRequiredErrors((prev) => ({ ...prev, lotNo: "" }));
-                }}
-                className={requiredErrors.lotNo ? "border-destructive" : ""}
-              />
-              {requiredErrors.lotNo && (
-                <p className="text-sm text-destructive">{requiredErrors.lotNo}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                From location <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                value={form.fromLocation}
-                onChange={(e) => {
-                  setForm({ ...form, fromLocation: e.target.value });
-                  setRequiredErrors((prev) => ({ ...prev, fromLocation: "" }));
-                }}
-                className={requiredErrors.fromLocation ? "border-destructive" : ""}
-              />
-              {requiredErrors.fromLocation && (
-                <p className="text-sm text-destructive">{requiredErrors.fromLocation}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                To location <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                value={form.toLocation}
-                onChange={(e) => {
-                  setForm({ ...form, toLocation: e.target.value });
-                  setRequiredErrors((prev) => ({ ...prev, toLocation: "" }));
-                }}
-                className={requiredErrors.toLocation ? "border-destructive" : ""}
-              />
-              {requiredErrors.toLocation && (
-                <p className="text-sm text-destructive">{requiredErrors.toLocation}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                Quantity <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                type="number"
-                value={form.quantity}
-                onChange={(e) => {
-                  setForm({ ...form, quantity: +e.target.value });
-                  setRequiredErrors((prev) => ({ ...prev, quantity: "" }));
-                }}
-                className={requiredErrors.quantity ? "border-destructive" : ""}
-              />
-              {requiredErrors.quantity && (
-                <p className="text-sm text-destructive">{requiredErrors.quantity}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                Unit <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                value={form.unit}
-                onChange={(e) => {
-                  setForm({ ...form, unit: e.target.value });
-                  setRequiredErrors((prev) => ({ ...prev, unit: "" }));
-                }}
-                className={requiredErrors.unit ? "border-destructive" : ""}
-              />
-              {requiredErrors.unit && (
-                <p className="text-sm text-destructive">{requiredErrors.unit}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>
-                Transferred by <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                value={form.transferredBy}
-                onChange={(e) => {
-                  setForm({ ...form, transferredBy: e.target.value });
-                  setRequiredErrors((prev) => ({ ...prev, transferredBy: "" }));
-                }}
-                className={requiredErrors.transferredBy ? "border-destructive" : ""}
-              />
-              {requiredErrors.transferredBy && (
-                <p className="text-sm text-destructive">{requiredErrors.transferredBy}</p>
-              )}
+              <Label>Quantity <span className="text-destructive">*</span></Label>
+              <Input type="number" {...f("quantity")} />
+              {requiredErrors.quantity && <p className="text-xs text-destructive">{requiredErrors.quantity}</p>}
             </div>
           </div>
-          <DialogFooter>
-            <Button type="submit" disabled={m.isPending || !allFilled}>
-              {m.isPending ? "Saving…" : "Create transfer"}
-            </Button>
-          </DialogFooter>
+          <DialogFooter><Button type="submit" disabled={m.isPending || !allFilled}>{m.isPending ? "Saving…" : "Create transfer"}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

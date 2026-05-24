@@ -8,15 +8,9 @@ import { AccessGuard } from "@/components/AccessGuard";
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/DataTable";
+import type { ColDef } from "@/components/ui/DataTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -528,112 +522,93 @@ function UsersPage() {
                 <CardHeader>
                   <CardTitle>All Users</CardTitle>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="w-full overflow-x-auto">
-                    <Table className="min-w-[800px] w-full">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Department</TableHead>
-                          <TableHead>Mill</TableHead>
-                          <TableHead>Company</TableHead>
-                          <TableHead>Last Login</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {users.length === 0 && (
-                          <TableRow>
-                            <TableCell
-                              colSpan={9}
-                              className="text-center text-muted-foreground py-8"
-                            >
-                              No users found. Create your first user.
-                            </TableCell>
-                          </TableRow>
+                <CardContent>
+                  <DataTable
+                    tableId="users_list"
+                    columns={[
+                      { key: "full_name", label: "Name", render: (u: any) => <span className="font-medium">{u.full_name}</span> },
+                      { key: "email", label: "Email" },
+                      {
+                        key: "role",
+                        label: "Role",
+                        type: "status",
+                        render: (u: any) => (
+                          <Badge className={cn("font-medium", ROLE_BADGE_COLORS[u.role] ?? "")}>
+                            {ROLE_LABELS[u.role as Role] ?? u.role}
+                          </Badge>
+                        ),
+                      },
+                      { key: "department", label: "Department" },
+                      {
+                        key: "mill_id",
+                        label: "Mill",
+                        render: (u: any) => mills.find((m: any) => m.id === u.mill_id)?.name ?? "—",
+                        filterable: false,
+                      },
+                      {
+                        key: "company_id",
+                        label: "Company",
+                        render: (u: any) => {
+                          const mill = mills.find((m: any) => m.id === u.mill_id);
+                          return companies.find((c: any) => c.id === (u.company_id || mill?.company_id))?.name ?? "—";
+                        },
+                        filterable: false,
+                      },
+                      {
+                        key: "last_login",
+                        label: "Last Login",
+                        render: (u: any) =>
+                          u.last_login ? (
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(u.last_login).toLocaleDateString()}
+                            </span>
+                          ) : "—",
+                      },
+                      {
+                        key: "is_active",
+                        label: "Status",
+                        type: "status",
+                        render: (u: any) => (
+                          <Badge variant={u.is_active ? "default" : "secondary"}>
+                            {u.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        ),
+                      },
+                    ] satisfies ColDef[]}
+                    data={users}
+                    rowKey={(u) => u.id}
+                    exportFilename="users"
+                    emptyMessage="No users found. Create your first user."
+                    actions={(user) => (
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(user)} title="Edit">
+                          <Pencil className="size-4" />
+                        </Button>
+                        {isSuperAdmin && (
+                          <Button variant="ghost" size="icon" onClick={() => setModulesUser(user)} title="Module Overrides">
+                            <Blocks className="size-4" />
+                          </Button>
                         )}
-                        {users.map((user: any) => {
-                          const userMill = mills.find((m: any) => m.id === user.mill_id);
-                          const userCompany = companies.find(
-                            (c: any) => c.id === (user.company_id || userMill?.company_id),
-                          );
-                          return (
-                            <TableRow key={user.id}>
-                              <TableCell className="font-medium">{user.full_name}</TableCell>
-                              <TableCell>{user.email}</TableCell>
-                              <TableCell>
-                                <Badge
-                                  className={cn("font-medium", ROLE_BADGE_COLORS[user.role] ?? "")}
-                                >
-                                  {ROLE_LABELS[user.role as Role] ?? user.role}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>{user.department ?? "—"}</TableCell>
-                              <TableCell>{userMill?.name ?? "—"}</TableCell>
-                              <TableCell>{userCompany?.name ?? "—"}</TableCell>
-                              <TableCell className="text-xs text-muted-foreground">
-                                {user.last_login
-                                  ? new Date(user.last_login).toLocaleDateString()
-                                  : "—"}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={user.is_active ? "default" : "secondary"}>
-                                  {user.is_active ? "Active" : "Inactive"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => openEdit(user)}
-                                    title="Edit"
-                                  >
-                                    <Pencil className="size-4" />
-                                  </Button>
-                                  {isSuperAdmin && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => setModulesUser(user)}
-                                      title="Module Overrides"
-                                    >
-                                      <Blocks className="size-4" />
-                                    </Button>
-                                  )}
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => deactivateMutation.mutate(user.id)}
-                                    title={user.is_active ? "Deactivate" : "Reactivate"}
-                                  >
-                                    {user.is_active ? (
-                                      <ToggleRight className="size-4 text-destructive" />
-                                    ) : (
-                                      <ToggleLeft className="size-4 text-green-600" />
-                                    )}
-                                  </Button>
-                                  {user.is_active && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => handleResetPwd(user)}
-                                      title="Reset Password"
-                                    >
-                                      <KeyRound className="size-4" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deactivateMutation.mutate(user.id)}
+                          title={user.is_active ? "Deactivate" : "Reactivate"}
+                        >
+                          {user.is_active ? (
+                            <ToggleRight className="size-4 text-destructive" />
+                          ) : (
+                            <ToggleLeft className="size-4 text-green-600" />
+                          )}
+                        </Button>
+                        {user.is_active && (
+                          <Button variant="ghost" size="icon" onClick={() => handleResetPwd(user)} title="Reset Password">
+                            <KeyRound className="size-4" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>

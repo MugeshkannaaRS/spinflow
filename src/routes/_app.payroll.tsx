@@ -6,15 +6,9 @@ import { AccessGuard } from "@/components/AccessGuard";
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { DataTable } from "@/components/ui/DataTable";
+import type { ColDef } from "@/components/ui/DataTable";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
@@ -419,63 +413,31 @@ function PayslipsTab({ millId, year }: { millId: string; year: number }) {
               onChange={(e) => setDept(e.target.value)}
             />
           </div>
-          <div className="self-end ml-auto">
-            <Button size="sm" variant="outline" onClick={() => toast.info("Export coming soon")}>
-              Export
-            </Button>
-          </div>
         </div>
       </CardHeader>
       <CardContent>
         {!payrollMonthId ? (
           <p className="text-sm text-muted-foreground">Payroll not yet processed for this month</p>
         ) : (
-          <div className="w-full overflow-x-auto">
-            <Table className="min-w-[640px] w-full">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Emp Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Dept</TableHead>
-                  <TableHead className="text-right">Present</TableHead>
-                  <TableHead className="text-right">OT Hrs</TableHead>
-                  <TableHead className="text-right">Gross</TableHead>
-                  <TableHead className="text-right">PF</TableHead>
-                  <TableHead className="text-right">ESIC</TableHead>
-                  <TableHead className="text-right">Net</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {payslips.map((p: any) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-mono text-xs">{p.employee_code}</TableCell>
-                    <TableCell className="font-medium">{p.employee_name}</TableCell>
-                    <TableCell>{p.department}</TableCell>
-                    <TableCell className="text-right">{p.present_days}</TableCell>
-                    <TableCell className="text-right">{p.overtime_hours}</TableCell>
-                    <TableCell className="text-right">
-                      ₹{(p.gross_wage ?? 0).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      ₹{(p.pf_employee ?? 0).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      ₹{(p.esic_employee ?? 0).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      ₹{(p.net_wage ?? 0).toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={p.status === "paid" ? "default" : "secondary"}>
-                        {p.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            tableId="payroll_payslips"
+            columns={[
+              { key: "employee_code", label: "Emp Code", className: "font-mono text-xs" },
+              { key: "employee_name", label: "Name", render: (p: any) => <span className="font-medium">{p.employee_name}</span> },
+              { key: "department", label: "Dept", type: "status" },
+              { key: "present_days", label: "Present" },
+              { key: "overtime_hours", label: "OT Hrs" },
+              { key: "gross_wage", label: "Gross", render: (p: any) => `₹${(p.gross_wage ?? 0).toLocaleString()}` },
+              { key: "pf_employee", label: "PF", render: (p: any) => `₹${(p.pf_employee ?? 0).toLocaleString()}` },
+              { key: "esic_employee", label: "ESIC", render: (p: any) => `₹${(p.esic_employee ?? 0).toLocaleString()}` },
+              { key: "net_wage", label: "Net", render: (p: any) => <span className="font-medium">₹{(p.net_wage ?? 0).toLocaleString()}</span> },
+              { key: "status", label: "Status", type: "status", render: (p: any) => <Badge variant={p.status === "paid" ? "default" : "secondary"}>{p.status}</Badge> },
+            ] satisfies ColDef[]}
+            data={payslips}
+            loading={payslipsQ.isLoading}
+            rowKey={(p: any) => p.id}
+            exportFilename={`payslips_${month}_${MONTHS[Number(month) - 1]}`}
+          />
         )}
       </CardContent>
     </Card>
