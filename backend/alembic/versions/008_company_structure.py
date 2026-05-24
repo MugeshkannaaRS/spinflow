@@ -1,20 +1,17 @@
-"""Add company_modules, mill_settings, company fields to companies and users
+"""Add company_modules, mill_settings, company fields
 
 Revision ID: 008
 Revises: 007
-Create Date: 2026-05-24 10:00:00.000000
+Create Date: 2026-05-24
 """
 from alembic import op
-import sqlalchemy as sa
 
-
-revision = "008"
-down_revision = "007"
+revision = '008'
+down_revision = '007'
 branch_labels = None
 depends_on = None
 
-
-def upgrade() -> None:
+def upgrade():
     op.execute("""
         ALTER TABLE companies
         ADD COLUMN IF NOT EXISTS max_users INTEGER DEFAULT 50,
@@ -22,62 +19,67 @@ def upgrade() -> None:
         ADD COLUMN IF NOT EXISTS subscription_plan VARCHAR(50) DEFAULT 'basic',
         ADD COLUMN IF NOT EXISTS enabled_modules TEXT DEFAULT 'dashboard,production,quality,stock,inventory,dispatch,stores,hr,accounts,maintenance,reports',
         ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true,
-        ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id),
         ADD COLUMN IF NOT EXISTS notes TEXT
     """)
 
-    op.create_table(
-        "company_modules",
-        sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("company_id", sa.String(36), sa.ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True),
-        sa.Column("module_name", sa.String(100), nullable=False),
-        sa.Column("is_enabled", sa.Boolean, default=True),
-        sa.Column("enabled_by", sa.String(36), sa.ForeignKey("users.id"), nullable=True),
-        sa.Column("enabled_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.UniqueConstraint("company_id", "module_name", name="uq_company_module"),
-    )
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS company_modules (
+            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+            company_id VARCHAR NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+            module_name VARCHAR(100) NOT NULL,
+            is_enabled BOOLEAN DEFAULT true,
+            enabled_at TIMESTAMPTZ DEFAULT now()
+        )
+    """)
 
-    op.create_table(
-        "mill_settings",
-        sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("mill_id", sa.String(36), sa.ForeignKey("mills.id", ondelete="CASCADE"), nullable=False, unique=True, index=True),
-        sa.Column("working_hours_per_day", sa.Integer, default=24),
-        sa.Column("shifts_per_day", sa.Integer, default=3),
-        sa.Column("production_target_kg", sa.Numeric, default=0),
-        sa.Column("currency", sa.String(10), default="INR"),
-        sa.Column("timezone", sa.String(50), default="Asia/Kolkata"),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-    )
+    op.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS uq_company_modules
+        ON company_modules (company_id, module_name)
+    """)
+
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS mill_settings (
+            id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+            mill_id VARCHAR NOT NULL REFERENCES mills(id) ON DELETE CASCADE UNIQUE,
+            working_hours_per_day INTEGER DEFAULT 24,
+            shifts_per_day INTEGER DEFAULT 3,
+            production_target_kg NUMERIC DEFAULT 0,
+            currency VARCHAR(10) DEFAULT 'INR',
+            timezone VARCHAR(50) DEFAULT 'Asia/Kolkata',
+            created_at TIMESTAMPTZ DEFAULT now(),
+            updated_at TIMESTAMPTZ DEFAULT now()
+        )
+    """)
 
     op.execute("""
         ALTER TABLE users
-        ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES companies(id),
-        ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true,
-        ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT true,
-        ADD COLUMN IF NOT EXISTS last_login TIMESTAMPTZ,
-        ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id)
+        ADD COLUMN IF NOT EXISTS company_id VARCHAR,
+        ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false
     """)
 
+    op.execute("""
+        INSERT INTO company_modules (id, company_id, module_name, is_enabled)
+        SELECT gen_random_uuid()::text, c.id, m.module_name, true
+        FROM companies c
+        CROSS JOIN (
+            VALUES
+            ('dashboard'), ('production'), ('quality'), ('stock'),
+            ('inventory'), ('dispatch'), ('purchase'), ('stores'),
+            ('hr'), ('accounts'), ('maintenance'), ('payroll'),
+            ('reports'), ('audit'), ('masters'), ('lotrac'), ('users')
+        ) AS m(module_name)
+        ON CONFLICT (company_id, module_name) DO NOTHING
+    """)
 
-def downgrade() -> None:
-    op.drop_table("mill_settings")
-    op.drop_table("company_modules")
-    op.execute("""
-        ALTER TABLE companies
-        DROP COLUMN IF EXISTS max_users,
-        DROP COLUMN IF EXISTS max_mills,
-        DROP COLUMN IF EXISTS subscription_plan,
-        DROP COLUMN IF EXISTS enabled_modules,
-        DROP COLUMN IF EXISTS is_active,
-        DROP COLUMN IF EXISTS created_by,
-        DROP COLUMN IF EXISTS notes
-    """)
-    op.execute("""
-        ALTER TABLE users
-        DROP COLUMN IF EXISTS company_id,
-        DROP COLUMN IF EXISTS is_active,
-        DROP COLUMN IF EXISTS must_change_password,
-        DROP COLUMN IF EXISTS last_login,
-        DROP COLUMN IF EXISTS created_by
-    """)
+def downgrade():
+    op.execute("DROP TABLE IF EXISTS mill_settings")
+    op.execute("DROP INDEX IF EXISTS uq_company_modules")
+    op.execute("DROP TABLE IF EXISTS company_modules")
+    op.execute("ALTER TABLE companies DROP COLUMN IF EXISTS max_users")
+    op.execute("ALTER TABLE companies DROP COLUMN IF EXISTS max_mills")
+    op.execute("ALTER TABLE companies DROP COLUMN IF EXISTS subscription_plan")
+    op.execute("ALTER TABLE companies DROP COLUMN IF EXISTS enabled_modules")
+    op.execute("ALTER TABLE companies DROP COLUMN IF EXISTS is_active")
+    op.execute("ALTER TABLE companies DROP COLUMN IF EXISTS notes")
+    op.execute("ALTER TABLE users DROP COLUMN IF EXISTS company_id")
+    op.execute("ALTER TABLE users DROP COLUMN IF EXISTS must_change_password")
