@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { usersApi } from "@/lib/api-service";
-import { ROLES, ROLE_LABELS } from "@/lib/rbac";
+import { usersApi, mastersApi, adminApi } from "@/lib/api-service";
+import { ROLES, ROLE_LABELS, type Module } from "@/lib/rbac";
 import type { Role } from "@/lib/rbac";
+import { useAuth } from "@/stores/auth";
 import { AccessGuard } from "@/components/AccessGuard";
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -18,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Sheet,
@@ -26,6 +29,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetDescription,
+  SheetFooter,
 } from "@/components/ui/sheet";
 import {
   Dialog,
@@ -42,7 +46,8 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
+import { toast } from "sonner";
 import {
   ShieldCheck,
   Users,
@@ -58,6 +63,7 @@ import {
   EyeOff,
   Check,
   X,
+  Blocks,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -109,6 +115,8 @@ const INITIAL_FORM = {
   role: "SUPERVISOR" as string,
   department: "",
   mobile: "",
+  company_id: "",
+  mill_id: "",
 };
 
 function generatePassword() {
@@ -120,13 +128,32 @@ function generatePassword() {
 
 function UsersPage() {
   const qc = useQueryClient();
+  const currentUser = useAuth((s) => s.user);
+  const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
+
   const usersQ = useQuery({
     queryKey: ["system-users"],
     queryFn: usersApi.list,
     staleTime: 60_000,
     retry: 1,
   });
+  const companiesQ = useQuery({
+    queryKey: ["masters", "companies"],
+    queryFn: () => mastersApi.getCompanies(),
+    staleTime: 60_000,
+    retry: 1,
+  });
+  const millsQ = useQuery({
+    queryKey: ["masters", "mills"],
+    queryFn: () => mastersApi.getMills(),
+    staleTime: 60_000,
+    retry: 1,
+  });
   const users: any[] = usersQ.data ?? [];
+  const companies: any[] =
+    ((companiesQ.data as any)?.data ?? Array.isArray(companiesQ.data)) ? companiesQ.data : [];
+  const mills: any[] =
+    ((millsQ.data as any)?.data ?? Array.isArray(millsQ.data)) ? millsQ.data : [];
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
@@ -136,9 +163,16 @@ function UsersPage() {
   const [successDialog, setSuccessDialog] = useState<{ user: any; password: string } | null>(null);
   const [resetDialog, setResetDialog] = useState<{ user: any; password: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [userTab, setUserTab] = useState("list");
+  const [modulesUser, setModulesUser] = useState<any | null>(null);
 
   const activeUsers = users.filter((u: any) => u.is_active).length;
   const roleCount = new Set(users.map((u: any) => u.role)).size;
+
+  const filteredMills = useMemo(
+    () => mills.filter((m: any) => m.company_id === form.company_id),
+    [mills, form.company_id],
+  );
 
   const createMutation = useMutation({
     mutationFn: (data: any) => usersApi.create(data),
@@ -177,7 +211,10 @@ function UsersPage() {
 
   function openNewUser() {
     setEditingUser(null);
-    setForm(INITIAL_FORM);
+    setForm({
+      ...INITIAL_FORM,
+      company_id: isSuperAdmin ? "" : (currentUser?.companyId ?? ""),
+    });
     setSheetOpen(true);
   }
 
@@ -191,6 +228,8 @@ function UsersPage() {
       role: user.role ?? "SUPERVISOR",
       department: user.department ?? "",
       mobile: user.mobile ?? "",
+      company_id: user.company_id ?? "",
+      mill_id: user.mill_id ?? "",
     });
     setSheetOpen(true);
   }
@@ -203,6 +242,8 @@ function UsersPage() {
       if (form.role) data.role = form.role;
       if (form.department !== undefined) data.department = form.department;
       if (form.mobile) data.mobile = form.mobile;
+      if (form.company_id) data.company_id = form.company_id;
+      if (form.mill_id) data.mill_id = form.mill_id;
       updateMutation.mutate({ id: editingUser.id, data });
     } else {
       createMutation.mutate({
@@ -212,6 +253,8 @@ function UsersPage() {
         role: form.role,
         department: form.department || undefined,
         mobile: form.mobile || undefined,
+        company_id: form.company_id || undefined,
+        mill_id: form.mill_id || undefined,
       });
     }
   }
@@ -343,6 +386,53 @@ function UsersPage() {
                 </Card>
               )}
               <div className="space-y-2">
+                <Label htmlFor="company_id">Company</Label>
+                <Select
+                  value={form.company_id}
+                  onValueChange={(v) => setForm({ ...form, company_id: v, mill_id: "" })}
+                  disabled={!isSuperAdmin && !!currentUser?.companyId}
+                >
+                  <SelectTrigger id="company_id">
+                    <SelectValue placeholder="Select company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="mill_id">
+                  Mill{" "}
+                  {form.role !== "MILL_OWNER" ? (
+                    <span className="text-destructive">*</span>
+                  ) : (
+                    "(optional)"
+                  )}
+                </Label>
+                <Select
+                  value={form.mill_id}
+                  onValueChange={(v) => setForm({ ...form, mill_id: v })}
+                  disabled={!form.company_id}
+                >
+                  <SelectTrigger id="mill_id">
+                    <SelectValue
+                      placeholder={form.company_id ? "Select mill" : "Select company first"}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredMills.map((m: any) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="department">Department (optional)</Label>
                 <Input
                   id="department"
@@ -380,12 +470,13 @@ function UsersPage() {
           <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Total Users
-                </CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">Users</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{users.length}</div>
+                <div className="text-2xl font-bold">
+                  {activeUsers} / {users.length}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">active / total</p>
               </CardContent>
             </Card>
             <Card>
@@ -418,87 +509,158 @@ function UsersPage() {
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>All Users</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="w-full overflow-x-auto">
-                <Table className="min-w-[640px] w-full">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                          No users found. Create your first user.
-                        </TableCell>
-                      </TableRow>
+          <Tabs value={userTab} onValueChange={setUserTab}>
+            <TabsList>
+              <TabsTrigger value="list">All Users</TabsTrigger>
+              <TabsTrigger value="modules">Module Overrides</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="list">
+              <Card>
+                <CardHeader>
+                  <CardTitle>All Users</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="w-full overflow-x-auto">
+                    <Table className="min-w-[800px] w-full">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Department</TableHead>
+                          <TableHead>Mill</TableHead>
+                          <TableHead>Company</TableHead>
+                          <TableHead>Last Login</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.length === 0 && (
+                          <TableRow>
+                            <TableCell
+                              colSpan={9}
+                              className="text-center text-muted-foreground py-8"
+                            >
+                              No users found. Create your first user.
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        {users.map((user: any) => {
+                          const userMill = mills.find((m: any) => m.id === user.mill_id);
+                          const userCompany = companies.find(
+                            (c: any) => c.id === (user.company_id || userMill?.company_id),
+                          );
+                          return (
+                            <TableRow key={user.id}>
+                              <TableCell className="font-medium">{user.full_name}</TableCell>
+                              <TableCell>{user.email}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  className={cn("font-medium", ROLE_BADGE_COLORS[user.role] ?? "")}
+                                >
+                                  {ROLE_LABELS[user.role as Role] ?? user.role}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{user.department ?? "—"}</TableCell>
+                              <TableCell>{userMill?.name ?? "—"}</TableCell>
+                              <TableCell>{userCompany?.name ?? "—"}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">
+                                {user.last_login
+                                  ? new Date(user.last_login).toLocaleDateString()
+                                  : "—"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={user.is_active ? "default" : "secondary"}>
+                                  {user.is_active ? "Active" : "Inactive"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => openEdit(user)}
+                                    title="Edit"
+                                  >
+                                    <Pencil className="size-4" />
+                                  </Button>
+                                  {isSuperAdmin && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => setModulesUser(user)}
+                                      title="Module Overrides"
+                                    >
+                                      <Blocks className="size-4" />
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => deactivateMutation.mutate(user.id)}
+                                    title={user.is_active ? "Deactivate" : "Reactivate"}
+                                  >
+                                    {user.is_active ? (
+                                      <ToggleRight className="size-4 text-destructive" />
+                                    ) : (
+                                      <ToggleLeft className="size-4 text-green-600" />
+                                    )}
+                                  </Button>
+                                  {user.is_active && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => handleResetPwd(user)}
+                                      title="Reset Password"
+                                    >
+                                      <KeyRound className="size-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="modules">
+              <Card>
+                <CardHeader>
+                  <CardTitle>User Module Overrides</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {users.filter((u: any) => u.is_active).length === 0 && (
+                      <p className="text-muted-foreground text-sm">No active users to configure.</p>
                     )}
-                    {users.map((user: any) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.full_name}</TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>
-                          <Badge className={cn("font-medium", ROLE_BADGE_COLORS[user.role] ?? "")}>
-                            {ROLE_LABELS[user.role as Role] ?? user.role}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{user.department ?? "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant={user.is_active ? "default" : "secondary"}>
-                            {user.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEdit(user)}
-                              title="Edit"
-                            >
-                              <Pencil className="size-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => deactivateMutation.mutate(user.id)}
-                              title={user.is_active ? "Deactivate" : "Reactivate"}
-                            >
-                              {user.is_active ? (
-                                <ToggleRight className="size-4 text-destructive" />
-                              ) : (
-                                <ToggleLeft className="size-4 text-green-600" />
-                              )}
-                            </Button>
-                            {user.is_active && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleResetPwd(user)}
-                                title="Reset Password"
-                              >
-                                <KeyRound className="size-4" />
-                              </Button>
-                            )}
+                    {users
+                      .filter((u: any) => u.is_active)
+                      .map((user: any) => (
+                        <div
+                          key={user.id}
+                          className="flex items-center justify-between py-2 border-b last:border-0"
+                        >
+                          <div>
+                            <p className="font-medium text-sm">{user.full_name}</p>
+                            <p className="text-xs text-muted-foreground">{user.email}</p>
                           </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
+                          <Button size="sm" variant="outline" onClick={() => setModulesUser(user)}>
+                            <Blocks className="size-3.5 mr-1" /> Configure
+                          </Button>
+                        </div>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </div>
 
         <Dialog open={!!successDialog} onOpenChange={(open) => !open && setSuccessDialog(null)}>
@@ -591,7 +753,99 @@ function UsersPage() {
             )}
           </DialogContent>
         </Dialog>
+
+        <Sheet
+          open={!!modulesUser}
+          onOpenChange={(o) => {
+            if (!o) setModulesUser(null);
+          }}
+        >
+          <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Module Overrides — {modulesUser?.full_name}</SheetTitle>
+              <SheetDescription>Override module access for this user.</SheetDescription>
+            </SheetHeader>
+            {modulesUser && (
+              <UserModulesPanel
+                user={modulesUser}
+                onClose={() => {
+                  setModulesUser(null);
+                  qc.invalidateQueries({ queryKey: ["system-users"] });
+                }}
+              />
+            )}
+          </SheetContent>
+        </Sheet>
       </AccessGuard>
     </>
+  );
+}
+
+const USER_MODULE_LABELS: Record<string, string> = {
+  dashboard: "Dashboard",
+  production: "Production",
+  quality: "Quality",
+  stock: "Stock",
+  inventory: "Inventory",
+  dispatch: "Dispatch",
+  purchase: "Purchase",
+  stores: "Stores",
+  hr: "HR",
+  accounts: "Accounts",
+  maintenance: "Maintenance",
+  payroll: "Payroll",
+  users: "Users",
+  audit: "Audit",
+  reports: "Reports",
+  masters: "Masters",
+  sales: "Sales",
+  lotrac: "LoTrac",
+};
+const ALL_USER_MODULES = Object.keys(USER_MODULE_LABELS);
+
+function UserModulesPanel({ user, onClose }: { user: any; onClose: () => void }) {
+  const qc = useQueryClient();
+  const modulesQ = useQuery({
+    queryKey: ["user-modules", user.id],
+    queryFn: () => adminApi.getUserModules(user.id),
+  });
+  const [modules, setModules] = useState<Record<string, boolean>>({});
+  const [initialized, setInitialized] = useState(false);
+
+  useMemo(() => {
+    if (modulesQ.data && !initialized) {
+      setModules(modulesQ.data);
+      setInitialized(true);
+    }
+  }, [modulesQ.data, initialized]);
+
+  const updateM = useMutation({
+    mutationFn: () => adminApi.updateUserModules(user.id, modules),
+    onSuccess: () => {
+      toast.success("Module overrides updated");
+      qc.invalidateQueries({ queryKey: ["user-modules", user.id] });
+      onClose();
+    },
+    onError: () => toast.error("Failed to update module overrides"),
+  });
+
+  return (
+    <div className="mt-4 space-y-4">
+      {ALL_USER_MODULES.map((mod) => (
+        <div key={mod} className="flex items-center justify-between py-2 border-b last:border-0">
+          <Label>{USER_MODULE_LABELS[mod]}</Label>
+          <Switch
+            checked={modules[mod] ?? false}
+            disabled={updateM.isPending}
+            onCheckedChange={(v) => setModules((prev) => ({ ...prev, [mod]: v }))}
+          />
+        </div>
+      ))}
+      <SheetFooter>
+        <Button onClick={() => updateM.mutate()} disabled={updateM.isPending}>
+          {updateM.isPending ? "Saving…" : "Save"}
+        </Button>
+      </SheetFooter>
+    </div>
   );
 }

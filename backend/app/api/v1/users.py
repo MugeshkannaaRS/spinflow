@@ -4,9 +4,10 @@ from sqlalchemy import select, func
 from typing import List
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module
+from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.core.security import hash_password
 from app.models.user import User, Role
+from app.models.masters import Mill
 from app.schemas.users import UserCreate, UserOut, UserUpdate, UserListResponse, PasswordChange, UserResetPassword
 from sqlalchemy.orm import selectinload
 
@@ -20,7 +21,15 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("users")),
 ):
+    scope = await get_mill_scope(current_user)
     stmt = select(User).options(selectinload(User.role_rel)).where(User.deleted_at.is_(None))
+    if scope["mill_id"] is None and scope["company_id"] is None:
+        pass  # SUPER_ADMIN sees all
+    elif scope["company_id"]:
+        mill_ids_subq = select(Mill.id).where(Mill.company_id == scope["company_id"])
+        stmt = stmt.where(User.mill_id.in_(mill_ids_subq))
+    elif scope["mill_id"]:
+        stmt = stmt.where(User.mill_id == scope["mill_id"])
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)

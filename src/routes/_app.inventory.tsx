@@ -324,6 +324,7 @@ function InventoryPage() {
 function NewTransferDialog() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [requiredErrors, setRequiredErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
     lotNo: "",
@@ -335,12 +336,36 @@ function NewTransferDialog() {
     status: "pending" as const,
   });
 
+  const reqFields = [
+    "date",
+    "lotNo",
+    "fromLocation",
+    "toLocation",
+    "quantity",
+    "unit",
+    "transferredBy",
+  ] as const;
+  const allFilled = reqFields.every((f) => {
+    const v = form[f];
+    if (typeof v === "number") return v > 0;
+    return typeof v === "string" && v.trim().length > 0;
+  });
+
   const m = useMutation({
     mutationFn: () => inventoryApi.createTransfer(form),
   });
 
   const handleCreateTransfer = (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: Record<string, string> = {};
+    reqFields.forEach((f) => {
+      const v = form[f];
+      if (typeof v === "number" ? v <= 0 : !v || (typeof v === "string" && !v.trim())) {
+        errors[f] = "This field is required";
+      }
+    });
+    setRequiredErrors(errors);
+    if (Object.keys(errors).length > 0) return;
     m.mutate(undefined, {
       onSuccess: () => {
         toast.success("Stock transfer created");
@@ -365,61 +390,122 @@ function NewTransferDialog() {
         <form onSubmit={handleCreateTransfer} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Date</Label>
+              <Label>
+                Date <span className="text-destructive">*</span>
+              </Label>
               <Input
                 type="date"
                 value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, date: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, date: "" }));
+                }}
+                className={requiredErrors.date ? "border-destructive" : ""}
               />
+              {requiredErrors.date && (
+                <p className="text-sm text-destructive">{requiredErrors.date}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Lot No</Label>
+              <Label>
+                Lot No <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.lotNo}
-                onChange={(e) => setForm({ ...form, lotNo: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, lotNo: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, lotNo: "" }));
+                }}
+                className={requiredErrors.lotNo ? "border-destructive" : ""}
               />
+              {requiredErrors.lotNo && (
+                <p className="text-sm text-destructive">{requiredErrors.lotNo}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>From location</Label>
+              <Label>
+                From location <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.fromLocation}
-                onChange={(e) => setForm({ ...form, fromLocation: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, fromLocation: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, fromLocation: "" }));
+                }}
+                className={requiredErrors.fromLocation ? "border-destructive" : ""}
               />
+              {requiredErrors.fromLocation && (
+                <p className="text-sm text-destructive">{requiredErrors.fromLocation}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>To location</Label>
+              <Label>
+                To location <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.toLocation}
-                onChange={(e) => setForm({ ...form, toLocation: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, toLocation: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, toLocation: "" }));
+                }}
+                className={requiredErrors.toLocation ? "border-destructive" : ""}
               />
+              {requiredErrors.toLocation && (
+                <p className="text-sm text-destructive">{requiredErrors.toLocation}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Quantity</Label>
+              <Label>
+                Quantity <span className="text-destructive">*</span>
+              </Label>
               <Input
                 type="number"
                 value={form.quantity}
-                onChange={(e) => setForm({ ...form, quantity: +e.target.value })}
-                required
+                onChange={(e) => {
+                  setForm({ ...form, quantity: +e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, quantity: "" }));
+                }}
+                className={requiredErrors.quantity ? "border-destructive" : ""}
               />
+              {requiredErrors.quantity && (
+                <p className="text-sm text-destructive">{requiredErrors.quantity}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Unit</Label>
+              <Label>
+                Unit <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.unit}
-                onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, unit: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, unit: "" }));
+                }}
+                className={requiredErrors.unit ? "border-destructive" : ""}
               />
+              {requiredErrors.unit && (
+                <p className="text-sm text-destructive">{requiredErrors.unit}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Transferred by</Label>
+              <Label>
+                Transferred by <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.transferredBy}
-                onChange={(e) => setForm({ ...form, transferredBy: e.target.value })}
-                required
+                onChange={(e) => {
+                  setForm({ ...form, transferredBy: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, transferredBy: "" }));
+                }}
+                className={requiredErrors.transferredBy ? "border-destructive" : ""}
               />
+              {requiredErrors.transferredBy && (
+                <p className="text-sm text-destructive">{requiredErrors.transferredBy}</p>
+              )}
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={m.isPending}>
+            <Button type="submit" disabled={m.isPending || !allFilled}>
               {m.isPending ? "Saving…" : "Create transfer"}
             </Button>
           </DialogFooter>

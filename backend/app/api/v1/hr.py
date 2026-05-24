@@ -5,9 +5,10 @@ from typing import List, Optional
 from datetime import datetime, timezone, date as date_type
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module, log_audit
+from app.core.deps import get_current_user, require_module, log_audit, get_mill_scope
 from app.models.user import User
 from app.models.hr import Employee, Attendance, Leave
+from app.models.masters import Mill
 from app.schemas.hr import (
     EmployeeCreate, EmployeeOut, EmployeeUpdate,
     AttendanceCreate, AttendanceOut, AttendanceBulkCreate, AttendanceSummary,
@@ -25,7 +26,12 @@ async def get_employees(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
+    scope = await get_mill_scope(current_user)
     stmt = select(Employee)
+    if scope["mill_id"]:
+        stmt = stmt.where(Employee.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Employee.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
@@ -118,7 +124,12 @@ async def get_attendance(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
-    stmt = select(Attendance).order_by(Attendance.date.desc())
+    scope = await get_mill_scope(current_user)
+    stmt = select(Attendance).join(Employee, Attendance.employee_id == Employee.id).order_by(Attendance.date.desc())
+    if scope["mill_id"]:
+        stmt = stmt.where(Employee.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Employee.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
@@ -213,7 +224,12 @@ async def get_leaves(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
-    stmt = select(Leave).order_by(Leave.created_at.desc())
+    scope = await get_mill_scope(current_user)
+    stmt = select(Leave).join(Employee, Leave.employee_id == Employee.id).order_by(Leave.created_at.desc())
+    if scope["mill_id"]:
+        stmt = stmt.where(Employee.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Employee.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)

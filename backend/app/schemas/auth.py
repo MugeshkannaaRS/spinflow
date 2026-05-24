@@ -27,11 +27,36 @@ class UserResponse(BaseModel):
     department: Optional[str] = None
     mill_id: Optional[str] = None
     mill_name: Optional[str] = None
+    company_id: Optional[str] = None
     is_active: bool
     last_login: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+
+class MillSettingsOut(BaseModel):
+    working_hours_per_day: int = 24
+    shifts_per_day: int = 3
+    production_target_kg: float = 0
+    currency: str = "INR"
+    timezone: str = "Asia/Kolkata"
+
+    class Config:
+        from_attributes = True
+
+
+class CompanyInfo(BaseModel):
+    name: str
+    max_users: int
+    current_user_count: int = 0
+
+
+class MeResponse(BaseModel):
+    user: UserResponse
+    allowed_modules: list[str]
+    mill_settings: Optional[MillSettingsOut] = None
+    company: Optional[CompanyInfo] = None
 
 
 class LoginResponse(BaseModel):

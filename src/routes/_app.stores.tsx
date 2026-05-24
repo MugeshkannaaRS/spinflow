@@ -277,6 +277,7 @@ function StoresPage() {
 function NewIssueNoteDialog() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [requiredErrors, setRequiredErrors] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
@@ -287,6 +288,21 @@ function NewIssueNoteDialog() {
     department: "",
     purpose: "",
     issuedBy: "",
+  });
+
+  const reqFields = [
+    "date",
+    "itemCode",
+    "itemName",
+    "quantity",
+    "issuedTo",
+    "department",
+    "issuedBy",
+  ] as const;
+  const allFilled = reqFields.every((f) => {
+    const v = form[f];
+    if (typeof v === "number") return v > 0;
+    return typeof v === "string" && v.trim().length > 0;
   });
 
   const m = useMutation({
@@ -301,6 +317,15 @@ function NewIssueNoteDialog() {
 
   const handleCreateIssue = (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: Record<string, string> = {};
+    reqFields.forEach((f) => {
+      const v = form[f];
+      if (typeof v === "number" ? v <= 0 : !v || (typeof v === "string" && !v.trim())) {
+        errors[f] = "This field is required";
+      }
+    });
+    setRequiredErrors(errors);
+    if (Object.keys(errors).length > 0) return;
     m.mutate(undefined, {
       onSuccess: () => {
         toast.success("Issue note created");
@@ -327,49 +352,102 @@ function NewIssueNoteDialog() {
         <form onSubmit={handleCreateIssue} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Date</Label>
+              <Label>
+                Date <span className="text-destructive">*</span>
+              </Label>
               <Input
                 type="date"
                 value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, date: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, date: "" }));
+                }}
+                className={requiredErrors.date ? "border-destructive" : ""}
               />
+              {requiredErrors.date && (
+                <p className="text-sm text-destructive">{requiredErrors.date}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Item code</Label>
+              <Label>
+                Item code <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.itemCode}
-                onChange={(e) => setForm({ ...form, itemCode: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, itemCode: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, itemCode: "" }));
+                }}
+                className={requiredErrors.itemCode ? "border-destructive" : ""}
               />
+              {requiredErrors.itemCode && (
+                <p className="text-sm text-destructive">{requiredErrors.itemCode}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Item name</Label>
+              <Label>
+                Item name <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.itemName}
-                onChange={(e) => setForm({ ...form, itemName: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, itemName: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, itemName: "" }));
+                }}
+                className={requiredErrors.itemName ? "border-destructive" : ""}
               />
+              {requiredErrors.itemName && (
+                <p className="text-sm text-destructive">{requiredErrors.itemName}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Quantity</Label>
+              <Label>
+                Quantity <span className="text-destructive">*</span>
+              </Label>
               <Input
                 type="number"
                 value={form.quantity}
-                onChange={(e) => setForm({ ...form, quantity: +e.target.value })}
-                required
+                onChange={(e) => {
+                  setForm({ ...form, quantity: +e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, quantity: "" }));
+                }}
+                className={requiredErrors.quantity ? "border-destructive" : ""}
               />
+              {requiredErrors.quantity && (
+                <p className="text-sm text-destructive">{requiredErrors.quantity}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Issued to</Label>
+              <Label>
+                Issued to <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.issuedTo}
-                onChange={(e) => setForm({ ...form, issuedTo: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, issuedTo: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, issuedTo: "" }));
+                }}
+                className={requiredErrors.issuedTo ? "border-destructive" : ""}
               />
+              {requiredErrors.issuedTo && (
+                <p className="text-sm text-destructive">{requiredErrors.issuedTo}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Department</Label>
+              <Label>
+                Department <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.department}
-                onChange={(e) => setForm({ ...form, department: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, department: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, department: "" }));
+                }}
+                className={requiredErrors.department ? "border-destructive" : ""}
               />
+              {requiredErrors.department && (
+                <p className="text-sm text-destructive">{requiredErrors.department}</p>
+              )}
             </div>
             <div className="space-y-1.5 col-span-2">
               <Label>Purpose</Label>
@@ -379,12 +457,20 @@ function NewIssueNoteDialog() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Issued by</Label>
+              <Label>
+                Issued by <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.issuedBy}
-                onChange={(e) => setForm({ ...form, issuedBy: e.target.value })}
-                required
+                onChange={(e) => {
+                  setForm({ ...form, issuedBy: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, issuedBy: "" }));
+                }}
+                className={requiredErrors.issuedBy ? "border-destructive" : ""}
               />
+              {requiredErrors.issuedBy && (
+                <p className="text-sm text-destructive">{requiredErrors.issuedBy}</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Attachment</Label>
@@ -392,7 +478,7 @@ function NewIssueNoteDialog() {
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={m.isPending}>
+            <Button type="submit" disabled={m.isPending || !allFilled}>
               {m.isPending ? "Saving…" : "Create issue note"}
             </Button>
           </DialogFooter>

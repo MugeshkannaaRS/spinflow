@@ -48,7 +48,8 @@ import { ExcelColumnFilter } from "@/components/ui/excel-column-filter";
 import { ColumnConfigurator } from "@/components/ui/column-configurator";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { FileUpload, type UploadedFile } from "@/components/ui/file-upload";
-import { useState, useMemo, useEffect } from "react";
+import { cn } from "@/lib/utils";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import {
   Plus,
@@ -750,7 +751,7 @@ function LeaveActionDialog({ leave }: { leave: LeaveRow }) {
         id: leave.id,
         leave_id: leave.id,
         action: "approved",
-        approved_by: user.name,
+        approved_by: user?.name ?? "",
         remarks,
       }),
   });
@@ -761,7 +762,7 @@ function LeaveActionDialog({ leave }: { leave: LeaveRow }) {
         id: leave.id,
         leave_id: leave.id,
         action: "rejected",
-        approved_by: user.name,
+        approved_by: user?.name ?? "",
         remarks,
       }),
   });
@@ -836,11 +837,65 @@ function LeaveActionDialog({ leave }: { leave: LeaveRow }) {
 function downloadEmployeeTemplate() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([
-    ["Employee Code", "Full Name", "Department", "Designation", "Shift (A/B/C/General)", "Date of Joining (DD/MM/YYYY)", "Phone", "Daily Wage"],
+    [
+      "Employee Code",
+      "Full Name",
+      "Department",
+      "Designation",
+      "Shift (A/B/C/General)",
+      "Date of Joining (DD/MM/YYYY)",
+      "Phone",
+      "Daily Wage",
+    ],
     ["EMP001", "Ravi Kumar", "Spinning", "Operator", "A", "01/06/2024", "9876543210", "500"],
   ]);
   XLSX.utils.book_append_sheet(wb, ws, "Employees");
   XLSX.writeFile(wb, "employee_import_template.xlsx");
+}
+
+const FIELD_CANDIDATES: Record<string, string[]> = {
+  code: ["code", "emp code", "employee code", "id", "emp id"],
+  name: ["name", "full name", "employee name", "emp name"],
+  department: ["department", "dept", "division"],
+  designation: ["designation", "position", "title", "post"],
+  shift: ["shift", "shift type", "work shift"],
+  doj: ["doj", "date of joining", "joining date", "join date", "start date"],
+  phone: ["phone", "mobile", "contact", "phone no", "mobile no"],
+  daily_wage: ["daily wage", "wage", "salary", "daily salary", "per day"],
+};
+
+function detectColumn(headers: string[], candidates: string[]): number | null {
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i].toLowerCase().trim();
+    if (candidates.some((c) => h.includes(c.toLowerCase()))) {
+      return i;
+    }
+  }
+  return null;
+}
+
+const VALID_SHIFTS = [
+  "A",
+  "B",
+  "C",
+  "General",
+  "Morning",
+  "Evening",
+  "Night",
+  "Day",
+  "1",
+  "2",
+  "3",
+];
+
+function normalizeShift(value: string): string {
+  const v = value.toLowerCase().trim();
+  if (v === "1" || v === "morning") return "A";
+  if (v === "2" || v === "evening") return "B";
+  if (v === "3" || v === "night") return "C";
+  if (v === "day" || v === "general") return "General";
+  if (["a", "b", "c"].includes(v)) return v.toUpperCase();
+  return value;
 }
 
 interface EmpImportRow {
@@ -855,37 +910,97 @@ interface EmpImportRow {
   _error?: string;
 }
 
-function parseEmployeeRow(row: any[]): EmpImportRow | null {
-  const employee_code = String(row[0] ?? "").trim();
-  const full_name = String(row[1] ?? "").trim();
-  const department = String(row[2] ?? "").trim();
+function parseEmployeeRow(row: any[], colMap: Record<string, number>): EmpImportRow | null {
+  const get = (field: string) =>
+    colMap[field] !== undefined ? String(row[colMap[field]] ?? "").trim() : "";
+  const employee_code = get("code");
+  const full_name = get("name");
+  const department = get("department");
   if (!employee_code && !full_name) return null;
+
+  let shift = get("shift");
+  if (shift) {
+    const normalized = normalizeShift(shift);
+    if (!VALID_SHIFTS.includes(normalized)) {
+      return {
+        employee_code,
+        full_name,
+        department,
+        designation: get("designation"),
+        shift,
+        date_of_joining: get("doj"),
+        phone: get("phone"),
+        daily_wage: get("daily_wage"),
+        _error: `Invalid shift: ${shift}`,
+      };
+    }
+    shift = normalized;
+  }
+
   return {
     employee_code,
     full_name,
     department,
-    designation: String(row[3] ?? "").trim(),
-    shift: String(row[4] ?? "").trim(),
-    date_of_joining: String(row[5] ?? "").trim(),
-    phone: String(row[6] ?? "").trim(),
-    daily_wage: String(row[7] ?? "").trim(),
+    designation: get("designation"),
+    shift,
+    date_of_joining: get("doj"),
+    phone: get("phone"),
+    daily_wage: get("daily_wage"),
     _error: !employee_code
       ? "Missing employee code"
       : !full_name
         ? "Missing full name"
         : !department
           ? "Missing department"
-          : !["A", "B", "C", "General", "G"].includes(String(row[4] ?? "").trim())
-            ? `Invalid shift: ${String(row[4] ?? "")}`
-            : undefined,
+          : undefined,
   };
 }
+
+function recalcError(row: EmpImportRow): string | undefined {
+  if (!row.employee_code) return "Missing employee code";
+  if (!row.full_name) return "Missing full name";
+  if (!row.department) return "Missing department";
+  if (row.shift) {
+    const normalized = normalizeShift(row.shift);
+    if (!VALID_SHIFTS.includes(normalized)) return `Invalid shift: ${row.shift}`;
+  }
+  return undefined;
+}
+
+const FIELD_TO_LABEL: Record<string, string> = {
+  code: "Employee Code",
+  name: "Full Name",
+  department: "Department",
+  designation: "Designation",
+  shift: "Shift",
+  doj: "Date of Joining",
+  phone: "Phone",
+  daily_wage: "Daily Wage",
+};
+
+const ROW_KEY_TO_FIELD: Record<string, string> = {
+  employee_code: "code",
+  full_name: "name",
+  department: "department",
+  designation: "designation",
+  shift: "shift",
+  date_of_joining: "doj",
+  phone: "phone",
+  daily_wage: "daily_wage",
+};
 
 function ImportEmployeeDialog() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [rows, setRows] = useState<EmpImportRow[]>([]);
   const [fileName, setFileName] = useState("");
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [colMap, setColMap] = useState<Record<string, number>>({});
+  const [rows, setRows] = useState<EmpImportRow[]>([]);
+  const [rawRows, setRawRows] = useState<any[][]>([]);
+  const [activeTab, setActiveTab] = useState<"mapping" | "preview">("mapping");
+  const [editingCell, setEditingCell] = useState<{ row: number; field: string } | null>(null);
+  const [dirtyCells, setDirtyCells] = useState<Set<string>>(new Set());
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   const m = useMutation({
     mutationFn: (items: any[]) => hrApi.bulkCreateEmployees({ items }),
@@ -900,22 +1015,63 @@ function ImportEmployeeDialog() {
       const wb = XLSX.read(ev.target?.result, { type: "array" });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const raw: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-      const parsed = raw.slice(1).map(parseEmployeeRow).filter((r): r is EmpImportRow => r !== null);
-      setRows(parsed);
+      const hdrs = (raw[0] ?? []).map((h: any) => String(h ?? "").trim());
+      setHeaders(hdrs);
+
+      const auto: Record<string, number> = {};
+      for (const [field, candidates] of Object.entries(FIELD_CANDIDATES)) {
+        const idx = detectColumn(hdrs, candidates);
+        if (idx !== null) auto[field] = idx;
+      }
+      setColMap(auto);
+      setRawRows(raw.slice(1));
+      setRows([]);
+      setDirtyCells(new Set());
+      setEditingCell(null);
+      setActiveTab("mapping");
     };
     reader.readAsArrayBuffer(file);
     e.target.value = "";
   }
 
+  function applyMapping() {
+    const parsed = rawRows
+      .map((row) => parseEmployeeRow(row, colMap))
+      .filter((r): r is EmpImportRow => r !== null);
+    setRows(parsed);
+    setDirtyCells(new Set());
+    setEditingCell(null);
+    setActiveTab("preview");
+  }
+
+  function updateCell(rowIdx: number, field: keyof EmpImportRow, value: string) {
+    setRows((prev) => {
+      const next = [...prev];
+      const updated = { ...next[rowIdx], [field]: value as any };
+      updated._error = recalcError(updated);
+      next[rowIdx] = updated;
+      return next;
+    });
+    setDirtyCells((prev) => {
+      const next = new Set(prev);
+      next.add(`${rowIdx}:${field}`);
+      return next;
+    });
+  }
+
   async function handleConfirm() {
-    const valid = rows.filter((r) => !r._error);
+    const validated = rows.map((r) => ({
+      ...r,
+      shift: normalizeShift(r.shift) || "General",
+    }));
+    const valid = validated.filter((r) => !r._error);
     if (!valid.length) return;
     const items = valid.map((r) => ({
       employee_code: r.employee_code,
       full_name: r.full_name,
       department: r.department,
       designation: r.designation,
-      shift: r.shift || "General",
+      shift: normalizeShift(r.shift) || "General",
       date_of_joining: r.date_of_joining || null,
       phone: r.phone || null,
       daily_wage: r.daily_wage ? parseFloat(r.daily_wage) : null,
@@ -928,8 +1084,14 @@ function ImportEmployeeDialog() {
         toast.success(`${res.created} employee(s) imported successfully`);
         qc.invalidateQueries({ queryKey: ["employees"] });
         setOpen(false);
-        setRows([]);
         setFileName("");
+        setHeaders([]);
+        setColMap({});
+        setRows([]);
+        setRawRows([]);
+        setDirtyCells(new Set());
+        setEditingCell(null);
+        setActiveTab("mapping");
       }
     } catch {
       toast.error("Failed to import employees");
@@ -938,6 +1100,41 @@ function ImportEmployeeDialog() {
 
   const validCount = rows.filter((r) => !r._error).length;
   const errorCount = rows.filter((r) => !!r._error).length;
+
+  function renderEditableCell(rowIdx: number, field: keyof EmpImportRow, value: string) {
+    const isEditing = editingCell?.row === rowIdx && editingCell?.field === field;
+    const isDirty = dirtyCells.has(`${rowIdx}:${field}`);
+
+    if (isEditing) {
+      return (
+        <TableCell key={`edit-${rowIdx}-${field}`} className="p-0">
+          <input
+            ref={editInputRef}
+            value={value}
+            onChange={(e) => updateCell(rowIdx, field, e.target.value)}
+            onBlur={() => setEditingCell(null)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") setEditingCell(null);
+              if (e.key === "Escape") setEditingCell(null);
+            }}
+            autoFocus
+            className="w-full h-full px-2 py-1 text-xs border-0 ring-1 ring-primary outline-none bg-white"
+          />
+        </TableCell>
+      );
+    }
+
+    return (
+      <TableCell
+        key={`cell-${rowIdx}-${field}`}
+        className={cn("cursor-pointer max-w-[160px] truncate", isDirty && "bg-yellow-100")}
+        title={value}
+        onClick={() => setEditingCell({ row: rowIdx, field })}
+      >
+        {value}
+      </TableCell>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -964,23 +1161,82 @@ function ImportEmployeeDialog() {
                   {fileName ? fileName : "Choose File"}
                 </span>
               </Button>
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={handleFile}
-              />
+              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile} />
             </label>
-            {rows.length > 0 && (
+            {activeTab === "preview" && rows.length > 0 && (
               <span className="text-sm text-muted-foreground">
                 {validCount} valid, {errorCount} errors
               </span>
             )}
           </div>
 
-          {rows.length > 0 && (
+          {activeTab === "mapping" && headers.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Column Mapping</p>
+              <div className="border rounded-md">
+                <Table className="text-xs">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Field</TableHead>
+                      <TableHead>Excel Column</TableHead>
+                      <TableHead className="w-10">Detected</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {Object.entries(FIELD_CANDIDATES).map(([field]) => {
+                      const detectedIdx = colMap[field];
+                      const detectedHeader =
+                        detectedIdx !== undefined ? headers[detectedIdx] : null;
+                      return (
+                        <TableRow key={field}>
+                          <TableCell className="font-medium">{FIELD_TO_LABEL[field]}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={detectedIdx !== undefined ? String(detectedIdx) : ""}
+                              onValueChange={(v) =>
+                                setColMap((prev) => ({
+                                  ...prev,
+                                  [field]: v ? Number(v) : (undefined as any),
+                                }))
+                              }
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder="Select column..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">(none)</SelectItem>
+                                {headers.map((h, i) => (
+                                  <SelectItem key={i} value={String(i)}>
+                                    {h || `Column ${i + 1}`}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {detectedHeader ? (
+                              <span className="text-green-600 text-sm">&#10003;</span>
+                            ) : (
+                              <span className="text-muted-foreground">&#8212;</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex justify-end">
+                <Button size="sm" onClick={applyMapping}>
+                  Apply Mapping
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "preview" && rows.length > 0 && (
             <div className="border rounded-md max-h-80 overflow-auto">
-              <Table className="min-w-[900px] w-full text-xs">
+              <Table className="min-w-[960px] w-full text-xs">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-8">#</TableHead>
@@ -998,39 +1254,64 @@ function ImportEmployeeDialog() {
                 <TableBody>
                   {rows.slice(0, 50).map((r, i) => (
                     <TableRow key={i} className={r._error ? "bg-destructive/10" : ""}>
-                      <TableCell>{i + 1}</TableCell>
-                      <TableCell className="font-mono">{r.employee_code}</TableCell>
-                      <TableCell>{r.full_name}</TableCell>
-                      <TableCell>{r.department}</TableCell>
-                      <TableCell>{r.designation}</TableCell>
-                      <TableCell>{r.shift}</TableCell>
-                      <TableCell>{r.date_of_joining}</TableCell>
-                      <TableCell>{r.phone}</TableCell>
-                      <TableCell>{r.daily_wage}</TableCell>
-                      <TableCell>
-                        {r._error ? (
-                          <span className="text-destructive">{r._error}</span>
-                        ) : (
-                          <span className="text-green-600">OK</span>
+                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                      {renderEditableCell(i, "employee_code", r.employee_code)}
+                      {renderEditableCell(i, "full_name", r.full_name)}
+                      {renderEditableCell(i, "department", r.department)}
+                      {renderEditableCell(i, "designation", r.designation)}
+                      {renderEditableCell(i, "shift", r.shift)}
+                      {renderEditableCell(i, "date_of_joining", r.date_of_joining)}
+                      {renderEditableCell(i, "phone", r.phone)}
+                      {renderEditableCell(i, "daily_wage", r.daily_wage)}
+                      <TableCell
+                        className={cn(
+                          "max-w-[140px] truncate",
+                          r._error ? "text-destructive" : "text-green-600",
                         )}
+                        title={r._error}
+                      >
+                        {r._error || "OK"}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+              {rows.length > 50 && (
+                <div className="text-xs text-center text-muted-foreground py-2 border-t">
+                  Showing 50 of {rows.length} rows
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "preview" && rows.length === 0 && headers.length > 0 && (
+            <div className="text-sm text-muted-foreground text-center py-8">
+              No valid data rows found. Check your column mapping.
             </div>
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => { setOpen(false); setRows([]); setFileName(""); }}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setOpen(false);
+              setFileName("");
+              setHeaders([]);
+              setColMap({});
+              setRows([]);
+              setRawRows([]);
+              setDirtyCells(new Set());
+              setEditingCell(null);
+              setActiveTab("mapping");
+            }}
+          >
             Cancel
           </Button>
-          <Button
-            onClick={handleConfirm}
-            disabled={validCount === 0 || m.isPending}
-          >
-            {m.isPending ? "Importing…" : `Import ${validCount} Employee(s)`}
-          </Button>
+          {activeTab === "preview" && (
+            <Button onClick={handleConfirm} disabled={validCount === 0 || m.isPending}>
+              {m.isPending ? "Importing…" : `Import ${validCount} Employee(s)`}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

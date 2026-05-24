@@ -5,9 +5,10 @@ from typing import List, Optional
 from datetime import datetime
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module
+from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.stores import Spare, SpareIssue
+from app.models.masters import Mill
 from app.schemas.stores import (
     SpareItemCreate, SpareItemOut, SpareItemUpdate, SpareInward,
     SpareIssueCreate, SpareIssueOut,

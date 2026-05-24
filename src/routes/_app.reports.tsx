@@ -67,11 +67,19 @@ function ReportsPage() {
       </>
     );
 
-  if (query.isError || !data?.productionSummary || !data?.qualitySummary || !data?.dispatchSummary || !data?.financialSummary)
+  if (
+    query.isError ||
+    !data?.productionSummary ||
+    !data?.qualitySummary ||
+    !data?.dispatchSummary ||
+    !data?.financialSummary
+  )
     return (
       <>
         <Topbar title="Reports & Analytics" subtitle="Error" />
-        <div className="p-6 text-sm text-destructive">Failed to load report data. Please refresh.</div>
+        <div className="p-6 text-sm text-destructive">
+          Failed to load report data. Please refresh.
+        </div>
       </>
     );
 

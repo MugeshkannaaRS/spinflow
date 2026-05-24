@@ -17,7 +17,28 @@ from app.schemas.masters import (
 )
 from app.models.masters import (
     Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route,
+    CompanyModule, MillSettings,
 )
+from app.models.audit import AuditLog
+
+
+ALL_MODULES = [
+    "dashboard", "production", "quality", "inventory", "dispatch",
+    "purchase", "stores", "hr", "accounts", "maintenance",
+    "users", "audit", "reports", "masters", "stock", "sales", "lotrac",
+    "payroll",
+]
+
+DEFAULT_DEPARTMENTS = [
+    ("blowroom", "Blowroom"),
+    ("carding", "Carding"),
+    ("drawing", "Drawing"),
+    ("simplex", "Simplex"),
+    ("ring_frame", "Ring Frame"),
+    ("winding", "Winding"),
+    ("quality", "Quality Control"),
+    ("admin", "Administration"),
+]
 
 
 class MastersService(BaseService):
@@ -55,7 +76,28 @@ class MastersService(BaseService):
             await self.db.flush()
         except IntegrityError:
             raise SpinFlowException.conflict(f"Company with code '{dto.code}' already exists")
-        await self._audit(action="create", entity="Company", entity_id=record.id, details=f"Created company: {record.name}")
+
+        for module_name in ALL_MODULES:
+            cm = CompanyModule(
+                company_id=record.id,
+                module_name=module_name,
+                is_enabled=True,
+                enabled_by=self.current_user.id if self.current_user else None,
+            )
+            self.db.add(cm)
+        await self.db.flush()
+
+        log = AuditLog(
+            user_id=self.current_user.id if self.current_user else "SYSTEM",
+            user_name=self.current_user.name if self.current_user else "System",
+            role=self.current_user.role_rel.code if self.current_user and self.current_user.role_rel else "SUPER_ADMIN",
+            action="COMPANY_CREATED",
+            entity="Company",
+            entity_id=record.id,
+            details=f"Created company: {record.name}",
+        )
+        self.db.add(log)
+        await self.db.flush()
         return record
 
     async def update_company(self, id: str, dto: CompanyUpdate, updated_by: Optional[str] = None):
@@ -84,14 +126,42 @@ class MastersService(BaseService):
     async def get_mill(self, id: str):
         return await self.get_or_404(Mill, id)
 
-    async def create_mill(self, dto: MillCreate, created_by: Optional[str] = None):
+    async def create_mill(self, dto: MillCreate, created_by: Optional[str] = None, create_defaults: bool = True):
         try:
             record = Mill(**dto.model_dump())
             self.db.add(record)
             await self.db.flush()
         except IntegrityError:
             raise SpinFlowException.conflict(f"Mill with code '{dto.code}' already exists")
-        await self._audit(action="create", entity="Mill", entity_id=record.id, details=f"Created mill: {record.name}")
+
+        ms = MillSettings(
+            mill_id=record.id,
+        )
+        self.db.add(ms)
+
+        if create_defaults:
+            for dep_type, dep_name in DEFAULT_DEPARTMENTS:
+                dep = Department(
+                    mill_id=record.id,
+                    code=dep_type,
+                    name=dep_name,
+                    department_type=dep_type,
+                    is_active=True,
+                )
+                self.db.add(dep)
+        await self.db.flush()
+
+        log = AuditLog(
+            user_id=self.current_user.id if self.current_user else "SYSTEM",
+            user_name=self.current_user.name if self.current_user else "System",
+            role=self.current_user.role_rel.code if self.current_user and self.current_user.role_rel else "SUPER_ADMIN",
+            action="MILL_CREATED",
+            entity="Mill",
+            entity_id=record.id,
+            details=f"Created mill: {record.name}",
+        )
+        self.db.add(log)
+        await self.db.flush()
         return record
 
     async def update_mill(self, id: str, dto: MillUpdate, updated_by: Optional[str] = None):

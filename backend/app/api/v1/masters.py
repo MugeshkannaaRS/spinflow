@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.core.deps import require_module
+from app.core.deps import require_module, get_mill_scope
 from app.services.masters_service import MastersService
 from app.schemas.masters import (
     CompanyCreate, CompanyUpdate, CompanyOut,
@@ -14,6 +15,9 @@ from app.schemas.masters import (
     RouteCreate, RouteUpdate, RouteOut,
 )
 from app.models.user import User
+from app.models.masters import (
+    Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route,
+)
 
 router = APIRouter()
 
@@ -27,6 +31,9 @@ async def list_companies(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
+    scope = await get_mill_scope(current_user)
+    if scope["company_id"] is not None:
+        raise HTTPException(status_code=403, detail="Only SUPER_ADMIN can list companies")
     service = MastersService(db, current_user)
     return await service.list_companies(page=page, page_size=page_size, include_inactive=include_inactive)
 
@@ -69,8 +76,25 @@ async def list_mills(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    service = MastersService(db, current_user)
-    return await service.list_mills(company_id=company_id, page=page, page_size=page_size, include_inactive=include_inactive)
+    scope = await get_mill_scope(current_user)
+    query = select(Mill)
+    if scope["company_id"]:
+        query = query.where(Mill.company_id == scope["company_id"])
+    elif scope["mill_id"]:
+        query = query.where(Mill.id == scope["mill_id"])
+    if not include_inactive:
+        query = query.where(Mill.is_active == True)
+    query = query.order_by(Mill.created_at.desc())
+    count_stmt = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    items = result.scalars().all()
+    pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+    return {
+        "total": total, "page": page, "page_size": page_size, "pages": pages,
+        "data": [MillOut.model_validate(item) for item in items],
+    }
 
 @router.post("/masters/mills", response_model=MillOut)
 async def create_mill(
@@ -111,8 +135,25 @@ async def list_departments(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    service = MastersService(db, current_user)
-    return await service.list_departments(mill_id=mill_id, page=page, page_size=page_size, include_inactive=include_inactive)
+    scope = await get_mill_scope(current_user)
+    query = select(Department)
+    if scope["mill_id"]:
+        query = query.where(Department.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        query = query.join(Mill, Department.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if not include_inactive:
+        query = query.where(Department.is_active == True)
+    query = query.order_by(Department.created_at.desc())
+    count_stmt = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    items = result.scalars().all()
+    pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+    return {
+        "total": total, "page": page, "page_size": page_size, "pages": pages,
+        "data": [DepartmentOut.model_validate(item) for item in items],
+    }
 
 @router.post("/masters/departments", response_model=DepartmentOut)
 async def create_department(
@@ -153,8 +194,25 @@ async def list_yarn_counts(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    service = MastersService(db, current_user)
-    return await service.list_yarn_counts(mill_id=mill_id, page=page, page_size=page_size, include_inactive=include_inactive)
+    scope = await get_mill_scope(current_user)
+    query = select(YarnCount)
+    if scope["mill_id"]:
+        query = query.where(YarnCount.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        query = query.join(Mill, YarnCount.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if not include_inactive:
+        query = query.where(YarnCount.is_active == True)
+    query = query.order_by(YarnCount.created_at.desc())
+    count_stmt = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    items = result.scalars().all()
+    pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+    return {
+        "total": total, "page": page, "page_size": page_size, "pages": pages,
+        "data": [YarnCountOut.model_validate(item) for item in items],
+    }
 
 @router.post("/masters/yarn-counts", response_model=YarnCountOut)
 async def create_yarn_count(
@@ -195,8 +253,25 @@ async def list_customers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    service = MastersService(db, current_user)
-    return await service.list_customers(mill_id=mill_id, page=page, page_size=page_size, include_inactive=include_inactive)
+    scope = await get_mill_scope(current_user)
+    query = select(Customer)
+    if scope["mill_id"]:
+        query = query.where(Customer.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        query = query.join(Mill, Customer.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if not include_inactive:
+        query = query.where(Customer.is_active == True)
+    query = query.order_by(Customer.created_at.desc())
+    count_stmt = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    items = result.scalars().all()
+    pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+    return {
+        "total": total, "page": page, "page_size": page_size, "pages": pages,
+        "data": [CustomerOut.model_validate(item) for item in items],
+    }
 
 @router.post("/masters/customers", response_model=CustomerOut)
 async def create_customer(
@@ -246,8 +321,25 @@ async def list_vehicles(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    service = MastersService(db, current_user)
-    return await service.list_vehicles(mill_id=mill_id, page=page, page_size=page_size, include_inactive=include_inactive)
+    scope = await get_mill_scope(current_user)
+    query = select(MasterVehicle)
+    if scope["mill_id"]:
+        query = query.where(MasterVehicle.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        query = query.join(Mill, MasterVehicle.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if not include_inactive:
+        query = query.where(MasterVehicle.is_active == True)
+    query = query.order_by(MasterVehicle.created_at.desc())
+    count_stmt = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    items = result.scalars().all()
+    pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+    return {
+        "total": total, "page": page, "page_size": page_size, "pages": pages,
+        "data": [MasterVehicleOut.model_validate(item) for item in items],
+    }
 
 @router.post("/masters/vehicles", response_model=MasterVehicleOut)
 async def create_vehicle(
@@ -288,8 +380,25 @@ async def list_routes(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    service = MastersService(db, current_user)
-    return await service.list_routes(mill_id=mill_id, page=page, page_size=page_size, include_inactive=include_inactive)
+    scope = await get_mill_scope(current_user)
+    query = select(Route)
+    if scope["mill_id"]:
+        query = query.where(Route.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        query = query.join(Mill, Route.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if not include_inactive:
+        query = query.where(Route.is_active == True)
+    query = query.order_by(Route.created_at.desc())
+    count_stmt = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    items = result.scalars().all()
+    pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+    return {
+        "total": total, "page": page, "page_size": page_size, "pages": pages,
+        "data": [RouteOut.model_validate(item) for item in items],
+    }
 
 @router.post("/masters/routes", response_model=RouteOut)
 async def create_route(

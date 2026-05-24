@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List, Optional
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module
+from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.payroll import PayrollMonth, PayslipEntry
+from app.models.hr import Employee
+from app.models.masters import Mill
 from app.schemas.payroll import (
     PayrollProcessRequest, PayrollMonthOut, PayslipOut, PayrollSummaryRow,
 )
@@ -22,6 +24,14 @@ async def get_payroll_months(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
+    scope = await get_mill_scope(current_user)
+    if scope["mill_id"]:
+        mill_id = scope["mill_id"]
+    elif scope["company_id"]:
+        mills_result = await db.execute(select(Mill.id).where(Mill.company_id == scope["company_id"]))
+        mill_ids = mills_result.scalars().all()
+        if mill_ids:
+            mill_id = mill_ids[0]
     svc = PayrollService(db, current_user)
     return await svc.payroll_summary(mill_id, year)
 
@@ -73,6 +83,15 @@ async def get_payslips(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
+    scope = await get_mill_scope(current_user)
+    pm = await db.get(PayrollMonth, payroll_month_id)
+    if pm:
+        if scope["mill_id"] and pm.mill_id != scope["mill_id"]:
+            raise HTTPException(status_code=404, detail="Payroll month not found")
+        elif scope["company_id"]:
+            mill = await db.get(Mill, pm.mill_id)
+            if not mill or mill.company_id != scope["company_id"]:
+                raise HTTPException(status_code=404, detail="Payroll month not found")
     svc = PayrollService(db, current_user)
     return await svc.get_payslips(payroll_month_id, department)
 
@@ -85,6 +104,17 @@ async def get_employee_payslip(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
+    scope = await get_mill_scope(current_user)
+    if scope["mill_id"]:
+        emp = await db.get(Employee, employee_id)
+        if emp and emp.mill_id != scope["mill_id"]:
+            raise HTTPException(status_code=404, detail="Employee not found")
+    elif scope["company_id"]:
+        emp = await db.get(Employee, employee_id)
+        if emp:
+            mill = await db.get(Mill, emp.mill_id)
+            if not mill or mill.company_id != scope["company_id"]:
+                raise HTTPException(status_code=404, detail="Employee not found")
     svc = PayrollService(db, current_user)
     return await svc.get_employee_payslip(employee_id, month, year)
 
@@ -96,5 +126,13 @@ async def payroll_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
+    scope = await get_mill_scope(current_user)
+    if scope["mill_id"]:
+        mill_id = scope["mill_id"]
+    elif scope["company_id"]:
+        mills_result = await db.execute(select(Mill.id).where(Mill.company_id == scope["company_id"]))
+        mill_ids = mills_result.scalars().all()
+        if mill_ids:
+            mill_id = mill_ids[0]
     svc = PayrollService(db, current_user)
     return await svc.payroll_summary(mill_id, year)

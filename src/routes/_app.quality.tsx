@@ -405,6 +405,7 @@ function QualityPage() {
 function NewTestDialog() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [requiredErrors, setRequiredErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
     type: "CSP" as QualityTest["type"],
@@ -418,12 +419,38 @@ function NewTestDialog() {
     status: "pending" as QualityTest["status"],
   });
 
+  const reqFields = [
+    "date",
+    "type",
+    "lotId",
+    "machineCode",
+    "sampleRef",
+    "result",
+    "unit",
+    "standard",
+    "testedBy",
+  ] as const;
+  const allFilled = reqFields.every((f) => {
+    const v = form[f];
+    if (typeof v === "number") return v > 0;
+    return typeof v === "string" && v.trim().length > 0;
+  });
+
   const m = useMutation({
     mutationFn: () => qualityApi.createTest(form),
   });
 
   const handleCreateTest = (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: Record<string, string> = {};
+    reqFields.forEach((f) => {
+      const v = form[f];
+      if (typeof v === "number" ? v <= 0 : !v || (typeof v === "string" && !v.trim())) {
+        errors[f] = "This field is required";
+      }
+    });
+    setRequiredErrors(errors);
+    if (Object.keys(errors).length > 0) return;
     m.mutate(undefined, {
       onSuccess: () => {
         toast.success("Test recorded");
@@ -448,20 +475,34 @@ function NewTestDialog() {
         <form onSubmit={handleCreateTest} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Date</Label>
+              <Label>
+                Date <span className="text-destructive">*</span>
+              </Label>
               <Input
                 type="date"
                 value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, date: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, date: "" }));
+                }}
+                className={requiredErrors.date ? "border-destructive" : ""}
               />
+              {requiredErrors.date && (
+                <p className="text-sm text-destructive">{requiredErrors.date}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Type</Label>
+              <Label>
+                Type <span className="text-destructive">*</span>
+              </Label>
               <Select
                 value={form.type}
-                onValueChange={(v) => setForm({ ...form, type: v as QualityTest["type"] })}
+                onValueChange={(v) => {
+                  setForm({ ...form, type: v as QualityTest["type"] });
+                  setRequiredErrors((prev) => ({ ...prev, type: "" }));
+                }}
               >
-                <SelectTrigger>
+                <SelectTrigger className={requiredErrors.type ? "border-destructive" : ""}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -472,66 +513,129 @@ function NewTestDialog() {
                   <SelectItem value="Strength">Strength</SelectItem>
                 </SelectContent>
               </Select>
+              {requiredErrors.type && (
+                <p className="text-sm text-destructive">{requiredErrors.type}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Lot ID</Label>
+              <Label>
+                Lot ID <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.lotId}
-                onChange={(e) => setForm({ ...form, lotId: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, lotId: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, lotId: "" }));
+                }}
+                className={requiredErrors.lotId ? "border-destructive" : ""}
               />
+              {requiredErrors.lotId && (
+                <p className="text-sm text-destructive">{requiredErrors.lotId}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Machine code</Label>
+              <Label>
+                Machine code <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.machineCode}
-                onChange={(e) => setForm({ ...form, machineCode: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, machineCode: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, machineCode: "" }));
+                }}
+                className={requiredErrors.machineCode ? "border-destructive" : ""}
               />
+              {requiredErrors.machineCode && (
+                <p className="text-sm text-destructive">{requiredErrors.machineCode}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Sample ref</Label>
+              <Label>
+                Sample ref <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.sampleRef}
-                onChange={(e) => setForm({ ...form, sampleRef: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, sampleRef: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, sampleRef: "" }));
+                }}
+                className={requiredErrors.sampleRef ? "border-destructive" : ""}
               />
+              {requiredErrors.sampleRef && (
+                <p className="text-sm text-destructive">{requiredErrors.sampleRef}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Unit</Label>
+              <Label>
+                Unit <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.unit}
-                onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                onChange={(e) => {
+                  setForm({ ...form, unit: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, unit: "" }));
+                }}
+                className={requiredErrors.unit ? "border-destructive" : ""}
               />
+              {requiredErrors.unit && (
+                <p className="text-sm text-destructive">{requiredErrors.unit}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Result</Label>
+              <Label>
+                Result <span className="text-destructive">*</span>
+              </Label>
               <Input
                 type="number"
                 step="0.01"
                 value={form.result}
-                onChange={(e) => setForm({ ...form, result: +e.target.value })}
-                required
+                onChange={(e) => {
+                  setForm({ ...form, result: +e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, result: "" }));
+                }}
+                className={requiredErrors.result ? "border-destructive" : ""}
               />
+              {requiredErrors.result && (
+                <p className="text-sm text-destructive">{requiredErrors.result}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Standard</Label>
+              <Label>
+                Standard <span className="text-destructive">*</span>
+              </Label>
               <Input
                 type="number"
                 step="0.01"
                 value={form.standard}
-                onChange={(e) => setForm({ ...form, standard: +e.target.value })}
-                required
+                onChange={(e) => {
+                  setForm({ ...form, standard: +e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, standard: "" }));
+                }}
+                className={requiredErrors.standard ? "border-destructive" : ""}
               />
+              {requiredErrors.standard && (
+                <p className="text-sm text-destructive">{requiredErrors.standard}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>Tested by</Label>
+              <Label>
+                Tested by <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.testedBy}
-                onChange={(e) => setForm({ ...form, testedBy: e.target.value })}
-                required
+                onChange={(e) => {
+                  setForm({ ...form, testedBy: e.target.value });
+                  setRequiredErrors((prev) => ({ ...prev, testedBy: "" }));
+                }}
+                className={requiredErrors.testedBy ? "border-destructive" : ""}
               />
+              {requiredErrors.testedBy && (
+                <p className="text-sm text-destructive">{requiredErrors.testedBy}</p>
+              )}
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={m.isPending}>
+            <Button type="submit" disabled={m.isPending || !allFilled}>
               {m.isPending ? "Saving…" : "Record test"}
             </Button>
           </DialogFooter>
@@ -545,7 +649,8 @@ function LotApproveAction({ lotId }: { lotId: string }) {
   const qc = useQueryClient();
   const user = useAuth((s) => s.user);
   const m = useMutation({
-    mutationFn: () => qualityApi.approveOrReject({ id: lotId, action: "approve", by: user?.name ?? "" }),
+    mutationFn: () =>
+      qualityApi.approveOrReject({ id: lotId, action: "approve", by: user?.name ?? "" }),
   });
   return (
     <Button
@@ -573,7 +678,8 @@ function LotRejectAction({ lotId }: { lotId: string }) {
   const qc = useQueryClient();
   const user = useAuth((s) => s.user);
   const m = useMutation({
-    mutationFn: () => qualityApi.approveOrReject({ id: lotId, action: "reject", by: user?.name ?? "" }),
+    mutationFn: () =>
+      qualityApi.approveOrReject({ id: lotId, action: "reject", by: user?.name ?? "" }),
   });
   return (
     <Button

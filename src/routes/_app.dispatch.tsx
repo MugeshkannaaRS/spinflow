@@ -346,7 +346,7 @@ function StatusUpdateSelect({
 
   const m = useMutation({
     mutationFn: (newStatus: DispatchEntry["status"]) =>
-      dispatchApi.updateStatus(dispatchId, { status: newStatus, scannedBy: user.name }),
+      dispatchApi.updateStatus(dispatchId, { status: newStatus, scannedBy: user?.name ?? "" }),
   });
 
   const handleStatusUpdate = (v: string) => {

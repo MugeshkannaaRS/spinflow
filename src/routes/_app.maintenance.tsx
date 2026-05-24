@@ -162,7 +162,10 @@ function ImportDialog({
     <Dialog
       open={open}
       onOpenChange={(v) => {
-        if (!v) { reset(); onClose(); }
+        if (!v) {
+          reset();
+          onClose();
+        }
       }}
     >
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
@@ -176,11 +179,7 @@ function ImportDialog({
               <Download className="size-3.5 mr-1.5" />
               Download Template
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fileRef.current?.click()}
-            >
+            <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
               <Upload className="size-3.5 mr-1.5" />
               {fileName ? "Change file" : "Choose Excel file"}
             </Button>
@@ -235,7 +234,10 @@ function ImportDialog({
                     {preview.slice(0, 50).map((row, i) => (
                       <TableRow key={i}>
                         {Object.values(row).map((v, j) => (
-                          <TableCell key={j} className="py-1.5 whitespace-nowrap max-w-[200px] truncate">
+                          <TableCell
+                            key={j}
+                            className="py-1.5 whitespace-nowrap max-w-[200px] truncate"
+                          >
                             {String(v)}
                           </TableCell>
                         ))}
@@ -260,7 +262,13 @@ function ImportDialog({
         </div>
 
         <DialogFooter className="pt-3 border-t mt-2">
-          <Button variant="outline" onClick={() => { reset(); onClose(); }}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              reset();
+              onClose();
+            }}
+          >
             Cancel
           </Button>
           <Button
@@ -284,7 +292,9 @@ function parseScheduleRow(row: any[]): Record<string, string> | null {
   return {
     machine_code: machineCode,
     task_description: taskDescription,
-    frequency: String(row[2] ?? "monthly").trim().toLowerCase(),
+    frequency: String(row[2] ?? "monthly")
+      .trim()
+      .toLowerCase(),
     last_done_date: String(row[3] ?? "").trim() || "",
     next_due_date: String(row[4] ?? "").trim() || "",
     technician_name: String(row[5] ?? "").trim(),
@@ -341,15 +351,23 @@ function MaintenancePage() {
   const [scheduleImportOpen, setScheduleImportOpen] = useState(false);
   const [paramImportOpen, setParamImportOpen] = useState(false);
 
-  useEffect(() => { setFilteredTasks(maintQ.data ?? []); }, [maintQ.data]);
-  useEffect(() => { setFilteredSchedules(schedulesQ.data ?? []); }, [schedulesQ.data]);
-  useEffect(() => { setFilteredParams(paramsQ.data ?? []); }, [paramsQ.data]);
+  useEffect(() => {
+    setFilteredTasks(maintQ.data ?? []);
+  }, [maintQ.data]);
+  useEffect(() => {
+    setFilteredSchedules(schedulesQ.data ?? []);
+  }, [schedulesQ.data]);
+  useEffect(() => {
+    setFilteredParams(paramsQ.data ?? []);
+  }, [paramsQ.data]);
 
   const scheduleMutation = useMutation({
     mutationFn: (rows: Record<string, string>[]) =>
       maintenanceApi.bulkCreateSchedules({ items: rows }),
     onSuccess: (res: any) => {
-      toast.success(`${res.created} schedules imported${res.skipped > 0 ? `, ${res.skipped} skipped` : ""}`);
+      toast.success(
+        `${res.created} schedules imported${res.skipped > 0 ? `, ${res.skipped} skipped` : ""}`,
+      );
       res.errors?.forEach((e: string) => toast.warning(e));
       qc.invalidateQueries({ queryKey: ["maintenance-schedules"] });
       setScheduleImportOpen(false);
@@ -361,7 +379,9 @@ function MaintenancePage() {
     mutationFn: (rows: Record<string, string>[]) =>
       maintenanceApi.bulkCreateParameters({ items: rows }),
     onSuccess: (res: any) => {
-      toast.success(`${res.created} parameters imported${res.skipped > 0 ? `, ${res.skipped} skipped` : ""}`);
+      toast.success(
+        `${res.created} parameters imported${res.skipped > 0 ? `, ${res.skipped} skipped` : ""}`,
+      );
       res.errors?.forEach((e: string) => toast.warning(e));
       qc.invalidateQueries({ queryKey: ["machine-parameters"] });
       setParamImportOpen(false);
@@ -404,7 +424,9 @@ function MaintenancePage() {
           <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
             <Card>
               <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">Open Tasks</div>
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Open Tasks
+                </div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
                   <AlertTriangle className="size-5 text-destructive" />
                   {openTasks}
@@ -413,7 +435,9 @@ function MaintenancePage() {
             </Card>
             <Card>
               <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">In Progress</div>
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  In Progress
+                </div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
                   <Activity className="size-5 text-warning" />
                   {inProgress}
@@ -422,7 +446,9 @@ function MaintenancePage() {
             </Card>
             <Card>
               <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">Completed Today</div>
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Completed Today
+                </div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
                   <CheckCircle2 className="size-5 text-success" />
                   {completedToday}
@@ -431,7 +457,9 @@ function MaintenancePage() {
             </Card>
             <Card>
               <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">Total Downtime</div>
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Total Downtime
+                </div>
                 <div className="text-2xl font-semibold mt-2">{totalDownTime} min</div>
               </CardContent>
             </Card>
@@ -471,9 +499,21 @@ function MaintenancePage() {
                     columns={[
                       { key: "date" as const, label: "Date", placeholder: "Filter date..." },
                       { key: "type" as const, label: "Type", placeholder: "Filter type..." },
-                      { key: "machineCode" as const, label: "Machine", placeholder: "Filter machine..." },
-                      { key: "department" as const, label: "Department", placeholder: "Filter dept..." },
-                      { key: "technician" as const, label: "Technician", placeholder: "Filter tech..." },
+                      {
+                        key: "machineCode" as const,
+                        label: "Machine",
+                        placeholder: "Filter machine...",
+                      },
+                      {
+                        key: "department" as const,
+                        label: "Department",
+                        placeholder: "Filter dept...",
+                      },
+                      {
+                        key: "technician" as const,
+                        label: "Technician",
+                        placeholder: "Filter tech...",
+                      },
                       { key: "spareUsed" as const, label: "Spare", placeholder: "Filter spare..." },
                       { key: "status" as const, label: "Status", placeholder: "Filter status..." },
                     ]}
@@ -513,7 +553,9 @@ function MaintenancePage() {
                             </TableCell>
                             <TableCell className="font-mono text-xs">{t.machineCode}</TableCell>
                             <TableCell>{t.department}</TableCell>
-                            <TableCell className="max-w-[250px] truncate">{t.description}</TableCell>
+                            <TableCell className="max-w-[250px] truncate">
+                              {t.description}
+                            </TableCell>
                             <TableCell>{t.technician}</TableCell>
                             <TableCell className="text-right">{t.downtimeMin} min</TableCell>
                             <TableCell className="text-sm">{t.spareUsed || "—"}</TableCell>
@@ -567,9 +609,17 @@ function MaintenancePage() {
                         data={schedules}
                         onFilter={setFilteredSchedules}
                         columns={[
-                          { key: "machine_code" as const, label: "Machine", placeholder: "Filter machine..." },
+                          {
+                            key: "machine_code" as const,
+                            label: "Machine",
+                            placeholder: "Filter machine...",
+                          },
                           { key: "type" as const, label: "Type", placeholder: "Filter type..." },
-                          { key: "description" as const, label: "Description", placeholder: "Filter..." },
+                          {
+                            key: "description" as const,
+                            label: "Description",
+                            placeholder: "Filter...",
+                          },
                         ]}
                       />
                       <div className="w-full overflow-x-auto">
@@ -588,14 +638,19 @@ function MaintenancePage() {
                           <TableBody>
                             {filteredSchedules.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
+                                <TableCell
+                                  colSpan={7}
+                                  className="text-center text-sm text-muted-foreground py-8"
+                                >
                                   No schedules yet. Use "Import Schedule" to upload from Excel.
                                 </TableCell>
                               </TableRow>
                             ) : (
                               filteredSchedules.map((s) => (
                                 <TableRow key={s.id}>
-                                  <TableCell className="font-mono text-xs">{s.machine_code}</TableCell>
+                                  <TableCell className="font-mono text-xs">
+                                    {s.machine_code}
+                                  </TableCell>
                                   <TableCell>
                                     <Badge variant="secondary">{s.type}</Badge>
                                   </TableCell>
@@ -643,8 +698,16 @@ function MaintenancePage() {
                         data={parameters}
                         onFilter={setFilteredParams}
                         columns={[
-                          { key: "machine_code" as const, label: "Machine", placeholder: "Filter machine..." },
-                          { key: "parameter_name" as const, label: "Parameter", placeholder: "Filter..." },
+                          {
+                            key: "machine_code" as const,
+                            label: "Machine",
+                            placeholder: "Filter machine...",
+                          },
+                          {
+                            key: "parameter_name" as const,
+                            label: "Parameter",
+                            placeholder: "Filter...",
+                          },
                           { key: "unit" as const, label: "Unit", placeholder: "Filter unit..." },
                         ]}
                       />
@@ -663,16 +726,25 @@ function MaintenancePage() {
                           <TableBody>
                             {filteredParams.length === 0 ? (
                               <TableRow>
-                                <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                                <TableCell
+                                  colSpan={6}
+                                  className="text-center text-sm text-muted-foreground py-8"
+                                >
                                   No parameters yet. Use "Import Parameters" to upload from Excel.
                                 </TableCell>
                               </TableRow>
                             ) : (
                               filteredParams.map((p) => (
                                 <TableRow key={p.id}>
-                                  <TableCell className="font-mono text-xs">{p.machine_code}</TableCell>
-                                  <TableCell className="font-medium text-sm">{p.parameter_name}</TableCell>
-                                  <TableCell className="text-right">{p.standard_value || "—"}</TableCell>
+                                  <TableCell className="font-mono text-xs">
+                                    {p.machine_code}
+                                  </TableCell>
+                                  <TableCell className="font-medium text-sm">
+                                    {p.parameter_name}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {p.standard_value || "—"}
+                                  </TableCell>
                                   <TableCell className="text-right text-muted-foreground">
                                     {p.min_value || "—"}
                                   </TableCell>
@@ -701,7 +773,14 @@ function MaintenancePage() {
           open={scheduleImportOpen}
           onClose={() => setScheduleImportOpen(false)}
           title="Import PM Schedules from Excel"
-          columns={["Machine Code", "Task Description", "Frequency", "Last Done", "Next Due", "Technician"]}
+          columns={[
+            "Machine Code",
+            "Task Description",
+            "Frequency",
+            "Last Done",
+            "Next Due",
+            "Technician",
+          ]}
           parseRow={parseScheduleRow}
           onConfirm={(rows) => scheduleMutation.mutateAsync(rows)}
           onDownloadTemplate={downloadScheduleTemplate}
@@ -711,7 +790,14 @@ function MaintenancePage() {
           open={paramImportOpen}
           onClose={() => setParamImportOpen(false)}
           title="Import Machine Parameters from Excel"
-          columns={["Machine Code", "Parameter Name", "Standard Value", "Min Value", "Max Value", "Unit"]}
+          columns={[
+            "Machine Code",
+            "Parameter Name",
+            "Standard Value",
+            "Min Value",
+            "Max Value",
+            "Unit",
+          ]}
           parseRow={parseParameterRow}
           onConfirm={(rows) => paramMutation.mutateAsync(rows)}
           onDownloadTemplate={downloadParameterTemplate}

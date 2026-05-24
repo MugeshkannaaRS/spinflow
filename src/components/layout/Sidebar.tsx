@@ -1,6 +1,6 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/stores/auth";
-import { canAccess, ROLE_LABELS, type Module } from "@/lib/rbac";
+import { MODULE_ACCESS, ROLE_LABELS, type Module } from "@/lib/rbac";
 import {
   LayoutDashboard,
   Factory,
@@ -57,7 +57,11 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
 
   if (!user) return null;
 
-  const items = NAV.filter((n) => canAccess(user.role, n.module));
+  const items = NAV.filter((n) => {
+    const allowedByRole = MODULE_ACCESS[user?.role] ?? ["dashboard"];
+    const allowedByCompany = user?.allowedModules ?? allowedByRole;
+    return allowedByRole.includes(n.module) && allowedByCompany.includes(n.module);
+  });
 
   return (
     <div className="flex flex-col h-full">

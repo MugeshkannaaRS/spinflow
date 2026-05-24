@@ -21,7 +21,9 @@ from app.schemas.auth import (
     LoginRequest, LoginResponse, TokenResponse, RefreshRequest,
     UserResponse, ChangePasswordRequest, ForgotPasswordRequest,
     ResetPasswordRequest, VerifyOTPRequest, UserCreateRequest, UserUpdateRequest,
+    MeResponse, MillSettingsOut, CompanyInfo,
 )
+from app.models.masters import Company, CompanyModule, MillSettings
 from pydantic import BaseModel, Field
 
 MAX_FAILED_ATTEMPTS = 5
@@ -118,6 +120,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
             department=user.department,
             mill_id=user.mill_id,
             mill_name=user.mill_name,
+            company_id=user.company_id,
             is_active=user.is_active,
             last_login=user.last_login,
         ),
@@ -164,20 +167,66 @@ async def logout(db: AsyncSession = Depends(get_db), current_user: User = Depend
     return {"message": "Logged out successfully"}
 
 
-@router.get("/auth/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_user)):
+@router.get("/auth/me", response_model=MeResponse)
+async def get_me(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
-    return UserResponse(
-        id=current_user.id,
-        name=current_user.name,
-        email=current_user.email,
-        role=role_code,
-        role_name=current_user.role_rel.name if current_user.role_rel else role_code,
-        department=current_user.department,
-        mill_id=current_user.mill_id,
-        mill_name=current_user.mill_name,
-        is_active=current_user.is_active,
-        last_login=current_user.last_login,
+
+    allowed_modules = []
+    if current_user.company_id:
+        result = await db.execute(
+            select(CompanyModule.module_name).where(
+                CompanyModule.company_id == current_user.company_id,
+                CompanyModule.is_enabled == True,
+            )
+        )
+        allowed_modules = [row[0] for row in result.all()]
+
+    mill_settings = None
+    if current_user.mill_id:
+        result = await db.execute(
+            select(MillSettings).where(MillSettings.mill_id == current_user.mill_id)
+        )
+        mill_settings_row = result.scalar_one_or_none()
+        if mill_settings_row:
+            mill_settings = MillSettingsOut.model_validate(mill_settings_row)
+
+    company_info = None
+    if current_user.company_id:
+        result = await db.execute(
+            select(Company).where(Company.id == current_user.company_id)
+        )
+        company = result.scalar_one_or_none()
+        if company:
+            count_result = await db.execute(
+                select(func.count(User.id)).where(
+                    User.company_id == current_user.company_id,
+                    User.deleted_at.is_(None),
+                )
+            )
+            user_count = count_result.scalar() or 0
+            company_info = CompanyInfo(
+                name=company.name,
+                max_users=company.max_users,
+                current_user_count=user_count,
+            )
+
+    return MeResponse(
+        user=UserResponse(
+            id=current_user.id,
+            name=current_user.name,
+            email=current_user.email,
+            role=role_code,
+            role_name=current_user.role_rel.name if current_user.role_rel else role_code,
+            department=current_user.department,
+            mill_id=current_user.mill_id,
+            mill_name=current_user.mill_name,
+            company_id=current_user.company_id,
+            is_active=current_user.is_active,
+            last_login=current_user.last_login,
+        ),
+        allowed_modules=allowed_modules,
+        mill_settings=mill_settings,
+        company=company_info,
     )
 
 
@@ -258,6 +307,7 @@ async def list_users(
             department=u.department,
             mill_id=u.mill_id,
             mill_name=u.mill_name,
+            company_id=u.company_id,
             is_active=u.is_active,
             last_login=u.last_login,
         ))
@@ -306,6 +356,7 @@ async def create_user(
         department=user.department,
         mill_id=user.mill_id,
         mill_name=user.mill_name,
+        company_id=user.company_id,
         is_active=user.is_active,
         last_login=user.last_login,
     )
@@ -365,6 +416,7 @@ async def force_change_password(
             department=user.department,
             mill_id=user.mill_id,
             mill_name=user.mill_name,
+            company_id=user.company_id,
             is_active=user.is_active,
             last_login=user.last_login,
         ),

@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module
+from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
-from app.models.production import Machine, Shift
+from app.models.production import Machine, Shift, ProductionEntry, DowntimeLog
+from app.models.masters import Mill, Department
 from app.schemas.production import (
     MachineCreate, MachineResponse, ProductionEntryResponse, ProductionEntryCreate,
     DowntimeResponse, DowntimeCreate, ShiftCreate, ShiftOut,
@@ -19,13 +20,33 @@ router = APIRouter()
 
 @router.get("/production/machines")
 async def get_machines(
+    department: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
-    svc = ProductionService(db, current_user)
-    return await svc.list_machines(page=page, page_size=page_size)
+    scope = await get_mill_scope(current_user)
+    query = select(Machine).where(Machine.status == True)
+    if scope["mill_id"]:
+        query = query.where(Machine.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        query = query.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if department:
+        query = query.join(Department, Machine.department_id == Department.id).where(Department.name == department)
+    count_stmt = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    items = result.scalars().all()
+    pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": pages,
+        "data": items,
+    }
 
 
 @router.post("/production/machines", response_model=MachineResponse)
@@ -45,7 +66,13 @@ async def get_shifts(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
-    result = await db.execute(select(Shift))
+    scope = await get_mill_scope(current_user)
+    query = select(Shift)
+    if scope["mill_id"]:
+        query = query.where(Shift.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        query = query.join(Mill, Shift.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(query)
     return result.scalars().all()
 
 
@@ -73,8 +100,39 @@ async def get_entries(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
-    svc = ProductionService(db, current_user)
-    return await svc.list_entries(date=date, shift=shift, department=department, machine=machine, status=status, page=page, page_size=page_size)
+    scope = await get_mill_scope(current_user)
+    query = select(ProductionEntry).join(Machine, ProductionEntry.machine_code == Machine.code)
+    if scope["mill_id"]:
+        query = query.where(Machine.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        query = query.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code == "MACHINE_OPERATOR":
+        query = query.where(ProductionEntry.operator == current_user.name)
+    if date:
+        query = query.where(ProductionEntry.date == date)
+    if shift:
+        query = query.where(ProductionEntry.shift == shift)
+    if department:
+        query = query.where(ProductionEntry.department == department)
+    if machine:
+        query = query.where(ProductionEntry.machine_code == machine)
+    if status:
+        query = query.where(ProductionEntry.status == status)
+    query = query.order_by(ProductionEntry.created_at.desc())
+    count_stmt = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    items = result.scalars().all()
+    pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": pages,
+        "data": items,
+    }
 
 
 @router.post("/production/entries", response_model=ProductionEntryResponse)
@@ -124,8 +182,26 @@ async def get_downtime(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
-    svc = ProductionService(db, current_user)
-    return await svc.list_downtime(page=page, page_size=page_size)
+    scope = await get_mill_scope(current_user)
+    query = select(DowntimeLog).join(Machine, DowntimeLog.machine_code == Machine.code)
+    if scope["mill_id"]:
+        query = query.where(Machine.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        query = query.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    query = query.order_by(DowntimeLog.started_at.desc())
+    count_stmt = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    items = result.scalars().all()
+    pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": pages,
+        "data": items,
+    }
 
 
 @router.post("/production/downtime", response_model=DowntimeResponse)

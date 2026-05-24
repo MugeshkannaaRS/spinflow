@@ -24,6 +24,7 @@ class User(TimestampMixin, SoftDeleteMixin, Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     email: Mapped[str] = mapped_column(String(200), unique=True, nullable=False, index=True)
     phone: Mapped[str] = mapped_column(String(20), nullable=True)
+    company_id: Mapped[str] = mapped_column(String(36), nullable=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role_id: Mapped[str] = mapped_column(String(36), ForeignKey("roles.id"), nullable=False, index=True)
     department: Mapped[str] = mapped_column(String(100), nullable=True)

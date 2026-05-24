@@ -40,6 +40,7 @@ class Company(TimestampMixin, Base):
     phone: Mapped[str] = mapped_column(String(20), nullable=True)
     email: Mapped[str] = mapped_column(String(200), nullable=True)
     logo_url: Mapped[str] = mapped_column(String(500), nullable=True)
+    max_users: Mapped[int] = mapped_column(Integer, default=50)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     mills = relationship("Mill", back_populates="company", cascade="all, delete-orphan")
@@ -150,3 +151,28 @@ class Route(TimestampMixin, Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     mill = relationship("Mill", back_populates="routes")
+
+
+class CompanyModule(Base):
+    __tablename__ = "company_modules"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    company_id: Mapped[str] = mapped_column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    module_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    enabled_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+    enabled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MillSettings(Base):
+    __tablename__ = "mill_settings"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    working_hours_per_day: Mapped[int] = mapped_column(Integer, default=24)
+    shifts_per_day: Mapped[int] = mapped_column(Integer, default=3)
+    production_target_kg: Mapped[float] = mapped_column(Float, default=0)
+    currency: Mapped[str] = mapped_column(String(10), default="INR")
+    timezone: Mapped[str] = mapped_column(String(50), default="Asia/Kolkata")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -10,6 +10,8 @@ export interface AuthUser {
   role: Role;
   millId: string;
   millName: string;
+  companyId?: string;
+  allowedModules?: string[];
 }
 
 interface AuthState {

@@ -39,9 +39,7 @@ function LoginPage() {
     mutationFn: () => authApi.login(email, password),
   });
 
-  const demos = [
-    { id: "u1", email: "admin@mill.spinflow", role: "SUPER_ADMIN" },
-  ];
+  const demos = [{ id: "u1", email: "admin@mill.spinflow", role: "SUPER_ADMIN" }];
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">

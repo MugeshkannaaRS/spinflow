@@ -1,10 +1,14 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Body
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 from typing import List, Optional
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module
+from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
+from app.models.dispatch import Dispatch, DispatchItem
+from app.models.inventory import Lot
+from app.models.masters import Mill
 from app.schemas.dispatch import (
     DispatchResponse, DispatchCreate, DispatchStatusUpdate, QRScanRequest,
 )
@@ -22,8 +26,31 @@ async def get_dispatches(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dispatch")),
 ):
-    svc = DispatchService(db, current_user)
-    return await svc.list_dispatches(status=status, date=date, page=page, page_size=page_size)
+    scope = await get_mill_scope(current_user)
+    query = select(Dispatch).outerjoin(Lot, Dispatch.lot_id == Lot.id)
+    if scope["mill_id"]:
+        query = query.where(Lot.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        query = query.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if status:
+        query = query.where(Dispatch.status == status)
+    if date:
+        query = query.where(Dispatch.date == date)
+    query = query.order_by(Dispatch.created_at.desc())
+    count_stmt = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_stmt)
+    total = total_result.scalar() or 0
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    items = list(result.scalars().all())
+    pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": pages,
+        "data": items,
+    }
 
 
 @router.post("/dispatch/orders", response_model=DispatchResponse)

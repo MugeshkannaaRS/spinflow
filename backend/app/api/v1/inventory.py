@@ -5,9 +5,10 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module, log_audit
+from app.core.deps import get_current_user, require_module, log_audit, get_mill_scope
 from app.models.user import User
 from app.models.inventory import Lot, StockMovement, Warehouse
+from app.models.masters import Mill
 from app.schemas.inventory import (
     LotCreate, LotOut, LotListResponse,
     WarehouseCreate, WarehouseOut,
@@ -24,7 +25,13 @@ async def get_lots(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory")),
 ):
-    stmt = select(Lot).order_by(Lot.created_at.desc())
+    scope = await get_mill_scope(current_user)
+    stmt = select(Lot)
+    if scope["mill_id"]:
+        stmt = stmt.where(Lot.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    stmt = stmt.order_by(Lot.created_at.desc())
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
@@ -46,7 +53,13 @@ async def get_transfers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory")),
 ):
-    stmt = select(StockMovement).order_by(StockMovement.created_at.desc())
+    scope = await get_mill_scope(current_user)
+    stmt = select(StockMovement).outerjoin(Lot, StockMovement.lot_id == Lot.id)
+    if scope["mill_id"]:
+        stmt = stmt.where(Lot.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    stmt = stmt.order_by(StockMovement.created_at.desc())
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)

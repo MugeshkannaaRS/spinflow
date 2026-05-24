@@ -4,9 +4,10 @@ from sqlalchemy import select, desc, func
 from typing import List, Optional
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module
+from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.audit import AuditLog
+from app.models.masters import Mill
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -39,7 +40,17 @@ async def get_audit_logs(
     action: Optional[str] = None,
     entity: Optional[str] = None,
 ):
-    query = select(AuditLog).where(AuditLog.action.isnot(None)).order_by(desc(AuditLog.created_at))
+    scope = await get_mill_scope(current_user)
+    query = select(AuditLog).where(AuditLog.action.isnot(None))
+    if scope["mill_id"] is None and scope["company_id"] is None:
+        pass  # SUPER_ADMIN sees all
+    else:
+        query = query.join(User, AuditLog.user_id == User.id)
+        if scope["mill_id"]:
+            query = query.where(User.mill_id == scope["mill_id"])
+        elif scope["company_id"]:
+            query = query.join(Mill, User.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    query = query.order_by(desc(AuditLog.created_at))
     if action:
         query = query.where(AuditLog.action == action)
     if entity:

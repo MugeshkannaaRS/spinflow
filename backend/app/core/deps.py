@@ -5,6 +5,7 @@ from app.db.session import get_db
 from app.core.security import decode_token
 from app.models.user import User
 from app.models.audit import AuditLog
+from app.models.masters import Mill
 from app.core.rbac import can_access, can_write
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -53,6 +54,15 @@ def require_module(module: str, write: bool = False):
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Access denied for module: {module}")
         return current_user
     return dependency
+
+
+async def get_mill_scope(current_user: User = Depends(get_current_user)):
+    """Returns scope dict to filter by: mill_id, company_id, or None for SUPER_ADMIN"""
+    if current_user.role == "SUPER_ADMIN":
+        return {"mill_id": None, "company_id": None}
+    if current_user.role == "MILL_OWNER":
+        return {"mill_id": None, "company_id": current_user.company_id}
+    return {"mill_id": current_user.mill_id, "company_id": current_user.company_id}
 
 
 async def log_audit(

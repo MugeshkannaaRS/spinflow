@@ -36,7 +36,8 @@ export const authApi = {
 
 // Production
 export const productionApi = {
-  getMachines: () => api.get("/production/machines").then(extractList),
+  getMachines: (params?: Record<string, any>) =>
+    api.get("/production/machines", { params }).then(extractList),
   createMachine: (data: any) => api.post("/production/machines", data).then((r) => r.data),
   getEntries: () => api.get("/production/entries").then(extractList),
   createEntry: (data: any) => api.post("/production/entries", data).then((r) => r.data),
@@ -423,6 +424,20 @@ export const exportApi = {
       `gst_${year}_${String(month).padStart(2, "0")}.xlsx`,
     );
   },
+};
+
+export const adminApi = {
+  getCompanyModules: (companyId: string) =>
+    api.get(`/admin/companies/${companyId}/modules`).then((r) => r.data),
+  updateCompanyModules: (companyId: string, modules: Record<string, boolean>) =>
+    api.put(`/admin/companies/${companyId}/modules`, { modules }).then((r) => r.data),
+  getMillSettings: (millId: string) =>
+    api.get(`/admin/mills/${millId}/settings`).then((r) => r.data),
+  updateMillSettings: (millId: string, settings: Record<string, any>) =>
+    api.put(`/admin/mills/${millId}/settings`, settings).then((r) => r.data),
+  getUserModules: (userId: string) => api.get(`/admin/users/${userId}/modules`).then((r) => r.data),
+  updateUserModules: (userId: string, modules: Record<string, boolean>) =>
+    api.put(`/admin/users/${userId}/modules`, { modules }).then((r) => r.data),
 };
 
 export const uploadApi = {

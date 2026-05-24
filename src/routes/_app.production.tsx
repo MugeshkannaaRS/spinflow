@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productionApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
@@ -60,37 +60,44 @@ type GridRow = {
   machineStatus: "running" | "breakdown" | "idle";
 };
 
-function buildRows(machines: any[], dept: string): GridRow[] {
-  return machines
-    .filter((m: any) => !dept || (m.department ?? "") === dept)
-    .map((m: any) => ({
-      machineCode: m.code ?? "",
-      machineName: m.name ?? m.code ?? "",
-      operator: "",
-      producedKg: "",
-      wasteKg: "",
-      stoppageMins: "",
-      stoppageReason: "",
-      machineStatus: (m.current_status ?? m.status ?? "running") as GridRow["machineStatus"],
-    }));
+function buildRows(machines: any[]): GridRow[] {
+  return machines.map((m: any) => ({
+    machineCode: m.code ?? "",
+    machineName: m.name ?? m.code ?? "",
+    operator: "",
+    producedKg: "",
+    wasteKg: "",
+    stoppageMins: "",
+    stoppageReason: "",
+    machineStatus: (m.current_status ?? m.status ?? "running") as GridRow["machineStatus"],
+  }));
 }
 
-function ShiftGrid({ machines }: { machines: any[] }) {
+function ShiftGrid() {
   const qc = useQueryClient();
   const today = new Date();
   const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
     .toISOString()
     .split("T")[0];
 
+  const [requiredErrors, setRequiredErrors] = useState<Record<string, string>>({});
   const [date, setDate] = useState(localDate);
   const [shift, setShift] = useState<"A" | "B" | "C">("A");
   const [department, setDepartment] = useState(DEPARTMENTS[4]);
   const [count, setCount] = useState("30s");
-  const [rows, setRows] = useState<GridRow[]>(() => buildRows(machines, DEPARTMENTS[4]));
+
+  const machinesQ = useQuery({
+    queryKey: ["machines", department],
+    queryFn: () => productionApi.getMachines({ department }),
+    staleTime: 60_000,
+  });
+
+  const machines = (machinesQ.data ?? []) as any[];
+  const [rows, setRows] = useState<GridRow[]>(() => buildRows(machines));
 
   useEffect(() => {
-    setRows(buildRows(machines, department));
-  }, [department, machines]);
+    setRows(buildRows(machines));
+  }, [machines]);
 
   const updateRow = (idx: number, field: keyof GridRow, value: string) => {
     setRows((prev) => {
@@ -139,12 +146,32 @@ function ShiftGrid({ machines }: { machines: any[] }) {
         res.errors.forEach((e: string) => toast.warning(e));
       }
       qc.invalidateQueries({ queryKey: ["shifts"] });
-      setRows(buildRows(machines, department));
+      setRows(buildRows(machines));
     },
     onError: (err: Error) => toast.error(err.message),
   });
 
   const activeCount = rows.filter((r) => Number(r.producedKg) > 0).length;
+
+  const headerFields = ["date", "shift", "department", "count"] as const;
+  const allHeaderFilled = headerFields.every((f) => {
+    const vals = { date, shift, department, count };
+    const v = vals[f];
+    return typeof v === "string" && v.trim().length > 0;
+  });
+  const handleSubmit = () => {
+    const errors: Record<string, string> = {};
+    const vals = { date, shift, department, count };
+    headerFields.forEach((f) => {
+      const v = vals[f];
+      if (!v || (typeof v === "string" && !v.trim())) {
+        errors[f] = "This field is required";
+      }
+    });
+    setRequiredErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+    bulkMutation.mutate();
+  };
 
   return (
     <div className="space-y-4">
@@ -152,18 +179,40 @@ function ShiftGrid({ machines }: { machines: any[] }) {
         <CardContent className="p-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">Date</Label>
+              <Label className="text-xs">
+                Date <span className="text-destructive">*</span>
+              </Label>
               <Input
                 type="date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="h-8 text-sm"
+                onChange={(e) => {
+                  setDate(e.target.value);
+                  setRequiredErrors((prev) => ({ ...prev, date: "" }));
+                }}
+                className={["h-8 text-sm", requiredErrors.date ? "border-destructive" : ""]
+                  .filter(Boolean)
+                  .join(" ")}
               />
+              {requiredErrors.date && (
+                <p className="text-xs text-destructive">{requiredErrors.date}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Shift</Label>
-              <Select value={shift} onValueChange={(v) => setShift(v as "A" | "B" | "C")}>
-                <SelectTrigger className="h-8 text-sm">
+              <Label className="text-xs">
+                Shift <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={shift}
+                onValueChange={(v) => {
+                  setShift(v as "A" | "B" | "C");
+                  setRequiredErrors((prev) => ({ ...prev, shift: "" }));
+                }}
+              >
+                <SelectTrigger
+                  className={["h-8 text-sm", requiredErrors.shift ? "border-destructive" : ""]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -172,11 +221,26 @@ function ShiftGrid({ machines }: { machines: any[] }) {
                   <SelectItem value="C">C — Night</SelectItem>
                 </SelectContent>
               </Select>
+              {requiredErrors.shift && (
+                <p className="text-xs text-destructive">{requiredErrors.shift}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Department</Label>
-              <Select value={department} onValueChange={setDepartment}>
-                <SelectTrigger className="h-8 text-sm">
+              <Label className="text-xs">
+                Department <span className="text-destructive">*</span>
+              </Label>
+              <Select
+                value={department}
+                onValueChange={(v) => {
+                  setDepartment(v);
+                  setRequiredErrors((prev) => ({ ...prev, department: "" }));
+                }}
+              >
+                <SelectTrigger
+                  className={["h-8 text-sm", requiredErrors.department ? "border-destructive" : ""]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -187,15 +251,28 @@ function ShiftGrid({ machines }: { machines: any[] }) {
                   ))}
                 </SelectContent>
               </Select>
+              {requiredErrors.department && (
+                <p className="text-xs text-destructive">{requiredErrors.department}</p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Count / Yarn</Label>
+              <Label className="text-xs">
+                Count / Yarn <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={count}
-                onChange={(e) => setCount(e.target.value)}
+                onChange={(e) => {
+                  setCount(e.target.value);
+                  setRequiredErrors((prev) => ({ ...prev, count: "" }));
+                }}
                 placeholder="e.g. 30s"
-                className="h-8 text-sm"
+                className={["h-8 text-sm", requiredErrors.count ? "border-destructive" : ""]
+                  .filter(Boolean)
+                  .join(" ")}
               />
+              {requiredErrors.count && (
+                <p className="text-xs text-destructive">{requiredErrors.count}</p>
+              )}
             </div>
           </div>
         </CardContent>
@@ -212,10 +289,14 @@ function ShiftGrid({ machines }: { machines: any[] }) {
         </div>
         <div className="rounded-lg border bg-card p-3">
           <div className="text-xs text-muted-foreground uppercase font-medium">Running</div>
-          <div className="text-lg font-semibold mt-1 text-green-600">{summary.running} machines</div>
+          <div className="text-lg font-semibold mt-1 text-green-600">
+            {summary.running} machines
+          </div>
         </div>
         <div className="rounded-lg border bg-card p-3">
-          <div className="text-xs text-muted-foreground uppercase font-medium">Idle / Breakdown</div>
+          <div className="text-xs text-muted-foreground uppercase font-medium">
+            Idle / Breakdown
+          </div>
           <div className="text-lg font-semibold mt-1 text-amber-600">
             {summary.idle + summary.breakdown} machines
           </div>
@@ -229,8 +310,8 @@ function ShiftGrid({ machines }: { machines: any[] }) {
           </CardTitle>
           <Button
             size="sm"
-            onClick={() => bulkMutation.mutate()}
-            disabled={bulkMutation.isPending || activeCount === 0}
+            onClick={handleSubmit}
+            disabled={bulkMutation.isPending || activeCount === 0 || !allHeaderFilled}
           >
             <Save className="size-3.5 mr-1.5" />
             {bulkMutation.isPending ? "Saving…" : `Submit All (${activeCount})`}
@@ -238,8 +319,13 @@ function ShiftGrid({ machines }: { machines: any[] }) {
         </CardHeader>
         <CardContent className="p-0">
           {rows.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground text-center">
-              No machines found for {department}. Add machines in the Machines tab first.
+            <div className="p-6 text-sm text-muted-foreground text-center space-y-2">
+              <p>
+                No machines in <strong>{department}</strong>. Add them in Masters → Machines.
+              </p>
+              <Link to="/masters" className="text-primary underline text-xs inline-block">
+                Go to Masters
+              </Link>
             </div>
           ) : (
             <div className="w-full overflow-x-auto">
@@ -323,9 +409,7 @@ function ShiftGrid({ machines }: { machines: any[] }) {
                         <TableCell>
                           <Select
                             value={row.machineStatus}
-                            onValueChange={(v) =>
-                              updateRow(idx, "machineStatus", v)
-                            }
+                            onValueChange={(v) => updateRow(idx, "machineStatus", v)}
                           >
                             <SelectTrigger className="h-7 text-xs w-full">
                               <SelectValue />
@@ -520,7 +604,7 @@ function ProductionPage() {
 
             <TabsContent value="entry">
               {canEdit ? (
-                <ShiftGrid machines={machines} />
+                <ShiftGrid />
               ) : (
                 <div className="p-6 text-sm text-muted-foreground">
                   You do not have permission to create shift entries.

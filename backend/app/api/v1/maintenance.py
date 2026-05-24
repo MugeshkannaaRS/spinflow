@@ -5,9 +5,11 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module
+from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter
+from app.models.production import Machine
+from app.models.masters import Mill
 from app.schemas.maintenance import (
     MaintenanceCreate, MaintenanceOut, MaintenanceUpdate,
     MaintenanceListResponse, ScheduleCreate, ScheduleOut,
@@ -24,7 +26,13 @@ async def get_tasks(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance")),
 ):
-    stmt = select(MaintenanceLog).order_by(MaintenanceLog.date.desc())
+    scope = await get_mill_scope(current_user)
+    stmt = select(MaintenanceLog).join(Machine, MaintenanceLog.machine_code == Machine.code)
+    if scope["mill_id"]:
+        stmt = stmt.where(Machine.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    stmt = stmt.order_by(MaintenanceLog.date.desc())
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
@@ -88,7 +96,12 @@ async def get_schedules(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance")),
 ):
-    stmt = select(MaintenanceSchedule)
+    scope = await get_mill_scope(current_user)
+    stmt = select(MaintenanceSchedule).join(Machine, MaintenanceSchedule.machine_code == Machine.code)
+    if scope["mill_id"]:
+        stmt = stmt.where(Machine.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
@@ -169,7 +182,12 @@ async def get_parameters(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance")),
 ):
-    stmt = select(MachineParameter)
+    scope = await get_mill_scope(current_user)
+    stmt = select(MachineParameter).join(Machine, MachineParameter.machine_code == Machine.code)
+    if scope["mill_id"]:
+        stmt = stmt.where(Machine.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     if machine_code:
         stmt = stmt.where(MachineParameter.machine_code == machine_code)
     count_stmt = select(func.count()).select_from(stmt.subquery())

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { mastersApi, productionApi, inventoryApi } from "@/lib/api-service";
+import { mastersApi, productionApi, inventoryApi, adminApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -36,7 +37,8 @@ import {
 } from "@/components/ui/sheet";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { Plus, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, Settings, ChevronLeft, ChevronRight, Blocks } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type {
   Company,
   Mill,
@@ -87,8 +89,10 @@ export const Route = createFileRoute("/_app/masters")({
 function MastersPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "masters");
-  const [tab, setTab] = useState("companies");
+  const [tab, setTab] = useState(user?.role === "SUPER_ADMIN" ? "companies" : "mills");
   const [search, setSearch] = useState("");
+  const [modulesCompany, setModulesCompany] = useState<Company | null>(null);
+  const [settingsMill, setSettingsMill] = useState<Mill | null>(null);
   const qcMasters = useQueryClient();
 
   function deactivateCustomer(id: string) {
@@ -194,7 +198,9 @@ function MastersPage() {
           </div>
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="flex-wrap h-auto">
-              <TabsTrigger value="companies">Companies</TabsTrigger>
+              {user.role === "SUPER_ADMIN" && (
+                <TabsTrigger value="companies">Companies</TabsTrigger>
+              )}
               <TabsTrigger value="mills">Mills</TabsTrigger>
               <TabsTrigger value="departments">Departments</TabsTrigger>
               <TabsTrigger value="yarn-counts">Yarn Counts</TabsTrigger>
@@ -221,6 +227,15 @@ function MastersPage() {
                 canEdit={canEdit}
                 onAdd={<CompanyForm />}
                 onEdit={(item) => <CompanyForm item={item} />}
+                extraActions={(item) => (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setModulesCompany(item as Company)}
+                  >
+                    <Blocks className="size-3.5 mr-1" /> Modules
+                  </Button>
+                )}
               />
             </TabsContent>
 
@@ -239,6 +254,11 @@ function MastersPage() {
                 canEdit={canEdit}
                 onAdd={<MillForm companies={companiesData} />}
                 onEdit={(item) => <MillForm item={item} companies={companiesData} />}
+                extraActions={(item) => (
+                  <Button size="sm" variant="outline" onClick={() => setSettingsMill(item as Mill)}>
+                    <Settings className="size-3.5 mr-1" /> Settings
+                  </Button>
+                )}
               />
             </TabsContent>
 
@@ -384,6 +404,50 @@ function MastersPage() {
             </TabsContent>
           </Tabs>
         </div>
+
+        <Sheet
+          open={!!modulesCompany}
+          onOpenChange={(o) => {
+            if (!o) setModulesCompany(null);
+          }}
+        >
+          <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Modules — {modulesCompany?.name}</SheetTitle>
+            </SheetHeader>
+            {modulesCompany && (
+              <CompanyModulesPanel
+                companyId={modulesCompany.id}
+                onClose={() => {
+                  setModulesCompany(null);
+                  qcMasters.invalidateQueries({ queryKey: ["masters", "companies"] });
+                }}
+              />
+            )}
+          </SheetContent>
+        </Sheet>
+
+        <Sheet
+          open={!!settingsMill}
+          onOpenChange={(o) => {
+            if (!o) setSettingsMill(null);
+          }}
+        >
+          <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Mill Settings — {settingsMill?.name}</SheetTitle>
+            </SheetHeader>
+            {settingsMill && (
+              <MillSettingsPanel
+                millId={settingsMill.id}
+                onClose={() => {
+                  setSettingsMill(null);
+                  qcMasters.invalidateQueries({ queryKey: ["masters", "mills"] });
+                }}
+              />
+            )}
+          </SheetContent>
+        </Sheet>
       </AccessGuard>
     </>
   );
@@ -409,6 +473,7 @@ function MasterTable<T = any>({
   onAdd,
   onEdit,
   onDeactivate,
+  extraActions,
 }: {
   title: string;
   data: T[];
@@ -419,6 +484,7 @@ function MasterTable<T = any>({
   onAdd: React.ReactElement;
   onEdit: (item: T) => React.ReactElement;
   onDeactivate?: (id: string) => void;
+  extraActions?: (item: T) => React.ReactElement;
 }) {
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<T | null>(null);
@@ -498,23 +564,30 @@ function MasterTable<T = any>({
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    {canEdit && (
+                    {(canEdit || extraActions) && (
                       <TableCell>
                         <div className="flex gap-1">
-                          <Sheet>
-                            <SheetTrigger asChild>
-                              <Button size="sm" variant="outline" onClick={() => setEditing(item)}>
-                                Edit
-                              </Button>
-                            </SheetTrigger>
-                            <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-                              <SheetHeader>
-                                <SheetTitle>Edit {title.slice(0, -1)}</SheetTitle>
-                              </SheetHeader>
-                              <div className="mt-4">{onEdit(item)}</div>
-                            </SheetContent>
-                          </Sheet>
-                          {onDeactivate && (
+                          {canEdit && (
+                            <Sheet>
+                              <SheetTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setEditing(item)}
+                                >
+                                  Edit
+                                </Button>
+                              </SheetTrigger>
+                              <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+                                <SheetHeader>
+                                  <SheetTitle>Edit {title.slice(0, -1)}</SheetTitle>
+                                </SheetHeader>
+                                <div className="mt-4">{onEdit(item)}</div>
+                              </SheetContent>
+                            </Sheet>
+                          )}
+                          {extraActions?.(item)}
+                          {canEdit && onDeactivate && (
                             <Button
                               size="sm"
                               variant="outline"
@@ -580,10 +653,187 @@ function formatValue(v: unknown): string {
   return String(v);
 }
 
+// ── Company Modules Panel ────────────────────────────────
+
+const MODULE_LABELS: Record<string, string> = {
+  dashboard: "Dashboard",
+  production: "Production",
+  quality: "Quality",
+  stock: "Stock",
+  inventory: "Inventory",
+  dispatch: "Dispatch",
+  purchase: "Purchase",
+  stores: "Stores",
+  hr: "HR",
+  accounts: "Accounts",
+  maintenance: "Maintenance",
+  payroll: "Payroll",
+  users: "Users",
+  audit: "Audit",
+  reports: "Reports",
+  masters: "Masters",
+  sales: "Sales",
+  lotrac: "LoTrac",
+};
+const ALL_MODULES = Object.keys(MODULE_LABELS);
+
+function CompanyModulesPanel({ companyId, onClose }: { companyId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const modulesQ = useQuery({
+    queryKey: ["company-modules", companyId],
+    queryFn: () => adminApi.getCompanyModules(companyId),
+  });
+  const [modules, setModules] = useState<Record<string, boolean>>({});
+  const [initialized, setInitialized] = useState(false);
+
+  useMemo(() => {
+    if (modulesQ.data && !initialized) {
+      setModules(modulesQ.data);
+      setInitialized(true);
+    }
+  }, [modulesQ.data, initialized]);
+
+  const updateM = useMutation({
+    mutationFn: () => adminApi.updateCompanyModules(companyId, modules),
+    onSuccess: () => {
+      toast.success("Modules updated");
+      qc.invalidateQueries({ queryKey: ["company-modules", companyId] });
+      onClose();
+    },
+    onError: () => toast.error("Failed to update modules"),
+  });
+
+  return (
+    <div className="mt-4 space-y-4">
+      {ALL_MODULES.map((mod) => (
+        <div key={mod} className="flex items-center justify-between py-2 border-b last:border-0">
+          <Label className={cn(mod === "dashboard" && "text-muted-foreground")}>
+            {MODULE_LABELS[mod]}
+          </Label>
+          <Switch
+            checked={modules[mod] ?? false}
+            disabled={mod === "dashboard" || updateM.isPending}
+            onCheckedChange={(v) => setModules((prev) => ({ ...prev, [mod]: v }))}
+          />
+        </div>
+      ))}
+      <SheetFooter>
+        <Button onClick={() => updateM.mutate()} disabled={updateM.isPending}>
+          {updateM.isPending ? "Saving…" : "Save"}
+        </Button>
+      </SheetFooter>
+    </div>
+  );
+}
+
+// ── Mill Settings Panel ──────────────────────────────────
+
+function MillSettingsPanel({ millId, onClose }: { millId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const settingsQ = useQuery({
+    queryKey: ["mill-settings", millId],
+    queryFn: () => adminApi.getMillSettings(millId),
+  });
+  const [form, setForm] = useState({
+    working_hours_per_day: 8,
+    shifts_per_day: 3,
+    production_target_kg: 0,
+    currency: "INR",
+    timezone: "Asia/Kolkata",
+  });
+  const [initialized, setInitialized] = useState(false);
+
+  useMemo(() => {
+    if (settingsQ.data && !initialized) {
+      setForm((prev) => ({ ...prev, ...settingsQ.data }));
+      setInitialized(true);
+    }
+  }, [settingsQ.data, initialized]);
+
+  const updateM = useMutation({
+    mutationFn: () => adminApi.updateMillSettings(millId, form),
+    onSuccess: () => {
+      toast.success("Mill settings updated");
+      qc.invalidateQueries({ queryKey: ["mill-settings", millId] });
+      onClose();
+    },
+    onError: () => toast.error("Failed to update mill settings"),
+  });
+
+  return (
+    <div className="mt-4 space-y-4">
+      <div className="space-y-1.5">
+        <Label>Working Hours / Day</Label>
+        <Input
+          type="number"
+          value={form.working_hours_per_day}
+          onChange={(e) =>
+            setForm({ ...form, working_hours_per_day: parseInt(e.target.value) || 0 })
+          }
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Shifts / Day</Label>
+        <Input
+          type="number"
+          value={form.shifts_per_day}
+          onChange={(e) => setForm({ ...form, shifts_per_day: parseInt(e.target.value) || 0 })}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Production Target (kg)</Label>
+        <Input
+          type="number"
+          step="any"
+          value={form.production_target_kg}
+          onChange={(e) =>
+            setForm({ ...form, production_target_kg: parseFloat(e.target.value) || 0 })
+          }
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Currency</Label>
+        <Select value={form.currency} onValueChange={(v) => setForm({ ...form, currency: v })}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="INR">INR (₹)</SelectItem>
+            <SelectItem value="USD">USD ($)</SelectItem>
+            <SelectItem value="EUR">EUR (€)</SelectItem>
+            <SelectItem value="GBP">GBP (£)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Timezone</Label>
+        <Select value={form.timezone} onValueChange={(v) => setForm({ ...form, timezone: v })}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="Asia/Kolkata">Asia/Kolkata (IST)</SelectItem>
+            <SelectItem value="Asia/Dubai">Asia/Dubai</SelectItem>
+            <SelectItem value="UTC">UTC</SelectItem>
+            <SelectItem value="America/New_York">America/New_York</SelectItem>
+            <SelectItem value="Europe/London">Europe/London</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <SheetFooter>
+        <Button onClick={() => updateM.mutate()} disabled={updateM.isPending}>
+          {updateM.isPending ? "Saving…" : "Save"}
+        </Button>
+      </SheetFooter>
+    </div>
+  );
+}
+
 // ── Form Components ──────────────────────────────────────
 
 function CompanyForm({ item }: { item?: Company }) {
   const qc = useQueryClient();
+  const requiredFields = ["code", "name"];
   const [form, setForm] = useState({
     code: item?.code ?? "",
     name: item?.name ?? "",
@@ -592,6 +842,11 @@ function CompanyForm({ item }: { item?: Company }) {
     phone: item?.phone ?? "",
     email: item?.email ?? "",
   });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const isComplete = requiredFields.every((f) => form[f as keyof typeof form] !== "");
+  const err = (f: string) =>
+    touched[f] && !form[f as keyof typeof form] ? "This field is required" : undefined;
 
   const createM = useMutation({
     mutationFn: () => mastersApi.createCompany(form),
@@ -610,26 +865,34 @@ function CompanyForm({ item }: { item?: Company }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+    if (!isComplete) return;
     (item ? updateM : createM).mutate();
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-1.5">
-        <Label>Code *</Label>
+        <Label className={cn(err("code") && "text-destructive")}>
+          Code <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.code}
           onChange={(e) => setForm({ ...form, code: e.target.value })}
-          required
+          className={cn(err("code") && "border-destructive")}
         />
+        {err("code") && <p className="text-xs text-destructive">{err("code")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Name *</Label>
+        <Label className={cn(err("name") && "text-destructive")}>
+          Name <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
-          required
+          className={cn(err("name") && "border-destructive")}
         />
+        {err("name") && <p className="text-xs text-destructive">{err("name")}</p>}
       </div>
       <div className="space-y-1.5">
         <Label>GSTIN</Label>
@@ -659,7 +922,7 @@ function CompanyForm({ item }: { item?: Company }) {
         />
       </div>
       <SheetFooter>
-        <Button type="submit" disabled={createM.isPending || updateM.isPending}>
+        <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
           {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
         </Button>
       </SheetFooter>
@@ -669,6 +932,7 @@ function CompanyForm({ item }: { item?: Company }) {
 
 function MillForm({ item, companies }: { item?: Mill; companies: Company[] }) {
   const qc = useQueryClient();
+  const requiredFields = ["company_id", "code", "name"];
   const [form, setForm] = useState({
     company_id: item?.company_id ?? "",
     code: item?.code ?? "",
@@ -680,6 +944,11 @@ function MillForm({ item, companies }: { item?: Mill; companies: Company[] }) {
     phone: item?.phone ?? "",
     email: item?.email ?? "",
   });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const isComplete = requiredFields.every((f) => form[f as keyof typeof form] !== "");
+  const err = (f: string) =>
+    touched[f] && !form[f as keyof typeof form] ? "This field is required" : undefined;
 
   const createM = useMutation({
     mutationFn: () => mastersApi.createMill(form),
@@ -698,15 +967,19 @@ function MillForm({ item, companies }: { item?: Mill; companies: Company[] }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+    if (!isComplete) return;
     (item ? updateM : createM).mutate();
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-1.5">
-        <Label>Company *</Label>
+        <Label className={cn(err("company_id") && "text-destructive")}>
+          Company <span className="text-destructive">*</span>
+        </Label>
         <Select value={form.company_id} onValueChange={(v) => setForm({ ...form, company_id: v })}>
-          <SelectTrigger>
+          <SelectTrigger className={cn(err("company_id") && "border-destructive")}>
             <SelectValue placeholder="Select company" />
           </SelectTrigger>
           <SelectContent>
@@ -717,22 +990,29 @@ function MillForm({ item, companies }: { item?: Mill; companies: Company[] }) {
             ))}
           </SelectContent>
         </Select>
+        {err("company_id") && <p className="text-xs text-destructive">{err("company_id")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Code *</Label>
+        <Label className={cn(err("code") && "text-destructive")}>
+          Code <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.code}
           onChange={(e) => setForm({ ...form, code: e.target.value })}
-          required
+          className={cn(err("code") && "border-destructive")}
         />
+        {err("code") && <p className="text-xs text-destructive">{err("code")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Name *</Label>
+        <Label className={cn(err("name") && "text-destructive")}>
+          Name <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
-          required
+          className={cn(err("name") && "border-destructive")}
         />
+        {err("name") && <p className="text-xs text-destructive">{err("name")}</p>}
       </div>
       <div className="space-y-1.5">
         <Label>Address</Label>
@@ -773,7 +1053,7 @@ function MillForm({ item, companies }: { item?: Mill; companies: Company[] }) {
         />
       </div>
       <SheetFooter>
-        <Button type="submit" disabled={createM.isPending || updateM.isPending}>
+        <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
           {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
         </Button>
       </SheetFooter>
@@ -783,12 +1063,18 @@ function MillForm({ item, companies }: { item?: Mill; companies: Company[] }) {
 
 function DepartmentForm({ item, mills }: { item?: Department; mills: Mill[] }) {
   const qc = useQueryClient();
+  const requiredFields = ["mill_id", "code", "name", "department_type"];
   const [form, setForm] = useState({
     mill_id: item?.mill_id ?? "",
     code: item?.code ?? "",
     name: item?.name ?? "",
     department_type: item?.department_type ?? "ring_frame",
   });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const isComplete = requiredFields.every((f) => form[f as keyof typeof form] !== "");
+  const err = (f: string) =>
+    touched[f] && !form[f as keyof typeof form] ? "This field is required" : undefined;
 
   const createM = useMutation({
     mutationFn: () => mastersApi.createDepartment(form),
@@ -807,15 +1093,19 @@ function DepartmentForm({ item, mills }: { item?: Department; mills: Mill[] }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+    if (!isComplete) return;
     (item ? updateM : createM).mutate();
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-1.5">
-        <Label>Mill *</Label>
+        <Label className={cn(err("mill_id") && "text-destructive")}>
+          Mill <span className="text-destructive">*</span>
+        </Label>
         <Select value={form.mill_id} onValueChange={(v) => setForm({ ...form, mill_id: v })}>
-          <SelectTrigger>
+          <SelectTrigger className={cn(err("mill_id") && "border-destructive")}>
             <SelectValue placeholder="Select mill" />
           </SelectTrigger>
           <SelectContent>
@@ -826,30 +1116,39 @@ function DepartmentForm({ item, mills }: { item?: Department; mills: Mill[] }) {
             ))}
           </SelectContent>
         </Select>
+        {err("mill_id") && <p className="text-xs text-destructive">{err("mill_id")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Code *</Label>
+        <Label className={cn(err("code") && "text-destructive")}>
+          Code <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.code}
           onChange={(e) => setForm({ ...form, code: e.target.value })}
-          required
+          className={cn(err("code") && "border-destructive")}
         />
+        {err("code") && <p className="text-xs text-destructive">{err("code")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Name *</Label>
+        <Label className={cn(err("name") && "text-destructive")}>
+          Name <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
-          required
+          className={cn(err("name") && "border-destructive")}
         />
+        {err("name") && <p className="text-xs text-destructive">{err("name")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Department Type *</Label>
+        <Label className={cn(err("department_type") && "text-destructive")}>
+          Department Type <span className="text-destructive">*</span>
+        </Label>
         <Select
           value={form.department_type}
           onValueChange={(v) => setForm({ ...form, department_type: v })}
         >
-          <SelectTrigger>
+          <SelectTrigger className={cn(err("department_type") && "border-destructive")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -860,9 +1159,12 @@ function DepartmentForm({ item, mills }: { item?: Department; mills: Mill[] }) {
             ))}
           </SelectContent>
         </Select>
+        {err("department_type") && (
+          <p className="text-xs text-destructive">{err("department_type")}</p>
+        )}
       </div>
       <SheetFooter>
-        <Button type="submit" disabled={createM.isPending || updateM.isPending}>
+        <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
           {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
         </Button>
       </SheetFooter>
@@ -872,6 +1174,7 @@ function DepartmentForm({ item, mills }: { item?: Department; mills: Mill[] }) {
 
 function YarnCountForm({ item, mills }: { item?: YarnCount; mills: Mill[] }) {
   const qc = useQueryClient();
+  const requiredFields = ["mill_id", "count", "count_value"];
   const [form, setForm] = useState({
     mill_id: item?.mill_id ?? "",
     count: item?.count ?? "",
@@ -881,6 +1184,18 @@ function YarnCountForm({ item, mills }: { item?: YarnCount; mills: Mill[] }) {
     standard_csp: item?.standard_csp ?? undefined,
     standard_u_percent: item?.standard_u_percent ?? undefined,
   });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const isComplete = requiredFields.every((f) => {
+    const v = form[f as keyof typeof form];
+    return v !== "" && v !== undefined && v !== null;
+  });
+  const err = (f: string) => {
+    if (!touched[f]) return undefined;
+    const v = form[f as keyof typeof form];
+    if (v === "" || v === undefined || v === null) return "This field is required";
+    return undefined;
+  };
 
   const createM = useMutation({
     mutationFn: () => mastersApi.createYarnCount(form),
@@ -899,15 +1214,19 @@ function YarnCountForm({ item, mills }: { item?: YarnCount; mills: Mill[] }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+    if (!isComplete) return;
     (item ? updateM : createM).mutate();
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-1.5">
-        <Label>Mill *</Label>
+        <Label className={cn(err("mill_id") && "text-destructive")}>
+          Mill <span className="text-destructive">*</span>
+        </Label>
         <Select value={form.mill_id} onValueChange={(v) => setForm({ ...form, mill_id: v })}>
-          <SelectTrigger>
+          <SelectTrigger className={cn(err("mill_id") && "border-destructive")}>
             <SelectValue placeholder="Select mill" />
           </SelectTrigger>
           <SelectContent>
@@ -918,25 +1237,32 @@ function YarnCountForm({ item, mills }: { item?: YarnCount; mills: Mill[] }) {
             ))}
           </SelectContent>
         </Select>
+        {err("mill_id") && <p className="text-xs text-destructive">{err("mill_id")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Count * (e.g. 40s)</Label>
+        <Label className={cn(err("count") && "text-destructive")}>
+          Count <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.count}
           onChange={(e) => setForm({ ...form, count: e.target.value })}
-          required
           placeholder="40s"
+          className={cn(err("count") && "border-destructive")}
         />
+        {err("count") && <p className="text-xs text-destructive">{err("count")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Count Value *</Label>
+        <Label className={cn(err("count_value") && "text-destructive")}>
+          Count Value <span className="text-destructive">*</span>
+        </Label>
         <Input
           type="number"
           step="any"
           value={form.count_value}
           onChange={(e) => setForm({ ...form, count_value: parseFloat(e.target.value) })}
-          required
+          className={cn(err("count_value") && "border-destructive")}
         />
+        {err("count_value") && <p className="text-xs text-destructive">{err("count_value")}</p>}
       </div>
       <div className="space-y-1.5">
         <Label>Blend</Label>
@@ -991,7 +1317,7 @@ function YarnCountForm({ item, mills }: { item?: YarnCount; mills: Mill[] }) {
         </div>
       </div>
       <SheetFooter>
-        <Button type="submit" disabled={createM.isPending || updateM.isPending}>
+        <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
           {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
         </Button>
       </SheetFooter>
@@ -1001,6 +1327,7 @@ function YarnCountForm({ item, mills }: { item?: YarnCount; mills: Mill[] }) {
 
 function CustomerForm({ item, mills }: { item?: Customer; mills: Mill[] }) {
   const qc = useQueryClient();
+  const requiredFields = ["mill_id", "code", "name"];
   const [form, setForm] = useState({
     mill_id: item?.mill_id ?? "",
     code: item?.code ?? "",
@@ -1018,6 +1345,18 @@ function CustomerForm({ item, mills }: { item?: Customer; mills: Mill[] }) {
     credit_limit: item?.credit_limit ?? 0,
     payment_terms_days: item?.payment_terms_days ?? 30,
   });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const isComplete = requiredFields.every((f) => {
+    const v = form[f as keyof typeof form];
+    return v !== "" && v !== undefined && v !== null;
+  });
+  const err = (f: string) => {
+    if (!touched[f]) return undefined;
+    const v = form[f as keyof typeof form];
+    if (v === "" || v === undefined || v === null) return "This field is required";
+    return undefined;
+  };
 
   const createM = useMutation({
     mutationFn: () => mastersApi.createCustomer(form),
@@ -1036,15 +1375,19 @@ function CustomerForm({ item, mills }: { item?: Customer; mills: Mill[] }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+    if (!isComplete) return;
     (item ? updateM : createM).mutate();
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-1.5">
-        <Label>Mill *</Label>
+        <Label className={cn(err("mill_id") && "text-destructive")}>
+          Mill <span className="text-destructive">*</span>
+        </Label>
         <Select value={form.mill_id} onValueChange={(v) => setForm({ ...form, mill_id: v })}>
-          <SelectTrigger>
+          <SelectTrigger className={cn(err("mill_id") && "border-destructive")}>
             <SelectValue placeholder="Select mill" />
           </SelectTrigger>
           <SelectContent>
@@ -1055,22 +1398,29 @@ function CustomerForm({ item, mills }: { item?: Customer; mills: Mill[] }) {
             ))}
           </SelectContent>
         </Select>
+        {err("mill_id") && <p className="text-xs text-destructive">{err("mill_id")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Code *</Label>
+        <Label className={cn(err("code") && "text-destructive")}>
+          Code <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.code}
           onChange={(e) => setForm({ ...form, code: e.target.value })}
-          required
+          className={cn(err("code") && "border-destructive")}
         />
+        {err("code") && <p className="text-xs text-destructive">{err("code")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Name *</Label>
+        <Label className={cn(err("name") && "text-destructive")}>
+          Name <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
-          required
+          className={cn(err("name") && "border-destructive")}
         />
+        {err("name") && <p className="text-xs text-destructive">{err("name")}</p>}
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
@@ -1154,7 +1504,7 @@ function CustomerForm({ item, mills }: { item?: Customer; mills: Mill[] }) {
         </div>
       </div>
       <SheetFooter>
-        <Button type="submit" disabled={createM.isPending || updateM.isPending}>
+        <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
           {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
         </Button>
       </SheetFooter>
@@ -1164,6 +1514,7 @@ function CustomerForm({ item, mills }: { item?: Customer; mills: Mill[] }) {
 
 function VehicleForm({ item, mills }: { item?: MasterVehicle; mills: Mill[] }) {
   const qc = useQueryClient();
+  const requiredFields = ["mill_id", "vehicle_no", "vehicle_type"];
   const [form, setForm] = useState({
     mill_id: item?.mill_id ?? "",
     vehicle_no: item?.vehicle_no ?? "",
@@ -1175,6 +1526,18 @@ function VehicleForm({ item, mills }: { item?: MasterVehicle; mills: Mill[] }) {
     driver_phone: item?.driver_phone ?? "",
     driver_license: item?.driver_license ?? "",
   });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const isComplete = requiredFields.every((f) => {
+    const v = form[f as keyof typeof form];
+    return v !== "" && v !== undefined && v !== null;
+  });
+  const err = (f: string) => {
+    if (!touched[f]) return undefined;
+    const v = form[f as keyof typeof form];
+    if (v === "" || v === undefined || v === null) return "This field is required";
+    return undefined;
+  };
 
   const createM = useMutation({
     mutationFn: () => mastersApi.createVehicle(form),
@@ -1193,15 +1556,19 @@ function VehicleForm({ item, mills }: { item?: MasterVehicle; mills: Mill[] }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+    if (!isComplete) return;
     (item ? updateM : createM).mutate();
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-1.5">
-        <Label>Mill *</Label>
+        <Label className={cn(err("mill_id") && "text-destructive")}>
+          Mill <span className="text-destructive">*</span>
+        </Label>
         <Select value={form.mill_id} onValueChange={(v) => setForm({ ...form, mill_id: v })}>
-          <SelectTrigger>
+          <SelectTrigger className={cn(err("mill_id") && "border-destructive")}>
             <SelectValue placeholder="Select mill" />
           </SelectTrigger>
           <SelectContent>
@@ -1212,23 +1579,29 @@ function VehicleForm({ item, mills }: { item?: MasterVehicle; mills: Mill[] }) {
             ))}
           </SelectContent>
         </Select>
+        {err("mill_id") && <p className="text-xs text-destructive">{err("mill_id")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Vehicle No *</Label>
+        <Label className={cn(err("vehicle_no") && "text-destructive")}>
+          Vehicle No <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.vehicle_no}
           onChange={(e) => setForm({ ...form, vehicle_no: e.target.value })}
-          required
           placeholder="TN 11 AB 1234"
+          className={cn(err("vehicle_no") && "border-destructive")}
         />
+        {err("vehicle_no") && <p className="text-xs text-destructive">{err("vehicle_no")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Vehicle Type *</Label>
+        <Label className={cn(err("vehicle_type") && "text-destructive")}>
+          Vehicle Type <span className="text-destructive">*</span>
+        </Label>
         <Select
           value={form.vehicle_type}
           onValueChange={(v) => setForm({ ...form, vehicle_type: v })}
         >
-          <SelectTrigger>
+          <SelectTrigger className={cn(err("vehicle_type") && "border-destructive")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -1239,6 +1612,7 @@ function VehicleForm({ item, mills }: { item?: MasterVehicle; mills: Mill[] }) {
             ))}
           </SelectContent>
         </Select>
+        {err("vehicle_type") && <p className="text-xs text-destructive">{err("vehicle_type")}</p>}
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
@@ -1288,7 +1662,7 @@ function VehicleForm({ item, mills }: { item?: MasterVehicle; mills: Mill[] }) {
         </div>
       </div>
       <SheetFooter>
-        <Button type="submit" disabled={createM.isPending || updateM.isPending}>
+        <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
           {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
         </Button>
       </SheetFooter>
@@ -1298,6 +1672,7 @@ function VehicleForm({ item, mills }: { item?: MasterVehicle; mills: Mill[] }) {
 
 function RouteForm({ item, mills }: { item?: MasterRoute; mills: Mill[] }) {
   const qc = useQueryClient();
+  const requiredFields = ["mill_id", "code", "name", "origin", "destination"];
   const [form, setForm] = useState({
     mill_id: item?.mill_id ?? "",
     code: item?.code ?? "",
@@ -1307,6 +1682,18 @@ function RouteForm({ item, mills }: { item?: MasterRoute; mills: Mill[] }) {
     distance_km: item?.distance_km ?? undefined,
     estimated_hours: item?.estimated_hours ?? undefined,
   });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const isComplete = requiredFields.every((f) => {
+    const v = form[f as keyof typeof form];
+    return v !== "" && v !== undefined && v !== null;
+  });
+  const err = (f: string) => {
+    if (!touched[f]) return undefined;
+    const v = form[f as keyof typeof form];
+    if (v === "" || v === undefined || v === null) return "This field is required";
+    return undefined;
+  };
 
   const createM = useMutation({
     mutationFn: () => mastersApi.createRoute(form),
@@ -1325,15 +1712,19 @@ function RouteForm({ item, mills }: { item?: MasterRoute; mills: Mill[] }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+    if (!isComplete) return;
     (item ? updateM : createM).mutate();
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-1.5">
-        <Label>Mill *</Label>
+        <Label className={cn(err("mill_id") && "text-destructive")}>
+          Mill <span className="text-destructive">*</span>
+        </Label>
         <Select value={form.mill_id} onValueChange={(v) => setForm({ ...form, mill_id: v })}>
-          <SelectTrigger>
+          <SelectTrigger className={cn(err("mill_id") && "border-destructive")}>
             <SelectValue placeholder="Select mill" />
           </SelectTrigger>
           <SelectContent>
@@ -1344,39 +1735,52 @@ function RouteForm({ item, mills }: { item?: MasterRoute; mills: Mill[] }) {
             ))}
           </SelectContent>
         </Select>
+        {err("mill_id") && <p className="text-xs text-destructive">{err("mill_id")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Code *</Label>
+        <Label className={cn(err("code") && "text-destructive")}>
+          Code <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.code}
           onChange={(e) => setForm({ ...form, code: e.target.value })}
-          required
+          className={cn(err("code") && "border-destructive")}
         />
+        {err("code") && <p className="text-xs text-destructive">{err("code")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Name *</Label>
+        <Label className={cn(err("name") && "text-destructive")}>
+          Name <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
-          required
+          className={cn(err("name") && "border-destructive")}
         />
+        {err("name") && <p className="text-xs text-destructive">{err("name")}</p>}
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label>Origin *</Label>
+          <Label className={cn(err("origin") && "text-destructive")}>
+            Origin <span className="text-destructive">*</span>
+          </Label>
           <Input
             value={form.origin}
             onChange={(e) => setForm({ ...form, origin: e.target.value })}
-            required
+            className={cn(err("origin") && "border-destructive")}
           />
+          {err("origin") && <p className="text-xs text-destructive">{err("origin")}</p>}
         </div>
         <div className="space-y-1.5">
-          <Label>Destination *</Label>
+          <Label className={cn(err("destination") && "text-destructive")}>
+            Destination <span className="text-destructive">*</span>
+          </Label>
           <Input
             value={form.destination}
             onChange={(e) => setForm({ ...form, destination: e.target.value })}
-            required
+            className={cn(err("destination") && "border-destructive")}
           />
+          {err("destination") && <p className="text-xs text-destructive">{err("destination")}</p>}
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -1410,7 +1814,7 @@ function RouteForm({ item, mills }: { item?: MasterRoute; mills: Mill[] }) {
         </div>
       </div>
       <SheetFooter>
-        <Button type="submit" disabled={createM.isPending || updateM.isPending}>
+        <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
           {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
         </Button>
       </SheetFooter>
@@ -1420,6 +1824,7 @@ function RouteForm({ item, mills }: { item?: MasterRoute; mills: Mill[] }) {
 
 function MachineForm({ item, departments }: { item?: MasterMachine; departments: Department[] }) {
   const qc = useQueryClient();
+  const requiredFields = ["code"];
   const [form, setForm] = useState({
     code: item?.code ?? "",
     name: item?.name ?? "",
@@ -1432,6 +1837,18 @@ function MachineForm({ item, departments }: { item?: MasterMachine; departments:
     amc_expiry: item?.amc_expiry ?? "",
     target_kg: item?.target_kg ?? 0,
   });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const isComplete = requiredFields.every((f) => {
+    const v = form[f as keyof typeof form];
+    return v !== "" && v !== undefined && v !== null;
+  });
+  const err = (f: string) => {
+    if (!touched[f]) return undefined;
+    const v = form[f as keyof typeof form];
+    if (v === "" || v === undefined || v === null) return "This field is required";
+    return undefined;
+  };
 
   const createM = useMutation({
     mutationFn: () => productionApi.createMachine(form),
@@ -1443,18 +1860,23 @@ function MachineForm({ item, departments }: { item?: MasterMachine; departments:
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+    if (!isComplete) return;
     createM.mutate();
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-1.5">
-        <Label>Machine Code *</Label>
+        <Label className={cn(err("code") && "text-destructive")}>
+          Machine Code <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.code}
           onChange={(e) => setForm({ ...form, code: e.target.value })}
-          required
+          className={cn(err("code") && "border-destructive")}
         />
+        {err("code") && <p className="text-xs text-destructive">{err("code")}</p>}
       </div>
       <div className="space-y-1.5">
         <Label>Machine Name</Label>
@@ -1543,7 +1965,7 @@ function MachineForm({ item, departments }: { item?: MasterMachine; departments:
         </div>
       </div>
       <SheetFooter>
-        <Button type="submit" disabled={createM.isPending}>
+        <Button type="submit" disabled={createM.isPending || !isComplete}>
           {createM.isPending ? "Saving…" : "Save"}
         </Button>
       </SheetFooter>
@@ -1553,12 +1975,25 @@ function MachineForm({ item, departments }: { item?: MasterMachine; departments:
 
 function ShiftForm({ item, mills }: { item?: Shift; mills?: Mill[] }) {
   const qc = useQueryClient();
+  const requiredFields = ["code", "name", "start_time", "end_time"];
   const [form, setForm] = useState({
     code: item?.code ?? "",
     name: item?.name ?? "",
     start_time: item?.start_time ?? "",
     end_time: item?.end_time ?? "",
   });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const isComplete = requiredFields.every((f) => {
+    const v = form[f as keyof typeof form];
+    return v !== "" && v !== undefined && v !== null;
+  });
+  const err = (f: string) => {
+    if (!touched[f]) return undefined;
+    const v = form[f as keyof typeof form];
+    if (v === "" || v === undefined || v === null) return "This field is required";
+    return undefined;
+  };
 
   const createM = useMutation({
     mutationFn: () => productionApi.createShift(form),
@@ -1570,15 +2005,19 @@ function ShiftForm({ item, mills }: { item?: Shift; mills?: Mill[] }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+    if (!isComplete) return;
     createM.mutate();
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-1.5">
-        <Label>Shift Code *</Label>
+        <Label className={cn(err("code") && "text-destructive")}>
+          Shift Code <span className="text-destructive">*</span>
+        </Label>
         <Select value={form.code} onValueChange={(v) => setForm({ ...form, code: v })}>
-          <SelectTrigger>
+          <SelectTrigger className={cn(err("code") && "border-destructive")}>
             <SelectValue placeholder="Select code" />
           </SelectTrigger>
           <SelectContent>
@@ -1589,37 +2028,47 @@ function ShiftForm({ item, mills }: { item?: Shift; mills?: Mill[] }) {
             ))}
           </SelectContent>
         </Select>
+        {err("code") && <p className="text-xs text-destructive">{err("code")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Shift Name *</Label>
+        <Label className={cn(err("name") && "text-destructive")}>
+          Shift Name <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
-          required
+          className={cn(err("name") && "border-destructive")}
         />
+        {err("name") && <p className="text-xs text-destructive">{err("name")}</p>}
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label>Start Time *</Label>
+          <Label className={cn(err("start_time") && "text-destructive")}>
+            Start Time <span className="text-destructive">*</span>
+          </Label>
           <Input
             type="time"
             value={form.start_time}
             onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-            required
+            className={cn(err("start_time") && "border-destructive")}
           />
+          {err("start_time") && <p className="text-xs text-destructive">{err("start_time")}</p>}
         </div>
         <div className="space-y-1.5">
-          <Label>End Time *</Label>
+          <Label className={cn(err("end_time") && "text-destructive")}>
+            End Time <span className="text-destructive">*</span>
+          </Label>
           <Input
             type="time"
             value={form.end_time}
             onChange={(e) => setForm({ ...form, end_time: e.target.value })}
-            required
+            className={cn(err("end_time") && "border-destructive")}
           />
+          {err("end_time") && <p className="text-xs text-destructive">{err("end_time")}</p>}
         </div>
       </div>
       <SheetFooter>
-        <Button type="submit" disabled={createM.isPending}>
+        <Button type="submit" disabled={createM.isPending || !isComplete}>
           {createM.isPending ? "Saving…" : "Save"}
         </Button>
       </SheetFooter>
@@ -1629,12 +2078,25 @@ function ShiftForm({ item, mills }: { item?: Shift; mills?: Mill[] }) {
 
 function WarehouseForm({ item }: { item?: Warehouse }) {
   const qc = useQueryClient();
+  const requiredFields = ["code", "name"];
   const [form, setForm] = useState({
     code: item?.code ?? "",
     name: item?.name ?? "",
     location: item?.location ?? "",
     capacity_bags: item?.capacity_bags ?? undefined,
   });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const isComplete = requiredFields.every((f) => {
+    const v = form[f as keyof typeof form];
+    return v !== "" && v !== undefined && v !== null;
+  });
+  const err = (f: string) => {
+    if (!touched[f]) return undefined;
+    const v = form[f as keyof typeof form];
+    if (v === "" || v === undefined || v === null) return "This field is required";
+    return undefined;
+  };
 
   const createM = useMutation({
     mutationFn: () => inventoryApi.createWarehouse(form),
@@ -1646,26 +2108,34 @@ function WarehouseForm({ item }: { item?: Warehouse }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+    if (!isComplete) return;
     createM.mutate();
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="space-y-1.5">
-        <Label>Code *</Label>
+        <Label className={cn(err("code") && "text-destructive")}>
+          Code <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.code}
           onChange={(e) => setForm({ ...form, code: e.target.value })}
-          required
+          className={cn(err("code") && "border-destructive")}
         />
+        {err("code") && <p className="text-xs text-destructive">{err("code")}</p>}
       </div>
       <div className="space-y-1.5">
-        <Label>Name *</Label>
+        <Label className={cn(err("name") && "text-destructive")}>
+          Name <span className="text-destructive">*</span>
+        </Label>
         <Input
           value={form.name}
           onChange={(e) => setForm({ ...form, name: e.target.value })}
-          required
+          className={cn(err("name") && "border-destructive")}
         />
+        {err("name") && <p className="text-xs text-destructive">{err("name")}</p>}
       </div>
       <div className="space-y-1.5">
         <Label>Location</Label>
@@ -1688,7 +2158,7 @@ function WarehouseForm({ item }: { item?: Warehouse }) {
         />
       </div>
       <SheetFooter>
-        <Button type="submit" disabled={createM.isPending}>
+        <Button type="submit" disabled={createM.isPending || !isComplete}>
           {createM.isPending ? "Saving…" : "Save"}
         </Button>
       </SheetFooter>

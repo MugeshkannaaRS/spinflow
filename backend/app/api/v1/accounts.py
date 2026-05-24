@@ -5,9 +5,10 @@ from typing import List, Optional
 from datetime import datetime, timezone, date
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module
+from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.accounts import Invoice, Payment
+from app.models.masters import Mill
 from app.schemas.accounts import (
     InvoiceCreate, InvoiceOut, InvoiceListResponse,
     PaymentCreate, PaymentOut, AccountsSummary,
@@ -24,7 +25,13 @@ async def get_invoices(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
-    stmt = select(Invoice).order_by(Invoice.date.desc())
+    scope = await get_mill_scope(current_user)
+    stmt = select(Invoice)
+    if scope["mill_id"]:
+        stmt = stmt.where(Invoice.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Invoice.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    stmt = stmt.order_by(Invoice.date.desc())
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
@@ -68,7 +75,13 @@ async def get_receivables(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
-    stmt = select(Invoice).where(Invoice.status.in_(["posted", "overdue"])).order_by(Invoice.date.desc())
+    scope = await get_mill_scope(current_user)
+    stmt = select(Invoice).where(Invoice.status.in_(["posted", "overdue"]))
+    if scope["mill_id"]:
+        stmt = stmt.where(Invoice.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Invoice.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    stmt = stmt.order_by(Invoice.date.desc())
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
@@ -117,6 +130,14 @@ async def get_pl(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
+    scope = await get_mill_scope(current_user)
+    if scope["mill_id"]:
+        mill_id = scope["mill_id"]
+    elif scope["company_id"]:
+        mills_result = await db.execute(select(Mill.id).where(Mill.company_id == scope["company_id"]))
+        mill_ids = mills_result.scalars().all()
+        if mill_ids:
+            mill_id = mill_ids[0]
     svc = AccountsService(db, current_user)
     return await svc.get_pl_statement(mill_id, month, year)
 
@@ -127,6 +148,14 @@ async def get_receivables_ageing(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
+    scope = await get_mill_scope(current_user)
+    if scope["mill_id"]:
+        mill_id = scope["mill_id"]
+    elif scope["company_id"]:
+        mills_result = await db.execute(select(Mill.id).where(Mill.company_id == scope["company_id"]))
+        mill_ids = mills_result.scalars().all()
+        if mill_ids:
+            mill_id = mill_ids[0]
     svc = AccountsService(db, current_user)
     return await svc.receivables_ageing(mill_id)
 
@@ -137,6 +166,14 @@ async def get_payables(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
+    scope = await get_mill_scope(current_user)
+    if scope["mill_id"]:
+        mill_id = scope["mill_id"]
+    elif scope["company_id"]:
+        mills_result = await db.execute(select(Mill.id).where(Mill.company_id == scope["company_id"]))
+        mill_ids = mills_result.scalars().all()
+        if mill_ids:
+            mill_id = mill_ids[0]
     svc = AccountsService(db, current_user)
     return await svc.payables_ageing(mill_id)
 
@@ -149,6 +186,14 @@ async def get_gst(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
+    scope = await get_mill_scope(current_user)
+    if scope["mill_id"]:
+        mill_id = scope["mill_id"]
+    elif scope["company_id"]:
+        mills_result = await db.execute(select(Mill.id).where(Mill.company_id == scope["company_id"]))
+        mill_ids = mills_result.scalars().all()
+        if mill_ids:
+            mill_id = mill_ids[0]
     svc = AccountsService(db, current_user)
     return await svc.gst_summary(mill_id, month, year)
 
@@ -161,5 +206,13 @@ async def get_cogs(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
+    scope = await get_mill_scope(current_user)
+    if scope["mill_id"]:
+        mill_id = scope["mill_id"]
+    elif scope["company_id"]:
+        mills_result = await db.execute(select(Mill.id).where(Mill.company_id == scope["company_id"]))
+        mill_ids = mills_result.scalars().all()
+        if mill_ids:
+            mill_id = mill_ids[0]
     svc = AccountsService(db, current_user)
     return await svc.get_cogs(mill_id, date_from, date_to)
