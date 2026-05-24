@@ -219,7 +219,7 @@ function HRPage() {
 
   const empQ = useQuery({
     queryKey: ["hr-employees"],
-    queryFn: hrApi.getEmployees,
+    queryFn: () => hrApi.getEmployees(),
     staleTime: 60_000,
     retry: 1,
   });
@@ -231,7 +231,7 @@ function HRPage() {
   });
   const leaveQ = useQuery({
     queryKey: ["hr-leaves"],
-    queryFn: hrApi.getLeaves,
+    queryFn: () => hrApi.getLeaves(),
     staleTime: 60_000,
     retry: 1,
   });

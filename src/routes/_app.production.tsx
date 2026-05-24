@@ -441,7 +441,7 @@ function ProductionPage() {
   const canEdit = canWrite(user?.role ?? "OPERATOR", "production");
   const machinesQ = useQuery({
     queryKey: ["machines"],
-    queryFn: productionApi.getMachines,
+    queryFn: () => productionApi.getMachines(),
     staleTime: 60_000,
     retry: 1,
   });

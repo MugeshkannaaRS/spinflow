@@ -74,9 +74,9 @@ export function useWebSocket() {
     let backoff = 1000;
     let intentionalClose = false;
 
-    function connect() {
-      const apiBase = import.meta.env.VITE_API_BASE_URL || "";
-      const wsBase = apiBase.replace(/^http/, "ws");
+    async function connect() {
+      const { API_BASE } = await import("@/lib/api");
+      const wsBase = API_BASE.replace(/^http/, "ws");
       const url = `${wsBase}/ws/notifications?token=${token}`;
 
       const ws = new WebSocket(url);
