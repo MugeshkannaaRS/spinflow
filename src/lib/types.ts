@@ -788,6 +788,45 @@ export interface Warehouse {
   created_at?: string;
 }
 
+export interface HRPayroll {
+  id: string;
+  employee_id: string;
+  mill_id: string;
+  month: number;
+  year: number;
+  days_of_month: number;
+  calculate_days: number;
+  actual_attendance: number;
+  day_off: number;
+  cl: number;
+  sl: number;
+  el: number;
+  comp_leave: number;
+  festival_holiday: number;
+  absent_days: number;
+  payable_days: number;
+  payable_salary: number;
+  ot_hours: number;
+  ot_amount: number;
+  festival_duty_benefit: number;
+  festival_holiday_allowance: number;
+  ifter_days: number;
+  ifter_allowance: number;
+  special_food: number;
+  attendance_bonus: number;
+  arrear_others: number;
+  shift_qty: number;
+  shift_amount: number;
+  roster_qty: number;
+  roster_amount: number;
+  absent_deduction: number;
+  advance_deduction: number;
+  tax_deduction: number;
+  net_payable: number;
+  is_finalized: boolean;
+  created_at?: string;
+}
+
 export interface InventoryBag {
   id: string;
   mill_id: string;

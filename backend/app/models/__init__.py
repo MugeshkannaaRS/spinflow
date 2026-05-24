@@ -8,7 +8,7 @@ from app.models.dispatch import Dispatch, DispatchItem, Vehicle, QRScan
 from app.models.lotrac import Trip, TripItem, TripScanLog
 from app.models.purchase import Supplier, CottonPurchase, BaleStock, GRNEntry
 from app.models.stores import Spare, SpareIssue, Vendor
-from app.models.hr import Employee, Attendance, Leave, EmployeeShift
+from app.models.hr import Employee, Attendance, Leave, EmployeeShift, MonthlyPayroll
 from app.models.payroll import PayrollMonth, PayslipEntry
 from app.models.accounts import Invoice, Payment, GSTEntry
 from app.models.attachment import DocumentAttachment
@@ -26,7 +26,7 @@ __all__ = [
     "Dispatch", "DispatchItem", "Vehicle", "QRScan",
     "Supplier", "CottonPurchase", "BaleStock", "GRNEntry",
     "Spare", "SpareIssue", "Vendor",
-    "Employee", "Attendance", "Leave", "EmployeeShift",
+    "Employee", "Attendance", "Leave", "EmployeeShift", "MonthlyPayroll",
     "PayrollMonth", "PayslipEntry",
     "Invoice", "Payment", "GSTEntry",
     "DocumentAttachment",

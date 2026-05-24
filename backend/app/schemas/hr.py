@@ -6,40 +6,74 @@ from datetime import date, datetime
 class EmployeeCreate(BaseModel):
     employee_code: str
     full_name: str
+    sl_no: Optional[int] = None
+    employee_id: Optional[str] = None
     department: str
-    designation: str
-    shift: str
+    designation: Optional[str] = None
+    section: Optional[str] = None
+    department_name: Optional[str] = None
+    shift: str = "General"
     date_of_joining: Optional[date] = None
+    dob: Optional[date] = None
+    gender: Optional[str] = None
+    grade: Optional[str] = None
+    bank_account_no: Optional[str] = None
+    basic: Optional[float] = 0
+    house_rent: Optional[float] = 0
+    medical: Optional[float] = 0
+    conveyance: Optional[float] = 0
+    food_allowance: Optional[float] = 0
+    wages: Optional[float] = 0
+    increment: Optional[float] = 0
+    mobile_bill: Optional[float] = 0
+    shift_benefit: Optional[float] = 0
+    days_of_month: Optional[int] = 26
+    total_salary: Optional[float] = None
     phone: Optional[str] = None
-    aadhaar_no: Optional[str] = None
-    bank_account: Optional[str] = None
-    bank_ifsc: Optional[str] = None
-    pf_no: Optional[str] = None
-    esic_no: Optional[str] = None
-    daily_wage: Optional[float] = Field(default=None, ge=0)
+    mill_id: Optional[str] = None
 
     @field_validator("shift")
     @classmethod
     def validate_shift(cls, v: str) -> str:
-        allowed = {"A", "B", "C", "G"}
+        allowed = {"A", "B", "C", "General"}
         if v not in allowed:
-            raise ValueError(f"shift must be one of {allowed}")
+            raise ValueError("shift must be one of A, B, C, General")
         return v
 
 
 class EmployeeOut(BaseModel):
     id: str
-    employee_code: Optional[str] = None
-    full_name: Optional[str] = None
+    code: Optional[str] = None
+    name: Optional[str] = None
+    sl_no: Optional[int] = None
+    employee_id: Optional[str] = None
     department: Optional[str] = None
     designation: Optional[str] = None
+    section: Optional[str] = None
+    department_name: Optional[str] = None
     shift: Optional[str] = None
-    date_of_joining: Optional[date] = None
+    joining_date: Optional[date] = None
+    dob: Optional[date] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    grade: Optional[str] = None
+    gen: Optional[str] = None
+    bank_account_no: Optional[str] = None
+    basic: Optional[float] = 0
+    house_rent: Optional[float] = 0
+    medical: Optional[float] = 0
+    conveyance: Optional[float] = 0
+    food_allowance: Optional[float] = 0
+    wages: Optional[float] = 0
+    increment: Optional[float] = 0
+    total_salary: Optional[float] = 0
+    mobile_bill: Optional[float] = 0
+    shift_benefit: Optional[float] = 0
+    wages_of_month: Optional[float] = 0
+    days_of_month: Optional[int] = 26
     phone: Optional[str] = None
-    pf_no: Optional[str] = None
-    esic_no: Optional[str] = None
-    daily_wage: Optional[float] = None
-    is_active: bool = True
+    is_active: Optional[bool] = True
+    mill_id: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:
@@ -47,12 +81,131 @@ class EmployeeOut(BaseModel):
 
 
 class EmployeeUpdate(BaseModel):
+    full_name: Optional[str] = None
+    sl_no: Optional[int] = None
+    employee_id: Optional[str] = None
     department: Optional[str] = None
     designation: Optional[str] = None
+    section: Optional[str] = None
+    department_name: Optional[str] = None
     shift: Optional[str] = None
+    gender: Optional[str] = None
+    grade: Optional[str] = None
+    bank_account_no: Optional[str] = None
+    basic: Optional[float] = None
+    house_rent: Optional[float] = None
+    medical: Optional[float] = None
+    conveyance: Optional[float] = None
+    food_allowance: Optional[float] = None
+    wages: Optional[float] = None
+    increment: Optional[float] = None
+    total_salary: Optional[float] = None
+    mobile_bill: Optional[float] = None
+    shift_benefit: Optional[float] = None
+    days_of_month: Optional[int] = None
     phone: Optional[str] = None
-    daily_wage: Optional[float] = None
     is_active: Optional[bool] = None
+
+
+class MonthlyPayrollCreate(BaseModel):
+    month: int
+    year: int
+    mill_id: str
+
+
+class MonthlyPayrollOut(BaseModel):
+    id: str
+    employee_id: str
+    mill_id: str
+    month: int
+    year: int
+    days_of_month: int = 26
+    calculate_days: Optional[float] = 0
+    actual_attendance: Optional[int] = 0
+    day_off: Optional[int] = 0
+    cl: Optional[int] = 0
+    sl: Optional[int] = 0
+    el: Optional[int] = 0
+    comp_leave: Optional[int] = 0
+    festival_holiday: Optional[int] = 0
+    absent_days: Optional[int] = 0
+    payable_days: Optional[float] = 0
+    payable_salary: Optional[float] = 0
+    ot_hours: Optional[float] = 0
+    ot_amount: Optional[float] = 0
+    festival_duty_benefit: Optional[float] = 0
+    festival_holiday_allowance: Optional[float] = 0
+    ifter_days: Optional[int] = 0
+    ifter_allowance: Optional[float] = 0
+    special_food: Optional[float] = 0
+    attendance_bonus: Optional[float] = 0
+    arrear_others: Optional[float] = 0
+    shift_qty: Optional[int] = 0
+    shift_amount: Optional[float] = 0
+    roster_qty: Optional[int] = 0
+    roster_amount: Optional[float] = 0
+    absent_deduction: Optional[float] = 0
+    advance_deduction: Optional[float] = 0
+    tax_deduction: Optional[float] = 0
+    net_payable: Optional[float] = 0
+    is_finalized: bool = False
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MonthlyPayrollUpdate(BaseModel):
+    days_of_month: Optional[int] = None
+    calculate_days: Optional[float] = None
+    actual_attendance: Optional[int] = None
+    day_off: Optional[int] = None
+    cl: Optional[int] = None
+    sl: Optional[int] = None
+    el: Optional[int] = None
+    comp_leave: Optional[int] = None
+    festival_holiday: Optional[int] = None
+    absent_days: Optional[int] = None
+    payable_days: Optional[float] = None
+    payable_salary: Optional[float] = None
+    ot_hours: Optional[float] = None
+    ot_amount: Optional[float] = None
+    festival_duty_benefit: Optional[float] = None
+    festival_holiday_allowance: Optional[float] = None
+    ifter_days: Optional[int] = None
+    ifter_allowance: Optional[float] = None
+    special_food: Optional[float] = None
+    attendance_bonus: Optional[float] = None
+    arrear_others: Optional[float] = None
+    shift_qty: Optional[int] = None
+    shift_amount: Optional[float] = None
+    roster_qty: Optional[int] = None
+    roster_amount: Optional[float] = None
+    absent_deduction: Optional[float] = None
+    advance_deduction: Optional[float] = None
+    tax_deduction: Optional[float] = None
+    net_payable: Optional[float] = None
+    is_finalized: Optional[bool] = None
+
+
+class MonthlyPayrollListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    pages: int
+    data: List[MonthlyPayrollOut]
+
+
+class PayrollCalculateRequest(BaseModel):
+    month: int
+    year: int
+    mill_id: str
+
+
+class PayrollFinalizeRequest(BaseModel):
+    month: int
+    year: int
+    mill_id: str
 
 
 class AttendanceCreate(BaseModel):
@@ -155,11 +308,18 @@ class EmployeeBulkItem(BaseModel):
     employee_code: str
     full_name: str
     department: str
-    designation: str
-    shift: str
+    designation: Optional[str] = None
+    shift: str = "General"
     date_of_joining: Optional[str] = None
     phone: Optional[str] = None
-    daily_wage: Optional[float] = None
+    wages: Optional[float] = None
+    basic: Optional[float] = None
+    house_rent: Optional[float] = None
+    medical: Optional[float] = None
+    conveyance: Optional[float] = None
+    food_allowance: Optional[float] = None
+    gender: Optional[str] = None
+    grade: Optional[str] = None
 
 
 class EmployeeBulkCreate(BaseModel):

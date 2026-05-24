@@ -100,17 +100,38 @@ export const storesApi = {
 
 // HR
 export const hrApi = {
-  getEmployees: () =>
-    api.get("/hr/employees").then((r) => ("data" in r.data ? r.data.data : r.data)),
+  getEmployees: (params?: Record<string, any>) =>
+    api.get("/hr/employees", { params }).then((r) => ("data" in r.data ? r.data.data : r.data)),
   createEmployee: (data: any) => api.post("/hr/employees", data).then((r) => r.data),
+  updateEmployee: (id: string, data: any) => api.put(`/hr/employees/${id}`, data).then((r) => r.data),
+  deleteEmployee: (id: string) => api.delete(`/hr/employees/${id}`).then((r) => r.data),
   bulkCreateEmployees: (data: any) => api.post("/hr/employees/bulk", data).then((r) => r.data),
-  getAttendance: () =>
-    api.get("/hr/attendance").then((r) => ("data" in r.data ? r.data.data : r.data)),
+  
+  // Attendance
+  getAttendance: (params?: Record<string, any>) =>
+    api.get("/hr/attendance", { params }).then((r) => ("data" in r.data ? r.data.data : r.data)),
   createAttendance: (data: any) => api.post("/hr/attendance", data).then((r) => r.data),
   createBulkAttendance: (data: any) => api.post("/hr/attendance/bulk", data).then((r) => r.data),
   updateAttendance: (id: string, data: any) =>
     api.patch(`/hr/attendance/${id}`, data).then((r) => r.data),
-  getLeaves: () => api.get("/hr/leaves").then((r) => ("data" in r.data ? r.data.data : r.data)),
+  bulkImportAttendance: (data: any) =>
+    api.post("/hr/attendance/bulk-import", data).then((r) => r.data),
+  getAttendanceSummary: (params: Record<string, any>) =>
+    api.get("/hr/attendance/summary", { params }).then((r) => r.data),
+  
+  // Monthly Payroll
+  getPayroll: (params: Record<string, any>) =>
+    api.get("/hr/payroll", { params }).then((r) => ("data" in r.data ? r.data.data : r.data)),
+  calculatePayroll: (data: any) =>
+    api.post("/hr/payroll/calculate", data).then((r) => r.data),
+  updatePayroll: (id: string, data: any) =>
+    api.put(`/hr/payroll/${id}`, data).then((r) => r.data),
+  finalizePayroll: (data: any) =>
+    api.post("/hr/payroll/finalize", data).then((r) => r.data),
+  
+  // Leaves
+  getLeaves: (params?: Record<string, any>) =>
+    api.get("/hr/leaves", { params }).then((r) => ("data" in r.data ? r.data.data : r.data)),
   createLeave: (data: any) => api.post("/hr/leaves", data).then((r) => r.data),
   approveOrRejectLeave: (data: any) =>
     api.put(`/hr/leaves/${data.id}/action`, data).then((r) => r.data),

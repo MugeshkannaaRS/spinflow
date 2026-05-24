@@ -1,21 +1,7 @@
-from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Enum as SAEnum
+from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Numeric, Date
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime, date
 from app.db.base import Base, TimestampMixin, generate_uuid
-import enum
-
-
-class AttendanceStatus(str, enum.Enum):
-    PRESENT = "present"
-    ABSENT = "absent"
-    HALF_DAY = "half-day"
-    LEAVE = "leave"
-
-
-class LeaveStatus(str, enum.Enum):
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
 
 
 class Employee(TimestampMixin, Base):
@@ -25,7 +11,31 @@ class Employee(TimestampMixin, Base):
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
-    department: Mapped[str] = mapped_column(String(100), nullable=False)
+    sl_no: Mapped[int] = mapped_column(Integer, nullable=True)
+    employee_id: Mapped[str] = mapped_column(String(50), nullable=True)
+    joining_date: Mapped[date] = mapped_column(Date, nullable=True)
+    gen: Mapped[str] = mapped_column(String(10), nullable=True)
+    dob: Mapped[date] = mapped_column(Date, nullable=True)
+    age: Mapped[int] = mapped_column(Integer, nullable=True)
+    gender: Mapped[str] = mapped_column(String(10), nullable=True)
+    grade: Mapped[str] = mapped_column(String(20), nullable=True)
+    designation: Mapped[str] = mapped_column(String(100), nullable=True)
+    section: Mapped[str] = mapped_column(String(100), nullable=True)
+    department_name: Mapped[str] = mapped_column(String(100), nullable=True)
+    bank_account_no: Mapped[str] = mapped_column(String(50), nullable=True)
+    basic: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    house_rent: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    medical: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    conveyance: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    food_allowance: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    wages: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    increment: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    total_salary: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    mobile_bill: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    shift_benefit: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    wages_of_month: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    days_of_month: Mapped[int] = mapped_column(Integer, default=26)
+    department: Mapped[str] = mapped_column(String(100), nullable=True)
     role: Mapped[str] = mapped_column(String(100), nullable=True)
     phone: Mapped[str] = mapped_column(String(20), nullable=True)
     email: Mapped[str] = mapped_column(String(200), nullable=True)
@@ -42,6 +52,46 @@ class Employee(TimestampMixin, Base):
     bank_ifsc: Mapped[str] = mapped_column(String(20), nullable=True)
     pf_enrolled: Mapped[bool] = mapped_column(Boolean, default=False)
     esic_enrolled: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class MonthlyPayroll(TimestampMixin, Base):
+    __tablename__ = "monthly_payroll"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    employee_id: Mapped[str] = mapped_column(String(36), ForeignKey("employees.id"), nullable=False, index=True)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    days_of_month: Mapped[int] = mapped_column(Integer, default=26)
+    calculate_days: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+    actual_attendance: Mapped[int] = mapped_column(Integer, default=0)
+    day_off: Mapped[int] = mapped_column(Integer, default=0)
+    cl: Mapped[int] = mapped_column(Integer, default=0)
+    sl: Mapped[int] = mapped_column(Integer, default=0)
+    el: Mapped[int] = mapped_column(Integer, default=0)
+    comp_leave: Mapped[int] = mapped_column(Integer, default=0)
+    festival_holiday: Mapped[int] = mapped_column(Integer, default=0)
+    absent_days: Mapped[int] = mapped_column(Integer, default=0)
+    payable_days: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+    payable_salary: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    ot_hours: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+    ot_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    festival_duty_benefit: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    festival_holiday_allowance: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    ifter_days: Mapped[int] = mapped_column(Integer, default=0)
+    ifter_allowance: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    special_food: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    attendance_bonus: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    arrear_others: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    shift_qty: Mapped[int] = mapped_column(Integer, default=0)
+    shift_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    roster_qty: Mapped[int] = mapped_column(Integer, default=0)
+    roster_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    absent_deduction: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    advance_deduction: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    tax_deduction: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    net_payable: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    is_finalized: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class Attendance(Base):
