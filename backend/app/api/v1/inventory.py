@@ -42,7 +42,7 @@ async def get_lots(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [LotOut.model_validate(item).model_dump() for item in items],
     }
 
 
@@ -70,7 +70,7 @@ async def get_transfers(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [StockMovementOut.model_validate(item).model_dump() for item in items],
     }
 
 
@@ -134,7 +134,7 @@ async def get_warehouses(
     elif scope["company_id"]:
         query = query.join(Mill, Warehouse.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     result = await db.execute(query)
-    return result.scalars().all()
+    return [WarehouseOut.model_validate(item).model_dump() for item in result.scalars().all()]
 
 
 @router.post("/inventory/warehouses", response_model=WarehouseOut)

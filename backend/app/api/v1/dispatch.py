@@ -49,8 +49,8 @@ async def get_dispatches(
         "page": page,
         "page_size": page_size,
         "pages": pages,
-        "data": items,
-    }
+        "data": [DispatchResponse.model_validate(item).model_dump() for item in items],
+        }
 
 
 @router.post("/dispatch/orders", response_model=DispatchResponse)

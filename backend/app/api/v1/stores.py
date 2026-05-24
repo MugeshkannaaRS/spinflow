@@ -45,7 +45,7 @@ async def get_spares(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [SpareItemOut.model_validate(item).model_dump() for item in items],
     }
 
 
@@ -133,7 +133,7 @@ async def get_issues(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [SpareIssueOut.model_validate(item).model_dump() for item in items],
     }
 
 

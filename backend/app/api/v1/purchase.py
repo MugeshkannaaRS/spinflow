@@ -73,7 +73,7 @@ async def get_purchases(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [CottonPurchaseOut.model_validate(item).model_dump() for item in items],
     }
 
 
@@ -120,7 +120,7 @@ async def get_suppliers(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [SupplierOut.model_validate(item).model_dump() for item in items],
     }
 
 
@@ -242,7 +242,7 @@ async def get_bales(
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(stmt)
     items = result.scalars().all()
-    return {"total": total, "page": page, "page_size": page_size, "data": items}
+    return {"total": total, "page": page, "page_size": page_size, "data": [BaleOut.model_validate(item).model_dump() for item in items]}
 
 
 @router.post("/purchase/bales", response_model=BaleOut)
@@ -351,7 +351,7 @@ async def get_grns(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [GRNOut.model_validate(item).model_dump() for item in items],
     }
 
 

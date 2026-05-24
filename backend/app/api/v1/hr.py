@@ -79,7 +79,7 @@ async def get_employees(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [EmployeeOut.model_validate(e).model_dump() for e in items],
     }
 
 
@@ -290,7 +290,7 @@ async def get_payroll(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [MonthlyPayrollOut.model_validate(m).model_dump() for m in items],
     }
 
 
@@ -443,7 +443,7 @@ async def get_attendance(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [AttendanceOut.model_validate(a).model_dump() for a in items],
     }
 
 
@@ -643,7 +643,7 @@ async def get_leaves(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [LeaveRequestOut.model_validate(l).model_dump() for l in items],
     }
 
 

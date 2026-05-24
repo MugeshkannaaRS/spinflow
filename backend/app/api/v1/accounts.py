@@ -42,7 +42,7 @@ async def get_invoices(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [InvoiceOut.model_validate(item).model_dump() for item in items],
     }
 
 
@@ -92,7 +92,7 @@ async def get_receivables(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [InvoiceOut.model_validate(item).model_dump() for item in items],
     }
 
 

@@ -45,7 +45,7 @@ async def get_machines(
         "page": page,
         "page_size": page_size,
         "pages": pages,
-        "data": items,
+        "data": [MachineResponse.model_validate(item).model_dump() for item in items],
     }
 
 
@@ -73,7 +73,7 @@ async def get_shifts(
     elif scope["company_id"]:
         query = query.join(Mill, Shift.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     result = await db.execute(query)
-    return result.scalars().all()
+    return [ShiftOut.model_validate(item).model_dump() for item in result.scalars().all()]
 
 
 @router.post("/production/shifts", response_model=ShiftOut)
@@ -131,7 +131,7 @@ async def get_entries(
         "page": page,
         "page_size": page_size,
         "pages": pages,
-        "data": items,
+        "data": [ProductionEntryResponse.model_validate(item).model_dump() for item in items],
     }
 
 
@@ -200,7 +200,7 @@ async def get_downtime(
         "page": page,
         "page_size": page_size,
         "pages": pages,
-        "data": items,
+        "data": [DowntimeResponse.model_validate(item).model_dump() for item in items],
     }
 
 

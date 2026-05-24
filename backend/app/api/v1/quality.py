@@ -14,6 +14,7 @@ from app.schemas.quality import (
     QualityTestResponse, QualityTestCreate,
     QualityApprovalResponse, QualityApprovalAction,
 )
+from app.schemas.inventory import LotOut
 from app.services.quality_service import QualityService
 
 
@@ -59,7 +60,7 @@ async def get_tests(
         "page": page,
         "page_size": page_size,
         "pages": pages,
-        "data": items,
+        "data": [QualityTestResponse.model_validate(item).model_dump() for item in items],
     }
 
 
@@ -161,7 +162,7 @@ async def list_lots(
         "page": page,
         "page_size": page_size,
         "pages": pages,
-        "data": items,
+        "data": [LotOut.model_validate(item).model_dump() for item in items],
     }
 
 

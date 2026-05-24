@@ -43,7 +43,7 @@ async def get_tasks(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [MaintenanceOut.model_validate(item).model_dump() for item in items],
     }
 
 
@@ -112,7 +112,7 @@ async def get_schedules(
         "page": page,
         "page_size": page_size,
         "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": items,
+        "data": [ScheduleOut.model_validate(item).model_dump() for item in items],
     }
 
 
@@ -195,7 +195,7 @@ async def get_parameters(
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(stmt)
     items = result.scalars().all()
-    return {"total": total, "page": page, "page_size": page_size, "data": items}
+    return {"total": total, "page": page, "page_size": page_size, "data": [MachineParameterOut.model_validate(item).model_dump() for item in items]}
 
 
 @router.post("/maintenance/parameters/bulk", response_model=BulkResponse)
