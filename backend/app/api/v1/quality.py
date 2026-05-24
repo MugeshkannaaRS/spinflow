@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
+from pydantic import BaseModel
 
 from app.db.session import get_db
 from app.core.deps import get_current_user, require_module, get_mill_scope
@@ -14,6 +15,11 @@ from app.schemas.quality import (
     QualityApprovalResponse, QualityApprovalAction,
 )
 from app.services.quality_service import QualityService
+
+
+class QualityTestBulkRequest(BaseModel):
+    items: List[Dict[str, Any]]
+
 
 router = APIRouter()
 
@@ -76,6 +82,46 @@ async def create_test(
         unit=req.unit,
         tested_by=req.tested_by,
     )
+
+
+@router.post("/quality/tests/bulk")
+async def bulk_create_tests(
+    req: QualityTestBulkRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("quality", write=True)),
+):
+    created = 0
+    skipped = 0
+    errors: List[str] = []
+    for i, row in enumerate(req.items):
+        try:
+            date = str(row.get("date") or "").strip()
+            test_type = str(row.get("type") or row.get("test_type") or "").strip()
+            result_val = row.get("result") or row.get("value")
+            standard_val = row.get("standard") or row.get("standard_value")
+            if not date or not test_type or result_val is None:
+                skipped += 1
+                errors.append(f"Row {i + 1}: missing date, type, or result")
+                continue
+            test = QualityTest(
+                date=date,
+                type=test_type,
+                lot_no=str(row.get("lot_no") or "").strip() or None,
+                result=float(result_val),
+                standard=float(standard_val) if standard_val is not None else 0.0,
+                unit=str(row.get("unit") or "").strip() or None,
+                machine_code=str(row.get("machine_code") or "").strip() or None,
+                sample_ref=str(row.get("sample_ref") or "").strip() or None,
+                tested_by=str(row.get("tested_by") or "").strip() or None,
+                status="pending",
+            )
+            db.add(test)
+            created += 1
+        except Exception as e:
+            skipped += 1
+            errors.append(f"Row {i + 1}: {str(e)}")
+    await db.flush()
+    return {"created": created, "skipped": skipped, "errors": errors}
 
 
 @router.patch("/quality/tests/{test_id}/approve", response_model=QualityTestResponse)

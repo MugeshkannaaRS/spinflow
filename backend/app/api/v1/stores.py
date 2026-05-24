@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from datetime import datetime
+from pydantic import BaseModel
 
 from app.db.session import get_db
 from app.core.deps import get_current_user, require_module, get_mill_scope
@@ -13,6 +14,10 @@ from app.schemas.stores import (
     SpareItemCreate, SpareItemOut, SpareItemUpdate, SpareInward,
     SpareIssueCreate, SpareIssueOut,
 )
+
+
+class SpareBulkRequest(BaseModel):
+    items: List[Dict[str, Any]]
 
 router = APIRouter()
 
@@ -62,6 +67,47 @@ async def create_spare(
     db.add(spare)
     await db.flush()
     return spare
+
+
+@router.post("/stores/spares/bulk")
+async def bulk_create_spares(
+    req: SpareBulkRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("stores", write=True)),
+):
+    scope = await get_mill_scope(current_user)
+    mill_id = scope.get("mill_id") or current_user.mill_id
+    created = 0
+    skipped = 0
+    errors: List[str] = []
+    for i, row in enumerate(req.items):
+        try:
+            code = str(row.get("item_code") or "").strip()
+            name = str(row.get("name") or "").strip()
+            if not code or not name:
+                skipped += 1
+                errors.append(f"Row {i + 1}: missing item_code or name")
+                continue
+            existing = await db.execute(select(Spare).where(Spare.code == code))
+            if existing.scalar_one_or_none():
+                skipped += 1
+                continue
+            spare = Spare(
+                code=code,
+                name=name,
+                category=str(row.get("category") or "General").strip(),
+                unit=str(row.get("unit") or "Nos").strip(),
+                stock=float(row.get("current_stock") or 0),
+                min_stock=float(row.get("reorder_level") or 0),
+                mill_id=mill_id,
+            )
+            db.add(spare)
+            created += 1
+        except Exception as e:
+            skipped += 1
+            errors.append(f"Row {i + 1}: {str(e)}")
+    await db.flush()
+    return {"created": created, "skipped": skipped, "errors": errors}
 
 
 @router.get("/stores/issues")

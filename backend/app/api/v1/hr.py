@@ -1,8 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from datetime import datetime, timezone, date as date_type
+from pydantic import BaseModel
+
+
+class AttendanceImportRequest(BaseModel):
+    items: List[Dict[str, Any]]
 
 from app.db.session import get_db
 from app.core.deps import get_current_user, require_module, log_audit, get_mill_scope
@@ -191,6 +196,58 @@ async def create_bulk_attendance(
         records.append(att)
     await db.flush()
     return records
+
+
+@router.post("/hr/attendance/bulk-import")
+async def bulk_import_attendance(
+    req: AttendanceImportRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("hr", write=True)),
+):
+    STATUS_MAP = {"p": "present", "a": "absent", "h": "holiday", "l": "leave",
+                  "present": "present", "absent": "absent", "holiday": "holiday", "leave": "leave"}
+    created = 0
+    skipped = 0
+    errors: List[str] = []
+    for i, row in enumerate(req.items):
+        try:
+            emp_code = str(row.get("employee_code") or "").strip()
+            date_str = str(row.get("date") or "").strip()
+            status_raw = str(row.get("status") or "").strip().lower()
+            if not emp_code or not date_str or not status_raw:
+                skipped += 1
+                errors.append(f"Row {i + 1}: missing employee_code, date, or status")
+                continue
+            norm_status = STATUS_MAP.get(status_raw)
+            if not norm_status:
+                skipped += 1
+                errors.append(f"Row {i + 1}: unknown status '{status_raw}'")
+                continue
+            emp_result = await db.execute(select(Employee).where(Employee.code == emp_code))
+            emp = emp_result.scalar_one_or_none()
+            if not emp:
+                skipped += 1
+                errors.append(f"Row {i + 1}: employee '{emp_code}' not found")
+                continue
+            # Normalise date: accept DD/MM/YYYY or YYYY-MM-DD
+            if "/" in date_str:
+                parts = date_str.split("/")
+                date_str = f"{parts[2]}-{parts[1].zfill(2)}-{parts[0].zfill(2)}"
+            att = Attendance(
+                date=date_str,
+                employee_id=emp.id,
+                employee_name=emp.name,
+                department=emp.department,
+                shift="General",
+                status=norm_status,
+            )
+            db.add(att)
+            created += 1
+        except Exception as e:
+            skipped += 1
+            errors.append(f"Row {i + 1}: {str(e)}")
+    await db.flush()
+    return {"created": created, "skipped": skipped, "errors": errors}
 
 
 @router.patch("/hr/attendance/{attendance_id}", response_model=AttendanceOut)
