@@ -40,6 +40,7 @@ export const productionApi = {
   createMachine: (data: any) => api.post("/production/machines", data).then((r) => r.data),
   getEntries: () => api.get("/production/entries").then(extractList),
   createEntry: (data: any) => api.post("/production/entries", data).then((r) => r.data),
+  createBulkEntries: (data: any) => api.post("/production/entries/bulk", data).then((r) => r.data),
   getDowntime: () => api.get("/production/downtime").then(extractList),
   createDowntime: (data: any) => api.post("/production/downtime", data).then((r) => r.data),
   approveEntry: (id: string) => api.put(`/production/entries/${id}/approve`).then((r) => r.data),

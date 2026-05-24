@@ -10,6 +10,7 @@ from app.models.production import Machine, Shift
 from app.schemas.production import (
     MachineCreate, MachineResponse, ProductionEntryResponse, ProductionEntryCreate,
     DowntimeResponse, DowntimeCreate, ShiftCreate, ShiftOut,
+    ProductionBulkCreate, ProductionBulkResponse,
 )
 from app.services.production_service import ProductionService
 
@@ -84,6 +85,16 @@ async def create_entry(
 ):
     svc = ProductionService(db, current_user)
     return await svc.create_entry(req)
+
+
+@router.post("/production/entries/bulk", response_model=ProductionBulkResponse)
+async def create_entries_bulk(
+    req: ProductionBulkCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    svc = ProductionService(db, current_user)
+    return await svc.create_entries_bulk(req)
 
 
 @router.put("/production/entries/{entry_id}/approve", response_model=ProductionEntryResponse)

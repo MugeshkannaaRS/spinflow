@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { productionApi, uploadApi } from "@/lib/api-service";
+import { productionApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
@@ -26,27 +26,332 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { ExcelColumnFilter } from "@/components/ui/excel-column-filter";
 import { ColumnConfigurator } from "@/components/ui/column-configurator";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
-import { FileUpload, type UploadedFile } from "@/components/ui/file-upload";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Activity, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid } from "lucide-react";
 
 export const Route = createFileRoute("/_app/production")({
   head: () => ({ meta: [{ title: "Production — SpinFlow ERP" }] }),
   component: ProductionPage,
 });
+
+const DEPARTMENTS = [
+  "Blowroom",
+  "Carding",
+  "Drawing",
+  "Simplex",
+  "Ring Frame",
+  "Winding",
+  "Quality",
+];
+
+type GridRow = {
+  machineCode: string;
+  machineName: string;
+  operator: string;
+  producedKg: string;
+  wasteKg: string;
+  stoppageMins: string;
+  stoppageReason: string;
+  machineStatus: "running" | "breakdown" | "idle";
+};
+
+function buildRows(machines: any[], dept: string): GridRow[] {
+  return machines
+    .filter((m: any) => !dept || (m.department ?? "") === dept)
+    .map((m: any) => ({
+      machineCode: m.code ?? "",
+      machineName: m.name ?? m.code ?? "",
+      operator: "",
+      producedKg: "",
+      wasteKg: "",
+      stoppageMins: "",
+      stoppageReason: "",
+      machineStatus: (m.current_status ?? m.status ?? "running") as GridRow["machineStatus"],
+    }));
+}
+
+function ShiftGrid({ machines }: { machines: any[] }) {
+  const qc = useQueryClient();
+  const today = new Date();
+  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
+
+  const [date, setDate] = useState(localDate);
+  const [shift, setShift] = useState<"A" | "B" | "C">("A");
+  const [department, setDepartment] = useState(DEPARTMENTS[4]);
+  const [count, setCount] = useState("30s");
+  const [rows, setRows] = useState<GridRow[]>(() => buildRows(machines, DEPARTMENTS[4]));
+
+  useEffect(() => {
+    setRows(buildRows(machines, department));
+  }, [department, machines]);
+
+  const updateRow = (idx: number, field: keyof GridRow, value: string) => {
+    setRows((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: value };
+      return next;
+    });
+  };
+
+  const summary = useMemo(() => {
+    const active = rows.filter((r) => Number(r.producedKg) > 0);
+    return {
+      totalProduced: active.reduce((s, r) => s + (Number(r.producedKg) || 0), 0),
+      totalWaste: active.reduce((s, r) => s + (Number(r.wasteKg) || 0), 0),
+      running: rows.filter((r) => r.machineStatus === "running").length,
+      idle: rows.filter((r) => r.machineStatus === "idle").length,
+      breakdown: rows.filter((r) => r.machineStatus === "breakdown").length,
+    };
+  }, [rows]);
+
+  const bulkMutation = useMutation({
+    mutationFn: () => {
+      const activeRows = rows.filter((r) => Number(r.producedKg) > 0);
+      if (activeRows.length === 0) throw new Error("No entries to submit");
+      return productionApi.createBulkEntries({
+        date,
+        shift,
+        department,
+        entries: activeRows.map((r) => ({
+          machine_code: r.machineCode,
+          operator: r.operator,
+          produced_kg: Number(r.producedKg),
+          waste_kg: Number(r.wasteKg) || 0,
+          count,
+          stoppage_mins: Number(r.stoppageMins) || 0,
+          stoppage_reason: r.stoppageReason || undefined,
+          machine_status: r.machineStatus,
+        })),
+      });
+    },
+    onSuccess: (res: any) => {
+      toast.success(
+        `${res.created} entries submitted${res.skipped > 0 ? `, ${res.skipped} skipped` : ""}`,
+      );
+      if (res.errors?.length > 0) {
+        res.errors.forEach((e: string) => toast.warning(e));
+      }
+      qc.invalidateQueries({ queryKey: ["shifts"] });
+      setRows(buildRows(machines, department));
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const activeCount = rows.filter((r) => Number(r.producedKg) > 0).length;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="p-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Date</Label>
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Shift</Label>
+              <Select value={shift} onValueChange={(v) => setShift(v as "A" | "B" | "C")}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A">A — Morning</SelectItem>
+                  <SelectItem value="B">B — Afternoon</SelectItem>
+                  <SelectItem value="C">C — Night</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Department</Label>
+              <Select value={department} onValueChange={setDepartment}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEPARTMENTS.map((d) => (
+                    <SelectItem key={d} value={d}>
+                      {d}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Count / Yarn</Label>
+              <Input
+                value={count}
+                onChange={(e) => setCount(e.target.value)}
+                placeholder="e.g. 30s"
+                className="h-8 text-sm"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+        <div className="rounded-lg border bg-card p-3">
+          <div className="text-xs text-muted-foreground uppercase font-medium">Total Produced</div>
+          <div className="text-lg font-semibold mt-1">{summary.totalProduced.toFixed(1)} kg</div>
+        </div>
+        <div className="rounded-lg border bg-card p-3">
+          <div className="text-xs text-muted-foreground uppercase font-medium">Total Waste</div>
+          <div className="text-lg font-semibold mt-1">{summary.totalWaste.toFixed(1)} kg</div>
+        </div>
+        <div className="rounded-lg border bg-card p-3">
+          <div className="text-xs text-muted-foreground uppercase font-medium">Running</div>
+          <div className="text-lg font-semibold mt-1 text-green-600">{summary.running} machines</div>
+        </div>
+        <div className="rounded-lg border bg-card p-3">
+          <div className="text-xs text-muted-foreground uppercase font-medium">Idle / Breakdown</div>
+          <div className="text-lg font-semibold mt-1 text-amber-600">
+            {summary.idle + summary.breakdown} machines
+          </div>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between py-3">
+          <CardTitle className="text-sm">
+            Machine Grid — {department} · Shift {shift} · {date}
+          </CardTitle>
+          <Button
+            size="sm"
+            onClick={() => bulkMutation.mutate()}
+            disabled={bulkMutation.isPending || activeCount === 0}
+          >
+            <Save className="size-3.5 mr-1.5" />
+            {bulkMutation.isPending ? "Saving…" : `Submit All (${activeCount})`}
+          </Button>
+        </CardHeader>
+        <CardContent className="p-0">
+          {rows.length === 0 ? (
+            <div className="p-6 text-sm text-muted-foreground text-center">
+              No machines found for {department}. Add machines in the Machines tab first.
+            </div>
+          ) : (
+            <div className="w-full overflow-x-auto">
+              <Table className="min-w-[900px] w-full text-sm">
+                <TableHeader>
+                  <TableRow className="bg-muted/40">
+                    <TableHead className="w-24 pl-4">Code</TableHead>
+                    <TableHead className="w-36">Name</TableHead>
+                    <TableHead className="w-32">Operator</TableHead>
+                    <TableHead className="w-20">Count</TableHead>
+                    <TableHead className="w-28">Produced kg</TableHead>
+                    <TableHead className="w-24">Waste kg</TableHead>
+                    <TableHead className="w-28">Stoppage min</TableHead>
+                    <TableHead className="w-40">Stoppage Reason</TableHead>
+                    <TableHead className="w-32">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((row, idx) => {
+                    const hasData = Number(row.producedKg) > 0;
+                    return (
+                      <TableRow
+                        key={row.machineCode}
+                        className={hasData ? "bg-primary/5" : undefined}
+                      >
+                        <TableCell className="pl-4 font-mono text-xs font-medium">
+                          {row.machineCode}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {row.machineName}
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={row.operator}
+                            onChange={(e) => updateRow(idx, "operator", e.target.value)}
+                            placeholder="Name"
+                            className="h-7 text-xs w-full"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs text-muted-foreground">{count || "—"}</span>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={row.producedKg}
+                            onChange={(e) => updateRow(idx, "producedKg", e.target.value)}
+                            placeholder="0"
+                            className="h-7 text-xs w-full"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={row.wasteKg}
+                            onChange={(e) => updateRow(idx, "wasteKg", e.target.value)}
+                            placeholder="0"
+                            className="h-7 text-xs w-full"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={row.stoppageMins}
+                            onChange={(e) => updateRow(idx, "stoppageMins", e.target.value)}
+                            placeholder="0"
+                            className="h-7 text-xs w-full"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            value={row.stoppageReason}
+                            onChange={(e) => updateRow(idx, "stoppageReason", e.target.value)}
+                            placeholder="Reason…"
+                            className="h-7 text-xs w-full"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={row.machineStatus}
+                            onValueChange={(v) =>
+                              updateRow(idx, "machineStatus", v)
+                            }
+                          >
+                            <SelectTrigger className="h-7 text-xs w-full">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="running">Running</SelectItem>
+                              <SelectItem value="breakdown">Breakdown</SelectItem>
+                              <SelectItem value="idle">Idle</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      <p className="text-xs text-muted-foreground">
+        Only rows with Produced kg &gt; 0 will be submitted. Empty rows are ignored.
+      </p>
+    </div>
+  );
+}
 
 function ProductionPage() {
   const user = useAuth((s) => s.user);
@@ -196,21 +501,32 @@ function ProductionPage() {
                   Avg Efficiency
                 </div>
                 <div className="text-2xl font-semibold mt-2">
-                  {(() => {
-                    const avgEfficiency = totalTarget > 0 ? (totalProduced / totalTarget) * 100 : 0;
-                    return avgEfficiency.toFixed(1) + "%";
-                  })()}
+                  {(totalTarget > 0 ? (totalProduced / totalTarget) * 100 : 0).toFixed(1)}%
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          <Tabs defaultValue="machines">
+          <Tabs defaultValue="entry">
             <TabsList>
+              <TabsTrigger value="entry" className="gap-1.5">
+                <LayoutGrid className="size-3.5" />
+                New Shift Entry
+              </TabsTrigger>
               <TabsTrigger value="machines">Machines</TabsTrigger>
               <TabsTrigger value="shifts">Shift Entries</TabsTrigger>
               <TabsTrigger value="downtime">Downtime</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="entry">
+              {canEdit ? (
+                <ShiftGrid machines={machines} />
+              ) : (
+                <div className="p-6 text-sm text-muted-foreground">
+                  You do not have permission to create shift entries.
+                </div>
+              )}
+            </TabsContent>
 
             <TabsContent value="machines">
               <Card>
@@ -306,10 +622,7 @@ function ProductionPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Shift Production Entries</CardTitle>
-                  <div className="flex gap-1">
-                    {isAdmin && <ColumnConfigurator module="production" tableKey="shifts" />}
-                    {canEdit && <NewShiftDialog />}
-                  </div>
+                  {isAdmin && <ColumnConfigurator module="production" tableKey="shifts" />}
                 </CardHeader>
                 <CardContent>
                   <ExcelColumnFilter
@@ -441,168 +754,5 @@ function ProductionPage() {
         </div>
       </AccessGuard>
     </>
-  );
-}
-
-const DEPARTMENTS = [
-  "Blowroom",
-  "Carding",
-  "Drawing",
-  "Simplex",
-  "Ring Frame",
-  "Winding",
-  "Quality",
-];
-
-function NewShiftDialog() {
-  const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [files, setFiles] = useState<UploadedFile[]>([]);
-  const today = new Date();
-  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
-    .toISOString()
-    .split("T")[0];
-
-  const [form, setForm] = useState({
-    date: localDate,
-    shift: "A" as "A" | "B" | "C",
-    machineCode: "RI-005",
-    department: "Ring Frame",
-    operator: "",
-    producedKg: 0,
-    wasteKg: 0,
-    count: "30s",
-  });
-
-  const m = useMutation({
-    mutationFn: async () => {
-      const entry = await productionApi.createEntry(form);
-      if (files.length > 0) {
-        await Promise.all(files.map((f) => uploadApi.upload("production", entry.id, f.file)));
-      }
-      return entry;
-    },
-  });
-
-  const handleCreateEntry = (e: React.FormEvent) => {
-    e.preventDefault();
-    m.mutate(undefined, {
-      onSuccess: () => {
-        toast.success("Shift entry submitted for approval");
-        qc.invalidateQueries({ queryKey: ["shifts"] });
-        setFiles([]);
-        setOpen(false);
-      },
-    });
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm">
-          <Plus className="size-4 mr-1" />
-          New entry
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>New shift entry</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleCreateEntry} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Date</Label>
-              <Input
-                type="date"
-                value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Shift</Label>
-              <Select
-                value={form.shift}
-                onValueChange={(v) => setForm({ ...form, shift: v as "A" | "B" | "C" })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="A">A</SelectItem>
-                  <SelectItem value="B">B</SelectItem>
-                  <SelectItem value="C">C</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Machine code</Label>
-              <Input
-                value={form.machineCode}
-                onChange={(e) => setForm({ ...form, machineCode: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Count</Label>
-              <Input
-                value={form.count}
-                onChange={(e) => setForm({ ...form, count: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Operator</Label>
-              <Input
-                value={form.operator}
-                onChange={(e) => setForm({ ...form, operator: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Department</Label>
-              <Select
-                value={form.department}
-                onValueChange={(v) => setForm({ ...form, department: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DEPARTMENTS.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Produced (kg)</Label>
-              <Input
-                type="number"
-                value={form.producedKg}
-                onChange={(e) => setForm({ ...form, producedKg: +e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Waste (kg)</Label>
-              <Input
-                type="number"
-                value={form.wasteKg}
-                onChange={(e) => setForm({ ...form, wasteKg: +e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Attachments (PDF, Excel, images)</Label>
-            <FileUpload files={files} onFilesChange={setFiles} />
-          </div>
-          <DialogFooter>
-            <Button type="submit" disabled={m.isPending}>
-              {m.isPending ? "Saving…" : "Submit for approval"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }

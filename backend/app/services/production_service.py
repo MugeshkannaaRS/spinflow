@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 from app.services.base import BaseService
 from app.models.production import Machine, ProductionEntry, DowntimeLog, Shift
 from app.models.user import User
-from app.schemas.production import ProductionEntryCreate
+from app.schemas.production import ProductionEntryCreate, ProductionBulkCreate, ProductionBulkResponse
 from app.core.error_handler import SpinFlowException, ErrorCode
 
 
@@ -117,6 +117,87 @@ class ProductionService(BaseService):
             details=f"Created production entry: {entry.produced_kg}kg on {entry.machine_code}",
         )
         return entry
+
+    async def create_entries_bulk(self, req: ProductionBulkCreate) -> ProductionBulkResponse:
+        created = 0
+        skipped = 0
+        errors: List[str] = []
+
+        active_items = [i for i in req.entries if i.produced_kg > 0]
+
+        for item in active_items:
+            try:
+                machine_result = await self.db.execute(
+                    select(Machine).where(Machine.code == item.machine_code)
+                )
+                machine = machine_result.scalar_one_or_none()
+                if not machine:
+                    errors.append(f"{item.machine_code}: machine not found")
+                    skipped += 1
+                    continue
+
+                dup_result = await self.db.execute(
+                    select(ProductionEntry).where(
+                        and_(
+                            ProductionEntry.machine_code == item.machine_code,
+                            ProductionEntry.shift == req.shift,
+                            ProductionEntry.date == req.date,
+                        )
+                    )
+                )
+                if dup_result.scalar_one_or_none():
+                    errors.append(f"{item.machine_code}: entry already exists for this shift")
+                    skipped += 1
+                    continue
+
+                if item.waste_kg > item.produced_kg:
+                    errors.append(f"{item.machine_code}: waste exceeds production")
+                    skipped += 1
+                    continue
+
+                entry = ProductionEntry(
+                    date=req.date,
+                    shift=req.shift,
+                    machine_code=item.machine_code,
+                    department=req.department,
+                    operator=item.operator,
+                    produced_kg=item.produced_kg,
+                    waste_kg=item.waste_kg,
+                    count=item.count,
+                    status="pending",
+                    entered_by=self.current_user.name,
+                )
+                self.db.add(entry)
+                await self.db.flush()
+
+                if item.machine_status and item.machine_status != machine.current_status:
+                    machine.current_status = item.machine_status
+
+                if item.stoppage_mins > 0:
+                    reason = item.stoppage_reason or "Stoppage logged via bulk entry"
+                    log = DowntimeLog(
+                        machine_code=item.machine_code,
+                        reason=reason,
+                        started_at=datetime.now(timezone.utc),
+                        duration_min=item.stoppage_mins,
+                        resolved=True,
+                        reported_by=self.current_user.name,
+                    )
+                    self.db.add(log)
+
+                await self._audit(
+                    action="create",
+                    entity="ProductionEntry",
+                    entity_id=entry.id,
+                    details=f"Bulk entry: {entry.produced_kg}kg on {entry.machine_code}",
+                )
+                created += 1
+            except Exception as exc:
+                errors.append(f"{item.machine_code}: {str(exc)}")
+                skipped += 1
+
+        await self.db.commit()
+        return ProductionBulkResponse(created=created, skipped=skipped, errors=errors)
 
     async def approve_entry(self, entry_id: str) -> ProductionEntry:
         entry = await self.get_or_404(ProductionEntry, entry_id)

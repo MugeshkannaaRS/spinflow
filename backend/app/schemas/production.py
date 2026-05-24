@@ -105,3 +105,27 @@ class DowntimeCreate(BaseModel):
     started_at: datetime
     duration_min: int = 0
     reported_by: Optional[str] = None
+
+
+class ProductionBulkItem(BaseModel):
+    machine_code: str
+    operator: str
+    produced_kg: float = Field(..., ge=0)
+    waste_kg: float = 0
+    count: Optional[str] = None
+    stoppage_mins: int = 0
+    stoppage_reason: Optional[str] = None
+    machine_status: str = "running"
+
+
+class ProductionBulkCreate(BaseModel):
+    date: str
+    shift: str = Field(..., pattern="^(A|B|C)$")
+    department: str
+    entries: List[ProductionBulkItem]
+
+
+class ProductionBulkResponse(BaseModel):
+    created: int
+    skipped: int
+    errors: List[str]
