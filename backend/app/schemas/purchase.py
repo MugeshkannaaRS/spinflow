@@ -91,6 +91,106 @@ class GRNCreate(BaseModel):
     remarks: Optional[str] = None
 
 
+class BaleCreate(BaseModel):
+    bale_number: str
+    supplier: str
+    lot_number: Optional[str] = None
+    date_received: date
+    micronaire: float = Field(..., ge=1.0, le=7.0)
+    staple_length: Optional[float] = Field(default=None, ge=20.0, le=45.0)
+    strength: Optional[float] = Field(default=None, ge=5.0, le=60.0)
+    uniformity: Optional[float] = Field(default=None, ge=50.0, le=100.0)
+    short_fiber_index: Optional[float] = Field(default=None, ge=0.0, le=50.0)
+    moisture: Optional[float] = Field(default=None, ge=0.0, le=20.0)
+    trash_area: Optional[float] = Field(default=None, ge=0.0, le=20.0)
+    trash_grade: Optional[int] = Field(default=None, ge=0, le=8)
+    color_grade: Optional[str] = None
+    reflectance: Optional[float] = None
+    yellowness: Optional[float] = None
+    elongation: Optional[float] = None
+    maturity: Optional[float] = None
+    sci: Optional[float] = None
+
+
+class BaleOut(BaseModel):
+    id: str
+    bale_number: str
+    supplier: str
+    lot_number: Optional[str] = None
+    date_received: Optional[str] = None
+    micronaire: float
+    staple_length: Optional[float] = None
+    strength: Optional[float] = None
+    uniformity: Optional[float] = None
+    short_fiber_index: Optional[float] = None
+    moisture: Optional[float] = None
+    trash_area: Optional[float] = None
+    trash_grade: Optional[int] = None
+    color_grade: Optional[str] = None
+    reflectance: Optional[float] = None
+    yellowness: Optional[float] = None
+    elongation: Optional[float] = None
+    maturity: Optional[float] = None
+    sci: Optional[float] = None
+    quality_index: Optional[float] = None
+    category: Optional[str] = None
+    status: str = "in-stock"
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class BaleGroupRequest(BaseModel):
+    yarn_count: str
+    bale_ids: Optional[List[str]] = None
+
+
+class BaleGroupResponse(BaseModel):
+    yarn_count: str
+    recommended_mic_min: float
+    recommended_mic_max: float
+    recommended_staple_min: float
+    recommended_staple_max: float
+    selected_bales: List[BaleOut]
+    blend_mic: float
+    blend_staple: float
+    blend_strength: float
+    blend_uniformity: float
+    mic_cv: float
+    quality_index: float
+    bale_count: int
+
+
+class SupplierStat(BaseModel):
+    supplier: str
+    bale_count: int
+    avg_mic: float
+    avg_strength: float
+    avg_uniformity: float
+
+
+class LotStat(BaseModel):
+    lot_number: str
+    bale_count: int
+    avg_mic: float
+
+
+class BaleStatsOut(BaseModel):
+    total_bales: int
+    in_stock: int
+    used: int
+    rejected: int
+    avg_mic: float
+    avg_staple: float
+    avg_strength: float
+    avg_uniformity: float
+    mic_cv: float
+    bales_by_category: dict
+    supplier_stats: List[SupplierStat]
+    lot_stats: List[LotStat]
+
+
 class GRNOut(BaseModel):
     id: str
     grn_no: str

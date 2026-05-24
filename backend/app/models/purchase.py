@@ -53,6 +53,33 @@ class BaleStock(Base):
     status: Mapped[str] = mapped_column(String(20), default="in-stock")
 
 
+class CottonBale(TimestampMixin, Base):
+    __tablename__ = "cotton_bales"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    bale_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    supplier: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    lot_number: Mapped[str] = mapped_column(String(100), nullable=True, index=True)
+    date_received: Mapped[str] = mapped_column(String(10), nullable=False)
+    micronaire: Mapped[float] = mapped_column(Float, nullable=False)
+    staple_length: Mapped[float] = mapped_column(Float, nullable=True)
+    strength: Mapped[float] = mapped_column(Float, nullable=True)
+    uniformity: Mapped[float] = mapped_column(Float, nullable=True)
+    short_fiber_index: Mapped[float] = mapped_column(Float, nullable=True)
+    moisture: Mapped[float] = mapped_column(Float, nullable=True)
+    trash_area: Mapped[float] = mapped_column(Float, nullable=True)
+    trash_grade: Mapped[int] = mapped_column(Integer, nullable=True)
+    color_grade: Mapped[str] = mapped_column(String(20), nullable=True)
+    reflectance: Mapped[float] = mapped_column(Float, nullable=True)
+    yellowness: Mapped[float] = mapped_column(Float, nullable=True)
+    elongation: Mapped[float] = mapped_column(Float, nullable=True)
+    maturity: Mapped[float] = mapped_column(Float, nullable=True)
+    sci: Mapped[float] = mapped_column(Float, nullable=True)
+    quality_index: Mapped[float] = mapped_column(Float, nullable=True)
+    category: Mapped[str] = mapped_column(String(10), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="in-stock", index=True)
+
+
 class GRNEntry(TimestampMixin, Base):
     __tablename__ = "grn_entries"
 

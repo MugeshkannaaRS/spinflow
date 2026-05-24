@@ -82,6 +82,14 @@ export const purchaseApi = {
   getGRNs: () => api.get("/purchase/grns").then(extractList),
 };
 
+export const baleApi = {
+  getBales: (params?: Record<string, string>) =>
+    api.get("/purchase/bales", { params }).then((r) => r.data),
+  createBale: (data: any) => api.post("/purchase/bales", data).then((r) => r.data),
+  getGroup: (data: any) => api.post("/purchase/bales/group", data).then((r) => r.data),
+  getStats: () => api.get("/purchase/bales/stats").then((r) => r.data),
+};
+
 // Stores
 export const storesApi = {
   getSpares: () => api.get("/stores/spares").then(extractList),
