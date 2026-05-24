@@ -383,7 +383,7 @@ function PayslipsTab({ millId, year }: { millId: string; year: number }) {
     retry: 1,
   });
 
-  const payslips = payslipsQ.data?.data ?? [];
+  const payslips = payslipsQ.data ?? [];
 
   return (
     <Card>

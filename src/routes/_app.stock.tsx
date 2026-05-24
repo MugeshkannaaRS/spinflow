@@ -295,9 +295,8 @@ function SalesOrdersTab() {
     const params: Record<string, string | number> = { page: 1, page_size: 50 };
     if (filterStatus) params.status = filterStatus;
     salesApi.listOrders(params).then((data) => {
-      const fetched = data.data || [];
-      setOrders(fetched);
-      setFilteredOrders(fetched);
+      setOrders(data ?? []);
+      setFilteredOrders(data ?? []);
       setLoading(false);
     });
   };
@@ -307,7 +306,7 @@ function SalesOrdersTab() {
   }, [filterStatus]);
 
   useEffect(() => {
-    mastersApi.getCustomers().then((d: any) => setCustomers(d.data || []));
+    mastersApi.getCustomers().then((d: any) => setCustomers(d ?? []));
     stockApi
       .getSnapshot({ fg_state: "SELLABLE" })
       .then((d: any) => setLots(Array.isArray(d) ? d : []));

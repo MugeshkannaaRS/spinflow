@@ -177,7 +177,7 @@ function TripsTab() {
     staleTime: 60_000,
     retry: 1,
   });
-  const trips: Trip[] = tripsQ.data?.data ?? [];
+  const trips: Trip[] = tripsQ.data ?? [];
 
   return (
     <div className="space-y-4">
@@ -378,11 +378,11 @@ function NewTripSheet() {
     retry: 1,
   });
 
-  const vehicles = vehiclesQ.data?.data ?? [];
-  const routes = routesQ.data?.data ?? [];
-  const customers = customersQ.data?.data ?? [];
-  const orders = ordersQ.data?.data ?? [];
-  const bags = bagsQ.data?.data ?? [];
+  const vehicles = vehiclesQ.data ?? [];
+  const routes = routesQ.data ?? [];
+  const customers = customersQ.data ?? [];
+  const orders = ordersQ.data ?? [];
+  const bags = bagsQ.data ?? [];
 
   const m = useMutation({
     mutationFn: (data: any) => loTracApi.createTrip(data),
@@ -610,7 +610,7 @@ function LoaderScannerTab() {
     staleTime: 60_000,
     retry: 1,
   });
-  const loadingTrips: Trip[] = loadingTripsQ.data?.data ?? [];
+  const loadingTrips: Trip[] = loadingTripsQ.data ?? [];
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -855,7 +855,7 @@ function ReceiverScannerTab() {
     staleTime: 60_000,
     retry: 1,
   });
-  const rxTrips: Trip[] = rxTripsQ.data?.data ?? [];
+  const rxTrips: Trip[] = rxTripsQ.data ?? [];
 
   const routesQ = useQuery({
     queryKey: ["routes"],
@@ -863,7 +863,7 @@ function ReceiverScannerTab() {
     staleTime: 60_000,
     retry: 1,
   });
-  const routes = routesQ.data?.data ?? [];
+  const routes = routesQ.data ?? [];
 
   useEffect(() => {
     inputRef.current?.focus();

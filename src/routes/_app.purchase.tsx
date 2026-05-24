@@ -698,7 +698,7 @@ function BaleStockTab({ canEdit }: { canEdit: boolean }) {
       }),
     staleTime: 30_000,
   });
-  const bales: any[] = balesQ.data?.data ?? [];
+  const bales: any[] = balesQ.data ?? [];
   const total: number = balesQ.data?.total ?? 0;
   return (
     <Card>

@@ -144,18 +144,8 @@ function UsersPage() {
     retry: 1,
   });
   const users: any[] = usersQ.data ?? [];
-  const rawCompanies = companiesQ.data;
-  const companies: any[] = Array.isArray(rawCompanies)
-    ? rawCompanies
-    : Array.isArray((rawCompanies as any)?.data)
-      ? (rawCompanies as any).data
-      : [];
-  const rawMills = millsQ.data;
-  const mills: any[] = Array.isArray(rawMills)
-    ? rawMills
-    : Array.isArray((rawMills as any)?.data)
-      ? (rawMills as any).data
-      : [];
+  const companies: any[] = companiesQ.data ?? [];
+  const mills: any[] = millsQ.data ?? [];
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);

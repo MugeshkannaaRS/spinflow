@@ -161,18 +161,16 @@ function MastersPage() {
     retry: 1,
   });
 
-  const companiesData = (companiesQ.data as ListResponse<Company>)?.data ?? [];
-  const millsData = (millsQ.data as ListResponse<Mill>)?.data ?? [];
-  const deptsData = (deptsQ.data as ListResponse<Department>)?.data ?? [];
-  const yarnData = (yarnQ.data as ListResponse<YarnCount>)?.data ?? [];
-  const custData = (custQ.data as ListResponse<Customer>)?.data ?? [];
-  const vehData = (vehQ.data as ListResponse<MasterVehicle>)?.data ?? [];
-  const routeData = (routeQ.data as ListResponse<MasterRoute>)?.data ?? [];
-  const machinesData =
-    (machinesQ.data as ListResponse<MasterMachine>)?.data ??
-    (Array.isArray(machinesQ.data) ? machinesQ.data : []);
-  const shiftsData = Array.isArray(shiftsQ.data) ? shiftsQ.data : [];
-  const warehousesData = Array.isArray(warehousesQ.data) ? warehousesQ.data : [];
+  const companiesData = (companiesQ.data ?? []) as Company[];
+  const millsData = (millsQ.data ?? []) as Mill[];
+  const deptsData = (deptsQ.data ?? []) as Department[];
+  const yarnData = (yarnQ.data ?? []) as YarnCount[];
+  const custData = (custQ.data ?? []) as Customer[];
+  const vehData = (vehQ.data ?? []) as MasterVehicle[];
+  const routeData = (routeQ.data ?? []) as MasterRoute[];
+  const machinesData = (machinesQ.data ?? []) as MasterMachine[];
+  const shiftsData = (shiftsQ.data ?? []) as any[];
+  const warehousesData = (warehousesQ.data ?? []) as any[];
 
   if (!user) return null;
 

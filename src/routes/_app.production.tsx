@@ -458,9 +458,9 @@ function ProductionPage() {
     retry: 1,
   });
 
-  const machines = (machinesQ.data?.data ?? machinesQ.data ?? []) as any[];
-  const shifts = (shiftsQ.data?.data ?? shiftsQ.data ?? []) as any[];
-  const downtime = (downQ.data?.data ?? downQ.data ?? []) as any[];
+  const machines = (machinesQ.data ?? []) as any[];
+  const shifts = (shiftsQ.data ?? []) as any[];
+  const downtime = (downQ.data ?? []) as any[];
 
   const totalProduced = machines.reduce(
     (s: number, m: any) => s + (m.produced_kg ?? m.producedKg ?? 0),
