@@ -91,3 +91,48 @@ class ScheduleOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ScheduleBulkItem(BaseModel):
+    machine_code: str
+    task_description: str
+    frequency: str
+    last_done_date: Optional[str] = None
+    next_due_date: Optional[str] = None
+    technician_name: Optional[str] = None
+
+
+class ScheduleBulkCreate(BaseModel):
+    items: List[ScheduleBulkItem]
+
+
+class BulkResponse(BaseModel):
+    created: int
+    skipped: int
+    errors: List[str]
+
+
+class ParameterBulkItem(BaseModel):
+    machine_code: str
+    parameter_name: str
+    standard_value: Optional[str] = None
+    min_value: Optional[str] = None
+    max_value: Optional[str] = None
+    unit: Optional[str] = None
+
+
+class ParameterBulkCreate(BaseModel):
+    items: List[ParameterBulkItem]
+
+
+class MachineParameterOut(BaseModel):
+    id: str
+    machine_code: str
+    parameter_name: str
+    standard_value: Optional[str] = None
+    min_value: Optional[str] = None
+    max_value: Optional[str] = None
+    unit: Optional[str] = None
+
+    class Config:
+        from_attributes = True

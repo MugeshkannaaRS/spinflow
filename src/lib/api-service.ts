@@ -117,6 +117,12 @@ export const maintenanceApi = {
   getTasks: () => api.get("/maintenance/tasks").then(extractList),
   updateStatus: (id: string, data: any) =>
     api.put(`/maintenance/tasks/${id}/status`, data).then((r) => r.data),
+  getSchedules: () => api.get("/maintenance/schedules").then(extractList),
+  bulkCreateSchedules: (data: any) =>
+    api.post("/maintenance/schedules/bulk", data).then((r) => r.data),
+  getParameters: () => api.get("/maintenance/parameters").then(extractList),
+  bulkCreateParameters: (data: any) =>
+    api.post("/maintenance/parameters/bulk", data).then((r) => r.data),
 };
 
 // Dashboard

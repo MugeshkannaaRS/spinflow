@@ -44,3 +44,16 @@ class Technician(Base):
     phone: Mapped[str] = mapped_column(String(20), nullable=True)
     specialization: Mapped[str] = mapped_column(String(200), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class MachineParameter(Base):
+    __tablename__ = "machine_parameters"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    machine_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    parameter_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    standard_value: Mapped[str] = mapped_column(String(100), nullable=True)
+    min_value: Mapped[str] = mapped_column(String(100), nullable=True)
+    max_value: Mapped[str] = mapped_column(String(100), nullable=True)
+    unit: Mapped[str] = mapped_column(String(50), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
