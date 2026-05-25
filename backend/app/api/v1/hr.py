@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
@@ -5,6 +6,8 @@ from typing import List, Optional, Any, Dict
 from datetime import datetime, timezone, date as date_type
 from pydantic import BaseModel
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 
 class AttendanceImportRequest(BaseModel):
@@ -69,18 +72,22 @@ async def get_employees(
             )
         )
 
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": [EmployeeOut.model_validate(e).model_dump() for e in items],
-    }
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": [EmployeeOut.model_validate(e).model_dump() for e in items],
+        }
+    except Exception as e:
+        logger.error(f"HR employees list error: {e}", exc_info=True)
+        raise
 
 
 @router.post("/hr/employees", response_model=EmployeeOut)

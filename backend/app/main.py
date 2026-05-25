@@ -1,5 +1,7 @@
 import asyncio
+import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -18,9 +20,24 @@ from app.api.v1 import auth, production, quality, inventory, dispatch, purchase,
 from app.api.v1.admin import router as admin_router
 from app.ws.notifications import router as ws_router
 
+logger = logging.getLogger(__name__)
+
+
+def _run_alembic_upgrade() -> None:
+    from alembic.config import Config as AlembicConfig
+    from alembic import command as alembic_command
+    alembic_ini = Path(__file__).parent.parent / "alembic.ini"
+    cfg = AlembicConfig(str(alembic_ini))
+    alembic_command.upgrade(cfg, "head")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:
+        await asyncio.to_thread(_run_alembic_upgrade)
+        logger.info("Database migrations applied successfully")
+    except Exception as exc:
+        logger.error(f"Failed to apply database migrations: {exc}", exc_info=True)
     yield
     await engine.dispose()
 
