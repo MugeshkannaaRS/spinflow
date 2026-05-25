@@ -1122,67 +1122,54 @@ function EditEmployeeSheet({
 // ─── Import Employee Dialog (Excel) ─────────────────────────────────────────────
 
 const FIELD_CANDIDATES: Record<string, string[]> = {
-  sl_no: ["sl no", "sl. no", "s no", "serial no"],
-  name: ["name", "full name", "employee name", "emp name"],
-  employee_id: ["employee_id", "employee id", "emp id", "emp code"],
-  joining_date: ["joining date", "date of joining", "doj", "join date", "start date"],
-  gen: ["gen", "gender (short)"],
-  dob: ["dob", "date of birth", "birth date"],
+  sl_no: ["sl no"],
+  name: ["name"],
+  employee_id: ["employee_id"],
+  joining_date: ["joining date"],
+  gen: ["gen"],
+  dob: ["dob"],
   age: ["age"],
   gender: ["gender"],
   grade: ["grade"],
-  designation: ["designation", "position", "title", "post"],
+  designation: ["designation"],
   section: ["section"],
-  department: ["department", "dept", "division"],
-  bank_account_no: ["bank a/c no", "bank account", "account no", "bank a/c"],
-  basic: ["basic", "basic pay", "basic salary"],
-  house_rent: ["house rent", "rent", "hra"],
-  medical: ["medical", "medical allowance"],
-  conveyance: ["conveyance", "conveyance allowance", "travel"],
-  food_allowance: ["food allow", "food allowance", "food"],
-  wages: ["wages", "wage", "daily wage", "salary"],
+  department: ["department"],
+  bank_account_no: ["bank a/c no."],
+  basic: ["basic"],
+  house_rent: ["house rent"],
+  medical: ["medical"],
+  conveyance: ["conveyance"],
+  food_allowance: ["food allow"],
+  wages: ["wages"],
   increment: ["increment"],
-  total_salary: ["total salary", "total", "gross salary"],
-  wages_of_month: ["wages of month", "monthly wages", "month wages"],
-  days_of_month: ["days of month", "working days", "month days"],
-  mobile_bill: ["mobile bill", "mobile", "phone bill"],
-  shift_benefit: ["shift benifit", "shift benefit", "shift allowance"],
-  shift_qty: ["shift qty", "shift quantity"],
-  shift_tk: ["shift tk", "shift tk", "shift amount"],
-  roster_qty: ["roster qty", "roster quantity"],
-  roster_tk: ["roster tk", "roster tk", "roster amount"],
+  total_salary: ["total salary"],
+  days_of_month: ["days of month"],
+  mobile_bill: ["mobile bill"],
+  shift_benefit: ["shift benifit"],
+  shift: ["shift"],
 };
 
-const VALID_SHIFTS = ["A", "B", "C", "General", "Morning", "Evening", "Night", "Day", "0", "1", "2", "3"];
-
-function excelDateToJS(serial: number | string): string {
-  if (!serial) return ''
-  if (typeof serial === 'string' && serial.includes('/')) return serial
-  if (typeof serial === 'string' && serial.includes('-')) return serial
-  const num = Number(serial)
-  if (isNaN(num)) return String(serial)
-  const date = new Date((num - 25569) * 86400 * 1000)
-  const d = date.getDate().toString().padStart(2, '0')
-  const m = (date.getMonth() + 1).toString().padStart(2, '0')
-  const y = date.getFullYear()
-  return `${y}-${m}-${d}`
+function excelToDate(v: any): string | null {
+  if (!v) return null
+  const n = Number(v)
+  if (isNaN(n) || n < 1000) return null
+  const d = new Date(Math.round((n - 25569) * 86400 * 1000))
+  return d.toISOString().split('T')[0]
 }
 
-function normalizeShift(value: string): string {
-  const v = value.toLowerCase().trim();
-  if (v === "0" || v === "general") return "General";
-  if (v === "1" || v === "morning") return "A";
-  if (v === "2" || v === "evening") return "B";
-  if (v === "3" || v === "night") return "C";
-  if (v === "day") return "General";
-  if (["a", "b", "c"].includes(v)) return v.toUpperCase();
-  return value;
+function normalizeShift(v: any): string {
+  const map: Record<string, string> = {
+    '0': 'General', '1': 'A', '2': 'B', '3': 'C',
+    'general': 'General', 'a': 'A', 'b': 'B', 'c': 'C',
+    'morning': 'A', 'evening': 'B', 'night': 'C',
+  }
+  return map[String(v).toLowerCase().trim()] ?? 'General'
 }
 
 function detectColumn(headers: string[], candidates: string[]): number | null {
   for (let i = 0; i < headers.length; i++) {
     const h = headers[i].toLowerCase().trim();
-    if (candidates.some((c) => h.includes(c.toLowerCase()))) return i;
+    if (candidates.some((c) => h === c.toLowerCase().trim())) return i;
   }
   return null;
 }
@@ -1227,23 +1214,22 @@ interface EmpImportRow {
 function parseEmployeeRow(row: any[], colMap: Record<string, number>, rowIndex: number): EmpImportRow | null {
   const get = (field: string) => (colMap[field] !== undefined ? String(row[colMap[field]] ?? "").trim() : "");
 
-  const rawCode = get("employee_id") || get("name");
-  const employee_code = get("employee_id") || `EMP-${rowIndex + 1}`;
+  const empIdCol = colMap["employee_id"];
+  const rawEmpId = empIdCol !== undefined ? row[empIdCol] : undefined;
+  const employee_code = rawEmpId ? String(rawEmpId).trim() || `EMP-${rowIndex + 1}` : `EMP-${rowIndex + 1}`;
   const full_name = get("name");
   if (!full_name) return null;
 
   const department = get("department");
 
-  let shift = get("shift");
-  if (shift) {
-    const normalized = normalizeShift(shift);
-    shift = normalized;
-  }
+  const shiftCol = colMap["shift"];
+  const rawShift = shiftCol !== undefined ? row[shiftCol] : undefined;
+  const shift = normalizeShift(rawShift);
 
-  const rawDoj = row[colMap["joining_date"]] !== undefined ? row[colMap["joining_date"]] : "";
-  const rawDob = row[colMap["dob"]] !== undefined ? row[colMap["dob"]] : "";
-
-  const warnings: string[] = [];
+  const dojCol = colMap["joining_date"];
+  const dobCol = colMap["dob"];
+  const date_of_joining = dojCol !== undefined ? excelToDate(row[dojCol]) : null;
+  const dob = dobCol !== undefined ? excelToDate(row[dobCol]) : null;
 
   return {
     employee_code,
@@ -1252,8 +1238,8 @@ function parseEmployeeRow(row: any[], colMap: Record<string, number>, rowIndex: 
     designation: get("designation"),
     section: get("section"),
     shift,
-    date_of_joining: excelDateToJS(rawDoj),
-    dob: excelDateToJS(rawDob),
+    date_of_joining: date_of_joining || "",
+    dob: dob || "",
     gen: get("gen"),
     age: get("age"),
     gender: get("gender"),
@@ -1270,16 +1256,16 @@ function parseEmployeeRow(row: any[], colMap: Record<string, number>, rowIndex: 
     wages: get("wages"),
     increment: get("increment"),
     total_salary: get("total_salary"),
-    wages_of_month: get("wages_of_month"),
+    wages_of_month: "",
     days_of_month: get("days_of_month"),
     mobile_bill: get("mobile_bill"),
     shift_benefit: get("shift_benefit"),
-    shift_qty: get("shift_qty"),
-    shift_tk: get("shift_tk"),
-    roster_qty: get("roster_qty"),
-    roster_tk: get("roster_tk"),
+    shift_qty: "",
+    shift_tk: "",
+    roster_qty: "",
+    roster_tk: "",
     _error: undefined,
-    _warnings: warnings.length > 0 ? warnings : undefined,
+    _warnings: undefined,
   };
 }
 
@@ -1428,14 +1414,9 @@ function ImportEmployeeDialog() {
       wages: r.wages ? parseFloat(r.wages) : 0,
       increment: r.increment ? parseFloat(r.increment) : 0,
       total_salary: r.total_salary ? parseFloat(r.total_salary) : null,
-      wages_of_month: r.wages_of_month ? parseFloat(r.wages_of_month) : 0,
       days_of_month: r.days_of_month ? parseInt(r.days_of_month) : 26,
       mobile_bill: r.mobile_bill ? parseFloat(r.mobile_bill) : 0,
       shift_benefit: r.shift_benefit ? parseFloat(r.shift_benefit) : 0,
-      shift_qty: r.shift_qty ? parseInt(r.shift_qty) : 0,
-      shift_tk: r.shift_tk ? parseFloat(r.shift_tk) : 0,
-      roster_qty: r.roster_qty ? parseInt(r.roster_qty) : 0,
-      roster_tk: r.roster_tk ? parseFloat(r.roster_tk) : 0,
     }));
     try {
       const res = await m.mutateAsync(items);
