@@ -2457,9 +2457,9 @@ function NewLeaveDialog({ employees }: { employees: EmployeeRow[] }) {
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(employees ?? []).map((emp, i) => emp ? (
-                    <SelectItem key={emp.id ?? i} value={emp.id ?? ""}>{emp.name ?? "—"} ({emp.code ?? ""})</SelectItem>
-                  ) : null)}
+                  {(employees ?? []).filter((emp) => emp?.id).map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id}>{emp.name ?? "—"} ({emp.code ?? ""})</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

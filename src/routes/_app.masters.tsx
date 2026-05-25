@@ -906,7 +906,7 @@ function MillForm({ item, companies }: { item?: Mill; companies: Company[] }) {
             <SelectValue placeholder="Select company" />
           </SelectTrigger>
           <SelectContent>
-            {companies.map((c) => (
+            {companies.filter((c) => c?.id).map((c) => (
               <SelectItem key={c.id} value={c.id}>
                 {c.name}
               </SelectItem>
@@ -1032,7 +1032,7 @@ function DepartmentForm({ item, mills }: { item?: Department; mills: Mill[] }) {
             <SelectValue placeholder="Select mill" />
           </SelectTrigger>
           <SelectContent>
-            {mills.map((m) => (
+            {mills.filter((m) => m?.id).map((m) => (
               <SelectItem key={m.id} value={m.id}>
                 {m.name}
               </SelectItem>
@@ -1153,7 +1153,7 @@ function YarnCountForm({ item, mills }: { item?: YarnCount; mills: Mill[] }) {
             <SelectValue placeholder="Select mill" />
           </SelectTrigger>
           <SelectContent>
-            {mills.map((m) => (
+            {mills.filter((m) => m?.id).map((m) => (
               <SelectItem key={m.id} value={m.id}>
                 {m.name}
               </SelectItem>
@@ -1314,7 +1314,7 @@ function CustomerForm({ item, mills }: { item?: Customer; mills: Mill[] }) {
             <SelectValue placeholder="Select mill" />
           </SelectTrigger>
           <SelectContent>
-            {mills.map((m) => (
+            {mills.filter((m) => m?.id).map((m) => (
               <SelectItem key={m.id} value={m.id}>
                 {m.name}
               </SelectItem>
@@ -1495,7 +1495,7 @@ function VehicleForm({ item, mills }: { item?: MasterVehicle; mills: Mill[] }) {
             <SelectValue placeholder="Select mill" />
           </SelectTrigger>
           <SelectContent>
-            {mills.map((m) => (
+            {mills.filter((m) => m?.id).map((m) => (
               <SelectItem key={m.id} value={m.id}>
                 {m.name}
               </SelectItem>
@@ -1651,7 +1651,7 @@ function RouteForm({ item, mills }: { item?: MasterRoute; mills: Mill[] }) {
             <SelectValue placeholder="Select mill" />
           </SelectTrigger>
           <SelectContent>
-            {mills.map((m) => (
+            {mills.filter((m) => m?.id).map((m) => (
               <SelectItem key={m.id} value={m.id}>
                 {m.name}
               </SelectItem>
@@ -1830,7 +1830,7 @@ function MachineForm({ item, departments }: { item?: MasterMachine; departments:
             <SelectValue placeholder="Select department" />
           </SelectTrigger>
           <SelectContent>
-            {departments.map((d) => (
+            {departments.filter((d) => d?.code).map((d) => (
               <SelectItem key={d.id} value={d.code}>
                 {d.name}
               </SelectItem>

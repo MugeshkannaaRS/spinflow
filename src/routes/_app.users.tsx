@@ -388,7 +388,7 @@ function UsersPage() {
                     <SelectValue placeholder="Select company" />
                   </SelectTrigger>
                   <SelectContent>
-                    {companies.map((c: any) => (
+                    {companies.filter((c: any) => c?.id).map((c: any) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.name}
                       </SelectItem>
@@ -416,7 +416,7 @@ function UsersPage() {
                     />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredMills.map((m: any) => (
+                    {filteredMills.filter((m: any) => m?.id).map((m: any) => (
                       <SelectItem key={m.id} value={m.id}>
                         {m.name}
                       </SelectItem>

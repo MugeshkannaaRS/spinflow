@@ -445,7 +445,7 @@ function NewTripSheet() {
                 <SelectValue placeholder="Select vehicle" />
               </SelectTrigger>
               <SelectContent>
-                {vehicles.map((v: any) => (
+                {vehicles.filter((v: any) => v?.id).map((v: any) => (
                   <SelectItem key={v.id} value={v.id}>
                     {v.vehicle_no}
                   </SelectItem>
@@ -479,7 +479,7 @@ function NewTripSheet() {
                 <SelectValue placeholder="Select route" />
               </SelectTrigger>
               <SelectContent>
-                {routes.map((r: any) => (
+                {routes.filter((r: any) => r?.id).map((r: any) => (
                   <SelectItem key={r.id} value={r.id}>
                     {r.name}
                   </SelectItem>
@@ -497,7 +497,7 @@ function NewTripSheet() {
                 <SelectValue placeholder="Select customer" />
               </SelectTrigger>
               <SelectContent>
-                {customers.map((c: any) => (
+                {customers.filter((c: any) => c?.id).map((c: any) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.name}
                   </SelectItem>
@@ -515,7 +515,7 @@ function NewTripSheet() {
                 <SelectValue placeholder="Select order" />
               </SelectTrigger>
               <SelectContent>
-                {orders.map((o: any) => (
+                {orders.filter((o: any) => o?.id).map((o: any) => (
                   <SelectItem key={o.id} value={o.id}>
                     {o.so_no}
                   </SelectItem>
@@ -682,7 +682,7 @@ function LoaderScannerTab() {
             <SelectValue placeholder="Choose trip..." />
           </SelectTrigger>
           <SelectContent>
-            {loadingTrips.map((t) => (
+            {loadingTrips.filter((t) => t?.id).map((t) => (
               <SelectItem key={t.id} value={t.id}>
                 {t.trip_no} — {t.loaded_bags}/{t.planned_bags} bags
               </SelectItem>
@@ -982,7 +982,7 @@ function ReceiverScannerTab() {
             <SelectValue placeholder="Choose trip..." />
           </SelectTrigger>
           <SelectContent>
-            {rxTrips.map((t) => (
+            {rxTrips.filter((t) => t?.id).map((t) => (
               <SelectItem key={t.id} value={t.id}>
                 {t.trip_no} — {t.delivered_bags}/{t.planned_bags} bags
               </SelectItem>
@@ -1000,7 +1000,7 @@ function ReceiverScannerTab() {
                 <SelectValue placeholder="Select your location..." />
               </SelectTrigger>
               <SelectContent>
-                {routes.map((r: any) => (
+                {routes.filter((r: any) => r?.id).map((r: any) => (
                   <SelectItem key={r.id} value={r.id}>
                     {r.name}
                   </SelectItem>
