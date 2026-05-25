@@ -33,10 +33,6 @@ interface WrongDestinationPayload {
   timestamp: string;
 }
 
-interface PingMessage {
-  type: "ping";
-  payload: Record<string, never>;
-}
 
 export function useWebSocket() {
   const token = useAuth((s) => s.token);
@@ -71,75 +67,87 @@ export function useWebSocket() {
 
     isMountedRef.current = true;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let backoff = 1000;
     let intentionalClose = false;
+    let retryCount = 0;
+    const MAX_RETRIES = 3;
 
-    async function connect() {
-      const { API_BASE } = await import("@/lib/api");
-      const wsBase = API_BASE.replace(/^http/, "ws");
-      const url = `${wsBase}/ws/notifications?token=${token}`;
+    const API_BASE =
+      import.meta.env.VITE_API_BASE_URL || "https://spinflow.onrender.com";
+    const WS_BASE = API_BASE.replace("https://", "wss://").replace("http://", "ws://");
+    const wsUrl = `${WS_BASE}/ws/notifications?token=${token}`;
 
-      const ws = new WebSocket(url);
-      wsRef.current = ws;
+    function connect() {
+      try {
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
 
-      ws.onopen = () => {
-        if (!isMountedRef.current) {
-          ws.close();
-          return;
-        }
-        setIsConnected(true);
-        backoff = 1000;
-      };
-
-      ws.onclose = (e) => {
-        wsRef.current = null;
-        if (!isMountedRef.current) return;
-        setIsConnected(false);
-
-        if (intentionalClose) return;
-        if (e.code === 4001) return;
-
-        reconnectTimer = setTimeout(() => {
-          if (isMountedRef.current) connect();
-        }, backoff);
-
-        backoff = Math.min(backoff * 2, 30000);
-      };
-
-      ws.onmessage = (e) => {
-        try {
-          const data = JSON.parse(e.data) as any;
-          setLastMessage(data);
-
-          // ping/pong handling
-          if (data.type === "ping") {
-            ws.send(JSON.stringify({ type: "pong" }));
+        ws.onopen = () => {
+          if (!isMountedRef.current) {
+            ws.close();
             return;
           }
+          setIsConnected(true);
+          retryCount = 0;
+        };
 
-          if (data.type === "pong" || data.type === "connected") return;
+        ws.onclose = (e) => {
+          wsRef.current = null;
+          if (!isMountedRef.current || intentionalClose || e.code === 4001) return;
+          setIsConnected(false);
 
-          // Normalize server events into a notification-like payload
-          const notif: NotificationPayload = {
-            id:
-              data.id || data.dispatch_no || data.lot_no || data.machine_code || String(Date.now()),
-            title: data.type,
-            message: data.message || data.reason || data.item || JSON.stringify(data).slice(0, 200),
-            type: "info",
-            module: (data.type || "").split(".")[0],
-            created_at: new Date().toISOString(),
-          };
+          if (retryCount >= MAX_RETRIES) return;
 
-          if (data.type === "wrong_destination") {
-            setLastWrongDestination(data as WrongDestinationPayload);
+          retryCount += 1;
+          const backoff = Math.min(1000 * Math.pow(2, retryCount - 1), 8000);
+          reconnectTimer = setTimeout(() => {
+            if (isMountedRef.current) connect();
+          }, backoff);
+        };
+
+        ws.onerror = () => {
+          // errors surface via onclose; suppress to avoid console noise
+        };
+
+        ws.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data) as any;
+            setLastMessage(data);
+
+            if (data.type === "ping") {
+              ws.send(JSON.stringify({ type: "pong" }));
+              return;
+            }
+
+            if (data.type === "pong" || data.type === "connected") return;
+
+            const notif: NotificationPayload = {
+              id:
+                data.id ||
+                data.dispatch_no ||
+                data.lot_no ||
+                data.machine_code ||
+                String(Date.now()),
+              title: data.type,
+              message:
+                data.message || data.reason || data.item || JSON.stringify(data).slice(0, 200),
+              type: "info",
+              module: (data.type || "").split(".")[0],
+              created_at: new Date().toISOString(),
+            };
+
+            if (data.type === "wrong_destination") {
+              setLastWrongDestination(data as WrongDestinationPayload);
+            }
+
+            setNotifications((prev) => [notif, ...prev].slice(0, 50));
+            setUnreadCount((prev) => prev + 1);
+          } catch {
+            // silently drop malformed messages
           }
-
-          setNotifications((prev) => [notif, ...prev].slice(0, 50));
-          setUnreadCount((prev) => prev + 1);
-        } catch (err) {
-          console.error("Failed to parse WebSocket message", err);
-        }
-      };
+        };
+      } catch {
+        // silently abort if WebSocket construction fails (e.g. bad URL, no network)
+      }
     }
 
     connect();
