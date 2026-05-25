@@ -236,9 +236,9 @@ function HRPage() {
     retry: 1,
   });
 
-  const employees: EmployeeRow[] = empQ.data ?? [];
-  const attendance: AttendanceRow[] = attQ.data ?? [];
-  const leaves: LeaveRow[] = leaveQ.data ?? [];
+  const employees: EmployeeRow[] = Array.isArray(empQ.data) ? empQ.data : (empQ.data?.data ?? []);
+  const attendance: AttendanceRow[] = Array.isArray(attQ.data) ? attQ.data : (attQ.data?.data ?? []);
+  const leaves: LeaveRow[] = Array.isArray(leaveQ.data) ? leaveQ.data : (leaveQ.data?.data ?? []);
 
   const activeEmployees = employees.filter((e) => e.is_active).length;
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -1522,7 +1522,7 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
     queryFn: () => hrApi.getAttendance({ month, year, department: deptFilter || undefined }),
   });
 
-  const attendanceRows: AttendanceRow[] = attendanceData ?? [];
+  const attendanceRows: AttendanceRow[] = Array.isArray(attendanceData) ? attendanceData : (attendanceData?.data ?? []);
   const days = daysInMonth(month, year);
 
   const filteredEmployees = useMemo(() => {
@@ -1923,7 +1923,7 @@ function PayrollTab({ employees, canEdit, millId, userRole }: { employees: Emplo
     queryFn: () => hrApi.getPayroll({ month, year, mill_id: millId }),
   });
 
-  const payroll: PayrollRow[] = payrollData ?? [];
+  const payroll: PayrollRow[] = Array.isArray(payrollData) ? payrollData : (payrollData?.data ?? []);
 
   useEffect(() => {
     if (payroll.length > 0) {
