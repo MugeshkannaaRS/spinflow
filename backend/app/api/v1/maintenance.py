@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -5,6 +6,8 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from app.db.session import get_db
+
+logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter
@@ -33,18 +36,22 @@ async def get_tasks(
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     stmt = stmt.order_by(MaintenanceLog.date.desc())
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": [MaintenanceOut.model_validate(item).model_dump() for item in items],
-    }
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": [MaintenanceOut.model_validate(item).model_dump() for item in items],
+        }
+    except Exception as e:
+        logger.error(f"maintenance.tasks list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/maintenance/tasks", response_model=MaintenanceOut)
@@ -102,18 +109,22 @@ async def get_schedules(
         stmt = stmt.where(Machine.mill_id == scope["mill_id"])
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": [ScheduleOut.model_validate(item).model_dump() for item in items],
-    }
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": [ScheduleOut.model_validate(item).model_dump() for item in items],
+        }
+    except Exception as e:
+        logger.error(f"maintenance.schedules list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/maintenance/schedules", response_model=ScheduleOut)
@@ -190,12 +201,16 @@ async def get_parameters(
         stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     if machine_code:
         stmt = stmt.where(MachineParameter.machine_code == machine_code)
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {"total": total, "page": page, "page_size": page_size, "data": [MachineParameterOut.model_validate(item).model_dump() for item in items]}
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {"total": total, "page": page, "page_size": page_size, "data": [MachineParameterOut.model_validate(item).model_dump() for item in items]}
+    except Exception as e:
+        logger.error(f"maintenance.parameters list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/maintenance/parameters/bulk", response_model=BulkResponse)

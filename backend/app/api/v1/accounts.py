@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -5,6 +6,8 @@ from typing import List, Optional
 from datetime import datetime, timezone, date
 
 from app.db.session import get_db
+
+logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.accounts import Invoice, Payment
@@ -32,18 +35,22 @@ async def get_invoices(
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Invoice.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     stmt = stmt.order_by(Invoice.date.desc())
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": [InvoiceOut.model_validate(item).model_dump() for item in items],
-    }
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": [InvoiceOut.model_validate(item).model_dump() for item in items],
+        }
+    except Exception as e:
+        logger.error(f"accounts.invoices list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/accounts/invoices", response_model=InvoiceOut)
@@ -82,18 +89,22 @@ async def get_receivables(
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Invoice.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     stmt = stmt.order_by(Invoice.date.desc())
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": [InvoiceOut.model_validate(item).model_dump() for item in items],
-    }
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": [InvoiceOut.model_validate(item).model_dump() for item in items],
+        }
+    except Exception as e:
+        logger.error(f"accounts.receivables list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/accounts/payments", response_model=PaymentOut)

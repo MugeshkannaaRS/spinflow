@@ -307,19 +307,35 @@ class LeaveRequestOut(BaseModel):
 class EmployeeBulkItem(BaseModel):
     employee_code: str
     full_name: str
-    department: str
+    department: str = "General"
     designation: Optional[str] = None
+    section: Optional[str] = None
     shift: str = "General"
     date_of_joining: Optional[str] = None
+    dob: Optional[str] = None
+    gen: Optional[str] = None
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    grade: Optional[str] = None
     phone: Optional[str] = None
-    wages: Optional[float] = None
+    sl_no: Optional[int] = None
+    bank_account_no: Optional[str] = None
     basic: Optional[float] = None
     house_rent: Optional[float] = None
     medical: Optional[float] = None
     conveyance: Optional[float] = None
     food_allowance: Optional[float] = None
-    gender: Optional[str] = None
-    grade: Optional[str] = None
+    wages: Optional[float] = None
+    increment: Optional[float] = None
+    total_salary: Optional[float] = None
+    wages_of_month: Optional[float] = None
+    days_of_month: Optional[int] = None
+    mobile_bill: Optional[float] = None
+    shift_benefit: Optional[float] = None
+    shift_qty: Optional[int] = None
+    shift_tk: Optional[float] = None
+    roster_qty: Optional[int] = None
+    roster_tk: Optional[float] = None
 
 
 class EmployeeBulkCreate(BaseModel):

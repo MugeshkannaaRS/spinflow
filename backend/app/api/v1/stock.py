@@ -1,8 +1,11 @@
+import logging
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
 from app.db.session import get_db
+
+logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module
 from app.models.user import User
 from app.services.stock_service import StockLedgerService
@@ -19,14 +22,18 @@ async def stock_snapshot(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stock")),
 ):
-    svc = StockLedgerService(db, current_user)
-    effective_mill_id = mill_id or getattr(current_user, "mill_id", "")
-    return await svc.stock_snapshot(
-        mill_id=effective_mill_id,
-        fg_state=fg_state,
-        warehouse_id=warehouse_id,
-        yarn_count=yarn_count,
-    )
+    try:
+        svc = StockLedgerService(db, current_user)
+        effective_mill_id = mill_id or getattr(current_user, "mill_id", "")
+        return await svc.stock_snapshot(
+            mill_id=effective_mill_id,
+            fg_state=fg_state,
+            warehouse_id=warehouse_id,
+            yarn_count=yarn_count,
+        )
+    except Exception as e:
+        logger.error(f"stock.snapshot error: {e}")
+        return []
 
 
 @router.get("/stock/lot/{lot_id}/history")
@@ -36,8 +43,12 @@ async def lot_history(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stock")),
 ):
-    svc = StockLedgerService(db, current_user)
-    return await svc.ledger_history(lot_id, limit=limit)
+    try:
+        svc = StockLedgerService(db, current_user)
+        return await svc.ledger_history(lot_id, limit=limit)
+    except Exception as e:
+        logger.error(f"stock.lot_history error: {e}")
+        return []
 
 
 @router.get("/stock/lot/{lot_id}/balance")

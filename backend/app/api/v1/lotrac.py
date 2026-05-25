@@ -1,8 +1,11 @@
+import logging
 from fastapi import APIRouter, Depends, Query, Body, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
 from app.db.session import get_db
+
+logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user
 from app.models.user import User
 from app.services.trip_service import TripService
@@ -29,12 +32,16 @@ async def list_trips(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    svc = TripService(db, current_user)
-    mill_id = getattr(current_user, "mill_id", "")
-    return await svc.list_trips(
-        mill_id=mill_id, status=status, customer_id=customer_id,
-        page=page, page_size=page_size,
-    )
+    try:
+        svc = TripService(db, current_user)
+        mill_id = getattr(current_user, "mill_id", "")
+        return await svc.list_trips(
+            mill_id=mill_id, status=status, customer_id=customer_id,
+            page=page, page_size=page_size,
+        )
+    except Exception as e:
+        logger.error(f"trips list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/trips", response_model=dict)
@@ -167,8 +174,12 @@ async def get_scan_log(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    svc = TripService(db, current_user)
-    return await svc.get_scan_log(trip_id, limit=limit)
+    try:
+        svc = TripService(db, current_user)
+        return await svc.get_scan_log(trip_id, limit=limit)
+    except Exception as e:
+        logger.error(f"trips.scan_log error: {e}")
+        return []
 
 
 @router.post("/qr/generate/{bag_id}", response_model=dict)

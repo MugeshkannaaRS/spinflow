@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -7,6 +8,8 @@ import math
 import statistics as stats_lib
 
 from app.db.session import get_db
+
+logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, log_audit
 from app.models.user import User
 from app.models.purchase import Supplier, CottonPurchase, GRNEntry, CottonBale
@@ -63,18 +66,22 @@ async def get_purchases(
     current_user: User = Depends(require_module("purchase")),
 ):
     stmt = select(CottonPurchase).order_by(CottonPurchase.created_at.desc())
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": [CottonPurchaseOut.model_validate(item).model_dump() for item in items],
-    }
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": [CottonPurchaseOut.model_validate(item).model_dump() for item in items],
+        }
+    except Exception as e:
+        logger.error(f"purchase.purchases list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/purchase/purchases", response_model=CottonPurchaseOut)
@@ -109,19 +116,23 @@ async def get_suppliers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase")),
 ):
-    stmt = select(Supplier)
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": [SupplierOut.model_validate(item).model_dump() for item in items],
-    }
+    try:
+        stmt = select(Supplier)
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": [SupplierOut.model_validate(item).model_dump() for item in items],
+        }
+    except Exception as e:
+        logger.error(f"purchase.suppliers list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/purchase/suppliers", response_model=SupplierOut)
@@ -237,12 +248,16 @@ async def get_bales(
         stmt = stmt.where(CottonBale.category == category)
     if status:
         stmt = stmt.where(CottonBale.status == status)
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {"total": total, "page": page, "page_size": page_size, "data": [BaleOut.model_validate(item).model_dump() for item in items]}
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {"total": total, "page": page, "page_size": page_size, "data": [BaleOut.model_validate(item).model_dump() for item in items]}
+    except Exception as e:
+        logger.error(f"purchase.bales list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/purchase/bales", response_model=BaleOut)
@@ -340,19 +355,23 @@ async def get_grns(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase")),
 ):
-    stmt = select(GRNEntry).order_by(GRNEntry.created_at.desc())
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": [GRNOut.model_validate(item).model_dump() for item in items],
-    }
+    try:
+        stmt = select(GRNEntry).order_by(GRNEntry.created_at.desc())
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": [GRNOut.model_validate(item).model_dump() for item in items],
+        }
+    except Exception as e:
+        logger.error(f"purchase.grns list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/purchase/grn", response_model=GRNOut)

@@ -1122,24 +1122,59 @@ function EditEmployeeSheet({
 // ─── Import Employee Dialog (Excel) ─────────────────────────────────────────────
 
 const FIELD_CANDIDATES: Record<string, string[]> = {
-  code: ["code", "emp code", "employee code", "id", "emp id"],
+  sl_no: ["sl no", "sl. no", "s no", "serial no"],
   name: ["name", "full name", "employee name", "emp name"],
-  department: ["department", "dept", "division"],
+  employee_id: ["employee_id", "employee id", "emp id", "emp code"],
+  joining_date: ["joining date", "date of joining", "doj", "join date", "start date"],
+  gen: ["gen", "gender (short)"],
+  dob: ["dob", "date of birth", "birth date"],
+  age: ["age"],
+  gender: ["gender"],
+  grade: ["grade"],
   designation: ["designation", "position", "title", "post"],
-  shift: ["shift", "shift type", "work shift"],
-  doj: ["doj", "date of joining", "joining date", "join date", "start date"],
-  phone: ["phone", "mobile", "contact", "phone no", "mobile no"],
-  daily_wage: ["daily wage", "wage", "salary", "daily salary", "per day"],
+  section: ["section"],
+  department: ["department", "dept", "division"],
+  bank_account_no: ["bank a/c no", "bank account", "account no", "bank a/c"],
+  basic: ["basic", "basic pay", "basic salary"],
+  house_rent: ["house rent", "rent", "hra"],
+  medical: ["medical", "medical allowance"],
+  conveyance: ["conveyance", "conveyance allowance", "travel"],
+  food_allowance: ["food allow", "food allowance", "food"],
+  wages: ["wages", "wage", "daily wage", "salary"],
+  increment: ["increment"],
+  total_salary: ["total salary", "total", "gross salary"],
+  wages_of_month: ["wages of month", "monthly wages", "month wages"],
+  days_of_month: ["days of month", "working days", "month days"],
+  mobile_bill: ["mobile bill", "mobile", "phone bill"],
+  shift_benefit: ["shift benifit", "shift benefit", "shift allowance"],
+  shift_qty: ["shift qty", "shift quantity"],
+  shift_tk: ["shift tk", "shift tk", "shift amount"],
+  roster_qty: ["roster qty", "roster quantity"],
+  roster_tk: ["roster tk", "roster tk", "roster amount"],
 };
 
-const VALID_SHIFTS = ["A", "B", "C", "General", "Morning", "Evening", "Night", "Day", "1", "2", "3"];
+const VALID_SHIFTS = ["A", "B", "C", "General", "Morning", "Evening", "Night", "Day", "0", "1", "2", "3"];
+
+function excelDateToJS(serial: number | string): string {
+  if (!serial) return ''
+  if (typeof serial === 'string' && serial.includes('/')) return serial
+  if (typeof serial === 'string' && serial.includes('-')) return serial
+  const num = Number(serial)
+  if (isNaN(num)) return String(serial)
+  const date = new Date((num - 25569) * 86400 * 1000)
+  const d = date.getDate().toString().padStart(2, '0')
+  const m = (date.getMonth() + 1).toString().padStart(2, '0')
+  const y = date.getFullYear()
+  return `${y}-${m}-${d}`
+}
 
 function normalizeShift(value: string): string {
   const v = value.toLowerCase().trim();
+  if (v === "0" || v === "general") return "General";
   if (v === "1" || v === "morning") return "A";
   if (v === "2" || v === "evening") return "B";
   if (v === "3" || v === "night") return "C";
-  if (v === "day" || v === "general") return "General";
+  if (v === "day") return "General";
   if (["a", "b", "c"].includes(v)) return v.toUpperCase();
   return value;
 }
@@ -1157,69 +1192,141 @@ interface EmpImportRow {
   full_name: string;
   department: string;
   designation: string;
+  section: string;
   shift: string;
   date_of_joining: string;
+  dob: string;
+  gen: string;
+  age: string;
+  gender: string;
+  grade: string;
   phone: string;
   daily_wage: string;
+  sl_no: string;
+  bank_account_no: string;
+  basic: string;
+  house_rent: string;
+  medical: string;
+  conveyance: string;
+  food_allowance: string;
+  wages: string;
+  increment: string;
+  total_salary: string;
+  wages_of_month: string;
+  days_of_month: string;
+  mobile_bill: string;
+  shift_benefit: string;
+  shift_qty: string;
+  shift_tk: string;
+  roster_qty: string;
+  roster_tk: string;
   _error?: string;
+  _warnings?: string[];
 }
 
-function parseEmployeeRow(row: any[], colMap: Record<string, number>): EmpImportRow | null {
+function parseEmployeeRow(row: any[], colMap: Record<string, number>, rowIndex: number): EmpImportRow | null {
   const get = (field: string) => (colMap[field] !== undefined ? String(row[colMap[field]] ?? "").trim() : "");
-  const employee_code = get("code");
+
+  const rawCode = get("employee_id") || get("name");
+  const employee_code = get("employee_id") || `EMP-${rowIndex + 1}`;
   const full_name = get("name");
+  if (!full_name) return null;
+
   const department = get("department");
-  if (!employee_code && !full_name) return null;
 
   let shift = get("shift");
   if (shift) {
     const normalized = normalizeShift(shift);
-    if (!VALID_SHIFTS.includes(normalized)) {
-      return { employee_code, full_name, department, designation: get("designation"), shift, date_of_joining: get("doj"), phone: get("phone"), daily_wage: get("daily_wage"), _error: `Invalid shift: ${shift}` };
-    }
     shift = normalized;
   }
+
+  const rawDoj = row[colMap["joining_date"]] !== undefined ? row[colMap["joining_date"]] : "";
+  const rawDob = row[colMap["dob"]] !== undefined ? row[colMap["dob"]] : "";
+
+  const warnings: string[] = [];
 
   return {
     employee_code,
     full_name,
     department,
     designation: get("designation"),
+    section: get("section"),
     shift,
-    date_of_joining: get("doj"),
+    date_of_joining: excelDateToJS(rawDoj),
+    dob: excelDateToJS(rawDob),
+    gen: get("gen"),
+    age: get("age"),
+    gender: get("gender"),
+    grade: get("grade"),
     phone: get("phone"),
-    daily_wage: get("daily_wage"),
-    _error: !employee_code ? "Missing employee code" : !full_name ? "Missing full name" : !department ? "Missing department" : undefined,
+    daily_wage: get("wages") || get("daily_wage"),
+    sl_no: get("sl_no"),
+    bank_account_no: get("bank_account_no"),
+    basic: get("basic"),
+    house_rent: get("house_rent"),
+    medical: get("medical"),
+    conveyance: get("conveyance"),
+    food_allowance: get("food_allowance"),
+    wages: get("wages"),
+    increment: get("increment"),
+    total_salary: get("total_salary"),
+    wages_of_month: get("wages_of_month"),
+    days_of_month: get("days_of_month"),
+    mobile_bill: get("mobile_bill"),
+    shift_benefit: get("shift_benefit"),
+    shift_qty: get("shift_qty"),
+    shift_tk: get("shift_tk"),
+    roster_qty: get("roster_qty"),
+    roster_tk: get("roster_tk"),
+    _error: undefined,
+    _warnings: warnings.length > 0 ? warnings : undefined,
   };
 }
 
 function recalcError(row: EmpImportRow): string | undefined {
-  if (!row.employee_code) return "Missing employee code";
   if (!row.full_name) return "Missing full name";
-  if (!row.department) return "Missing department";
-  if (row.shift) {
-    const normalized = normalizeShift(row.shift);
-    if (!VALID_SHIFTS.includes(normalized)) return `Invalid shift: ${row.shift}`;
-  }
   return undefined;
 }
 
 const FIELD_TO_LABEL: Record<string, string> = {
-  code: "Employee Code",
+  sl_no: "Sl No",
   name: "Full Name",
-  department: "Department",
+  employee_id: "Employee ID",
+  joining_date: "Date of Joining",
+  gen: "Gen",
+  dob: "DOB",
+  age: "Age",
+  gender: "Gender",
+  grade: "Grade",
   designation: "Designation",
-  shift: "Shift",
-  doj: "Date of Joining",
+  section: "Section",
+  department: "Department",
+  bank_account_no: "Bank A/C No.",
+  basic: "Basic",
+  house_rent: "House Rent",
+  medical: "Medical",
+  conveyance: "Conveyance",
+  food_allowance: "Food Allow",
+  wages: "Wages",
+  increment: "Increment",
+  total_salary: "Total Salary",
+  wages_of_month: "Wages of Month",
+  days_of_month: "Days of Month",
+  mobile_bill: "Mobile Bill",
+  shift_benefit: "Shift Benefit",
+  shift_qty: "Shift Qty",
+  shift_tk: "Shift TK",
+  roster_qty: "Roster Qty",
+  roster_tk: "Roster TK",
   phone: "Phone",
-  daily_wage: "Daily Wage",
+  shift: "Shift",
 };
 
 function downloadEmployeeTemplate() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet([
-    ["Employee Code", "Full Name", "Department", "Designation", "Shift (A/B/C/General)", "Date of Joining (DD/MM/YYYY)", "Phone", "Daily Wage"],
-    ["EMP001", "Ravi Kumar", "Spinning", "Operator", "A", "01/06/2024", "9876543210", "500"],
+    ["Sl no", "name", "employee_id", "Joining Date", "Gen", "DOB", "Age", "Gender", "Grade", "Designation", "Section", "Department", "Bank A/C No.", "Basic", "House Rent", "Medical", "Conveyance", "Food Allow", "Wages", "Increment", "Total Salary", "Wages of Month", "Days of Month", "Mobile Bill", "shift Benifit", "shift Qty", "Shift TK", "Roster Qty", "Roster TK"],
+    ["1", "Ravi Kumar", "EMP001", "01/06/2024", "M", "15/03/1990", "34", "Male", "Grade A", "Operator", "Section 1", "Spinning", "123456789", "10000", "2000", "1500", "800", "500", "5000", "300", "20100", "5000", "26", "500", "500", "0", "0", "0", "0"],
   ]);
   XLSX.utils.book_append_sheet(wb, ws, "Employees");
   XLSX.writeFile(wb, "employee_import_template.xlsx");
@@ -1271,7 +1378,7 @@ function ImportEmployeeDialog() {
   }
 
   function applyMapping() {
-    const parsed = rawRows.map((row) => parseEmployeeRow(row, colMap)).filter((r): r is EmpImportRow => r !== null);
+    const parsed = rawRows.map((row, i) => parseEmployeeRow(row, colMap, i)).filter((r): r is EmpImportRow => r !== null);
     setRows(parsed);
     setDirtyCells(new Set());
     setEditingCell(null);
@@ -1300,12 +1407,35 @@ function ImportEmployeeDialog() {
     const items = valid.map((r) => ({
       employee_code: r.employee_code,
       full_name: r.full_name,
-      department: r.department,
-      designation: r.designation,
+      department: r.department || "General",
+      designation: r.designation || null,
+      section: r.section || null,
       shift: normalizeShift(r.shift) || "General",
       date_of_joining: r.date_of_joining || null,
+      dob: r.dob || null,
+      gen: r.gen || null,
+      age: r.age ? parseInt(r.age) : null,
+      gender: r.gender || null,
+      grade: r.grade || null,
       phone: r.phone || null,
-      daily_wage: r.daily_wage ? parseFloat(r.daily_wage) : null,
+      sl_no: r.sl_no ? parseInt(r.sl_no) : null,
+      bank_account_no: r.bank_account_no || null,
+      basic: r.basic ? parseFloat(r.basic) : 0,
+      house_rent: r.house_rent ? parseFloat(r.house_rent) : 0,
+      medical: r.medical ? parseFloat(r.medical) : 0,
+      conveyance: r.conveyance ? parseFloat(r.conveyance) : 0,
+      food_allowance: r.food_allowance ? parseFloat(r.food_allowance) : 0,
+      wages: r.wages ? parseFloat(r.wages) : 0,
+      increment: r.increment ? parseFloat(r.increment) : 0,
+      total_salary: r.total_salary ? parseFloat(r.total_salary) : null,
+      wages_of_month: r.wages_of_month ? parseFloat(r.wages_of_month) : 0,
+      days_of_month: r.days_of_month ? parseInt(r.days_of_month) : 26,
+      mobile_bill: r.mobile_bill ? parseFloat(r.mobile_bill) : 0,
+      shift_benefit: r.shift_benefit ? parseFloat(r.shift_benefit) : 0,
+      shift_qty: r.shift_qty ? parseInt(r.shift_qty) : 0,
+      shift_tk: r.shift_tk ? parseFloat(r.shift_tk) : 0,
+      roster_qty: r.roster_qty ? parseInt(r.roster_qty) : 0,
+      roster_tk: r.roster_tk ? parseFloat(r.roster_tk) : 0,
     }));
     try {
       const res = await m.mutateAsync(items);

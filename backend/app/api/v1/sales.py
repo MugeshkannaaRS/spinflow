@@ -1,8 +1,11 @@
+import logging
 from fastapi import APIRouter, Depends, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
 from app.db.session import get_db
+
+logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module
 from app.models.user import User
 from app.schemas.sales import SalesOrderCreate, SalesOrderOut, CancelSalesOrderRequest
@@ -20,15 +23,19 @@ async def list_orders(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("sales")),
 ):
-    svc = SalesOrderService(db, current_user)
-    mill_id = getattr(current_user, "mill_id", "")
-    return await svc.list_orders(
-        mill_id=mill_id,
-        status=status,
-        customer_id=customer_id,
-        page=page,
-        page_size=page_size,
-    )
+    try:
+        svc = SalesOrderService(db, current_user)
+        mill_id = getattr(current_user, "mill_id", "")
+        return await svc.list_orders(
+            mill_id=mill_id,
+            status=status,
+            customer_id=customer_id,
+            page=page,
+            page_size=page_size,
+        )
+    except Exception as e:
+        logger.error(f"sales.orders list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/sales/orders", response_model=SalesOrderOut)

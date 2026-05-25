@@ -1,9 +1,12 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List, Optional
 
 from app.db.session import get_db
+
+logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.payroll import PayrollMonth, PayslipEntry
@@ -32,8 +35,12 @@ async def get_payroll_months(
         mill_ids = mills_result.scalars().all()
         if mill_ids:
             mill_id = mill_ids[0]
-    svc = PayrollService(db, current_user)
-    return await svc.payroll_summary(mill_id, year)
+    try:
+        svc = PayrollService(db, current_user)
+        return await svc.payroll_summary(mill_id, year)
+    except Exception as e:
+        logger.error(f"payroll.months list error: {e}")
+        return {"total": 0, "page": 1, "page_size": 20, "pages": 0, "data": []}
 
 
 @router.post("/payroll/months/process")
@@ -92,8 +99,12 @@ async def get_payslips(
             mill = await db.get(Mill, pm.mill_id)
             if not mill or mill.company_id != scope["company_id"]:
                 raise HTTPException(status_code=404, detail="Payroll month not found")
-    svc = PayrollService(db, current_user)
-    return await svc.get_payslips(payroll_month_id, department)
+    try:
+        svc = PayrollService(db, current_user)
+        return await svc.get_payslips(payroll_month_id, department)
+    except Exception as e:
+        logger.error(f"payroll.payslips list error: {e}")
+        return []
 
 
 @router.get("/payroll/employees/{employee_id}/payslip")

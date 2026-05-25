@@ -86,8 +86,8 @@ async def get_employees(
             "data": [EmployeeOut.model_validate(e).model_dump() for e in items],
         }
     except Exception as e:
-        logger.error(f"HR employees list error: {e}", exc_info=True)
-        raise
+        logger.error(f"HR employees list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/hr/employees", response_model=EmployeeOut)
@@ -207,42 +207,67 @@ async def bulk_create_employees(
     scope = await get_mill_scope(current_user)
     mill_id = scope["mill_id"]
 
+    def parse_date(s: Optional[str], row_label: str) -> Optional[date_type]:
+        if not s:
+            return None
+        s = s.strip()
+        for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
+            try:
+                from datetime import datetime as dt
+                return dt.strptime(s, fmt).date()
+            except ValueError:
+                continue
+        errors.append(f"{row_label}: invalid date format '{s}', expected DD/MM/YYYY or YYYY-MM-DD")
+        return None
+
     employees_to_add: List[Employee] = []
     errors: List[str] = []
     for i, item in enumerate(req.items, start=1):
         row_label = f"Row {i} ({item.employee_code or 'no code'})"
-        if not item.employee_code or not item.full_name or not item.department:
-            errors.append(f"{row_label}: missing required field (code, name, or department)")
+        if not item.employee_code or not item.full_name:
+            errors.append(f"{row_label}: missing required field (code, name)")
             continue
 
-        doj = None
-        if item.date_of_joining:
-            try:
-                from datetime import datetime as dt
-                doj = dt.strptime(item.date_of_joining.strip(), "%d/%m/%Y").date()
-            except ValueError:
-                errors.append(f"{row_label}: invalid date format '{item.date_of_joining}', expected DD/MM/YYYY")
-                continue
+        doj = parse_date(item.date_of_joining, row_label)
+        if item.date_of_joining and not doj:
+            continue
 
-        total_sal = (item.wages or 0) + (item.basic or 0) + (item.house_rent or 0) + (item.medical or 0) + (item.conveyance or 0) + (item.food_allowance or 0)
+        dob = parse_date(item.dob, row_label)
+        if item.dob and not dob:
+            continue
+
+        total_sal = item.total_salary
+        if total_sal is None:
+            total_sal = (item.wages or 0) + (item.basic or 0) + (item.house_rent or 0) + (item.medical or 0) + (item.conveyance or 0) + (item.food_allowance or 0) + (item.increment or 0) + (item.mobile_bill or 0) + (item.shift_benefit or 0)
 
         employees_to_add.append(Employee(
             code=item.employee_code.strip(),
             name=item.full_name.strip(),
-            department=item.department.strip(),
+            department=(item.department or "General").strip(),
             designation=item.designation.strip() if item.designation else None,
+            section=item.section.strip() if item.section else None,
             shift=item.shift,
             joining_date=doj,
+            dob=dob,
+            gen=item.gen.strip() if item.gen else None,
+            age=item.age,
+            gender=item.gender.strip() if item.gender else None,
+            grade=item.grade.strip() if item.grade else None,
             phone=item.phone.strip() if item.phone else None,
-            gender=item.gender,
-            grade=item.grade,
+            sl_no=item.sl_no,
+            bank_account_no=item.bank_account_no.strip() if item.bank_account_no else None,
             wages=item.wages or 0,
             basic=item.basic or 0,
             house_rent=item.house_rent or 0,
             medical=item.medical or 0,
             conveyance=item.conveyance or 0,
             food_allowance=item.food_allowance or 0,
+            increment=item.increment or 0,
             total_salary=total_sal,
+            wages_of_month=item.wages_of_month or 0,
+            days_of_month=item.days_of_month or 26,
+            mobile_bill=item.mobile_bill or 0,
+            shift_benefit=item.shift_benefit or 0,
             is_active=True,
             mill_id=mill_id,
         ))
@@ -287,18 +312,22 @@ async def get_payroll(
     if employee_id:
         stmt = stmt.where(MonthlyPayroll.employee_id == employee_id)
 
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": [MonthlyPayrollOut.model_validate(m).model_dump() for m in items],
-    }
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": [MonthlyPayrollOut.model_validate(m).model_dump() for m in items],
+        }
+    except Exception as e:
+        logger.error(f"HR payroll list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/hr/payroll/calculate")
@@ -440,18 +469,22 @@ async def get_attendance(
         stmt = stmt.where(Attendance.employee_id == employee_id)
     if department:
         stmt = stmt.where(Employee.department == department)
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": [AttendanceOut.model_validate(a).model_dump() for a in items],
-    }
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": [AttendanceOut.model_validate(a).model_dump() for a in items],
+        }
+    except Exception as e:
+        logger.error(f"HR attendance list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.get("/hr/attendance/summary")
@@ -640,18 +673,22 @@ async def get_leaves(
         stmt = stmt.where(Leave.employee_id == employee_id)
     if status:
         stmt = stmt.where(Leave.status == status)
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": [LeaveRequestOut.model_validate(l).model_dump() for l in items],
-    }
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": [LeaveRequestOut.model_validate(l).model_dump() for l in items],
+        }
+    except Exception as e:
+        logger.error(f"HR leaves list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/hr/leaves", response_model=LeaveRequestOut)

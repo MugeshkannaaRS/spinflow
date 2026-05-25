@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -5,6 +6,8 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from app.db.session import get_db
+
+logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, log_audit, get_mill_scope
 from app.models.user import User
 from app.models.inventory import Lot, StockMovement, Warehouse
@@ -32,18 +35,22 @@ async def get_lots(
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     stmt = stmt.order_by(Lot.created_at.desc())
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": [LotOut.model_validate(item).model_dump() for item in items],
-    }
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": [LotOut.model_validate(item).model_dump() for item in items],
+        }
+    except Exception as e:
+        logger.error(f"inventory.lots list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.get("/inventory/transfers")
@@ -60,18 +67,22 @@ async def get_transfers(
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     stmt = stmt.order_by(StockMovement.created_at.desc())
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(stmt)
-    items = result.scalars().all()
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-        "data": [StockMovementOut.model_validate(item).model_dump() for item in items],
-    }
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = result.scalars().all()
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": [StockMovementOut.model_validate(item).model_dump() for item in items],
+        }
+    except Exception as e:
+        logger.error(f"inventory.transfers list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/inventory/transfers", response_model=StockMovementOut)
@@ -133,8 +144,12 @@ async def get_warehouses(
         query = query.where(Warehouse.mill_id == scope["mill_id"])
     elif scope["company_id"]:
         query = query.join(Mill, Warehouse.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
-    result = await db.execute(query)
-    return [WarehouseOut.model_validate(item).model_dump() for item in result.scalars().all()]
+    try:
+        result = await db.execute(query)
+        return [WarehouseOut.model_validate(item).model_dump() for item in result.scalars().all()]
+    except Exception as e:
+        logger.error(f"inventory.warehouses list error: {e}")
+        return []
 
 
 @router.post("/inventory/warehouses", response_model=WarehouseOut)

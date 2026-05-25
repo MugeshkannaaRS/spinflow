@@ -1,9 +1,12 @@
+import logging
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List, Optional
 
 from app.db.session import get_db
+
+logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.dispatch import Dispatch, DispatchItem
@@ -37,20 +40,24 @@ async def get_dispatches(
     if date:
         query = query.where(Dispatch.date == date)
     query = query.order_by(Dispatch.created_at.desc())
-    count_stmt = select(func.count()).select_from(query.subquery())
-    total_result = await db.execute(count_stmt)
-    total = total_result.scalar() or 0
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(query)
-    items = list(result.scalars().all())
-    pages = (total + page_size - 1) // page_size if page_size > 0 else 0
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": pages,
-        "data": [DispatchResponse.model_validate(item).model_dump() for item in items],
-        }
+    try:
+        count_stmt = select(func.count()).select_from(query.subquery())
+        total_result = await db.execute(count_stmt)
+        total = total_result.scalar() or 0
+        query = query.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(query)
+        items = list(result.scalars().all())
+        pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": pages,
+            "data": [DispatchResponse.model_validate(item).model_dump() for item in items],
+            }
+    except Exception as e:
+        logger.error(f"dispatch.orders list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/dispatch/orders", response_model=DispatchResponse)
@@ -150,8 +157,12 @@ async def get_scan_history(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dispatch")),
 ):
-    svc = DispatchService(db, current_user)
-    return await svc.scan_history(dispatch_id)
+    try:
+        svc = DispatchService(db, current_user)
+        return await svc.scan_history(dispatch_id)
+    except Exception as e:
+        logger.error(f"dispatch.scan_history error: {e}")
+        return []
 
 
 @router.get("/dispatch/summary/today")

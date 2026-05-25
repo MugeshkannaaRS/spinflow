@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,6 +6,8 @@ from typing import List, Optional, Any, Dict
 from pydantic import BaseModel
 
 from app.db.session import get_db
+
+logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.quality import QualityApproval, LabReport, QualityTest
@@ -48,20 +51,24 @@ async def get_tests(
     if status:
         query = query.where(QualityTest.status == status)
     query = query.order_by(QualityTest.created_at.desc())
-    count_stmt = select(func.count()).select_from(query.subquery())
-    total_result = await db.execute(count_stmt)
-    total = total_result.scalar() or 0
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(query)
-    items = result.scalars().all()
-    pages = (total + page_size - 1) // page_size if page_size > 0 else 0
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": pages,
-        "data": [QualityTestResponse.model_validate(item).model_dump() for item in items],
-    }
+    try:
+        count_stmt = select(func.count()).select_from(query.subquery())
+        total_result = await db.execute(count_stmt)
+        total = total_result.scalar() or 0
+        query = query.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(query)
+        items = result.scalars().all()
+        pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": pages,
+            "data": [QualityTestResponse.model_validate(item).model_dump() for item in items],
+        }
+    except Exception as e:
+        logger.error(f"quality.tests list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.post("/quality/tests", response_model=QualityTestResponse)
@@ -150,20 +157,24 @@ async def list_lots(
     elif scope["company_id"]:
         query = query.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     query = query.order_by(Lot.created_at.desc())
-    count_stmt = select(func.count()).select_from(query.subquery())
-    total_result = await db.execute(count_stmt)
-    total = total_result.scalar() or 0
-    query = query.offset((page - 1) * page_size).limit(page_size)
-    result = await db.execute(query)
-    items = result.scalars().all()
-    pages = (total + page_size - 1) // page_size if page_size > 0 else 0
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": pages,
-        "data": [LotOut.model_validate(item).model_dump() for item in items],
-    }
+    try:
+        count_stmt = select(func.count()).select_from(query.subquery())
+        total_result = await db.execute(count_stmt)
+        total = total_result.scalar() or 0
+        query = query.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(query)
+        items = result.scalars().all()
+        pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": pages,
+            "data": [LotOut.model_validate(item).model_dump() for item in items],
+        }
+    except Exception as e:
+        logger.error(f"quality.lots list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.get("/quality/lots/{lot_id}/tests", response_model=List[QualityTestResponse])
@@ -172,8 +183,12 @@ async def get_lot_tests(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):
-    svc = QualityService(db, current_user)
-    return await svc.get_lot_tests(lot_id)
+    try:
+        svc = QualityService(db, current_user)
+        return await svc.get_lot_tests(lot_id)
+    except Exception as e:
+        logger.error(f"quality.lot_tests error: {e}")
+        return []
 
 
 @router.get("/quality/summary")
@@ -206,8 +221,12 @@ async def list_approvals(
         stmt = stmt.where(Lot.mill_id == scope["mill_id"])
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
-    result = await db.execute(stmt)
-    approvals = result.scalars().all()
+    try:
+        result = await db.execute(stmt)
+        approvals = result.scalars().all()
+    except Exception as e:
+        logger.error(f"quality.approvals list error: {e}")
+        return []
 
     out = []
     for a in approvals:
@@ -288,8 +307,12 @@ async def list_rejections(
         stmt = stmt.where(Lot.mill_id == scope["mill_id"])
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
-    result = await db.execute(stmt)
-    tests = result.scalars().all()
+    try:
+        result = await db.execute(stmt)
+        tests = result.scalars().all()
+    except Exception as e:
+        logger.error(f"quality.rejections list error: {e}")
+        return []
 
     out = []
     for t in tests:
