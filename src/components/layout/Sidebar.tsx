@@ -104,7 +104,7 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
         })}
       </nav>
 
-      <div className="border-t border-sidebar-border p-3">
+      <div className="mt-auto border-t border-sidebar-border p-3">
         <div className="px-2 pb-2">
           <div className="text-sm font-medium text-sidebar-accent-foreground">{user.name}</div>
           <div className="text-xs text-sidebar-foreground/70">{ROLE_LABELS[user.role]}</div>
@@ -126,7 +126,7 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
 export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => void }) {
   return (
     <>
-      <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
+      <aside className="fixed top-0 left-0 h-screen w-64 overflow-y-auto flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border z-30">
         <SidebarContent />
       </aside>
 

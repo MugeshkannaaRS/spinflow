@@ -23,9 +23,9 @@ function AppLayout() {
 function AppShell() {
   const { open, close } = useSidebar();
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <Sidebar open={open} onClose={close} />
-      <main className="flex-1 flex flex-col min-w-0 relative pb-16 lg:pb-0">
+      <main className="ml-64 min-h-screen overflow-y-auto flex flex-col relative pb-16 lg:pb-0">
         <AlertBanner />
         <Outlet />
       </main>
