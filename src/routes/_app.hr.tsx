@@ -469,8 +469,8 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((emp, i) => (
-              <TableRow key={emp.id}>
+            {(filtered ?? []).map((emp, i) => emp ? (
+              <TableRow key={emp.id ?? i}>
                 <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
                 <TableCell className="font-mono text-xs">{emp.code}</TableCell>
                 <TableCell className="font-medium">{emp.name}</TableCell>
@@ -502,7 +502,7 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+            ) : null)}
             {filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
@@ -1644,10 +1644,11 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredEmployees.map((emp) => {
+            {(filteredEmployees ?? []).map((emp, i) => {
+              if (!emp) return null;
               const totals = calcTotals(emp.id);
               return (
-                <TableRow key={emp.id}>
+                <TableRow key={emp.id ?? i}>
                   <TableCell className="sticky left-0 bg-background z-10 font-medium whitespace-nowrap">{emp.name}</TableCell>
                   <TableCell className="sticky left-[140px] bg-background z-10">{emp.department}</TableCell>
                   {Array.from({ length: days }, (_, i) => i + 1).map((d) => {
@@ -1784,8 +1785,8 @@ function MarkAttendanceSheet({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {employees.map((emp, i) => (
-                    <TableRow key={emp.id}>
+                  {(employees ?? []).map((emp, i) => emp ? (
+                    <TableRow key={emp.id ?? i}>
                       <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="font-medium">{emp.name}</TableCell>
                       <TableCell>{emp.department}</TableCell>
@@ -1821,7 +1822,7 @@ function MarkAttendanceSheet({
                         />
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : null)}
                 </TableBody>
               </Table>
             </div>
@@ -2073,8 +2074,8 @@ function PayrollTab({ employees, canEdit, millId, userRole }: { employees: Emplo
               </TableRow>
             </TableHeader>
             <TableBody>
-              {displayData.map((row) => (
-                <TableRow key={row.id} className={row.is_finalized ? "bg-green-50" : ""}>
+              {(displayData ?? []).map((row, i) => row ? (
+                <TableRow key={row.id ?? i} className={row.is_finalized ? "bg-green-50" : ""}>
                   <TableCell className="sticky left-0 bg-background z-10 font-mono">{row.employee_code}</TableCell>
                   <TableCell className="sticky left-[80px] bg-background z-10 font-medium">{row.employee_name}</TableCell>
                   <TableCell className="text-right">{formatCurrency(row.basic)}</TableCell>
@@ -2182,7 +2183,7 @@ function PayrollTab({ employees, canEdit, millId, userRole }: { employees: Emplo
                   </TableCell>
                   <TableCell className="text-right font-semibold">{formatCurrency(row.net_payable)}</TableCell>
                 </TableRow>
-              ))}
+              ) : null)}
               {displayData.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={16} className="text-center text-muted-foreground py-8">
@@ -2317,8 +2318,8 @@ function LeavesTab({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredLeaves.map((l) => (
-              <TableRow key={l.id}>
+            {(filteredLeaves ?? []).map((l, i) => l ? (
+              <TableRow key={l.id ?? i}>
                 <TableCell className="font-medium">{l.employee_name}</TableCell>
                 <TableCell>{l.department}</TableCell>
                 <TableCell>{formatDate(l.from_date)}</TableCell>
@@ -2340,7 +2341,7 @@ function LeavesTab({
                   )}
                 </TableCell>
               </TableRow>
-            ))}
+            ) : null)}
             {filteredLeaves.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
@@ -2369,10 +2370,11 @@ function LeavesTab({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {employees.slice(0, 20).map((emp) => {
+                {(employees ?? []).slice(0, 20).map((emp, i) => {
+                  if (!emp) return null;
                   const bal = leaveBalances[emp.id];
                   return (
-                    <TableRow key={emp.id}>
+                    <TableRow key={emp.id ?? i}>
                       <TableCell className="font-medium">{emp.name}</TableCell>
                       <TableCell className="text-center">{bal?.CL ?? "-"}</TableCell>
                       <TableCell className="text-center">{bal?.SL ?? "-"}</TableCell>
@@ -2455,9 +2457,9 @@ function NewLeaveDialog({ employees }: { employees: EmployeeRow[] }) {
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.map((emp) => (
-                    <SelectItem key={emp.id} value={emp.id}>{emp.name} ({emp.code})</SelectItem>
-                  ))}
+                  {(employees ?? []).map((emp, i) => emp ? (
+                    <SelectItem key={emp.id ?? i} value={emp.id ?? ""}>{emp.name ?? "—"} ({emp.code ?? ""})</SelectItem>
+                  ) : null)}
                 </SelectContent>
               </Select>
             </div>
