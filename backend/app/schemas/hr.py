@@ -27,7 +27,7 @@ class EmployeeCreate(BaseModel):
     increment: Optional[float] = 0
     mobile_bill: Optional[float] = 0
     shift_benefit: Optional[float] = 0
-    days_of_month: Optional[int] = 26
+    days_of_month: Optional[int] = 30
     total_salary: Optional[float] = None
     phone: Optional[str] = None
     mill_id: Optional[str] = None
@@ -70,7 +70,7 @@ class EmployeeOut(BaseModel):
     mobile_bill: Optional[float] = 0
     shift_benefit: Optional[float] = 0
     wages_of_month: Optional[float] = 0
-    days_of_month: Optional[int] = 26
+    days_of_month: Optional[int] = 30
     phone: Optional[str] = None
     is_active: Optional[bool] = True
     mill_id: Optional[str] = None
@@ -119,37 +119,7 @@ class MonthlyPayrollOut(BaseModel):
     mill_id: str
     month: int
     year: int
-    days_of_month: int = 26
-    calculate_days: Optional[float] = 0
-    actual_attendance: Optional[int] = 0
-    day_off: Optional[int] = 0
-    cl: Optional[int] = 0
-    sl: Optional[int] = 0
-    el: Optional[int] = 0
-    comp_leave: Optional[int] = 0
-    festival_holiday: Optional[int] = 0
-    absent_days: Optional[int] = 0
-    payable_days: Optional[float] = 0
-    payable_salary: Optional[float] = 0
-    ot_hours: Optional[float] = 0
-    ot_amount: Optional[float] = 0
-    festival_duty_benefit: Optional[float] = 0
-    festival_holiday_allowance: Optional[float] = 0
-    ifter_days: Optional[int] = 0
-    ifter_allowance: Optional[float] = 0
-    special_food: Optional[float] = 0
-    attendance_bonus: Optional[float] = 0
-    arrear_others: Optional[float] = 0
-    shift_qty: Optional[int] = 0
-    shift_amount: Optional[float] = 0
-    roster_qty: Optional[int] = 0
-    roster_amount: Optional[float] = 0
-    absent_deduction: Optional[float] = 0
-    advance_deduction: Optional[float] = 0
-    tax_deduction: Optional[float] = 0
-    net_payable: Optional[float] = 0
-    is_finalized: bool = False
-    created_at: Optional[datetime] = None
+    days_of_month: int = 30
 
     class Config:
         from_attributes = True

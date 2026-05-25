@@ -128,7 +128,7 @@ async def create_employee(
         total_salary=total_sal,
         mobile_bill=req.mobile_bill or 0,
         shift_benefit=req.shift_benefit or 0,
-        days_of_month=req.days_of_month or 26,
+        days_of_month=req.days_of_month or 30,
         phone=req.phone,
         is_active=True,
         mill_id=mill_id,
@@ -273,7 +273,7 @@ async def bulk_create_employees(
             increment=item.increment or 0,
             total_salary=total_sal,
             wages_of_month=item.wages_of_month or 0,
-            days_of_month=item.days_of_month or 26,
+            days_of_month=item.days_of_month or 30,
             mobile_bill=item.mobile_bill or 0,
             shift_benefit=item.shift_benefit or 0,
             is_active=True,
@@ -314,7 +314,7 @@ async def bulk_create_employees(
             mill_id=mill_id,
             month=cur_month,
             year=cur_year,
-            days_of_month=item.days_of_month or 26,
+            days_of_month=item.days_of_month or 30,
             calculate_days=item.calculate_days or 0,
             actual_attendance=item.actual_attendance or 0,
             day_off=item.day_off or 0,
@@ -445,7 +445,7 @@ async def calculate_payroll(
             )
             db.add(payroll)
 
-        payroll.days_of_month = emp.days_of_month or 26
+        payroll.days_of_month = emp.days_of_month or 30
         payroll.payable_salary = float(emp.wages or 0) / max(payroll.days_of_month, 1) * float(payroll.payable_days or payroll.days_of_month)
         payroll.net_payable = (
             payroll.payable_salary

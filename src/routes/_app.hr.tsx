@@ -376,13 +376,13 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
     { key: "personal", label: "Personal", columns: ["sl_no", "code", "name", "dob", "age", "gender"] },
     { key: "job", label: "Job", columns: ["department", "designation", "section", "grade"] },
     { key: "salary", label: "Salary", columns: ["basic", "wages", "total_salary"] },
-    { key: "allowances", label: "Allowances", columns: ["house_rent", "medical", "conveyance", "food_allowance", "mobile_bill"] },
-    { key: "monthly", label: "Monthly", columns: ["joining_date", "gen", "bank_account_no", "increment", "shift_benefit", "days_of_month", "phone", "shift"] },
+    { key: "allowances", label: "Allowances", columns: ["house_rent", "medical", "conveyance", "food_allowance", "mobile_bill", "increment", "shift_benefit"] },
+    { key: "monthly", label: "Monthly", columns: ["joining_date", "bank_account_no", "days_of_month"] },
   ];
 
   const ALL_COLUMNS = COLUMN_GROUPS.flatMap((g) => g.columns);
 
-  const PRIMARY_COLUMNS = new Set(["sl_no", "code", "name", "department", "designation", "grade", "gender", "basic", "total_salary", "status", "actions"]);
+  const PRIMARY_COLUMNS = new Set(["sl_no", "code", "name", "department", "designation", "grade", "gen", "basic", "wages", "total_salary", "status", "actions"]);
   const SECONDARY_COLUMNS = ALL_COLUMNS.filter((c) => !PRIMARY_COLUMNS.has(c));
 
   const stored = typeof window !== "undefined" ? localStorage.getItem("hr-column-groups") : null;
@@ -405,9 +405,10 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
     { key: "name", label: "Name" },
     { key: "department", label: "Department" },
     { key: "designation", label: "Designation" },
-    { key: "grade", label: "Grade", className: "w-16" },
-    { key: "gender", label: "Gender", className: "w-20" },
+    { key: "grade", label: "Grade", className: "w-12" },
+    { key: "gen", label: "Gen", className: "w-16" },
     { key: "basic", label: "Basic", className: "w-24" },
+    { key: "wages", label: "Wages", className: "w-24" },
     { key: "total_salary", label: "Total Salary", className: "w-28" },
     { key: "status", label: "Status", className: "w-20" },
     { key: "actions", label: "Actions", className: "w-28" },
@@ -415,22 +416,19 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
 
   const SECONDARY_HEADERS: { key: string; label: string }[] = [
     { key: "section", label: "Section" },
-    { key: "joining_date", label: "Joining Date" },
     { key: "dob", label: "DOB" },
     { key: "age", label: "Age" },
-    { key: "gen", label: "Gen" },
+    { key: "gender", label: "Gender" },
+    { key: "joining_date", label: "Joining Date" },
     { key: "bank_account_no", label: "Bank A/C No" },
     { key: "house_rent", label: "House Rent" },
     { key: "medical", label: "Medical" },
     { key: "conveyance", label: "Conveyance" },
     { key: "food_allowance", label: "Food Allow" },
-    { key: "wages", label: "Wages" },
     { key: "increment", label: "Increment" },
     { key: "mobile_bill", label: "Mobile Bill" },
     { key: "shift_benefit", label: "Shift Ben." },
     { key: "days_of_month", label: "Days/Month" },
-    { key: "phone", label: "Phone" },
-    { key: "shift", label: "Shift" },
   ];
 
   const filtered = useMemo(() => {
@@ -607,8 +605,9 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
                 <TableCell>{cellVal(emp, "department")}</TableCell>
                 <TableCell>{cellVal(emp, "designation")}</TableCell>
                 <TableCell>{cellVal(emp, "grade")}</TableCell>
-                <TableCell>{cellVal(emp, "gender")}</TableCell>
+                <TableCell>{cellVal(emp, "gen")}</TableCell>
                 <TableCell>{cellVal(emp, "basic")}</TableCell>
+                <TableCell>{cellVal(emp, "wages")}</TableCell>
                 <TableCell>{cellVal(emp, "total_salary")}</TableCell>
                 <TableCell>
                   <Badge variant={emp.is_active ? "default" : "secondary"}>
@@ -826,7 +825,7 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
     shift_benefit: 0,
     wages: 0,
     increment: 0,
-    days_of_month: 26,
+    days_of_month: 30,
   });
 
   const nextSlNo = employees.length > 0 ? Math.max(...employees.map((e) => e.sl_no ?? 0)) + 1 : 1;
@@ -869,7 +868,7 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
         shift_benefit: 0,
         wages: 0,
         increment: 0,
-        days_of_month: 26,
+        days_of_month: 30,
       });
       setErrors({});
     }
@@ -977,7 +976,7 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Gender</Label>
+                  <Label>Gender (M/F)</Label>
                   <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
@@ -987,16 +986,11 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Grade</Label>
-                  <Select value={form.grade} onValueChange={(v) => setForm({ ...form, grade: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>
-                      {GRADES.map((g) => (<SelectItem key={g} value={g}>Grade {g}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
+                  <Input type="number" min={0} max={99} value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} placeholder="0" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Gen</Label>
-                  <Input value={form.gen} onChange={(e) => setForm({ ...form, gen: e.target.value })} placeholder="M/F" />
+                  <Input value={form.gen} onChange={(e) => setForm({ ...form, gen: e.target.value })} placeholder="Male/Female" />
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -1162,7 +1156,7 @@ function EditEmployeeSheet({
     shift_benefit: employee.shift_benefit ?? 0,
     wages: employee.wages ?? 0,
     increment: employee.increment ?? 0,
-    days_of_month: employee.days_of_month ?? 26,
+    days_of_month: employee.days_of_month ?? 30,
   });
 
   const totalSalary = form.basic + form.house_rent + form.medical + form.conveyance +
@@ -1274,7 +1268,7 @@ function EditEmployeeSheet({
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Gender</Label>
+                  <Label>Gender (M/F)</Label>
                   <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
@@ -1284,16 +1278,11 @@ function EditEmployeeSheet({
                 </div>
                 <div className="space-y-1.5">
                   <Label>Grade</Label>
-                  <Select value={form.grade} onValueChange={(v) => setForm({ ...form, grade: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                    <SelectContent>
-                      {GRADES.map((g) => (<SelectItem key={g} value={g}>Grade {g}</SelectItem>))}
-                    </SelectContent>
-                  </Select>
+                  <Input type="number" min={0} max={99} value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} placeholder="0" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Gen</Label>
-                  <Input value={form.gen} onChange={(e) => setForm({ ...form, gen: e.target.value })} placeholder="M/F" />
+                  <Input value={form.gen} onChange={(e) => setForm({ ...form, gen: e.target.value })} placeholder="Male/Female" />
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -1477,7 +1466,7 @@ const FIELD_CANDIDATES: Record<string, string[]> = {
   absent_deduction: ["absent ded. tk.", "absent deduction", "absent ded"],
   advance_deduction: ["adv. ded. tk.", "advance deduction", "adv ded"],
   tax_deduction: ["tax ded. tk.", "tax deduction", "tax ded"],
-  net_payable: ["net payable"],
+  net_payable: ["net payable", "column1"],
 };
 
 function excelToDate(v: any): string | null {
@@ -1742,10 +1731,24 @@ function ImportEmployeeDialog() {
   const [activeTab, setActiveTab] = useState<"mapping" | "preview">("mapping");
   const [editingCell, setEditingCell] = useState<{ row: number; field: string } | null>(null);
   const [dirtyCells, setDirtyCells] = useState<Set<string>>(new Set());
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
-  const m = useMutation({
-    mutationFn: (items: any[]) => hrApi.bulkCreateEmployees({ items }),
+  const importMutation = useMutation({
+    mutationFn: async (items: any[]) => {
+      const CHUNK = 50;
+      const total = items.length;
+      let created = 0;
+      const allErrors: string[] = [];
+      for (let i = 0; i < total; i += CHUNK) {
+        const chunk = items.slice(i, i + CHUNK);
+        setImportProgress({ current: Math.min(i + CHUNK, total), total });
+        const res = await hrApi.bulkCreateEmployees({ items: chunk });
+        if (res.errors?.length) allErrors.push(...res.errors);
+        created += res.created ?? 0;
+      }
+      return { created, errors: allErrors };
+    },
   });
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -1757,7 +1760,7 @@ function ImportEmployeeDialog() {
       const wb = XLSX.read(ev.target?.result, { type: "array", cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const raw: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-      const hdrs = (raw[0] ?? []).map((h: any) => String(h ?? "").trim());
+      const hdrs = (raw[0] ?? []).map((h: any) => String(h ?? "").replace(/\n/g, " ").replace(/\s+/g, " ").trim());
       setHeaders(hdrs);
 
       const auto: Record<string, number> = {};
@@ -1822,7 +1825,7 @@ function ImportEmployeeDialog() {
       gen: r.gen || null,
       age: r.age ? parseInt(r.age) : null,
       gender: r.gender || null,
-      grade: r.grade || null,
+      grade: r.grade ? parseInt(r.grade) : null,
       phone: r.phone || null,
       sl_no: r.sl_no ? parseInt(r.sl_no) : null,
       bank_account_no: r.bank_account_no || null,
@@ -1834,7 +1837,7 @@ function ImportEmployeeDialog() {
       wages: r.wages ? parseFloat(r.wages) : 0,
       increment: r.increment ? parseFloat(r.increment) : 0,
       total_salary: r.total_salary ? parseFloat(r.total_salary) : null,
-      days_of_month: r.days_of_month ? parseInt(r.days_of_month) : 26,
+      days_of_month: r.days_of_month ? parseInt(r.days_of_month) : 30,
       mobile_bill: r.mobile_bill ? parseFloat(r.mobile_bill) : 0,
       shift_benefit: r.shift_benefit ? parseFloat(r.shift_benefit) : 0,
       wages_of_month: r.wages_of_month ? parseFloat(r.wages_of_month) : 0,
@@ -1868,11 +1871,13 @@ function ImportEmployeeDialog() {
       net_payable: r.net_payable ? parseFloat(r.net_payable) : 0,
     }));
     try {
-      const res = await m.mutateAsync(items);
+      const res = await importMutation.mutateAsync(items);
+      setImportProgress(null);
       if (res.errors?.length) {
-        toast.error(`Import failed: ${res.errors[0]}`);
+        toast.error(`Import errors: ${res.errors.slice(0, 3).join("; ")}`);
       } else {
-        toast.success(`${res.created} employee(s) imported successfully`);
+        const payrollMsg = items.some((i) => i.payable_salary || i.net_payable) ? `, ${items.length} payroll records created` : "";
+        toast.success(`${res.created} employees imported${payrollMsg}`);
         qc.invalidateQueries({ queryKey: ["hr-employees"] });
         setOpen(false);
         setFileName("");
@@ -1885,6 +1890,7 @@ function ImportEmployeeDialog() {
         setActiveTab("mapping");
       }
     } catch {
+      setImportProgress(null);
       toast.error("Failed to import employees");
     }
   }
@@ -2056,8 +2062,8 @@ function ImportEmployeeDialog() {
             Cancel
           </Button>
           {activeTab === "preview" && (
-            <Button onClick={handleConfirm} disabled={validCount === 0 || m.isPending}>
-              {m.isPending ? "Importing…" : `Import ${validCount} Employee(s)`}
+            <Button onClick={handleConfirm} disabled={validCount === 0 || importMutation.isPending}>
+              {importProgress ? `Importing... ${importProgress.current}/${importProgress.total}` : importMutation.isPending ? "Importing..." : `Import ${validCount} Employee(s)`}
             </Button>
           )}
         </DialogFooter>
