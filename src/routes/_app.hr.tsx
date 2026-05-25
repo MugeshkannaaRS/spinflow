@@ -43,6 +43,14 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { FileUpload, type UploadedFile } from "@/components/ui/file-upload";
 import { cn } from "@/lib/utils";
@@ -66,6 +74,8 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
+  Settings2,
+  Eye,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/hr")({
@@ -83,14 +93,20 @@ interface EmployeeRow {
   role: string;
   phone: string;
   is_active: boolean;
+  employee_id?: string;
+  sl_no?: number;
   date_of_joining?: string;
   date_of_birth?: string;
+  dob?: string;
+  age?: number;
   gender?: string;
+  gen?: string;
   grade?: string;
   designation?: string;
   shift?: string;
   section?: string;
   bank_account?: string;
+  bank_account_no?: string;
   basic?: number;
   house_rent?: number;
   medical?: number;
@@ -100,9 +116,10 @@ interface EmployeeRow {
   shift_benefit?: number;
   wages?: number;
   increment?: number;
+  wages_of_month?: number;
   total_salary?: number;
   days_of_month?: number;
-  sl_no?: number;
+  [key: string]: any;
 }
 
 interface AttendanceRow {
@@ -352,6 +369,69 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
   const [statusFilter, setStatusFilter] = useState("all");
   const [editOpen, setEditOpen] = useState(false);
   const [editingEmp, setEditingEmp] = useState<EmployeeRow | null>(null);
+  const [detailEmp, setDetailEmp] = useState<EmployeeRow | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  const COLUMN_GROUPS: { key: string; label: string; columns: string[] }[] = [
+    { key: "personal", label: "Personal", columns: ["sl_no", "code", "name", "dob", "age", "gender"] },
+    { key: "job", label: "Job", columns: ["department", "designation", "section", "grade"] },
+    { key: "salary", label: "Salary", columns: ["basic", "wages", "total_salary"] },
+    { key: "allowances", label: "Allowances", columns: ["house_rent", "medical", "conveyance", "food_allowance", "mobile_bill"] },
+    { key: "monthly", label: "Monthly", columns: ["joining_date", "gen", "bank_account_no", "increment", "shift_benefit", "days_of_month", "phone", "shift"] },
+  ];
+
+  const ALL_COLUMNS = COLUMN_GROUPS.flatMap((g) => g.columns);
+
+  const PRIMARY_COLUMNS = new Set(["sl_no", "code", "name", "department", "designation", "grade", "gender", "basic", "total_salary", "status", "actions"]);
+  const SECONDARY_COLUMNS = ALL_COLUMNS.filter((c) => !PRIMARY_COLUMNS.has(c));
+
+  const stored = typeof window !== "undefined" ? localStorage.getItem("hr-column-groups") : null;
+  const [visibleGroups, setVisibleGroups] = useState<Set<string>>(new Set(stored ? JSON.parse(stored) : ["monthly"]));
+
+  useEffect(() => {
+    localStorage.setItem("hr-column-groups", JSON.stringify([...visibleGroups]));
+  }, [visibleGroups]);
+
+  const visibleSecondary = new Set<string>();
+  COLUMN_GROUPS.forEach((g) => {
+    if (visibleGroups.has(g.key)) {
+      g.columns.forEach((c) => visibleSecondary.add(c));
+    }
+  });
+
+  const PRIMARY_HEADERS: { key: string; label: string; className?: string }[] = [
+    { key: "sl_no", label: "Sl No", className: "w-12" },
+    { key: "code", label: "Emp ID" },
+    { key: "name", label: "Name" },
+    { key: "department", label: "Department" },
+    { key: "designation", label: "Designation" },
+    { key: "grade", label: "Grade", className: "w-16" },
+    { key: "gender", label: "Gender", className: "w-20" },
+    { key: "basic", label: "Basic", className: "w-24" },
+    { key: "total_salary", label: "Total Salary", className: "w-28" },
+    { key: "status", label: "Status", className: "w-20" },
+    { key: "actions", label: "Actions", className: "w-28" },
+  ];
+
+  const SECONDARY_HEADERS: { key: string; label: string }[] = [
+    { key: "section", label: "Section" },
+    { key: "joining_date", label: "Joining Date" },
+    { key: "dob", label: "DOB" },
+    { key: "age", label: "Age" },
+    { key: "gen", label: "Gen" },
+    { key: "bank_account_no", label: "Bank A/C No" },
+    { key: "house_rent", label: "House Rent" },
+    { key: "medical", label: "Medical" },
+    { key: "conveyance", label: "Conveyance" },
+    { key: "food_allowance", label: "Food Allow" },
+    { key: "wages", label: "Wages" },
+    { key: "increment", label: "Increment" },
+    { key: "mobile_bill", label: "Mobile Bill" },
+    { key: "shift_benefit", label: "Shift Ben." },
+    { key: "days_of_month", label: "Days/Month" },
+    { key: "phone", label: "Phone" },
+    { key: "shift", label: "Shift" },
+  ];
 
   const filtered = useMemo(() => {
     return employees.filter((e) => {
@@ -378,6 +458,11 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
     setEditOpen(true);
   };
 
+  const handleView = (emp: EmployeeRow) => {
+    setDetailEmp(emp);
+    setDetailOpen(true);
+  };
+
   const handleDeactivate = async (emp: EmployeeRow) => {
     if (!confirm(`Deactivate ${emp.name}?`)) return;
     try {
@@ -389,6 +474,30 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
     }
   };
 
+  const cellVal = (emp: EmployeeRow, key: string): string => {
+    if (key === "sl_no") return String(emp.sl_no ?? emp.employee_id ?? "");
+    if (key === "code") return emp.code || "";
+    if (key === "name") return emp.name || "";
+    if (key === "gender") return emp.gender || "-";
+    if (key === "grade") return emp.grade ?? "-";
+    if (key === "department") return emp.department || "-";
+    if (key === "designation") return emp.designation ?? emp.role ?? "-";
+    if (key === "section") return emp.section ?? "-";
+    if (key === "gen") return emp.gen ?? "-";
+    if (key === "age") return emp.age != null ? String(emp.age) : emp.date_of_birth ? String(calcAge(emp.date_of_birth)) : "-";
+    if (key === "dob") return emp.dob ? formatDate(emp.dob) : emp.date_of_birth ? formatDate(emp.date_of_birth) : "-";
+    if (key === "joining_date") return emp.date_of_joining ? formatDate(emp.date_of_joining) : "-";
+    if (key === "bank_account_no") return emp.bank_account_no ?? emp.bank_account ?? "-";
+    if (key === "phone") return emp.phone ?? "-";
+    if (key === "shift") return emp.shift ?? "General";
+    if (["basic", "house_rent", "medical", "conveyance", "food_allowance", "wages", "increment", "total_salary", "mobile_bill", "shift_benefit"].includes(key)) {
+      const v = emp[key] ?? 0;
+      return `₹${Number(v).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+    }
+    if (key === "days_of_month") return String(emp.days_of_month ?? 26);
+    return String((emp as any)[key] ?? "");
+  };
+
   const depts = useMemo(() => [...new Set(employees.map((e) => e.department).filter((d): d is string => !!d))].sort(), [employees]);
   const grades = useMemo(() => [...new Set(employees.map((e) => e.grade).filter((g): g is string => !!g))].sort(), [employees]);
 
@@ -397,12 +506,7 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
       <div className="flex flex-wrap gap-2 items-center">
         <div className="relative w-64">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            placeholder="Search employees..."
-            className="pl-8 h-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <Input placeholder="Search employees..." className="pl-8 h-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={deptFilter} onValueChange={setDeptFilter}>
           <SelectTrigger className="w-36 h-9">
@@ -410,9 +514,7 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Departments</SelectItem>
-            {depts.map((d) => (
-              <SelectItem key={d} value={d}>{d}</SelectItem>
-            ))}
+            {depts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
           </SelectContent>
         </Select>
         <Select value={gradeFilter} onValueChange={setGradeFilter}>
@@ -421,9 +523,7 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Grades</SelectItem>
-            {grades.map((g) => (
-              <SelectItem key={g} value={g}>Grade {g}</SelectItem>
-            ))}
+            {grades.map((g) => (<SelectItem key={g} value={g}>Grade {g}</SelectItem>))}
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -440,58 +540,91 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
         {canEdit && <ImportEmployeeDialog />}
         <Button size="sm" variant="outline" onClick={() => {
           const wb = XLSX.utils.book_new();
-          const ws = XLSX.utils.json_to_sheet(filtered);
+          const ws = XLSX.utils.json_to_sheet(filtered.map((e) => ({
+            "Sl No": e.sl_no,
+            "Emp ID": e.code,
+            Name: e.name,
+            Department: e.department,
+            Designation: e.designation,
+            Grade: e.grade,
+            Gender: e.gender,
+            Basic: e.basic,
+            "Total Salary": e.total_salary,
+            Status: e.is_active ? "Active" : "Inactive",
+          })));
           XLSX.utils.book_append_sheet(wb, ws, "Employees");
           XLSX.writeFile(wb, `employees_${new Date().toISOString().slice(0, 10)}.xlsx`);
         }}>
           <Download className="size-4 mr-1" />
           Export
         </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button size="sm" variant="outline">
+              <Settings2 className="size-4 mr-1" />
+              Columns
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-3" align="end">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Column Groups</p>
+            <div className="space-y-2">
+              {COLUMN_GROUPS.filter((g) => g.key !== "personal" && g.key !== "job" && g.key !== "salary").map((g) => (
+                <label key={g.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={visibleGroups.has(g.key)}
+                    onCheckedChange={() => {
+                      const next = new Set(visibleGroups);
+                      if (next.has(g.key)) next.delete(g.key); else next.add(g.key);
+                      setVisibleGroups(next);
+                    }}
+                  />
+                  {g.label}
+                </label>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <div className="border rounded-md overflow-x-auto">
         <Table className="min-w-[1200px] w-full">
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12">Sl No</TableHead>
-              <TableHead>Emp ID</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Joining Date</TableHead>
-              <TableHead>Age</TableHead>
-              <TableHead>Gender</TableHead>
-              <TableHead>Grade</TableHead>
-              <TableHead>Designation</TableHead>
-              <TableHead>Department</TableHead>
-              <TableHead>Basic</TableHead>
-              <TableHead>Total Salary</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-28">Actions</TableHead>
+              {PRIMARY_HEADERS.map((h) => (
+                <TableHead key={h.key} className={h.className}>{h.label}</TableHead>
+              ))}
+              {SECONDARY_HEADERS.filter((h) => visibleSecondary.has(h.key)).map((h) => (
+                <TableHead key={h.key} className="whitespace-nowrap">{h.label}</TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {(filtered ?? []).map((emp, i) => emp ? (
-              <TableRow key={emp.id ?? i}>
-                <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
-                <TableCell className="font-mono text-xs">{emp.code}</TableCell>
-                <TableCell className="font-medium">{emp.name}</TableCell>
-                <TableCell>{formatDate(emp.date_of_joining ?? "")}</TableCell>
-                <TableCell>{emp.date_of_birth ? calcAge(emp.date_of_birth) : "-"}</TableCell>
-                <TableCell>{emp.gender ?? "-"}</TableCell>
-                <TableCell>{emp.grade ?? "-"}</TableCell>
-                <TableCell>{emp.designation ?? emp.role}</TableCell>
-                <TableCell>{emp.department}</TableCell>
-                <TableCell>{formatCurrency(emp.basic)}</TableCell>
-                <TableCell>{formatCurrency(emp.total_salary)}</TableCell>
+              <TableRow key={emp.id ?? i} className="cursor-pointer hover:bg-muted/50" onClick={() => handleView(emp)}>
+                <TableCell className="text-xs text-muted-foreground">{cellVal(emp, "sl_no")}</TableCell>
+                <TableCell className="font-mono text-xs">{cellVal(emp, "code")}</TableCell>
+                <TableCell className="font-medium">{cellVal(emp, "name")}</TableCell>
+                <TableCell>{cellVal(emp, "department")}</TableCell>
+                <TableCell>{cellVal(emp, "designation")}</TableCell>
+                <TableCell>{cellVal(emp, "grade")}</TableCell>
+                <TableCell>{cellVal(emp, "gender")}</TableCell>
+                <TableCell>{cellVal(emp, "basic")}</TableCell>
+                <TableCell>{cellVal(emp, "total_salary")}</TableCell>
                 <TableCell>
                   <Badge variant={emp.is_active ? "default" : "secondary"}>
                     {emp.is_active ? "Active" : "Inactive"}
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                     {canEdit && (
                       <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEdit(emp)} title="Edit">
                         <Pencil className="size-3.5" />
+                      </Button>
+                    )}
+                    {canEdit && (
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleView(emp)} title="View">
+                        <Eye className="size-3.5" />
                       </Button>
                     )}
                     {canEdit && emp.is_active && (
@@ -501,11 +634,14 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
                     )}
                   </div>
                 </TableCell>
+                {SECONDARY_HEADERS.filter((h) => visibleSecondary.has(h.key)).map((h) => (
+                  <TableCell key={h.key} className="text-xs whitespace-nowrap">{cellVal(emp, h.key)}</TableCell>
+                ))}
               </TableRow>
             ) : null)}
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={PRIMARY_HEADERS.length + SECONDARY_HEADERS.filter((h) => visibleSecondary.has(h.key)).length} className="text-center text-muted-foreground py-8">
                   No employees found
                 </TableCell>
               </TableRow>
@@ -515,13 +651,143 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
       </div>
 
       {editOpen && editingEmp && (
-        <EditEmployeeSheet
-          open={editOpen}
-          onOpenChange={setEditOpen}
-          employee={editingEmp}
-        />
+        <EditEmployeeSheet open={editOpen} onOpenChange={setEditOpen} employee={editingEmp} />
+      )}
+      {detailOpen && detailEmp && (
+        <EmployeeDetailSheet open={detailOpen} onOpenChange={setDetailOpen} employee={detailEmp} />
       )}
     </div>
+  );
+}
+
+// ─── Employee Detail Sheet ───────────────────────────────────────────────────────
+
+function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; onOpenChange: (v: boolean) => void; employee: EmployeeRow }) {
+  const [payrollTab, setPayrollTab] = useState("personal");
+
+  const now = new Date();
+  const curMonth = now.getMonth() + 1;
+  const curYear = now.getFullYear();
+  const { data: payrollData } = useQuery({
+    queryKey: ["hr-payroll-employee", employee.id, curMonth, curYear],
+    queryFn: () => hrApi.getPayroll({ employee_id: employee.id, month: curMonth, year: curYear }).then((r: any) => r.data?.[0]),
+    enabled: open,
+    staleTime: 30_000,
+  });
+
+  const Field = ({ label, value }: { label: string; value: string | number | undefined | null }) => (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-sm font-medium">{value ?? "-"}</p>
+    </div>
+  );
+
+  const Currency = ({ label, value }: { label: string; value: number | undefined | null }) => (
+    <Field label={label} value={value != null ? formatCurrency(value) : "₹0.00"} />
+  );
+
+  const p = payrollData as any;
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>{employee.name}</SheetTitle>
+          <p className="text-xs text-muted-foreground">{employee.code} · {employee.department}</p>
+        </SheetHeader>
+        <div className="flex gap-2 border-b pb-2 mt-4">
+          <button type="button" onClick={() => setPayrollTab("personal")} className={cn("px-3 py-1 text-sm rounded", payrollTab === "personal" ? "bg-primary text-primary-foreground" : "bg-muted")}>Personal Info</button>
+          <button type="button" onClick={() => setPayrollTab("salary")} className={cn("px-3 py-1 text-sm rounded", payrollTab === "salary" ? "bg-primary text-primary-foreground" : "bg-muted")}>Salary Structure</button>
+          <button type="button" onClick={() => setPayrollTab("monthly")} className={cn("px-3 py-1 text-sm rounded", payrollTab === "monthly" ? "bg-primary text-primary-foreground" : "bg-muted")}>Monthly Data</button>
+        </div>
+
+        {payrollTab === "personal" && (
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <Field label="Sl No" value={employee.sl_no} />
+            <Field label="Employee ID" value={employee.employee_id ?? employee.code} />
+            <Field label="Full Name" value={employee.name} />
+            <Field label="DOB" value={employee.dob ? formatDate(employee.dob) : employee.date_of_birth ? formatDate(employee.date_of_birth) : "-"} />
+            <Field label="Age" value={employee.age ?? (employee.date_of_birth ? calcAge(employee.date_of_birth) : "-")} />
+            <Field label="Gender" value={employee.gender ?? "-"} />
+            <Field label="Grade" value={employee.grade ?? "-"} />
+            <Field label="Gen" value={employee.gen ?? "-"} />
+            <Field label="Joining Date" value={employee.date_of_joining ? formatDate(employee.date_of_joining) : "-"} />
+            <Field label="Section" value={employee.section ?? "-"} />
+            <Field label="Department" value={employee.department ?? "-"} />
+            <Field label="Designation" value={employee.designation ?? employee.role ?? "-"} />
+            <Field label="Phone" value={employee.phone ?? "-"} />
+            <Field label="Bank Account No" value={employee.bank_account_no ?? employee.bank_account ?? "-"} />
+            <Field label="Shift" value={employee.shift ?? "General"} />
+          </div>
+        )}
+
+        {payrollTab === "salary" && (
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <Currency label="Basic" value={employee.basic} />
+            <Currency label="House Rent" value={employee.house_rent} />
+            <Currency label="Medical" value={employee.medical} />
+            <Currency label="Conveyance" value={employee.conveyance} />
+            <Currency label="Food Allowance" value={employee.food_allowance} />
+            <Currency label="Wages" value={employee.wages} />
+            <Currency label="Increment" value={employee.increment} />
+            <Currency label="Total Salary" value={employee.total_salary} />
+            <Currency label="Mobile Bill" value={employee.mobile_bill} />
+            <Currency label="Shift Benefit" value={employee.shift_benefit} />
+            <Field label="Days of Month" value={employee.days_of_month ?? 26} />
+            <Currency label="Wages of Month" value={employee.wages_of_month} />
+          </div>
+        )}
+
+        {payrollTab === "monthly" && (
+          <div className="space-y-4 py-4">
+            {p ? (
+              <>
+                <div className="grid grid-cols-3 gap-3">
+                  <Field label="Days of Month" value={p.days_of_month} />
+                  <Field label="Calculate Days" value={p.calculate_days} />
+                  <Field label="Actual Attendance" value={p.actual_attendance} />
+                  <Field label="Day Off" value={p.day_off} />
+                  <Field label="CL" value={p.cl} />
+                  <Field label="SL" value={p.sl} />
+                  <Field label="EL" value={p.el} />
+                  <Field label="Comp Leave" value={p.comp_leave} />
+                  <Field label="Festival Holiday" value={p.festival_holiday} />
+                  <Field label="Absent Days" value={p.absent_days} />
+                  <Field label="Payable Days" value={p.payable_days} />
+                  <Field label="Payable Salary" value={p.payable_salary != null ? formatCurrency(p.payable_salary) : "-"} />
+                </div>
+                <Separator />
+                <div className="grid grid-cols-3 gap-3">
+                  <Field label="OT Hours" value={p.ot_hours} />
+                  <Field label="OT Amount" value={p.ot_amount != null ? formatCurrency(p.ot_amount) : "-"} />
+                  <Field label="Attendance Bonus" value={p.attendance_bonus != null ? formatCurrency(p.attendance_bonus) : "-"} />
+                  <Field label="Festival Duty Benefit" value={p.festival_duty_benefit != null ? formatCurrency(p.festival_duty_benefit) : "-"} />
+                  <Field label="Festival Holiday Allow" value={p.festival_holiday_allowance != null ? formatCurrency(p.festival_holiday_allowance) : "-"} />
+                  <Field label="Ifter Days" value={p.ifter_days} />
+                  <Field label="Ifter Allowance" value={p.ifter_allowance != null ? formatCurrency(p.ifter_allowance) : "-"} />
+                  <Field label="Special Food" value={p.special_food != null ? formatCurrency(p.special_food) : "-"} />
+                  <Field label="Arrear/Others" value={p.arrear_others != null ? formatCurrency(p.arrear_others) : "-"} />
+                  <Field label="Shift Qty" value={p.shift_qty} />
+                  <Field label="Shift Amount" value={p.shift_amount != null ? formatCurrency(p.shift_amount) : "-"} />
+                  <Field label="Roster Qty" value={p.roster_qty} />
+                  <Field label="Roster Amount" value={p.roster_amount != null ? formatCurrency(p.roster_amount) : "-"} />
+                  <Field label="Absent Deduction" value={p.absent_deduction != null ? formatCurrency(p.absent_deduction) : "-"} />
+                  <Field label="Advance Deduction" value={p.advance_deduction != null ? formatCurrency(p.advance_deduction) : "-"} />
+                  <Field label="Tax Deduction" value={p.tax_deduction != null ? formatCurrency(p.tax_deduction) : "-"} />
+                </div>
+                <Separator />
+                <div className="flex justify-between items-center p-3 bg-muted rounded-md">
+                  <span className="text-sm font-semibold">Net Payable</span>
+                  <span className="text-lg font-bold text-primary">{p.net_payable != null ? formatCurrency(p.net_payable) : "-"}</span>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">No payroll data for current month. Calculate payroll in the Payroll tab.</p>
+            )}
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -536,17 +802,20 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
 
   const [form, setForm] = useState({
     sl_no: 0,
+    employee_id: "",
     employee_code: "",
     full_name: "",
     date_of_birth: "",
     age: 0,
     gender: "",
     grade: "",
+    gen: "",
     date_of_joining: new Date().toISOString().slice(0, 10),
     designation: "",
     section: "",
     department: "",
     shift: "General",
+    phone: "",
     bank_account: "",
     basic: 0,
     house_rent: 0,
@@ -563,7 +832,7 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
   const nextSlNo = employees.length > 0 ? Math.max(...employees.map((e) => e.sl_no ?? 0)) + 1 : 1;
 
   const totalSalary = form.basic + form.house_rent + form.medical + form.conveyance +
-    form.food_allowance + form.wages + form.increment + form.mobile_bill + form.shift_benefit;
+    form.food_allowance + form.mobile_bill + form.shift_benefit;
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -576,17 +845,20 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
       setSection("personal");
       setForm({
         sl_no: nextSlNo,
+        employee_id: "",
         employee_code: "",
         full_name: "",
         date_of_birth: "",
         age: 0,
         gender: "",
         grade: "",
+        gen: "",
         date_of_joining: new Date().toISOString().slice(0, 10),
         designation: "",
         section: "",
         department: "",
         shift: "General",
+        phone: "",
         bank_account: "",
         basic: 0,
         house_rent: 0,
@@ -606,9 +878,7 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!form.full_name) errs.full_name = "Full name is required";
-    if (!form.date_of_joining) errs.date_of_joining = "Joining date is required";
-    if (!form.designation) errs.designation = "Designation is required";
-    if (form.basic <= 0) errs.basic = "Basic salary must be > 0";
+    if (!form.department) errs.department = "Department is required";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -616,27 +886,31 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
   const m = useMutation({
     mutationFn: () =>
       hrApi.createEmployee({
-        sl_no: form.sl_no,
-        employee_code: form.employee_code,
+        employee_code: form.employee_code || `EMP-${Date.now()}`,
         full_name: form.full_name,
-        date_of_birth: form.date_of_birth || null,
+        sl_no: form.sl_no,
+        employee_id: form.employee_id || null,
+        department: form.department,
+        designation: form.designation || null,
+        section: form.section || null,
+        shift: form.shift,
+        date_of_joining: form.date_of_joining || null,
+        dob: form.date_of_birth || null,
+        gen: form.gen || null,
+        age: form.age || null,
         gender: form.gender || null,
         grade: form.grade || null,
-        date_of_joining: form.date_of_joining,
-        designation: form.designation,
-        section: form.section || null,
-        department: form.department,
-        shift: form.shift,
-        bank_account: form.bank_account || null,
+        phone: form.phone || null,
+        bank_account_no: form.bank_account || null,
         basic: form.basic,
         house_rent: form.house_rent,
         medical: form.medical,
         conveyance: form.conveyance,
         food_allowance: form.food_allowance,
-        mobile_bill: form.mobile_bill,
-        shift_benefit: form.shift_benefit,
         wages: form.wages,
         increment: form.increment,
+        mobile_bill: form.mobile_bill,
+        shift_benefit: form.shift_benefit,
         total_salary: totalSalary,
         days_of_month: form.days_of_month,
       }),
@@ -663,14 +937,14 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
           Add Employee
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-xl sm:max-w-[600px] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Add Employee</SheetTitle>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="flex gap-2 border-b pb-2">
-            <button type="button" onClick={() => setSection("personal")} className={cn("px-3 py-1 text-sm rounded", section === "personal" ? "bg-primary text-primary-foreground" : "bg-muted")}>Personal</button>
-            <button type="button" onClick={() => setSection("job")} className={cn("px-3 py-1 text-sm rounded", section === "job" ? "bg-primary text-primary-foreground" : "bg-muted")}>Job</button>
+            <button type="button" onClick={() => setSection("personal")} className={cn("px-3 py-1 text-sm rounded", section === "personal" ? "bg-primary text-primary-foreground" : "bg-muted")}>Personal Info</button>
+            <button type="button" onClick={() => setSection("job")} className={cn("px-3 py-1 text-sm rounded", section === "job" ? "bg-primary text-primary-foreground" : "bg-muted")}>Job Info</button>
             <button type="button" onClick={() => setSection("salary")} className={cn("px-3 py-1 text-sm rounded", section === "salary" ? "bg-primary text-primary-foreground" : "bg-muted")}>Salary</button>
           </div>
 
@@ -701,75 +975,79 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
                   <Input value={form.age} readOnly className="bg-muted" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label>Gender</Label>
                   <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
-                      {GENDERS.map((g) => (
-                        <SelectItem key={g} value={g}>{g}</SelectItem>
-                      ))}
+                      {GENDERS.map((g) => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Grade</Label>
                   <Select value={form.grade} onValueChange={(v) => setForm({ ...form, grade: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select grade" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
-                      {GRADES.map((g) => (
-                        <SelectItem key={g} value={g}>Grade {g}</SelectItem>
-                      ))}
+                      {GRADES.map((g) => (<SelectItem key={g} value={g}>Grade {g}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-1.5">
+                  <Label>Gen</Label>
+                  <Input value={form.gen} onChange={(e) => setForm({ ...form, gen: e.target.value })} placeholder="M/F" />
+                </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Joining Date <span className="text-destructive">*</span></Label>
-                <Input type="date" value={form.date_of_joining} onChange={(e) => setForm({ ...form, date_of_joining: e.target.value })} className={errors.date_of_joining ? "border-destructive" : ""} />
-                {errors.date_of_joining && <p className="text-xs text-destructive">{errors.date_of_joining}</p>}
+                <Label>Joining Date</Label>
+                <Input type="date" value={form.date_of_joining} onChange={(e) => setForm({ ...form, date_of_joining: e.target.value })} />
               </div>
             </div>
           )}
 
           {section === "job" && (
             <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label>Designation <span className="text-destructive">*</span></Label>
-                <Input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} className={errors.designation ? "border-destructive" : ""} />
-                {errors.designation && <p className="text-xs text-destructive">{errors.designation}</p>}
-              </div>
-              <div className="space-y-1.5">
-                <Label>Section</Label>
-                <Input value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Designation</Label>
+                  <Input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Section</Label>
+                  <Input value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} />
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label>Department <span className="text-destructive">*</span></Label>
-                <Input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} placeholder="Enter department name" />
+                <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
+                  <SelectTrigger className={errors.department ? "border-destructive" : ""}>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENTS.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+                {errors.department && <p className="text-xs text-destructive">{errors.department}</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Shift</Label>
                   <Select value={form.shift} onValueChange={(v) => setForm({ ...form, shift: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {SHIFTS.map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
+                      {SHIFTS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Bank Account No.</Label>
-                  <Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} />
+                  <Label>Phone</Label>
+                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
                 </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Bank Account No.</Label>
+                <Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} />
               </div>
             </div>
           )}
@@ -778,60 +1056,64 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Basic <span className="text-destructive">*</span></Label>
-                  <Input type="number" min={0} value={form.basic} onChange={(e) => setForm({ ...form, basic: Number(e.target.value) })} className={errors.basic ? "border-destructive" : ""} />
-                  {errors.basic && <p className="text-xs text-destructive">{errors.basic}</p>}
+                  <Label>Basic</Label>
+                  <Input type="number" min={0} step={0.01} value={form.basic} onChange={(e) => setForm({ ...form, basic: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>House Rent</Label>
-                  <Input type="number" min={0} value={form.house_rent} onChange={(e) => setForm({ ...form, house_rent: Number(e.target.value) })} />
+                  <Input type="number" min={0} step={0.01} value={form.house_rent} onChange={(e) => setForm({ ...form, house_rent: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Medical</Label>
-                  <Input type="number" min={0} value={form.medical} onChange={(e) => setForm({ ...form, medical: Number(e.target.value) })} />
+                  <Input type="number" min={0} step={0.01} value={form.medical} onChange={(e) => setForm({ ...form, medical: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Conveyance</Label>
-                  <Input type="number" min={0} value={form.conveyance} onChange={(e) => setForm({ ...form, conveyance: Number(e.target.value) })} />
+                  <Input type="number" min={0} step={0.01} value={form.conveyance} onChange={(e) => setForm({ ...form, conveyance: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Food Allowance</Label>
-                  <Input type="number" min={0} value={form.food_allowance} onChange={(e) => setForm({ ...form, food_allowance: Number(e.target.value) })} />
+                  <Input type="number" min={0} step={0.01} value={form.food_allowance} onChange={(e) => setForm({ ...form, food_allowance: Number(e.target.value) })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Wages</Label>
+                  <Input type="number" min={0} step={0.01} value={form.wages} onChange={(e) => setForm({ ...form, wages: Number(e.target.value) })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Increment</Label>
+                  <Input type="number" min={0} step={0.01} value={form.increment} onChange={(e) => setForm({ ...form, increment: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Mobile Bill</Label>
-                  <Input type="number" min={0} value={form.mobile_bill} onChange={(e) => setForm({ ...form, mobile_bill: Number(e.target.value) })} />
+                  <Input type="number" min={0} step={0.01} value={form.mobile_bill} onChange={(e) => setForm({ ...form, mobile_bill: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Shift Benefit</Label>
-                  <Input type="number" min={0} value={form.shift_benefit} onChange={(e) => setForm({ ...form, shift_benefit: Number(e.target.value) })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Increment</Label>
-                  <Input type="number" min={0} value={form.increment} onChange={(e) => setForm({ ...form, increment: Number(e.target.value) })} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Total Salary</Label>
-                  <Input value={formatCurrency(totalSalary)} readOnly className="bg-muted font-semibold" />
+                  <Input type="number" min={0} step={0.01} value={form.shift_benefit} onChange={(e) => setForm({ ...form, shift_benefit: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Days of Month</Label>
                   <Input type="number" min={1} max={31} value={form.days_of_month} onChange={(e) => setForm({ ...form, days_of_month: Number(e.target.value) })} />
                 </div>
               </div>
+              <div className="bg-muted p-3 rounded-md">
+                <Label>Total Salary (auto-calculated)</Label>
+                <p className="text-lg font-bold text-primary mt-1">{formatCurrency(totalSalary)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Basic + House Rent + Medical + Conveyance + Food Allowance + Mobile Bill + Shift Benefit</p>
+              </div>
             </div>
           )}
 
           <SheetFooter>
-            <Button type="submit" disabled={m.isPending || Object.keys(errors).length > 0}>
+            <Button type="submit" disabled={m.isPending}>
               {m.isPending ? "Saving…" : "Save Employee"}
             </Button>
           </SheetFooter>
@@ -856,18 +1138,21 @@ function EditEmployeeSheet({
   const [section, setSection] = useState<"personal" | "job" | "salary">("personal");
   const [form, setForm] = useState({
     sl_no: employee.sl_no ?? 0,
+    employee_id: employee.employee_id ?? "",
     employee_code: employee.code ?? "",
     full_name: employee.name ?? "",
     date_of_birth: employee.date_of_birth ?? "",
-    age: employee.date_of_birth ? calcAge(employee.date_of_birth) : 0,
+    age: employee.date_of_birth ? calcAge(employee.date_of_birth) : employee.age ?? 0,
     gender: employee.gender ?? "",
     grade: employee.grade ?? "",
+    gen: employee.gen ?? "",
     date_of_joining: employee.date_of_joining ?? "",
     designation: employee.designation ?? employee.role ?? "",
     section: employee.section ?? "",
     department: employee.department ?? "",
     shift: employee.shift ?? "General",
-    bank_account: employee.bank_account ?? "",
+    phone: employee.phone ?? "",
+    bank_account: employee.bank_account_no ?? employee.bank_account ?? "",
     basic: employee.basic ?? 0,
     house_rent: employee.house_rent ?? 0,
     medical: employee.medical ?? 0,
@@ -881,7 +1166,7 @@ function EditEmployeeSheet({
   });
 
   const totalSalary = form.basic + form.house_rent + form.medical + form.conveyance +
-    form.food_allowance + form.wages + form.increment + form.mobile_bill + form.shift_benefit;
+    form.food_allowance + form.mobile_bill + form.shift_benefit;
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -896,9 +1181,7 @@ function EditEmployeeSheet({
   const validate = (): boolean => {
     const errs: Record<string, string> = {};
     if (!form.full_name) errs.full_name = "Full name is required";
-    if (!form.date_of_joining) errs.date_of_joining = "Joining date is required";
-    if (!form.designation) errs.designation = "Designation is required";
-    if (form.basic <= 0) errs.basic = "Basic salary must be > 0";
+    if (!form.department) errs.department = "Department is required";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -906,27 +1189,31 @@ function EditEmployeeSheet({
   const m = useMutation({
     mutationFn: () =>
       hrApi.updateEmployee(employee.id, {
-        sl_no: form.sl_no,
         employee_code: form.employee_code,
         full_name: form.full_name,
-        date_of_birth: form.date_of_birth || null,
+        sl_no: form.sl_no,
+        employee_id: form.employee_id || null,
+        department: form.department,
+        designation: form.designation || null,
+        section: form.section || null,
+        shift: form.shift,
+        date_of_joining: form.date_of_joining || null,
+        dob: form.date_of_birth || null,
+        gen: form.gen || null,
+        age: form.age || null,
         gender: form.gender || null,
         grade: form.grade || null,
-        date_of_joining: form.date_of_joining,
-        designation: form.designation,
-        section: form.section || null,
-        department: form.department,
-        shift: form.shift,
-        bank_account: form.bank_account || null,
+        phone: form.phone || null,
+        bank_account_no: form.bank_account || null,
         basic: form.basic,
         house_rent: form.house_rent,
         medical: form.medical,
         conveyance: form.conveyance,
         food_allowance: form.food_allowance,
-        mobile_bill: form.mobile_bill,
-        shift_benefit: form.shift_benefit,
         wages: form.wages,
         increment: form.increment,
+        mobile_bill: form.mobile_bill,
+        shift_benefit: form.shift_benefit,
         total_salary: totalSalary,
         days_of_month: form.days_of_month,
       }),
@@ -947,14 +1234,14 @@ function EditEmployeeSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-xl sm:max-w-[600px] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Edit Employee — {employee.name}</SheetTitle>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="flex gap-2 border-b pb-2">
-            <button type="button" onClick={() => setSection("personal")} className={cn("px-3 py-1 text-sm rounded", section === "personal" ? "bg-primary text-primary-foreground" : "bg-muted")}>Personal</button>
-            <button type="button" onClick={() => setSection("job")} className={cn("px-3 py-1 text-sm rounded", section === "job" ? "bg-primary text-primary-foreground" : "bg-muted")}>Job</button>
+            <button type="button" onClick={() => setSection("personal")} className={cn("px-3 py-1 text-sm rounded", section === "personal" ? "bg-primary text-primary-foreground" : "bg-muted")}>Personal Info</button>
+            <button type="button" onClick={() => setSection("job")} className={cn("px-3 py-1 text-sm rounded", section === "job" ? "bg-primary text-primary-foreground" : "bg-muted")}>Job Info</button>
             <button type="button" onClick={() => setSection("salary")} className={cn("px-3 py-1 text-sm rounded", section === "salary" ? "bg-primary text-primary-foreground" : "bg-muted")}>Salary</button>
           </div>
 
@@ -985,13 +1272,11 @@ function EditEmployeeSheet({
                   <Input value={form.age} readOnly className="bg-muted" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label>Gender</Label>
                   <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
                       {GENDERS.map((g) => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
                     </SelectContent>
@@ -1000,54 +1285,66 @@ function EditEmployeeSheet({
                 <div className="space-y-1.5">
                   <Label>Grade</Label>
                   <Select value={form.grade} onValueChange={(v) => setForm({ ...form, grade: v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select grade" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
                       {GRADES.map((g) => (<SelectItem key={g} value={g}>Grade {g}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-1.5">
+                  <Label>Gen</Label>
+                  <Input value={form.gen} onChange={(e) => setForm({ ...form, gen: e.target.value })} placeholder="M/F" />
+                </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Joining Date <span className="text-destructive">*</span></Label>
-                <Input type="date" value={form.date_of_joining} onChange={(e) => setForm({ ...form, date_of_joining: e.target.value })} className={errors.date_of_joining ? "border-destructive" : ""} />
-                {errors.date_of_joining && <p className="text-xs text-destructive">{errors.date_of_joining}</p>}
+                <Label>Joining Date</Label>
+                <Input type="date" value={form.date_of_joining} onChange={(e) => setForm({ ...form, date_of_joining: e.target.value })} />
               </div>
             </div>
           )}
 
           {section === "job" && (
             <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label>Designation <span className="text-destructive">*</span></Label>
-                <Input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} className={errors.designation ? "border-destructive" : ""} />
-                {errors.designation && <p className="text-xs text-destructive">{errors.designation}</p>}
-              </div>
-              <div className="space-y-1.5">
-                <Label>Section</Label>
-                <Input value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Designation</Label>
+                  <Input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Section</Label>
+                  <Input value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} />
+                </div>
               </div>
               <div className="space-y-1.5">
                 <Label>Department <span className="text-destructive">*</span></Label>
-                <Input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} />
+                <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
+                  <SelectTrigger className={errors.department ? "border-destructive" : ""}>
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENTS.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+                {errors.department && <p className="text-xs text-destructive">{errors.department}</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Shift</Label>
                   <Select value={form.shift} onValueChange={(v) => setForm({ ...form, shift: v })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {SHIFTS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Bank Account No.</Label>
-                  <Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} />
+                  <Label>Phone</Label>
+                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
                 </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Bank Account No.</Label>
+                <Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} />
               </div>
             </div>
           )}
@@ -1056,60 +1353,64 @@ function EditEmployeeSheet({
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Basic <span className="text-destructive">*</span></Label>
-                  <Input type="number" min={0} value={form.basic} onChange={(e) => setForm({ ...form, basic: Number(e.target.value) })} className={errors.basic ? "border-destructive" : ""} />
-                  {errors.basic && <p className="text-xs text-destructive">{errors.basic}</p>}
+                  <Label>Basic</Label>
+                  <Input type="number" min={0} step={0.01} value={form.basic} onChange={(e) => setForm({ ...form, basic: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>House Rent</Label>
-                  <Input type="number" min={0} value={form.house_rent} onChange={(e) => setForm({ ...form, house_rent: Number(e.target.value) })} />
+                  <Input type="number" min={0} step={0.01} value={form.house_rent} onChange={(e) => setForm({ ...form, house_rent: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Medical</Label>
-                  <Input type="number" min={0} value={form.medical} onChange={(e) => setForm({ ...form, medical: Number(e.target.value) })} />
+                  <Input type="number" min={0} step={0.01} value={form.medical} onChange={(e) => setForm({ ...form, medical: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Conveyance</Label>
-                  <Input type="number" min={0} value={form.conveyance} onChange={(e) => setForm({ ...form, conveyance: Number(e.target.value) })} />
+                  <Input type="number" min={0} step={0.01} value={form.conveyance} onChange={(e) => setForm({ ...form, conveyance: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Food Allowance</Label>
-                  <Input type="number" min={0} value={form.food_allowance} onChange={(e) => setForm({ ...form, food_allowance: Number(e.target.value) })} />
+                  <Input type="number" min={0} step={0.01} value={form.food_allowance} onChange={(e) => setForm({ ...form, food_allowance: Number(e.target.value) })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Wages</Label>
+                  <Input type="number" min={0} step={0.01} value={form.wages} onChange={(e) => setForm({ ...form, wages: Number(e.target.value) })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Increment</Label>
+                  <Input type="number" min={0} step={0.01} value={form.increment} onChange={(e) => setForm({ ...form, increment: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Mobile Bill</Label>
-                  <Input type="number" min={0} value={form.mobile_bill} onChange={(e) => setForm({ ...form, mobile_bill: Number(e.target.value) })} />
+                  <Input type="number" min={0} step={0.01} value={form.mobile_bill} onChange={(e) => setForm({ ...form, mobile_bill: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Shift Benefit</Label>
-                  <Input type="number" min={0} value={form.shift_benefit} onChange={(e) => setForm({ ...form, shift_benefit: Number(e.target.value) })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Increment</Label>
-                  <Input type="number" min={0} value={form.increment} onChange={(e) => setForm({ ...form, increment: Number(e.target.value) })} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Total Salary</Label>
-                  <Input value={formatCurrency(totalSalary)} readOnly className="bg-muted font-semibold" />
+                  <Input type="number" min={0} step={0.01} value={form.shift_benefit} onChange={(e) => setForm({ ...form, shift_benefit: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Days of Month</Label>
                   <Input type="number" min={1} max={31} value={form.days_of_month} onChange={(e) => setForm({ ...form, days_of_month: Number(e.target.value) })} />
                 </div>
               </div>
+              <div className="bg-muted p-3 rounded-md">
+                <Label>Total Salary (auto-calculated)</Label>
+                <p className="text-lg font-bold text-primary mt-1">{formatCurrency(totalSalary)}</p>
+                <p className="text-xs text-muted-foreground mt-1">Basic + House Rent + Medical + Conveyance + Food Allowance + Mobile Bill + Shift Benefit</p>
+              </div>
             </div>
           )}
 
           <SheetFooter>
-            <Button type="submit" disabled={m.isPending || Object.keys(errors).length > 0}>
+            <Button type="submit" disabled={m.isPending}>
               {m.isPending ? "Saving…" : "Update Employee"}
             </Button>
           </SheetFooter>
@@ -1146,15 +1447,47 @@ const FIELD_CANDIDATES: Record<string, string[]> = {
   days_of_month: ["days of month"],
   mobile_bill: ["mobile bill"],
   shift_benefit: ["shift benifit"],
+  phone: ["phone"],
   shift: ["shift"],
+  wages_of_month: ["wages of month"],
+  calculate_days: ["calculate days"],
+  actual_attendance: ["acctual atten.", "actual attendance", "attendance"],
+  day_off: ["day off"],
+  cl: ["cl"],
+  sl: ["sl"],
+  el: ["el"],
+  comp_leave: ["comp leave", "com.l.", "comp l"],
+  festival_holiday: ["festival holiday", "g/h & festival holi day", "g/h & festival holiday"],
+  absent_days: ["absent days"],
+  payable_days: ["payable days"],
+  payable_salary: ["payable salary"],
+  ot_hours: ["ot hour", "ot hours"],
+  ot_amount: ["ot tk.", "ot amount", "ot taka"],
+  festival_duty_benefit: ["festival duty benifte", "festival duty benefit", "g/h & festival holiday duty benifte"],
+  festival_holiday_allowance: ["festival holiday allowance", "festival holiday allow", "g/h & festival holiday allow"],
+  ifter_days: ["ifter days"],
+  ifter_allowance: ["ifter allow", "ifter allowance"],
+  special_food: ["special food tk.", "special food", "special food taka"],
+  attendance_bonus: ["atten. bonus tk.", "attendance bonus", "atten bonus"],
+  arrear_others: ["arear/ others tk.", "arrear/others", "arrear others"],
+  shift_qty: ["shift qty"],
+  shift_amount: ["shift tk", "shift amount"],
+  roster_qty: ["roster qty"],
+  roster_amount: ["roster tk", "roster amount"],
+  absent_deduction: ["absent ded. tk.", "absent deduction", "absent ded"],
+  advance_deduction: ["adv. ded. tk.", "advance deduction", "adv ded"],
+  tax_deduction: ["tax ded. tk.", "tax deduction", "tax ded"],
+  net_payable: ["net payable"],
 };
 
 function excelToDate(v: any): string | null {
   if (!v) return null
-  const n = Number(v)
-  if (isNaN(n) || n < 1000) return null
-  const d = new Date(Math.round((n - 25569) * 86400 * 1000))
-  return d.toISOString().split('T')[0]
+  if (v instanceof Date) return v.toISOString().split('T')[0]
+  if (typeof v === 'number') {
+    const d = new Date(Math.round((v - 25569) * 86400 * 1000))
+    return d.toISOString().split('T')[0]
+  }
+  return String(v)
 }
 
 function normalizeShift(v: any): string {
@@ -1204,9 +1537,33 @@ interface EmpImportRow {
   mobile_bill: string;
   shift_benefit: string;
   shift_qty: string;
-  shift_tk: string;
+  shift_amount: string;
   roster_qty: string;
-  roster_tk: string;
+  roster_amount: string;
+  calculate_days: string;
+  actual_attendance: string;
+  day_off: string;
+  cl: string;
+  sl: string;
+  el: string;
+  comp_leave: string;
+  festival_holiday: string;
+  absent_days: string;
+  payable_days: string;
+  payable_salary: string;
+  ot_hours: string;
+  ot_amount: string;
+  festival_duty_benefit: string;
+  festival_holiday_allowance: string;
+  ifter_days: string;
+  ifter_allowance: string;
+  special_food: string;
+  attendance_bonus: string;
+  arrear_others: string;
+  absent_deduction: string;
+  advance_deduction: string;
+  tax_deduction: string;
+  net_payable: string;
   _error?: string;
   _warnings?: string[];
 }
@@ -1231,6 +1588,9 @@ function parseEmployeeRow(row: any[], colMap: Record<string, number>, rowIndex: 
   const date_of_joining = dojCol !== undefined ? excelToDate(row[dojCol]) : null;
   const dob = dobCol !== undefined ? excelToDate(row[dobCol]) : null;
 
+  const rawGrade = get("grade");
+  const finalGrade = rawGrade !== "" ? rawGrade : "";
+
   return {
     employee_code,
     full_name,
@@ -1243,8 +1603,8 @@ function parseEmployeeRow(row: any[], colMap: Record<string, number>, rowIndex: 
     gen: get("gen"),
     age: get("age"),
     gender: get("gender"),
-    grade: get("grade"),
-    phone: get("phone"),
+    grade: finalGrade,
+    phone: "",
     daily_wage: get("wages") || get("daily_wage"),
     sl_no: get("sl_no"),
     bank_account_no: get("bank_account_no"),
@@ -1256,14 +1616,38 @@ function parseEmployeeRow(row: any[], colMap: Record<string, number>, rowIndex: 
     wages: get("wages"),
     increment: get("increment"),
     total_salary: get("total_salary"),
-    wages_of_month: "",
+    wages_of_month: get("wages_of_month"),
     days_of_month: get("days_of_month"),
     mobile_bill: get("mobile_bill"),
     shift_benefit: get("shift_benefit"),
-    shift_qty: "",
-    shift_tk: "",
-    roster_qty: "",
-    roster_tk: "",
+    shift_qty: get("shift_qty"),
+    shift_amount: get("shift_amount"),
+    roster_qty: get("roster_qty"),
+    roster_amount: get("roster_amount"),
+    calculate_days: get("calculate_days"),
+    actual_attendance: get("actual_attendance"),
+    day_off: get("day_off"),
+    cl: get("cl"),
+    sl: get("sl"),
+    el: get("el"),
+    comp_leave: get("comp_leave"),
+    festival_holiday: get("festival_holiday"),
+    absent_days: get("absent_days"),
+    payable_days: get("payable_days"),
+    payable_salary: get("payable_salary"),
+    ot_hours: get("ot_hours"),
+    ot_amount: get("ot_amount"),
+    festival_duty_benefit: get("festival_duty_benefit"),
+    festival_holiday_allowance: get("festival_holiday_allowance"),
+    ifter_days: get("ifter_days"),
+    ifter_allowance: get("ifter_allowance"),
+    special_food: get("special_food"),
+    attendance_bonus: get("attendance_bonus"),
+    arrear_others: get("arrear_others"),
+    absent_deduction: get("absent_deduction"),
+    advance_deduction: get("advance_deduction"),
+    tax_deduction: get("tax_deduction"),
+    net_payable: get("net_payable"),
     _error: undefined,
     _warnings: undefined,
   };
@@ -1301,19 +1685,48 @@ const FIELD_TO_LABEL: Record<string, string> = {
   mobile_bill: "Mobile Bill",
   shift_benefit: "Shift Benefit",
   shift_qty: "Shift Qty",
-  shift_tk: "Shift TK",
+  shift_amount: "Shift Amount",
   roster_qty: "Roster Qty",
-  roster_tk: "Roster TK",
+  roster_amount: "Roster Amount",
   phone: "Phone",
   shift: "Shift",
+  calculate_days: "Calculate Days",
+  actual_attendance: "Actual Attendance",
+  day_off: "Day Off",
+  cl: "CL",
+  sl: "SL",
+  el: "EL",
+  comp_leave: "Comp Leave",
+  festival_holiday: "Festival Holiday",
+  absent_days: "Absent Days",
+  payable_days: "Payable Days",
+  payable_salary: "Payable Salary",
+  ot_hours: "OT Hours",
+  ot_amount: "OT Amount",
+  festival_duty_benefit: "Festival Duty Benefit",
+  festival_holiday_allowance: "Festival Holiday Allow",
+  ifter_days: "Ifter Days",
+  ifter_allowance: "Ifter Allowance",
+  special_food: "Special Food",
+  attendance_bonus: "Attendance Bonus",
+  arrear_others: "Arrear/Others",
+  absent_deduction: "Absent Deduction",
+  advance_deduction: "Advance Deduction",
+  tax_deduction: "Tax Deduction",
+  net_payable: "Net Payable",
 };
 
 function downloadEmployeeTemplate() {
+  const hdrs = ["Sl no", "name", "employee_id", "Joining Date", "Gen", "DOB", "Age", "Gender", "Grade", "Designation", "Section", "Department", "Bank A/C No.", "Basic", "House Rent", "Medical", "Conveyance", "Food Allow", "Wages", "Increment", "Total Salary", "Wages of Month", "Days of Month", "Mobile Bill", "shift Benifit", "Phone", "Shift",
+    "Calculate Days", "Acctual Atten.", "Day Off", "CL", "SL", "EL", "Com.L.", "Festival Holiday", "Absent Days", "Payable Days", "Payable Salary",
+    "OT Hour", "OT Tk.", "Festival Duty Benifte", "Festival Holiday Allow", "Ifter Days", "Ifter Allow", "Special Food Tk.", "Atten. Bonus Tk.",
+    "Arear/ others Tk.", "shift Qty", "Shift TK", "Roster Qty", "Roster TK", "Absent Ded. Tk.", "Adv. Ded. Tk.", "TAX Ded. Tk.", "Net Payable"];
+  const sample = ["1", "Ravi Kumar", "EMP001", "01/06/2024", "M", "15/03/1990", "34", "Male", "Grade A", "Operator", "Section 1", "Spinning", "123456789", "10000", "2000", "1500", "800", "500", "5000", "300", "20100", "5000", "26", "500", "500", "01712345678", "General",
+    "26", "26", "4", "1", "0", "0", "0", "1", "1", "26", "19500",
+    "0", "0", "0", "0", "0", "0", "0", "0",
+    "0", "0", "0", "0", "0", "0", "0", "0", "19500"];
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([
-    ["Sl no", "name", "employee_id", "Joining Date", "Gen", "DOB", "Age", "Gender", "Grade", "Designation", "Section", "Department", "Bank A/C No.", "Basic", "House Rent", "Medical", "Conveyance", "Food Allow", "Wages", "Increment", "Total Salary", "Wages of Month", "Days of Month", "Mobile Bill", "shift Benifit", "shift Qty", "Shift TK", "Roster Qty", "Roster TK"],
-    ["1", "Ravi Kumar", "EMP001", "01/06/2024", "M", "15/03/1990", "34", "Male", "Grade A", "Operator", "Section 1", "Spinning", "123456789", "10000", "2000", "1500", "800", "500", "5000", "300", "20100", "5000", "26", "500", "500", "0", "0", "0", "0"],
-  ]);
+  const ws = XLSX.utils.aoa_to_sheet([hdrs, sample]);
   XLSX.utils.book_append_sheet(wb, ws, "Employees");
   XLSX.writeFile(wb, "employee_import_template.xlsx");
 }
@@ -1341,7 +1754,7 @@ function ImportEmployeeDialog() {
     setFileName(file.name);
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const wb = XLSX.read(ev.target?.result, { type: "array" });
+      const wb = XLSX.read(ev.target?.result, { type: "array", cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const raw: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
       const hdrs = (raw[0] ?? []).map((h: any) => String(h ?? "").trim());
@@ -1364,7 +1777,14 @@ function ImportEmployeeDialog() {
   }
 
   function applyMapping() {
-    const parsed = rawRows.map((row, i) => parseEmployeeRow(row, colMap, i)).filter((r): r is EmpImportRow => r !== null);
+    const parsed = rawRows
+      .filter((row) => {
+        const nameIdx = colMap["name"];
+        if (nameIdx === undefined) return true;
+        return String(row[nameIdx] ?? "").trim() !== "";
+      })
+      .map((row, i) => parseEmployeeRow(row, colMap, i))
+      .filter((r): r is EmpImportRow => r !== null);
     setRows(parsed);
     setDirtyCells(new Set());
     setEditingCell(null);
@@ -1417,6 +1837,35 @@ function ImportEmployeeDialog() {
       days_of_month: r.days_of_month ? parseInt(r.days_of_month) : 26,
       mobile_bill: r.mobile_bill ? parseFloat(r.mobile_bill) : 0,
       shift_benefit: r.shift_benefit ? parseFloat(r.shift_benefit) : 0,
+      wages_of_month: r.wages_of_month ? parseFloat(r.wages_of_month) : 0,
+      shift_qty: r.shift_qty ? parseInt(r.shift_qty) : 0,
+      shift_tk: r.shift_amount ? parseFloat(r.shift_amount) : 0,
+      roster_qty: r.roster_qty ? parseInt(r.roster_qty) : 0,
+      roster_tk: r.roster_amount ? parseFloat(r.roster_amount) : 0,
+      calculate_days: r.calculate_days ? parseFloat(r.calculate_days) : 0,
+      actual_attendance: r.actual_attendance ? parseInt(r.actual_attendance) : 0,
+      day_off: r.day_off ? parseInt(r.day_off) : 0,
+      cl: r.cl ? parseInt(r.cl) : 0,
+      sl: r.sl ? parseInt(r.sl) : 0,
+      el: r.el ? parseInt(r.el) : 0,
+      comp_leave: r.comp_leave ? parseInt(r.comp_leave) : 0,
+      festival_holiday: r.festival_holiday ? parseInt(r.festival_holiday) : 0,
+      absent_days: r.absent_days ? parseInt(r.absent_days) : 0,
+      payable_days: r.payable_days ? parseFloat(r.payable_days) : 0,
+      payable_salary: r.payable_salary ? parseFloat(r.payable_salary) : 0,
+      ot_hours: r.ot_hours ? parseFloat(r.ot_hours) : 0,
+      ot_amount: r.ot_amount ? parseFloat(r.ot_amount) : 0,
+      festival_duty_benefit: r.festival_duty_benefit ? parseFloat(r.festival_duty_benefit) : 0,
+      festival_holiday_allowance: r.festival_holiday_allowance ? parseFloat(r.festival_holiday_allowance) : 0,
+      ifter_days: r.ifter_days ? parseInt(r.ifter_days) : 0,
+      ifter_allowance: r.ifter_allowance ? parseFloat(r.ifter_allowance) : 0,
+      special_food: r.special_food ? parseFloat(r.special_food) : 0,
+      attendance_bonus: r.attendance_bonus ? parseFloat(r.attendance_bonus) : 0,
+      arrear_others: r.arrear_others ? parseFloat(r.arrear_others) : 0,
+      absent_deduction: r.absent_deduction ? parseFloat(r.absent_deduction) : 0,
+      advance_deduction: r.advance_deduction ? parseFloat(r.advance_deduction) : 0,
+      tax_deduction: r.tax_deduction ? parseFloat(r.tax_deduction) : 0,
+      net_payable: r.net_payable ? parseFloat(r.net_payable) : 0,
     }));
     try {
       const res = await m.mutateAsync(items);

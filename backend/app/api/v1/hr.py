@@ -221,7 +221,12 @@ async def bulk_create_employees(
         return None
 
     employees_to_add: List[Employee] = []
+    payroll_records: List[MonthlyPayroll] = []
     errors: List[str] = []
+    now = datetime.now(timezone.utc)
+    cur_month = now.month
+    cur_year = now.year
+
     for i, item in enumerate(req.items, start=1):
         row_label = f"Row {i} ({item.employee_code or 'no code'})"
         if not item.employee_code or not item.full_name:
@@ -240,22 +245,25 @@ async def bulk_create_employees(
         if total_sal is None:
             total_sal = (item.wages or 0) + (item.basic or 0) + (item.house_rent or 0) + (item.medical or 0) + (item.conveyance or 0) + (item.food_allowance or 0) + (item.increment or 0) + (item.mobile_bill or 0) + (item.shift_benefit or 0)
 
-        employees_to_add.append(Employee(
+        def _str(v):
+            return str(v).strip() if v is not None else None
+
+        emp = Employee(
             code=item.employee_code.strip(),
             name=item.full_name.strip(),
             department=(item.department or "General").strip(),
-            designation=item.designation.strip() if item.designation else None,
-            section=item.section.strip() if item.section else None,
-            shift=item.shift,
+            designation=_str(item.designation),
+            section=_str(item.section),
+            shift=item.shift or "General",
             joining_date=doj,
             dob=dob,
-            gen=item.gen.strip() if item.gen else None,
+            gen=_str(item.gen),
             age=item.age,
-            gender=item.gender.strip() if item.gender else None,
-            grade=item.grade.strip() if item.grade else None,
-            phone=item.phone.strip() if item.phone else None,
+            gender=_str(item.gender),
+            grade=_str(item.grade) if item.grade is not None else None,
+            phone=_str(item.phone),
             sl_no=item.sl_no,
-            bank_account_no=item.bank_account_no.strip() if item.bank_account_no else None,
+            bank_account_no=_str(item.bank_account_no),
             wages=item.wages or 0,
             basic=item.basic or 0,
             house_rent=item.house_rent or 0,
@@ -270,19 +278,80 @@ async def bulk_create_employees(
             shift_benefit=item.shift_benefit or 0,
             is_active=True,
             mill_id=mill_id,
-        ))
+        )
+        employees_to_add.append(emp)
+        has_payroll = any(getattr(item, f, None) is not None for f in [
+            "calculate_days", "actual_attendance", "day_off", "cl", "sl", "el",
+            "comp_leave", "festival_holiday", "absent_days", "payable_days",
+            "payable_salary", "ot_hours", "ot_amount", "festival_duty_benefit",
+            "festival_holiday_allowance", "ifter_days", "ifter_allowance",
+            "special_food", "attendance_bonus", "arrear_others", "shift_qty",
+            "shift_tk", "roster_qty", "roster_tk", "absent_deduction",
+            "advance_deduction", "tax_deduction", "net_payable",
+        ])
+        if has_payroll:
+            payroll_records.append((emp, item))
 
     if errors:
         return EmployeeBulkResponse(created=0, errors=errors)
 
-    for emp in employees_to_add:
-        db.add(emp)
+    BATCH_SIZE = 50
+    imported = 0
+    for batch_start in range(0, len(employees_to_add), BATCH_SIZE):
+        batch = employees_to_add[batch_start:batch_start + BATCH_SIZE]
+        for emp in batch:
+            db.add(emp)
+        try:
+            await db.flush()
+            imported += len(batch)
+        except Exception as exc:
+            await db.rollback()
+            return EmployeeBulkResponse(created=imported, errors=[f"Batch error at row {batch_start + 1}: {str(exc)}"])
+
+    for emp, item in payroll_records:
+        mp = MonthlyPayroll(
+            employee_id=emp.id,
+            mill_id=mill_id,
+            month=cur_month,
+            year=cur_year,
+            days_of_month=item.days_of_month or 26,
+            calculate_days=item.calculate_days or 0,
+            actual_attendance=item.actual_attendance or 0,
+            day_off=item.day_off or 0,
+            cl=item.cl or 0,
+            sl=item.sl or 0,
+            el=item.el or 0,
+            comp_leave=item.comp_leave or 0,
+            festival_holiday=item.festival_holiday or 0,
+            absent_days=item.absent_days or 0,
+            payable_days=item.payable_days or 0,
+            payable_salary=item.payable_salary or 0,
+            ot_hours=item.ot_hours or 0,
+            ot_amount=item.ot_amount or 0,
+            festival_duty_benefit=item.festival_duty_benefit or 0,
+            festival_holiday_allowance=item.festival_holiday_allowance or 0,
+            ifter_days=item.ifter_days or 0,
+            ifter_allowance=item.ifter_allowance or 0,
+            special_food=item.special_food or 0,
+            attendance_bonus=item.attendance_bonus or 0,
+            arrear_others=item.arrear_others or 0,
+            shift_qty=item.shift_qty or 0,
+            shift_amount=item.shift_tk or 0,
+            roster_qty=item.roster_qty or 0,
+            roster_amount=item.roster_tk or 0,
+            absent_deduction=item.absent_deduction or 0,
+            advance_deduction=item.advance_deduction or 0,
+            tax_deduction=item.tax_deduction or 0,
+            net_payable=item.net_payable or 0,
+        )
+        db.add(mp)
+
     try:
         await db.commit()
     except Exception as exc:
         await db.rollback()
-        return EmployeeBulkResponse(created=0, errors=[f"Database error: {str(exc)}"])
-    return EmployeeBulkResponse(created=len(employees_to_add), errors=[])
+        return EmployeeBulkResponse(created=imported, errors=[f"Commit error: {str(exc)}"])
+    return EmployeeBulkResponse(created=imported, errors=[])
 
 
 # ── Payroll ────────────────────────────────────────────────────────────────
