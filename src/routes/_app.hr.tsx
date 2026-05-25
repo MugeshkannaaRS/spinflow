@@ -347,8 +347,8 @@ function HRPage() {
 function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdit: boolean }) {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState("");
-  const [gradeFilter, setGradeFilter] = useState("");
+  const [deptFilter, setDeptFilter] = useState("all");
+  const [gradeFilter, setGradeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editOpen, setEditOpen] = useState(false);
   const [editingEmp, setEditingEmp] = useState<EmployeeRow | null>(null);
@@ -365,8 +365,8 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
         )
           return false;
       }
-      if (deptFilter && e.department !== deptFilter) return false;
-      if (gradeFilter && e.grade !== gradeFilter) return false;
+      if (deptFilter !== "all" && e.department !== deptFilter) return false;
+      if (gradeFilter !== "all" && e.grade !== gradeFilter) return false;
       if (statusFilter === "active" && !e.is_active) return false;
       if (statusFilter === "inactive" && e.is_active) return false;
       return true;
@@ -409,7 +409,7 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
             <SelectValue placeholder="Department" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Departments</SelectItem>
+            <SelectItem value="all">All Departments</SelectItem>
             {depts.map((d) => (
               <SelectItem key={d} value={d}>{d}</SelectItem>
             ))}
@@ -420,7 +420,7 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
             <SelectValue placeholder="Grade" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Grades</SelectItem>
+            <SelectItem value="all">All Grades</SelectItem>
             {grades.map((g) => (
               <SelectItem key={g} value={g}>Grade {g}</SelectItem>
             ))}
@@ -1418,12 +1418,12 @@ function ImportEmployeeDialog() {
                         <TableRow key={field}>
                           <TableCell className="font-medium">{FIELD_TO_LABEL[field]}</TableCell>
                           <TableCell>
-                            <Select value={detectedIdx !== undefined ? String(detectedIdx) : ""} onValueChange={(v) => setColMap((prev) => ({ ...prev, [field]: v ? Number(v) : (undefined as any) }))}>
+                            <Select value={detectedIdx !== undefined ? String(detectedIdx) : "__none__"} onValueChange={(v) => setColMap((prev) => ({ ...prev, [field]: v && v !== "__none__" ? Number(v) : (undefined as any) }))}>
                               <SelectTrigger className="h-8 text-xs">
                                 <SelectValue placeholder="Select column..." />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">(none)</SelectItem>
+                                <SelectItem value="__none__">(none)</SelectItem>
                                 {headers.map((h, i) => (
                                   <SelectItem key={i} value={String(i)}>{h || `Column ${i + 1}`}</SelectItem>
                                 ))}
@@ -1514,12 +1514,12 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
-  const [deptFilter, setDeptFilter] = useState("");
-  const [shiftFilter, setShiftFilter] = useState("");
+  const [deptFilter, setDeptFilter] = useState("all");
+  const [shiftFilter, setShiftFilter] = useState("all");
 
   const { data: attendanceData, isLoading, refetch } = useQuery({
     queryKey: ["hr-attendance", month, year, deptFilter],
-    queryFn: () => hrApi.getAttendance({ month, year, department: deptFilter || undefined }),
+    queryFn: () => hrApi.getAttendance({ month, year, department: deptFilter !== "all" ? deptFilter : undefined }),
   });
 
   const attendanceRows: AttendanceRow[] = Array.isArray(attendanceData) ? attendanceData : (attendanceData?.data ?? []);
@@ -1527,8 +1527,8 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((e) => {
-      if (deptFilter && e.department !== deptFilter) return false;
-      if (shiftFilter && e.shift !== shiftFilter) return false;
+      if (deptFilter !== "all" && e.department !== deptFilter) return false;
+      if (shiftFilter !== "all" && e.shift !== shiftFilter) return false;
       return true;
     });
   }, [employees, deptFilter, shiftFilter]);
@@ -1609,7 +1609,7 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
             <SelectValue placeholder="Department" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Departments</SelectItem>
+            <SelectItem value="all">All Departments</SelectItem>
             {depts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
           </SelectContent>
         </Select>
@@ -1618,7 +1618,7 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
             <SelectValue placeholder="Shift" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Shifts</SelectItem>
+            <SelectItem value="all">All Shifts</SelectItem>
             {shifts.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
           </SelectContent>
         </Select>
