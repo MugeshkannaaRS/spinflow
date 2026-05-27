@@ -367,7 +367,7 @@ function ReportsPage() {
                   <div className="text-xs text-muted-foreground mt-1">Total Lots</div>
                 </div>
                 <div className="rounded-lg border p-4 text-center">
-                  <div className="text-2xl font-semibold">{stock.sellable_stock_kg.toLocaleString()} kg</div>
+                  <div className="text-2xl font-semibold">{(stock.sellable_stock_kg ?? 0).toLocaleString()} kg</div>
                   <div className="text-xs text-muted-foreground mt-1">Sellable Stock</div>
                 </div>
               </div>

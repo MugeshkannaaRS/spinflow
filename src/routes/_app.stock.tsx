@@ -400,7 +400,7 @@ function SalesOrdersTab() {
                   <td className="px-4 py-3">{so.order_date}</td>
                   <td className="px-4 py-3">{so.delivery_date || "-"}</td>
                   <td className="px-4 py-3 text-right">{so.total_bags}</td>
-                  <td className="px-4 py-3 text-right">{so.total_weight_kg.toFixed(1)}</td>
+                  <td className="px-4 py-3 text-right">{(so.total_weight_kg ?? 0).toFixed(1)}</td>
                   <td className="px-4 py-3 text-right">
                     {so.total_value != null ? `\u20B9${so.total_value.toLocaleString()}` : "-"}
                   </td>

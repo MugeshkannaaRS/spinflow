@@ -670,7 +670,7 @@ function FinanceTab({ millId }: { millId: string }) {
                           key={b.label}
                           className={`${b.color}`}
                           style={{ width: `${pct}%` }}
-                          title={`${b.label}: ₹${b.val.toLocaleString()}`}
+                          title={`${b.label}: ₹${(b.val ?? 0).toLocaleString()}`}
                         />
                       );
                     })}
