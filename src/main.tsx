@@ -5,16 +5,25 @@ import { router } from "./router";
 import { startKeepAlive, stopKeepAlive } from "./lib/keepAlive";
 import "./styles.css";
 
-function App() {
+function KeepAlive({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    const id = startKeepAlive();
-    return () => stopKeepAlive(id);
+    let id: ReturnType<typeof setInterval> | null = null;
+    try {
+      id = startKeepAlive();
+    } catch {
+      // keep-alive must never crash the app
+    }
+    return () => {
+      if (id != null) stopKeepAlive(id);
+    };
   }, []);
-  return <RouterProvider router={router} />;
+  return <>{children}</>;
 }
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <KeepAlive>
+      <RouterProvider router={router} />
+    </KeepAlive>
   </StrictMode>,
 );

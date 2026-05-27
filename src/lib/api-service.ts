@@ -29,6 +29,7 @@ export const authApi = {
             role: (u.role ?? "OPERATOR") as Role,
             millId: u.mill_id || "m1",
             millName: u.mill_name || "SpinFlow Coimbatore Unit-1",
+            companyId: u.company_id || undefined,
             mustChangePassword: u.must_change_password ?? false,
           },
         };
