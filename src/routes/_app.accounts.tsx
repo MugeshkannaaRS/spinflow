@@ -26,6 +26,7 @@ import {
   TrendingUp,
   TrendingDown,
 } from "lucide-react";
+import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/accounts")({
   head: () => ({ meta: [{ title: "Accounts — SpinFlow ERP" }] }),
@@ -34,6 +35,8 @@ export const Route = createFileRoute("/_app/accounts")({
 
 function AccountsPage() {
   const user = useAuth((s) => s.user);
+  const invColConfig = useColumnConfig("accounts_invoices");
+  const recvColConfig = useColumnConfig("accounts_invoices");
   const invQ = useQuery({
     queryKey: ["invoices"],
     queryFn: accountsApi.getInvoices,
@@ -146,14 +149,14 @@ function AccountsPage() {
                   <DataTable
                     tableId="accounts_invoices"
                     columns={[
-                      { key: "invoiceNo", label: "Invoice No", className: "font-mono text-xs" },
-                      { key: "date", label: "Date", type: "date" },
-                      { key: "customer", label: "Customer / Supplier", render: (inv: any) => <span className="font-medium">{inv.customer}</span> },
-                      { key: "type", label: "Type", type: "status", render: (inv: any) => <Badge variant={inv.type === "sales" ? "default" : "secondary"}>{inv.type}</Badge> },
-                      { key: "amount", label: "Amount", render: (inv: any) => `₹${(inv.amount ?? 0).toLocaleString()}` },
-                      { key: "gst", label: "GST", render: (inv: any) => `₹${(inv.gst ?? 0).toLocaleString()}` },
-                      { key: "total", label: "Total", render: (inv: any) => <span className="font-medium">₹{(inv.total ?? 0).toLocaleString()}</span> },
-                      { key: "status", label: "Status", type: "status", render: (inv: any) => <Badge variant={inv.status === "paid" ? "default" : inv.status === "overdue" ? "destructive" : inv.status === "posted" ? "secondary" : "outline"}>{inv.status}</Badge> },
+                      { key: "invoiceNo", label: invColConfig.getLabel('invoice_no'), className: "font-mono text-xs" },
+                      { key: "date", label: invColConfig.getLabel('date'), type: "date" },
+                      { key: "customer", label: invColConfig.getLabel('customer'), render: (inv: any) => <span className="font-medium">{inv.customer}</span> },
+                      { key: "type", label: invColConfig.getLabel('type'), type: "status", render: (inv: any) => <Badge variant={inv.type === "sales" ? "default" : "secondary"}>{inv.type}</Badge> },
+                      { key: "amount", label: invColConfig.getLabel('amount'), render: (inv: any) => `₹${(inv.amount ?? 0).toLocaleString()}` },
+                      { key: "gst", label: invColConfig.getLabel('gst'), render: (inv: any) => `₹${(inv.gst ?? 0).toLocaleString()}` },
+                      { key: "total", label: invColConfig.getLabel('total'), render: (inv: any) => <span className="font-medium">₹{(inv.total ?? 0).toLocaleString()}</span> },
+                      { key: "status", label: invColConfig.getLabel('status'), type: "status", render: (inv: any) => <Badge variant={inv.status === "paid" ? "default" : inv.status === "overdue" ? "destructive" : inv.status === "posted" ? "secondary" : "outline"}>{inv.status}</Badge> },
                     ] satisfies ColDef[]}
                     data={invoices}
                     loading={invQ.isLoading}
@@ -171,14 +174,14 @@ function AccountsPage() {
                   <DataTable
                     tableId="accounts_receivables"
                     columns={[
-                      { key: "customer", label: "Customer", render: (r: any) => <span className="font-medium">{r.customer}</span> },
-                      { key: "invoiceNo", label: "Invoice", className: "font-mono text-xs" },
-                      { key: "date", label: "Date", type: "date" },
-                      { key: "dueDate", label: "Due Date", type: "date" },
-                      { key: "amount", label: "Amount", render: (r: any) => `₹${(r.amount ?? 0).toLocaleString()}` },
-                      { key: "outstanding", label: "Outstanding", render: (r: any) => <span className="font-medium text-destructive">₹{(r.outstanding ?? 0).toLocaleString()}</span> },
-                      { key: "status", label: "Status", type: "status", render: (r: any) => <Badge variant={r.status === "paid" ? "default" : r.status === "overdue" ? "destructive" : "secondary"}>{r.status === "paid" && <CheckCircle2 className="size-3 mr-1 inline" />}{r.status}</Badge> },
-                      { key: "daysOverdue", label: "Days Overdue", render: (r: any) => r.daysOverdue > 0 ? <span className="text-destructive font-medium">{r.daysOverdue}d</span> : "—" },
+                      { key: "customer", label: recvColConfig.getLabel('customer'), render: (r: any) => <span className="font-medium">{r.customer}</span> },
+                      { key: "invoiceNo", label: recvColConfig.getLabel('invoice_no'), className: "font-mono text-xs" },
+                      { key: "date", label: recvColConfig.getLabel('date'), type: "date" },
+                      { key: "dueDate", label: recvColConfig.getLabel('due_date'), type: "date" },
+                      { key: "amount", label: recvColConfig.getLabel('amount'), render: (r: any) => `₹${(r.amount ?? 0).toLocaleString()}` },
+                      { key: "outstanding", label: recvColConfig.getLabel('outstanding'), render: (r: any) => <span className="font-medium text-destructive">₹{(r.outstanding ?? 0).toLocaleString()}</span> },
+                      { key: "status", label: recvColConfig.getLabel('status'), type: "status", render: (r: any) => <Badge variant={r.status === "paid" ? "default" : r.status === "overdue" ? "destructive" : "secondary"}>{r.status === "paid" && <CheckCircle2 className="size-3 mr-1 inline" />}{r.status}</Badge> },
+                      { key: "daysOverdue", label: recvColConfig.getLabel('days_overdue'), render: (r: any) => r.daysOverdue > 0 ? <span className="text-destructive font-medium">{r.daysOverdue}d</span> : "—" },
                     ] satisfies ColDef[]}
                     data={receivables as any[]}
                     loading={recvQ.isLoading}

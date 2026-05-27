@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { hrApi, uploadApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
@@ -362,6 +363,7 @@ function HRPage() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdit: boolean }) {
+  const empColConfig = useColumnConfig("hr_employees");
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
@@ -589,10 +591,10 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
           <TableHeader>
             <TableRow>
               {PRIMARY_HEADERS.map((h) => (
-                <TableHead key={h.key} className={h.className}>{h.label}</TableHead>
+                <TableHead key={h.key} className={h.className}>{empColConfig.getLabel(h.key)}</TableHead>
               ))}
               {SECONDARY_HEADERS.filter((h) => visibleSecondary.has(h.key)).map((h) => (
-                <TableHead key={h.key} className="whitespace-nowrap">{h.label}</TableHead>
+                <TableHead key={h.key} className="whitespace-nowrap">{empColConfig.getLabel(h.key)}</TableHead>
               ))}
             </TableRow>
           </TableHeader>
@@ -662,6 +664,7 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
 // ─── Employee Detail Sheet ───────────────────────────────────────────────────────
 
 function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; onOpenChange: (v: boolean) => void; employee: EmployeeRow }) {
+  const empColConfig = useColumnConfig("hr_employees");
   const [payrollTab, setPayrollTab] = useState("personal");
 
   const now = new Date();
@@ -702,38 +705,38 @@ function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; 
 
         {payrollTab === "personal" && (
           <div className="grid grid-cols-2 gap-4 py-4">
-            <Field label="Sl No" value={employee.sl_no} />
-            <Field label="Employee ID" value={employee.employee_id ?? employee.code} />
-            <Field label="Full Name" value={employee.name} />
-            <Field label="DOB" value={employee.dob ? formatDate(employee.dob) : employee.date_of_birth ? formatDate(employee.date_of_birth) : "-"} />
-            <Field label="Age" value={employee.age ?? (employee.date_of_birth ? calcAge(employee.date_of_birth) : "-")} />
-            <Field label="Gender" value={employee.gender ?? "-"} />
-            <Field label="Grade" value={employee.grade ?? "-"} />
-            <Field label="Gen" value={employee.gen ?? "-"} />
-            <Field label="Joining Date" value={employee.date_of_joining ? formatDate(employee.date_of_joining) : "-"} />
-            <Field label="Section" value={employee.section ?? "-"} />
-            <Field label="Department" value={employee.department ?? "-"} />
-            <Field label="Designation" value={employee.designation ?? employee.role ?? "-"} />
-            <Field label="Phone" value={employee.phone ?? "-"} />
-            <Field label="Bank Account No" value={employee.bank_account_no ?? employee.bank_account ?? "-"} />
-            <Field label="Shift" value={employee.shift ?? "General"} />
+            <Field label={empColConfig.getLabel('sl_no')} value={employee.sl_no} />
+            <Field label={empColConfig.getLabel('employee_id')} value={employee.employee_id ?? employee.code} />
+            <Field label={empColConfig.getLabel('name')} value={employee.name} />
+            <Field label={empColConfig.getLabel('dob')} value={employee.dob ? formatDate(employee.dob) : employee.date_of_birth ? formatDate(employee.date_of_birth) : "-"} />
+            <Field label={empColConfig.getLabel('age')} value={employee.age ?? (employee.date_of_birth ? calcAge(employee.date_of_birth) : "-")} />
+            <Field label={empColConfig.getLabel('gender')} value={employee.gender ?? "-"} />
+            <Field label={empColConfig.getLabel('grade')} value={employee.grade ?? "-"} />
+            <Field label={empColConfig.getLabel('gen')} value={employee.gen ?? "-"} />
+            <Field label={empColConfig.getLabel('joining_date')} value={employee.date_of_joining ? formatDate(employee.date_of_joining) : "-"} />
+            <Field label={empColConfig.getLabel('section')} value={employee.section ?? "-"} />
+            <Field label={empColConfig.getLabel('department')} value={employee.department ?? "-"} />
+            <Field label={empColConfig.getLabel('designation')} value={employee.designation ?? employee.role ?? "-"} />
+            <Field label={empColConfig.getLabel('phone')} value={employee.phone ?? "-"} />
+            <Field label={empColConfig.getLabel('bank_account_no')} value={employee.bank_account_no ?? employee.bank_account ?? "-"} />
+            <Field label={empColConfig.getLabel('shift')} value={employee.shift ?? "General"} />
           </div>
         )}
 
         {payrollTab === "salary" && (
           <div className="grid grid-cols-2 gap-4 py-4">
-            <Currency label="Basic" value={employee.basic} />
-            <Currency label="House Rent" value={employee.house_rent} />
-            <Currency label="Medical" value={employee.medical} />
-            <Currency label="Conveyance" value={employee.conveyance} />
-            <Currency label="Food Allowance" value={employee.food_allowance} />
-            <Currency label="Wages" value={employee.wages} />
-            <Currency label="Increment" value={employee.increment} />
-            <Currency label="Total Salary" value={employee.total_salary} />
-            <Currency label="Mobile Bill" value={employee.mobile_bill} />
-            <Currency label="Shift Benefit" value={employee.shift_benefit} />
-            <Field label="Days of Month" value={employee.days_of_month ?? 26} />
-            <Currency label="Wages of Month" value={employee.wages_of_month} />
+            <Currency label={empColConfig.getLabel('basic')} value={employee.basic} />
+            <Currency label={empColConfig.getLabel('house_rent')} value={employee.house_rent} />
+            <Currency label={empColConfig.getLabel('medical')} value={employee.medical} />
+            <Currency label={empColConfig.getLabel('conveyance')} value={employee.conveyance} />
+            <Currency label={empColConfig.getLabel('food_allowance')} value={employee.food_allowance} />
+            <Currency label={empColConfig.getLabel('wages')} value={employee.wages} />
+            <Currency label={empColConfig.getLabel('increment')} value={employee.increment} />
+            <Currency label={empColConfig.getLabel('total_salary')} value={employee.total_salary} />
+            <Currency label={empColConfig.getLabel('mobile_bill')} value={employee.mobile_bill} />
+            <Currency label={empColConfig.getLabel('shift_benefit')} value={employee.shift_benefit} />
+            <Field label={empColConfig.getLabel('days_of_month')} value={employee.days_of_month ?? 26} />
+            <Currency label={empColConfig.getLabel('wages_of_month')} value={employee.wages_of_month} />
           </div>
         )}
 
@@ -742,41 +745,41 @@ function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; 
             {p ? (
               <>
                 <div className="grid grid-cols-3 gap-3">
-                  <Field label="Days of Month" value={p.days_of_month} />
-                  <Field label="Calculate Days" value={p.calculate_days} />
-                  <Field label="Actual Attendance" value={p.actual_attendance} />
-                  <Field label="Day Off" value={p.day_off} />
-                  <Field label="CL" value={p.cl} />
-                  <Field label="SL" value={p.sl} />
-                  <Field label="EL" value={p.el} />
-                  <Field label="Comp Leave" value={p.comp_leave} />
-                  <Field label="Festival Holiday" value={p.festival_holiday} />
-                  <Field label="Absent Days" value={p.absent_days} />
-                  <Field label="Payable Days" value={p.payable_days} />
-                  <Field label="Payable Salary" value={p.payable_salary != null ? formatCurrency(p.payable_salary) : "-"} />
+                  <Field label={empColConfig.getLabel('days_of_month')} value={p.days_of_month} />
+                  <Field label={empColConfig.getLabel('calculate_days')} value={p.calculate_days} />
+                  <Field label={empColConfig.getLabel('actual_attendance')} value={p.actual_attendance} />
+                  <Field label={empColConfig.getLabel('day_off')} value={p.day_off} />
+                  <Field label={empColConfig.getLabel('cl')} value={p.cl} />
+                  <Field label={empColConfig.getLabel('sl')} value={p.sl} />
+                  <Field label={empColConfig.getLabel('el')} value={p.el} />
+                  <Field label={empColConfig.getLabel('comp_leave')} value={p.comp_leave} />
+                  <Field label={empColConfig.getLabel('festival_holiday')} value={p.festival_holiday} />
+                  <Field label={empColConfig.getLabel('absent_days')} value={p.absent_days} />
+                  <Field label={empColConfig.getLabel('payable_days')} value={p.payable_days} />
+                  <Field label={empColConfig.getLabel('payable_salary')} value={p.payable_salary != null ? formatCurrency(p.payable_salary) : "-"} />
                 </div>
                 <Separator />
                 <div className="grid grid-cols-3 gap-3">
-                  <Field label="OT Hours" value={p.ot_hours} />
-                  <Field label="OT Amount" value={p.ot_amount != null ? formatCurrency(p.ot_amount) : "-"} />
-                  <Field label="Attendance Bonus" value={p.attendance_bonus != null ? formatCurrency(p.attendance_bonus) : "-"} />
-                  <Field label="Festival Duty Benefit" value={p.festival_duty_benefit != null ? formatCurrency(p.festival_duty_benefit) : "-"} />
-                  <Field label="Festival Holiday Allow" value={p.festival_holiday_allowance != null ? formatCurrency(p.festival_holiday_allowance) : "-"} />
-                  <Field label="Ifter Days" value={p.ifter_days} />
-                  <Field label="Ifter Allowance" value={p.ifter_allowance != null ? formatCurrency(p.ifter_allowance) : "-"} />
-                  <Field label="Special Food" value={p.special_food != null ? formatCurrency(p.special_food) : "-"} />
-                  <Field label="Arrear/Others" value={p.arrear_others != null ? formatCurrency(p.arrear_others) : "-"} />
-                  <Field label="Shift Qty" value={p.shift_qty} />
-                  <Field label="Shift Amount" value={p.shift_amount != null ? formatCurrency(p.shift_amount) : "-"} />
-                  <Field label="Roster Qty" value={p.roster_qty} />
-                  <Field label="Roster Amount" value={p.roster_amount != null ? formatCurrency(p.roster_amount) : "-"} />
-                  <Field label="Absent Deduction" value={p.absent_deduction != null ? formatCurrency(p.absent_deduction) : "-"} />
-                  <Field label="Advance Deduction" value={p.advance_deduction != null ? formatCurrency(p.advance_deduction) : "-"} />
-                  <Field label="Tax Deduction" value={p.tax_deduction != null ? formatCurrency(p.tax_deduction) : "-"} />
+                  <Field label={empColConfig.getLabel('ot_hours')} value={p.ot_hours} />
+                  <Field label={empColConfig.getLabel('ot_amount')} value={p.ot_amount != null ? formatCurrency(p.ot_amount) : "-"} />
+                  <Field label={empColConfig.getLabel('attendance_bonus')} value={p.attendance_bonus != null ? formatCurrency(p.attendance_bonus) : "-"} />
+                  <Field label={empColConfig.getLabel('festival_duty_benefit')} value={p.festival_duty_benefit != null ? formatCurrency(p.festival_duty_benefit) : "-"} />
+                  <Field label={empColConfig.getLabel('festival_holiday_allowance')} value={p.festival_holiday_allowance != null ? formatCurrency(p.festival_holiday_allowance) : "-"} />
+                  <Field label={empColConfig.getLabel('ifter_days')} value={p.ifter_days} />
+                  <Field label={empColConfig.getLabel('ifter_allowance')} value={p.ifter_allowance != null ? formatCurrency(p.ifter_allowance) : "-"} />
+                  <Field label={empColConfig.getLabel('special_food')} value={p.special_food != null ? formatCurrency(p.special_food) : "-"} />
+                  <Field label={empColConfig.getLabel('arrear_others')} value={p.arrear_others != null ? formatCurrency(p.arrear_others) : "-"} />
+                  <Field label={empColConfig.getLabel('shift_qty')} value={p.shift_qty} />
+                  <Field label={empColConfig.getLabel('shift_amount')} value={p.shift_amount != null ? formatCurrency(p.shift_amount) : "-"} />
+                  <Field label={empColConfig.getLabel('roster_qty')} value={p.roster_qty} />
+                  <Field label={empColConfig.getLabel('roster_amount')} value={p.roster_amount != null ? formatCurrency(p.roster_amount) : "-"} />
+                  <Field label={empColConfig.getLabel('absent_deduction')} value={p.absent_deduction != null ? formatCurrency(p.absent_deduction) : "-"} />
+                  <Field label={empColConfig.getLabel('advance_deduction')} value={p.advance_deduction != null ? formatCurrency(p.advance_deduction) : "-"} />
+                  <Field label={empColConfig.getLabel('tax_deduction')} value={p.tax_deduction != null ? formatCurrency(p.tax_deduction) : "-"} />
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center p-3 bg-muted rounded-md">
-                  <span className="text-sm font-semibold">Net Payable</span>
+                  <span className="text-sm font-semibold">{empColConfig.getLabel('net_payable')}</span>
                   <span className="text-lg font-bold text-primary">{p.net_payable != null ? formatCurrency(p.net_payable) : "-"}</span>
                 </div>
               </>
@@ -795,6 +798,7 @@ function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; 
 const GENDERS = ["Male", "Female", "Other"];
 
 function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
+  const empColConfig = useColumnConfig("hr_employees");
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [section, setSection] = useState<"personal" | "job" | "salary">("personal");
@@ -951,32 +955,32 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Sl No</Label>
+                  <Label>{empColConfig.getLabel('sl_no')}</Label>
                   <Input value={form.sl_no} onChange={(e) => setForm({ ...form, sl_no: Number(e.target.value) })} type="number" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Employee ID</Label>
+                  <Label>{empColConfig.getLabel('employee_id')}</Label>
                   <Input value={form.employee_code} onChange={(e) => setForm({ ...form, employee_code: e.target.value })} />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Full Name <span className="text-destructive">*</span></Label>
+                <Label>{empColConfig.getLabel('name')}{empColConfig.isRequired('name') && <span className="text-destructive">*</span>}</Label>
                 <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className={errors.full_name ? "border-destructive" : ""} />
                 {errors.full_name && <p className="text-xs text-destructive">{errors.full_name}</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>DOB</Label>
+                  <Label>{empColConfig.getLabel('dob')}</Label>
                   <Input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Age</Label>
+                  <Label>{empColConfig.getLabel('age')}</Label>
                   <Input value={form.age} readOnly className="bg-muted" />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Gender (M/F)</Label>
+                  <Label>{empColConfig.getLabel('gender')}</Label>
                   <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
@@ -985,16 +989,16 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Grade</Label>
+                  <Label>{empColConfig.getLabel('grade')}</Label>
                   <Input type="number" min={0} max={99} value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} placeholder="0" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Gen</Label>
+                  <Label>{empColConfig.getLabel('gen')}</Label>
                   <Input value={form.gen} onChange={(e) => setForm({ ...form, gen: e.target.value })} placeholder="Male/Female" />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Joining Date</Label>
+                <Label>{empColConfig.getLabel('joining_date')}</Label>
                 <Input type="date" value={form.date_of_joining} onChange={(e) => setForm({ ...form, date_of_joining: e.target.value })} />
               </div>
             </div>
@@ -1004,16 +1008,16 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Designation</Label>
+                  <Label>{empColConfig.getLabel('designation')}</Label>
                   <Input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Section</Label>
+                  <Label>{empColConfig.getLabel('section')}</Label>
                   <Input value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Department <span className="text-destructive">*</span></Label>
+                <Label>{empColConfig.getLabel('department')}{empColConfig.isRequired('department') && <span className="text-destructive">*</span>}</Label>
                 <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
                   <SelectTrigger className={errors.department ? "border-destructive" : ""}>
                     <SelectValue placeholder="Select department" />
@@ -1026,7 +1030,7 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Shift</Label>
+                  <Label>{empColConfig.getLabel('shift')}</Label>
                   <Select value={form.shift} onValueChange={(v) => setForm({ ...form, shift: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -1035,12 +1039,12 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Phone</Label>
+                  <Label>{empColConfig.getLabel('phone')}</Label>
                   <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Bank Account No.</Label>
+                <Label>{empColConfig.getLabel('bank_account_no')}</Label>
                 <Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} />
               </div>
             </div>
@@ -1050,56 +1054,56 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Basic</Label>
+                  <Label>{empColConfig.getLabel('basic')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.basic} onChange={(e) => setForm({ ...form, basic: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>House Rent</Label>
+                  <Label>{empColConfig.getLabel('house_rent')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.house_rent} onChange={(e) => setForm({ ...form, house_rent: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Medical</Label>
+                  <Label>{empColConfig.getLabel('medical')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.medical} onChange={(e) => setForm({ ...form, medical: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Conveyance</Label>
+                  <Label>{empColConfig.getLabel('conveyance')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.conveyance} onChange={(e) => setForm({ ...form, conveyance: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Food Allowance</Label>
+                  <Label>{empColConfig.getLabel('food_allowance')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.food_allowance} onChange={(e) => setForm({ ...form, food_allowance: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Wages</Label>
+                  <Label>{empColConfig.getLabel('wages')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.wages} onChange={(e) => setForm({ ...form, wages: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Increment</Label>
+                  <Label>{empColConfig.getLabel('increment')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.increment} onChange={(e) => setForm({ ...form, increment: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Mobile Bill</Label>
+                  <Label>{empColConfig.getLabel('mobile_bill')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.mobile_bill} onChange={(e) => setForm({ ...form, mobile_bill: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Shift Benefit</Label>
+                  <Label>{empColConfig.getLabel('shift_benefit')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.shift_benefit} onChange={(e) => setForm({ ...form, shift_benefit: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Days of Month</Label>
+                  <Label>{empColConfig.getLabel('days_of_month')}</Label>
                   <Input type="number" min={1} max={31} value={form.days_of_month} onChange={(e) => setForm({ ...form, days_of_month: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="bg-muted p-3 rounded-md">
-                <Label>Total Salary (auto-calculated)</Label>
+                <Label>{empColConfig.getLabel('total_salary')} (auto-calculated)</Label>
                 <p className="text-lg font-bold text-primary mt-1">{formatCurrency(totalSalary)}</p>
                 <p className="text-xs text-muted-foreground mt-1">Basic + House Rent + Medical + Conveyance + Food Allowance + Mobile Bill + Shift Benefit</p>
               </div>
@@ -1128,6 +1132,7 @@ function EditEmployeeSheet({
   onOpenChange: (v: boolean) => void;
   employee: EmployeeRow;
 }) {
+  const empColConfig = useColumnConfig("hr_employees");
   const qc = useQueryClient();
   const [section, setSection] = useState<"personal" | "job" | "salary">("personal");
   const [form, setForm] = useState({
@@ -1243,32 +1248,32 @@ function EditEmployeeSheet({
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Sl No</Label>
+                  <Label>{empColConfig.getLabel('sl_no')}</Label>
                   <Input value={form.sl_no} onChange={(e) => setForm({ ...form, sl_no: Number(e.target.value) })} type="number" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Employee ID</Label>
+                  <Label>{empColConfig.getLabel('employee_id')}</Label>
                   <Input value={form.employee_code} onChange={(e) => setForm({ ...form, employee_code: e.target.value })} />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Full Name <span className="text-destructive">*</span></Label>
+                <Label>{empColConfig.getLabel('name')}{empColConfig.isRequired('name') && <span className="text-destructive">*</span>}</Label>
                 <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className={errors.full_name ? "border-destructive" : ""} />
                 {errors.full_name && <p className="text-xs text-destructive">{errors.full_name}</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>DOB</Label>
+                  <Label>{empColConfig.getLabel('dob')}</Label>
                   <Input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Age</Label>
+                  <Label>{empColConfig.getLabel('age')}</Label>
                   <Input value={form.age} readOnly className="bg-muted" />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Gender (M/F)</Label>
+                  <Label>{empColConfig.getLabel('gender')}</Label>
                   <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
                     <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                     <SelectContent>
@@ -1277,16 +1282,16 @@ function EditEmployeeSheet({
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Grade</Label>
+                  <Label>{empColConfig.getLabel('grade')}</Label>
                   <Input type="number" min={0} max={99} value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} placeholder="0" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Gen</Label>
+                  <Label>{empColConfig.getLabel('gen')}</Label>
                   <Input value={form.gen} onChange={(e) => setForm({ ...form, gen: e.target.value })} placeholder="Male/Female" />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Joining Date</Label>
+                <Label>{empColConfig.getLabel('joining_date')}</Label>
                 <Input type="date" value={form.date_of_joining} onChange={(e) => setForm({ ...form, date_of_joining: e.target.value })} />
               </div>
             </div>
@@ -1296,16 +1301,16 @@ function EditEmployeeSheet({
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Designation</Label>
+                  <Label>{empColConfig.getLabel('designation')}</Label>
                   <Input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Section</Label>
+                  <Label>{empColConfig.getLabel('section')}</Label>
                   <Input value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Department <span className="text-destructive">*</span></Label>
+                <Label>{empColConfig.getLabel('department')}{empColConfig.isRequired('department') && <span className="text-destructive">*</span>}</Label>
                 <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
                   <SelectTrigger className={errors.department ? "border-destructive" : ""}>
                     <SelectValue placeholder="Select department" />
@@ -1318,7 +1323,7 @@ function EditEmployeeSheet({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Shift</Label>
+                  <Label>{empColConfig.getLabel('shift')}</Label>
                   <Select value={form.shift} onValueChange={(v) => setForm({ ...form, shift: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -1327,12 +1332,12 @@ function EditEmployeeSheet({
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Phone</Label>
+                  <Label>{empColConfig.getLabel('phone')}</Label>
                   <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Bank Account No.</Label>
+                <Label>{empColConfig.getLabel('bank_account_no')}</Label>
                 <Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} />
               </div>
             </div>
@@ -1342,56 +1347,56 @@ function EditEmployeeSheet({
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Basic</Label>
+                  <Label>{empColConfig.getLabel('basic')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.basic} onChange={(e) => setForm({ ...form, basic: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>House Rent</Label>
+                  <Label>{empColConfig.getLabel('house_rent')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.house_rent} onChange={(e) => setForm({ ...form, house_rent: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Medical</Label>
+                  <Label>{empColConfig.getLabel('medical')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.medical} onChange={(e) => setForm({ ...form, medical: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Conveyance</Label>
+                  <Label>{empColConfig.getLabel('conveyance')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.conveyance} onChange={(e) => setForm({ ...form, conveyance: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Food Allowance</Label>
+                  <Label>{empColConfig.getLabel('food_allowance')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.food_allowance} onChange={(e) => setForm({ ...form, food_allowance: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Wages</Label>
+                  <Label>{empColConfig.getLabel('wages')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.wages} onChange={(e) => setForm({ ...form, wages: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Increment</Label>
+                  <Label>{empColConfig.getLabel('increment')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.increment} onChange={(e) => setForm({ ...form, increment: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Mobile Bill</Label>
+                  <Label>{empColConfig.getLabel('mobile_bill')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.mobile_bill} onChange={(e) => setForm({ ...form, mobile_bill: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Shift Benefit</Label>
+                  <Label>{empColConfig.getLabel('shift_benefit')}</Label>
                   <Input type="number" min={0} step={0.01} value={form.shift_benefit} onChange={(e) => setForm({ ...form, shift_benefit: Number(e.target.value) })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Days of Month</Label>
+                  <Label>{empColConfig.getLabel('days_of_month')}</Label>
                   <Input type="number" min={1} max={31} value={form.days_of_month} onChange={(e) => setForm({ ...form, days_of_month: Number(e.target.value) })} />
                 </div>
               </div>
               <div className="bg-muted p-3 rounded-md">
-                <Label>Total Salary (auto-calculated)</Label>
+                <Label>{empColConfig.getLabel('total_salary')} (auto-calculated)</Label>
                 <p className="text-lg font-bold text-primary mt-1">{formatCurrency(totalSalary)}</p>
                 <p className="text-xs text-muted-foreground mt-1">Basic + House Rent + Medical + Conveyance + Food Allowance + Mobile Bill + Shift Benefit</p>
               </div>
@@ -1721,6 +1726,7 @@ function downloadEmployeeTemplate() {
 }
 
 function ImportEmployeeDialog() {
+  const empColConfig = useColumnConfig("hr_employees");
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -2017,14 +2023,14 @@ function ImportEmployeeDialog() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-8">#</TableHead>
-                    <TableHead>Code</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Designation</TableHead>
-                    <TableHead>Shift</TableHead>
-                    <TableHead>DOJ</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Daily Wage</TableHead>
+                    <TableHead>{empColConfig.getLabel('employee_id')}</TableHead>
+                    <TableHead>{empColConfig.getLabel('name')}</TableHead>
+                    <TableHead>{empColConfig.getLabel('department')}</TableHead>
+                    <TableHead>{empColConfig.getLabel('designation')}</TableHead>
+                    <TableHead>{empColConfig.getLabel('shift')}</TableHead>
+                    <TableHead>{empColConfig.getLabel('joining_date')}</TableHead>
+                    <TableHead>{empColConfig.getLabel('phone')}</TableHead>
+                    <TableHead>{empColConfig.getLabel('wages')}</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -2077,6 +2083,7 @@ function ImportEmployeeDialog() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdit: boolean }) {
+  const attColConfig = useColumnConfig("hr_attendance");
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
@@ -2196,8 +2203,8 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
         <Table className="min-w-[800px] w-full text-xs">
           <TableHeader>
             <TableRow>
-              <TableHead className="sticky left-0 bg-background z-10 min-w-[140px]">Employee</TableHead>
-              <TableHead className="sticky left-[140px] bg-background z-10 min-w-[80px]">Dept</TableHead>
+              <TableHead className="sticky left-0 bg-background z-10 min-w-[140px]">{attColConfig.getLabel('employee')}</TableHead>
+              <TableHead className="sticky left-[140px] bg-background z-10 min-w-[80px]">{attColConfig.getLabel('department')}</TableHead>
               {Array.from({ length: days }, (_, i) => i + 1).map((d) => (
                 <TableHead key={d} className="text-center w-8 min-w-[28px] p-1">{d}</TableHead>
               ))}
@@ -2274,6 +2281,7 @@ function MarkAttendanceSheet({
   year: number;
   onSuccess: () => void;
 }) {
+  const attColConfig = useColumnConfig("hr_attendance");
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -2333,7 +2341,7 @@ function MarkAttendanceSheet({
         <div className="space-y-4 py-4">
           <div className="flex gap-3 items-end">
             <div className="space-y-1.5">
-              <Label>Date</Label>
+              <Label>{attColConfig.getLabel('date')}</Label>
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
           </div>
@@ -2344,9 +2352,9 @@ function MarkAttendanceSheet({
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-8">#</TableHead>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Department</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>{attColConfig.getLabel('employee')}</TableHead>
+                    <TableHead>{attColConfig.getLabel('department')}</TableHead>
+                    <TableHead>{attColConfig.getLabel('status')}</TableHead>
                     <TableHead>OT Hours</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -2478,6 +2486,7 @@ function ImportAttendanceDialog({ month, year, onSuccess }: { month: number; yea
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function PayrollTab({ employees, canEdit, millId, userRole }: { employees: EmployeeRow[]; canEdit: boolean; millId: string; userRole: string }) {
+  const payrollColConfig = useColumnConfig("hr_payroll");
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
@@ -2553,16 +2562,16 @@ function PayrollTab({ employees, canEdit, millId, userRole }: { employees: Emplo
   };
 
   const editableFields = [
-    { key: "ot_hours", label: "OT Hours" },
-    { key: "ot_amount", label: "OT Amt" },
-    { key: "attendance_bonus", label: "Att. Bonus" },
-    { key: "arrear_others", label: "Arrear" },
-    { key: "shift_amount", label: "Shift Amt" },
-    { key: "roster_amount", label: "Roster Amt" },
+    { key: "ot_hours", label: payrollColConfig.getLabel("ot_hours") },
+    { key: "ot_amount", label: payrollColConfig.getLabel("ot_amount") },
+    { key: "attendance_bonus", label: payrollColConfig.getLabel("attendance_bonus") },
+    { key: "arrear_others", label: payrollColConfig.getLabel("arrear_others") },
+    { key: "shift_amount", label: payrollColConfig.getLabel("shift_amount") },
+    { key: "roster_amount", label: payrollColConfig.getLabel("roster_amount") },
     { key: "festival_duty_benefit", label: "Festival Allow." },
-    { key: "absent_deduction", label: "Absent Ded." },
-    { key: "advance_deduction", label: "Adv. Ded." },
-    { key: "tax_deduction", label: "Tax Ded." },
+    { key: "absent_deduction", label: payrollColConfig.getLabel("absent_deduction") },
+    { key: "advance_deduction", label: payrollColConfig.getLabel("advance_deduction") },
+    { key: "tax_deduction", label: payrollColConfig.getLabel("tax_deduction") },
   ];
 
   const canFinalize = userRole === "MILL_OWNER" || userRole === "ACCOUNTANT" || userRole === "SUPER_ADMIN";
@@ -2621,22 +2630,22 @@ function PayrollTab({ employees, canEdit, millId, userRole }: { employees: Emplo
           <Table className="min-w-[1400px] w-full text-xs">
             <TableHeader>
               <TableRow>
-                <TableHead className="sticky left-0 bg-background z-10">Emp ID</TableHead>
-                <TableHead className="sticky left-[80px] bg-background z-10 min-w-[120px]">Name</TableHead>
-                <TableHead className="text-right">Basic</TableHead>
-                <TableHead className="text-right">Payable Days</TableHead>
-                <TableHead className="text-right">Payable Salary</TableHead>
-                <TableHead className="text-right">OT Hours</TableHead>
-                <TableHead className="text-right">OT Amount</TableHead>
-                <TableHead className="text-right">Att. Bonus</TableHead>
-                <TableHead className="text-right">Arrear</TableHead>
-                <TableHead className="text-right">Shift Amt</TableHead>
-                <TableHead className="text-right">Roster Amt</TableHead>
+                <TableHead className="sticky left-0 bg-background z-10">{payrollColConfig.getLabel('employee_id')}</TableHead>
+                <TableHead className="sticky left-[80px] bg-background z-10 min-w-[120px]">{payrollColConfig.getLabel('name')}</TableHead>
+                <TableHead className="text-right">{payrollColConfig.getLabel('basic')}</TableHead>
+                <TableHead className="text-right">{payrollColConfig.getLabel('payable_days')}</TableHead>
+                <TableHead className="text-right">{payrollColConfig.getLabel('payable_salary')}</TableHead>
+                <TableHead className="text-right">{payrollColConfig.getLabel('ot_hours')}</TableHead>
+                <TableHead className="text-right">{payrollColConfig.getLabel('ot_amount')}</TableHead>
+                <TableHead className="text-right">{payrollColConfig.getLabel('attendance_bonus')}</TableHead>
+                <TableHead className="text-right">{payrollColConfig.getLabel('arrear_others')}</TableHead>
+                <TableHead className="text-right">{payrollColConfig.getLabel('shift_amount')}</TableHead>
+                <TableHead className="text-right">{payrollColConfig.getLabel('roster_amount')}</TableHead>
                 <TableHead className="text-right">Festival Allow.</TableHead>
-                <TableHead className="text-right">Absent Ded.</TableHead>
-                <TableHead className="text-right">Adv. Ded.</TableHead>
-                <TableHead className="text-right">Tax Ded.</TableHead>
-                <TableHead className="text-right">Net Payable</TableHead>
+                <TableHead className="text-right">{payrollColConfig.getLabel('absent_deduction')}</TableHead>
+                <TableHead className="text-right">{payrollColConfig.getLabel('advance_deduction')}</TableHead>
+                <TableHead className="text-right">{payrollColConfig.getLabel('tax_deduction')}</TableHead>
+                <TableHead className="text-right">{payrollColConfig.getLabel('net_payable')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -2825,6 +2834,7 @@ function LeavesTab({
   canEdit: boolean;
   user: any;
 }) {
+  const leaveColConfig = useColumnConfig("hr_leaves");
   const qc = useQueryClient();
   const [leaveFilter, setLeaveFilter] = useState("all");
 
@@ -2873,13 +2883,13 @@ function LeavesTab({
         <Table className="min-w-[1000px] w-full">
           <TableHeader>
             <TableRow>
-              <TableHead>Employee</TableHead>
-              <TableHead>Department</TableHead>
-              <TableHead>From</TableHead>
-              <TableHead>To</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead className="max-w-xs">Reason</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>{leaveColConfig.getLabel('employee')}</TableHead>
+              <TableHead>{leaveColConfig.getLabel('department')}</TableHead>
+              <TableHead>{leaveColConfig.getLabel('from_date')}</TableHead>
+              <TableHead>{leaveColConfig.getLabel('to_date')}</TableHead>
+              <TableHead>{leaveColConfig.getLabel('type')}</TableHead>
+              <TableHead className="max-w-xs">{leaveColConfig.getLabel('reason')}</TableHead>
+              <TableHead>{leaveColConfig.getLabel('status')}</TableHead>
               <TableHead className="w-36">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -2928,7 +2938,7 @@ function LeavesTab({
             <Table className="min-w-[600px] w-full text-xs">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Employee</TableHead>
+                  <TableHead>{leaveColConfig.getLabel('employee')}</TableHead>
                   <TableHead className="text-center">CL</TableHead>
                   <TableHead className="text-center">SL</TableHead>
                   <TableHead className="text-center">EL</TableHead>
@@ -2968,6 +2978,7 @@ function LeavesTab({
 // ─── New Leave Dialog ───────────────────────────────────────────────────────────
 
 function NewLeaveDialog({ employees }: { employees: EmployeeRow[] }) {
+  const leaveColConfig = useColumnConfig("hr_leaves");
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -3017,7 +3028,7 @@ function NewLeaveDialog({ employees }: { employees: EmployeeRow[] }) {
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Employee <span className="text-destructive">*</span></Label>
+              <Label>{leaveColConfig.getLabel('employee')}{leaveColConfig.isRequired('employee') && <span className="text-destructive">*</span>}</Label>
               <Select value={form.employee_id} onValueChange={(v) => setForm({ ...form, employee_id: v })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select employee" />
@@ -3030,7 +3041,7 @@ function NewLeaveDialog({ employees }: { employees: EmployeeRow[] }) {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Leave Type <span className="text-destructive">*</span></Label>
+              <Label>{leaveColConfig.getLabel('type')}{leaveColConfig.isRequired('type') && <span className="text-destructive">*</span>}</Label>
               <Select value={form.leave_type} onValueChange={(v) => setForm({ ...form, leave_type: v })}>
                 <SelectTrigger>
                   <SelectValue />
@@ -3045,15 +3056,15 @@ function NewLeaveDialog({ employees }: { employees: EmployeeRow[] }) {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>From date <span className="text-destructive">*</span></Label>
+              <Label>{leaveColConfig.getLabel('from_date')}{leaveColConfig.isRequired('from_date') && <span className="text-destructive">*</span>}</Label>
               <Input type="date" value={form.from_date} onChange={(e) => setForm({ ...form, from_date: e.target.value })} required />
             </div>
             <div className="space-y-1.5">
-              <Label>To date <span className="text-destructive">*</span></Label>
+              <Label>{leaveColConfig.getLabel('to_date')}{leaveColConfig.isRequired('to_date') && <span className="text-destructive">*</span>}</Label>
               <Input type="date" value={form.to_date} onChange={(e) => setForm({ ...form, to_date: e.target.value })} required />
             </div>
             <div className="space-y-1.5 col-span-2">
-              <Label>Reason <span className="text-destructive">*</span></Label>
+              <Label>{leaveColConfig.getLabel('reason')}{leaveColConfig.isRequired('reason') && <span className="text-destructive">*</span>}</Label>
               <Textarea value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} required rows={3} />
             </div>
             <div className="space-y-1.5 col-span-2">
@@ -3075,6 +3086,7 @@ function NewLeaveDialog({ employees }: { employees: EmployeeRow[] }) {
 // ─── Leave Action Dialog (Approve/Reject) ───────────────────────────────────────
 
 function LeaveActionDialog({ leave }: { leave: LeaveRow }) {
+  const leaveColConfig = useColumnConfig("hr_leaves");
   const qc = useQueryClient();
   const user = useAuth((s) => s.user);
   const [open, setOpen] = useState(false);
@@ -3141,7 +3153,7 @@ function LeaveActionDialog({ leave }: { leave: LeaveRow }) {
             <p><strong>Reason:</strong> {leave.reason}</p>
           </div>
           <div className="space-y-1.5">
-            <Label>Remarks (optional)</Label>
+            <Label>{leaveColConfig.getLabel('reason')} (optional)</Label>
             <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} />
           </div>
         </div>

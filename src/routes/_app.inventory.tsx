@@ -24,6 +24,7 @@ import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import { toast } from "sonner";
 import { Plus, Boxes, ArrowRightLeft, AlertTriangle, Package } from "lucide-react";
+import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/inventory")({
   head: () => ({ meta: [{ title: "Inventory — SpinFlow ERP" }] }),
@@ -33,6 +34,8 @@ export const Route = createFileRoute("/_app/inventory")({
 function InventoryPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "inventory");
+  const lotColConfig = useColumnConfig("inventory_lots");
+  const transferColConfig = useColumnConfig("inventory_lots");
   const lotsQ = useQuery({ queryKey: ["inventory-lots"], queryFn: inventoryApi.getLots, staleTime: 60_000, retry: 1 });
   const transfersQ = useQuery({ queryKey: ["stock-transfers"], queryFn: inventoryApi.getTransfers, staleTime: 60_000, retry: 1 });
 
@@ -49,21 +52,21 @@ function InventoryPage() {
   if (lotsQ.isError) return (<><Topbar title="Inventory" subtitle="Error" /><div className="p-6 text-sm text-destructive">Error loading data.</div></>);
 
   const lotCols: ColDef[] = [
-    { key: "lotNo", label: "Lot No", className: "font-mono text-xs" },
-    { key: "type", label: "Type", type: "status", render: (l: any) => <Badge variant="outline">{l.type}</Badge> },
-    { key: "department", label: "Department", type: "status" },
-    { key: "quantity", label: "Qty (kg)", render: (l: any) => <span className="text-right">{(l.quantity ?? 0).toLocaleString()}</span> },
-    { key: "location", label: "Location", type: "status" },
+    { key: "lotNo", label: lotColConfig.getLabel('lot_no'), className: "font-mono text-xs" },
+    { key: "type", label: lotColConfig.getLabel('type'), type: "status", render: (l: any) => <Badge variant="outline">{l.type}</Badge> },
+    { key: "department", label: lotColConfig.getLabel('department'), type: "status" },
+    { key: "quantity", label: lotColConfig.getLabel('quantity'), render: (l: any) => <span className="text-right">{(l.quantity ?? 0).toLocaleString()}</span> },
+    { key: "location", label: lotColConfig.getLabel('location'), type: "status" },
     {
-      key: "grade", label: "Grade", type: "status",
+      key: "grade", label: lotColConfig.getLabel('grade'), type: "status",
       render: (l: any) => (
         <Badge variant={l.grade === "A+" || l.grade === "A" ? "default" : l.grade === "B" ? "secondary" : "destructive"}>{l.grade}</Badge>
       ),
     },
-    { key: "producedDate", label: "Produced" },
-    { key: "age", label: "Age (d)", render: (l: any) => <span className={l.age > 14 ? "text-destructive font-medium" : ""}>{l.age}</span> },
+    { key: "producedDate", label: lotColConfig.getLabel('produced_date') },
+    { key: "age", label: lotColConfig.getLabel('age'), render: (l: any) => <span className={l.age > 14 ? "text-destructive font-medium" : ""}>{l.age}</span> },
     {
-      key: "status", label: "Status", type: "status",
+      key: "status", label: lotColConfig.getLabel('status'), type: "status",
       render: (l: any) => (
         <Badge variant={l.status === "in-stock" ? "default" : l.status === "transferred" ? "secondary" : "outline"}>{l.status}</Badge>
       ),
@@ -71,13 +74,13 @@ function InventoryPage() {
   ];
 
   const transferCols: ColDef[] = [
-    { key: "date", label: "Date", type: "date" },
-    { key: "lotNo", label: "Lot No", className: "font-mono text-xs" },
-    { key: "fromLocation", label: "From", type: "status" },
-    { key: "toLocation", label: "To", type: "status", render: (t: any) => <span><ArrowRightLeft className="size-3 inline mr-1 text-muted-foreground" />{t.toLocation}</span> },
-    { key: "quantity", label: "Qty", render: (t: any) => `${t.quantity} ${t.unit}` },
-    { key: "transferredBy", label: "By" },
-    { key: "status", label: "Status", type: "status", render: (t: any) => <Badge variant={t.status === "completed" ? "default" : "secondary"}>{t.status}</Badge> },
+    { key: "date", label: transferColConfig.getLabel('date'), type: "date" },
+    { key: "lotNo", label: transferColConfig.getLabel('lot_no'), className: "font-mono text-xs" },
+    { key: "fromLocation", label: transferColConfig.getLabel('from_location'), type: "status" },
+    { key: "toLocation", label: transferColConfig.getLabel('to_location'), type: "status", render: (t: any) => <span><ArrowRightLeft className="size-3 inline mr-1 text-muted-foreground" />{t.toLocation}</span> },
+    { key: "quantity", label: transferColConfig.getLabel('quantity'), render: (t: any) => `${t.quantity} ${t.unit}` },
+    { key: "transferredBy", label: transferColConfig.getLabel('transferred_by') },
+    { key: "status", label: transferColConfig.getLabel('status'), type: "status", render: (t: any) => <Badge variant={t.status === "completed" ? "default" : "secondary"}>{t.status}</Badge> },
   ];
 
   return (
@@ -127,6 +130,7 @@ function InventoryPage() {
 
 function NewTransferDialog() {
   const qc = useQueryClient();
+  const { getLabel: getTransferLabel } = useColumnConfig("inventory_lots");
   const [open, setOpen] = useState(false);
   const [requiredErrors, setRequiredErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), lotNo: "", fromLocation: "", toLocation: "", quantity: 0, unit: "kg", transferredBy: "", status: "pending" as const });
@@ -160,13 +164,13 @@ function NewTransferDialog() {
           <div className="grid grid-cols-2 gap-3">
             {(["date", "lotNo", "fromLocation", "toLocation", "unit", "transferredBy"] as const).map((key) => (
               <div key={key} className="space-y-1.5">
-                <Label>{key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase())} <span className="text-destructive">*</span></Label>
+                <Label>{getTransferLabel(key.replace(/([A-Z])/g, "_$1").toLowerCase())} <span className="text-destructive">*</span></Label>
                 <Input type={key === "date" ? "date" : "text"} {...f(key)} />
                 {requiredErrors[key] && <p className="text-xs text-destructive">{requiredErrors[key]}</p>}
               </div>
             ))}
             <div className="space-y-1.5">
-              <Label>Quantity <span className="text-destructive">*</span></Label>
+              <Label>{getTransferLabel('quantity')} <span className="text-destructive">*</span></Label>
               <Input type="number" {...f("quantity")} />
               {requiredErrors.quantity && <p className="text-xs text-destructive">{requiredErrors.quantity}</p>}
             </div>

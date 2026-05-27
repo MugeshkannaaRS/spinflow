@@ -22,6 +22,7 @@ import {
   ClipboardList,
   MapPin,
   IndianRupee,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +31,7 @@ const NAV: Array<{
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   module: Module;
+  superAdminOnly?: boolean;
 }> = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
   { to: "/production", label: "Production", icon: Factory, module: "production" },
@@ -48,6 +50,7 @@ const NAV: Array<{
   { to: "/audit", label: "Audit Logs", icon: FileText, module: "audit" },
   { to: "/masters", label: "Masters", icon: Database, module: "masters" },
   { to: "/reports", label: "Reports", icon: BarChart3, module: "reports" },
+  { to: "/admin/column-config", label: "Column Config", icon: Settings, module: "masters", superAdminOnly: true },
 ];
 
 function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
@@ -58,6 +61,7 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
   if (!user) return null;
 
   const items = NAV.filter((n) => {
+    if (n.superAdminOnly && user.role !== "SUPER_ADMIN") return false;
     const allowedByRole = MODULE_ACCESS[user?.role] ?? ["dashboard"];
     const allowedByCompany = user?.allowedModules ?? allowedByRole;
     return allowedByRole.includes(n.module) && allowedByCompany.includes(n.module);

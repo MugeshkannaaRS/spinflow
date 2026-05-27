@@ -9,7 +9,8 @@ import {
   SheetTrigger,
   SheetFooter,
 } from "@/components/ui/sheet";
-import { useColumnConfig, type ColumnDef } from "@/hooks/useColumnConfig";
+import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { api } from "@/lib/api";
 import { Settings2, ArrowUp, ArrowDown, RotateCcw } from "lucide-react";
 
 interface ColumnConfiguratorProps {
@@ -17,14 +18,22 @@ interface ColumnConfiguratorProps {
   tableKey: string;
 }
 
+interface LocalCol {
+  key: string;
+  label: string;
+  visible: boolean;
+  order: number;
+}
+
 export function ColumnConfigurator({ module, tableKey }: ColumnConfiguratorProps) {
-  const { columns, saveColumns, isSaving } = useColumnConfig(module, tableKey);
+  const { columns, isLoading } = useColumnConfig(tableKey);
   const [open, setOpen] = useState(false);
-  const [localCols, setLocalCols] = useState<ColumnDef[]>([]);
+  const [localCols, setLocalCols] = useState<LocalCol[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleOpen = (o: boolean) => {
     setOpen(o);
-    if (o) setLocalCols(columns.map((c) => ({ ...c })));
+    if (o) setLocalCols(columns.map((c, i) => ({ key: c.key, label: c.label, visible: c.isVisible, order: i + 1 })));
   };
 
   const toggleVisible = (key: string) => {
@@ -49,27 +58,34 @@ export function ColumnConfigurator({ module, tableKey }: ColumnConfiguratorProps
     });
   };
 
-  const resetDefaults = async () => {
-    try {
-      const { api } = await import("@/lib/api");
-      const res = await api.get("/ui-config/columns/defaults", {
-        params: { module, table_key: tableKey },
-      });
-      const defaults: ColumnDef[] = res.data.map((c: ColumnDef, i: number) => ({
-        ...c,
-        visible: true,
-        order: i + 1,
-      }));
-      setLocalCols(defaults);
-    } catch {
-      // fallback: keep current
-    }
+  const resetDefaults = () => {
+    setLocalCols(columns.map((c, i) => ({ key: c.key, label: c.label, visible: c.isVisible, order: i + 1 })));
   };
 
-  const handleSave = () => {
-    const updated = localCols.map((c, i) => ({ ...c, order: i + 1 }));
-    saveColumns(updated);
-    setOpen(false);
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      const updated = localCols.map((c, i) => ({
+        key: c.key,
+        label: c.label,
+        is_visible: c.visible,
+        display_order: i + 1,
+        type: "text",
+        is_required: false,
+        is_searchable: true,
+        is_sortable: true,
+        is_exportable: true,
+        is_importable: true,
+      }));
+      await api.put("/ui-config/columns", { columns: updated }, {
+        params: { table: tableKey, mill_id: "default" },
+      });
+      setOpen(false);
+    } catch {
+      // silent
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

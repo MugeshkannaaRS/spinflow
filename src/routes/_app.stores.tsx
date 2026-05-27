@@ -26,6 +26,7 @@ import { ImportButton } from "@/components/ui/ImportButton";
 import type { ColDef } from "@/components/ui/DataTable";
 import { toast } from "sonner";
 import { Plus, Warehouse, AlertTriangle, Package } from "lucide-react";
+import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/stores")({
   head: () => ({ meta: [{ title: "Stores — SpinFlow ERP" }] }),
@@ -46,21 +47,24 @@ function StoresPage() {
   const totalStock = items.reduce((s, i) => s + (i.stock ?? 0), 0);
   const reorderItems = items.filter((i) => i.stock < i.minStock * 0.5).length;
 
+  const spareColConfig = useColumnConfig("stores_spares");
+  const issueColConfig = useColumnConfig("stores_issues");
+
   if (!user) return null;
   if (itemsQ.isLoading) return (<><Topbar title="Stores & Spares" subtitle="Loading..." /><div className="p-6 text-sm text-muted-foreground">Loading data…</div></>);
   if (itemsQ.isError) return (<><Topbar title="Stores & Spares" subtitle="Error" /><div className="p-6 text-sm text-destructive">Error loading data.</div></>);
 
   const itemCols: ColDef[] = [
-    { key: "code", label: "Code", className: "font-mono text-xs" },
-    { key: "name", label: "Name", render: (i: any) => <span className="font-medium">{i.name}</span> },
-    { key: "category", label: "Category", type: "status", render: (i: any) => <Badge variant="outline">{i.category}</Badge> },
-    { key: "stock", label: "Stock", render: (i: any) => <span className="font-medium">{i.stock}</span> },
-    { key: "minStock", label: "Min Stock", className: "text-muted-foreground" },
-    { key: "unit", label: "Unit", type: "status" },
-    { key: "location", label: "Location" },
-    { key: "vendor", label: "Vendor" },
+    { key: "code", label: spareColConfig.getLabel('code'), className: "font-mono text-xs" },
+    { key: "name", label: spareColConfig.getLabel('name'), render: (i: any) => <span className="font-medium">{i.name}</span> },
+    { key: "category", label: spareColConfig.getLabel('category'), type: "status", render: (i: any) => <Badge variant="outline">{i.category}</Badge> },
+    { key: "stock", label: spareColConfig.getLabel('stock'), render: (i: any) => <span className="font-medium">{i.stock}</span> },
+    { key: "minStock", label: spareColConfig.getLabel('minStock'), className: "text-muted-foreground" },
+    { key: "unit", label: spareColConfig.getLabel('unit'), type: "status" },
+    { key: "location", label: spareColConfig.getLabel('location') },
+    { key: "vendor", label: spareColConfig.getLabel('vendor') },
     {
-      key: "status", label: "Status", type: "status", filterable: false,
+      key: "status", label: spareColConfig.getLabel('status'), type: "status", filterable: false,
       render: (i: any) => i.stock <= i.minStock ? (
         <Badge variant={i.stock < i.minStock * 0.5 ? "destructive" : "secondary"}>
           {i.stock < i.minStock * 0.5 ? "Reorder" : "Low"}
@@ -70,13 +74,13 @@ function StoresPage() {
   ];
 
   const issueCols: ColDef[] = [
-    { key: "date", label: "Date", type: "date" },
-    { key: "itemCode", label: "Item", className: "font-mono text-xs" },
-    { key: "quantity", label: "Qty" },
-    { key: "issuedTo", label: "Issued To" },
-    { key: "department", label: "Department", type: "status" },
-    { key: "purpose", label: "Purpose", className: "max-w-xs truncate" },
-    { key: "issuedBy", label: "Issued By" },
+    { key: "date", label: issueColConfig.getLabel('date'), type: "date" },
+    { key: "itemCode", label: issueColConfig.getLabel('itemCode'), className: "font-mono text-xs" },
+    { key: "quantity", label: issueColConfig.getLabel('quantity') },
+    { key: "issuedTo", label: issueColConfig.getLabel('issuedTo') },
+    { key: "department", label: issueColConfig.getLabel('department'), type: "status" },
+    { key: "purpose", label: issueColConfig.getLabel('purpose'), className: "max-w-xs truncate" },
+    { key: "issuedBy", label: issueColConfig.getLabel('issuedBy') },
   ];
 
   return (
@@ -154,6 +158,7 @@ function NewIssueNoteDialog() {
   const [open, setOpen] = useState(false);
   const [requiredErrors, setRequiredErrors] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<UploadedFile[]>([]);
+  const issueColConfig = useColumnConfig("stores_issues");
   const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), itemCode: "", itemName: "", quantity: 0, issuedTo: "", department: "", purpose: "", issuedBy: "" });
 
   const reqFields = ["date", "itemCode", "itemName", "quantity", "issuedTo", "department", "issuedBy"] as const;
@@ -191,18 +196,18 @@ function NewIssueNoteDialog() {
           <div className="grid grid-cols-2 gap-3">
             {(["date", "itemCode", "itemName", "issuedTo", "department", "issuedBy"] as const).map((key) => (
               <div key={key} className="space-y-1.5">
-                <Label>{key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase())} <span className="text-destructive">*</span></Label>
+                <Label>{issueColConfig.getLabel(key)} <span className="text-destructive">*</span></Label>
                 <Input type={key === "date" ? "date" : "text"} {...fi(key)} />
                 {requiredErrors[key] && <p className="text-xs text-destructive">{requiredErrors[key]}</p>}
               </div>
             ))}
             <div className="space-y-1.5">
-              <Label>Quantity <span className="text-destructive">*</span></Label>
+              <Label>{issueColConfig.getLabel('quantity')} <span className="text-destructive">*</span></Label>
               <Input type="number" {...fi("quantity", "number")} />
               {requiredErrors.quantity && <p className="text-xs text-destructive">{requiredErrors.quantity}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Purpose</Label>
+              <Label>{issueColConfig.getLabel('purpose')}</Label>
               <Input value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} />
             </div>
             <div className="space-y-1.5 col-span-2">

@@ -29,6 +29,7 @@ import { Route as AppDispatchRouteImport } from './routes/_app.dispatch'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppAuditRouteImport } from './routes/_app.audit'
 import { Route as AppAccountsRouteImport } from './routes/_app.accounts'
+import { Route as AppAdminColumnConfigRouteImport } from './routes/_app.admin.column-config'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -129,11 +130,17 @@ const AppAccountsRoute = AppAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminColumnConfigRoute = AppAdminColumnConfigRouteImport.update({
+  id: '/admin/column-config',
+  path: '/admin/column-config',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/accounts': typeof AppAccountsRoute
+  '/admin/column-config': typeof AppAdminColumnConfigRoute
   '/audit': typeof AppAuditRoute
   '/dashboard': typeof AppDashboardRoute
   '/dispatch': typeof AppDispatchRoute
@@ -155,6 +162,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/accounts': typeof AppAccountsRoute
+  '/admin/column-config': typeof AppAdminColumnConfigRoute
   '/audit': typeof AppAuditRoute
   '/dashboard': typeof AppDashboardRoute
   '/dispatch': typeof AppDispatchRoute
@@ -178,6 +186,7 @@ export interface FileRoutesById {
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
   '/_app/accounts': typeof AppAccountsRoute
+  '/_app/admin/column-config': typeof AppAdminColumnConfigRoute
   '/_app/audit': typeof AppAuditRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/dispatch': typeof AppDispatchRoute
@@ -201,6 +210,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/accounts'
+    | '/admin/column-config'
     | '/audit'
     | '/dashboard'
     | '/dispatch'
@@ -222,6 +232,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/accounts'
+    | '/admin/column-config'
     | '/audit'
     | '/dashboard'
     | '/dispatch'
@@ -244,6 +255,7 @@ export interface FileRouteTypes {
     | '/_app'
     | '/login'
     | '/_app/accounts'
+    | '/_app/admin/column-config'
     | '/_app/audit'
     | '/_app/dashboard'
     | '/_app/dispatch'
@@ -410,11 +422,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAccountsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/column-config': {
+      id: '/_app/admin/column-config'
+      path: '/admin/column-config'
+      fullPath: '/admin/column-config'
+      preLoaderRoute: typeof AppAdminColumnConfigRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
   AppAccountsRoute: typeof AppAccountsRoute
+  AppAdminColumnConfigRoute: typeof AppAdminColumnConfigRoute
   AppAuditRoute: typeof AppAuditRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDispatchRoute: typeof AppDispatchRoute
@@ -435,6 +455,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAccountsRoute: AppAccountsRoute,
+  AppAdminColumnConfigRoute: AppAdminColumnConfigRoute,
   AppAuditRoute: AppAuditRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDispatchRoute: AppDispatchRoute,

@@ -46,20 +46,48 @@ interface ImportButtonProps {
 
 // ─── Column mapping helpers ────────────────────────────────────────────────
 
-function detectColIndex(headers: string[], candidates: string[]): number {
-  const lower = headers.map((h) => (h ?? "").toLowerCase().trim());
+function levenshtein(a: string, b: string): number {
+  const m = a.length; const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+function similarity(a: string, b: string): number {
+  if (!a || !b) return 0;
+  const dist = levenshtein(a.toLowerCase().trim(), b.toLowerCase().trim());
+  return 1 - dist / Math.max(a.length, b.length);
+}
+
+function detectColIndex(headers: string[], candidates: string[], threshold = 0.55): number {
+  const lowerHeaders = headers.map((h) => (h ?? "").toLowerCase().trim());
   for (const cand of candidates) {
-    const idx = lower.findIndex(
-      (h) => h === cand.toLowerCase() || h.includes(cand.toLowerCase()),
-    );
+    const idx = lowerHeaders.findIndex((h) => h === cand.toLowerCase().trim());
     if (idx !== -1) return idx;
   }
-  return -1;
+  let bestIdx = -1; let bestScore = 0;
+  for (let i = 0; i < lowerHeaders.length; i++) {
+    for (const cand of candidates) {
+      const score = similarity(lowerHeaders[i], cand.toLowerCase().trim());
+      if (score > bestScore && score >= threshold) {
+        bestScore = score; bestIdx = i;
+      }
+    }
+  }
+  return bestIdx;
 }
 
 function buildDefaultCandidates(col: ImportColDef): string[] {
   if (col.candidates?.length) return col.candidates;
-  return [col.key, col.label.toLowerCase()];
+  return [col.key, col.label];
 }
 
 // ─── Main component ───────────────────────────────────────────────────────
@@ -211,12 +239,53 @@ export function ImportButton({
   // ── Template download ──────────────────────────────────────────────────
   const downloadTemplate = () => {
     const headerRow = templateCols.map((c) => c.label);
-    const exRow = exampleRow
-      ? templateCols.map((c) => exampleRow[c.key] ?? "")
-      : templateCols.map((c) =>
-          c.type === "number" ? "0" : c.type === "date" ? "01/01/2025" : `Example ${c.label}`,
+
+    const exampleRows: string[][] = [];
+    if (exampleRow) {
+      exampleRows.push(templateCols.map((c) => exampleRow[c.key] ?? ""));
+      // Generate 2 more variant rows for richer templates
+      const variant: Record<string, string> = {};
+      for (const col of templateCols) {
+        if (exampleRow[col.key]) {
+          const v = exampleRow[col.key];
+          if (/^\d+$/.test(v)) variant[col.key] = String(Number(v) + Math.ceil(Math.random() * 10));
+          else if (v.length > 2) variant[col.key] = v.slice(0, -1) + String.fromCharCode(v.charCodeAt(v.length - 1) + 1);
+          else variant[col.key] = `Example ${col.label}`;
+        } else {
+          variant[col.key] = col.type === "number" ? "0" : col.type === "date" ? "01/01/2025" : `Example ${col.label}`;
+        }
+      }
+      exampleRows.push(templateCols.map((c) => variant[c.key] ?? ""));
+      const third: Record<string, string> = {};
+      for (const col of templateCols) {
+        if (exampleRow[col.key]) {
+          const v = exampleRow[col.key];
+          if (col.type === "date") third[col.key] = `02/01/2025`;
+          else if (col.type === "number") third[col.key] = String(Math.floor(Math.random() * 100));
+          else third[col.key] = `Example ${col.label} B`;
+        } else {
+          third[col.key] = col.type === "number" ? "0" : col.type === "date" ? "02/01/2025" : `Example ${col.label} 2`;
+        }
+      }
+      exampleRows.push(templateCols.map((c) => third[c.key] ?? ""));
+    } else {
+      for (let r = 0; r < 3; r++) {
+        exampleRows.push(
+          templateCols.map((c) =>
+            c.type === "number" ? String((r + 1) * 10) : c.type === "date" ? `0${r + 1}/01/2025` : `Example ${c.label}`,
+          ),
         );
-    const ws = XLSX.utils.aoa_to_sheet([headerRow, exRow]);
+      }
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet([headerRow, ...exampleRows]);
+
+    // Set column widths
+    const colWidths = templateCols.map((c) => ({
+      wch: Math.max(c.label.length + 4, c.type === "number" ? 12 : 18),
+    }));
+    ws["!cols"] = colWidths;
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template");
     XLSX.writeFile(wb, `template_${endpoint.replace(/\//g, "_")}.xlsx`);

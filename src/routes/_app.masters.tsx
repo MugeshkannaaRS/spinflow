@@ -33,6 +33,7 @@ import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { Plus, Search, Settings, Blocks } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useColumnConfig } from "@/hooks/useColumnConfig";
 import type {
   Company,
   Mill,
@@ -83,6 +84,12 @@ export const Route = createFileRoute("/_app/masters")({
 function MastersPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "masters");
+  const deptColConfig = useColumnConfig("masters_departments");
+  const machineColConfig = useColumnConfig("masters_machines");
+  const custColConfig = useColumnConfig("masters_customers");
+  const vehColConfig = useColumnConfig("masters_vehicles");
+  const shiftColConfig = useColumnConfig("masters_shifts");
+  const yarnColConfig = useColumnConfig("masters_yarn_counts");
   const [tab, setTab] = useState(user?.role === "SUPER_ADMIN" ? "companies" : "mills");
   const [search, setSearch] = useState("");
   const [modulesCompany, setModulesCompany] = useState<Company | null>(null);
@@ -259,9 +266,9 @@ function MastersPage() {
                 title="Departments"
                 data={deptsData.filter((x) => matchesSearch(x, search))}
                 columns={[
-                  { key: "code", label: "Code" },
-                  { key: "name", label: "Name" },
-                  { key: "department_type", label: "Type" },
+                  { key: "code", label: deptColConfig.getLabel("code") },
+                  { key: "name", label: deptColConfig.getLabel("name") },
+                  { key: "department_type", label: deptColConfig.getLabel("department_type") },
                   { key: "mill_id", label: "Mill ID" },
                 ]}
                 activeKey="is_active"
@@ -276,10 +283,10 @@ function MastersPage() {
                 title="Yarn Counts"
                 data={yarnData.filter((x) => matchesSearch(x, search))}
                 columns={[
-                  { key: "count", label: "Count" },
-                  { key: "count_value", label: "Value" },
-                  { key: "blend", label: "Blend" },
-                  { key: "standard_csp", label: "Std CSP" },
+                  { key: "count", label: yarnColConfig.getLabel("count") },
+                  { key: "count_value", label: yarnColConfig.getLabel("count_value") },
+                  { key: "blend", label: yarnColConfig.getLabel("blend") },
+                  { key: "standard_csp", label: yarnColConfig.getLabel("standard_csp") },
                 ]}
                 activeKey="is_active"
                 canEdit={canEdit}
@@ -293,11 +300,11 @@ function MastersPage() {
                 title="Customers"
                 data={custData.filter((x) => matchesSearch(x, search))}
                 columns={[
-                  { key: "code", label: "Code" },
-                  { key: "name", label: "Name" },
-                  { key: "city", label: "City" },
-                  { key: "phone", label: "Phone" },
-                  { key: "credit_limit", label: "Credit Limit" },
+                  { key: "code", label: custColConfig.getLabel("code") },
+                  { key: "name", label: custColConfig.getLabel("name") },
+                  { key: "city", label: custColConfig.getLabel("city") },
+                  { key: "phone", label: custColConfig.getLabel("phone") },
+                  { key: "credit_limit", label: custColConfig.getLabel("credit_limit") },
                 ]}
                 activeKey="is_active"
                 canEdit={canEdit}
@@ -312,11 +319,11 @@ function MastersPage() {
                 title="Vehicles"
                 data={vehData.filter((x) => matchesSearch(x, search))}
                 columns={[
-                  { key: "vehicle_no", label: "Vehicle No" },
-                  { key: "vehicle_type", label: "Type" },
-                  { key: "capacity_kg", label: "Capacity (kg)" },
-                  { key: "driver_name", label: "Driver" },
-                  { key: "driver_phone", label: "Driver Phone" },
+                  { key: "vehicle_no", label: vehColConfig.getLabel("vehicle_no") },
+                  { key: "vehicle_type", label: vehColConfig.getLabel("vehicle_type") },
+                  { key: "capacity_kg", label: vehColConfig.getLabel("capacity_kg") },
+                  { key: "driver_name", label: vehColConfig.getLabel("driver_name") },
+                  { key: "driver_phone", label: vehColConfig.getLabel("driver_phone") },
                 ]}
                 activeKey="is_active"
                 canEdit={canEdit}
@@ -348,11 +355,11 @@ function MastersPage() {
                 title="Machines"
                 data={machinesData.filter((x) => matchesSearch(x, search))}
                 columns={[
-                  { key: "code", label: "Code" },
-                  { key: "name", label: "Name" },
-                  { key: "machine_type", label: "Type" },
-                  { key: "department", label: "Department" },
-                  { key: "target_kg", label: "Target (kg)" },
+                  { key: "code", label: machineColConfig.getLabel("code") },
+                  { key: "name", label: machineColConfig.getLabel("name") },
+                  { key: "machine_type", label: machineColConfig.getLabel("machine_type") },
+                  { key: "department", label: machineColConfig.getLabel("department") },
+                  { key: "target_kg", label: machineColConfig.getLabel("target_kg") },
                 ]}
                 activeKey="current_status"
                 canEdit={canEdit}
@@ -366,10 +373,10 @@ function MastersPage() {
                 title="Shifts"
                 data={shiftsData.filter((x) => matchesSearch(x, search))}
                 columns={[
-                  { key: "code", label: "Code" },
-                  { key: "name", label: "Name" },
-                  { key: "start_time", label: "Start Time" },
-                  { key: "end_time", label: "End Time" },
+                  { key: "code", label: shiftColConfig.getLabel("code") },
+                  { key: "name", label: shiftColConfig.getLabel("name") },
+                  { key: "start_time", label: shiftColConfig.getLabel("start_time") },
+                  { key: "end_time", label: shiftColConfig.getLabel("end_time") },
                 ]}
                 noStatus
                 canEdit={canEdit}

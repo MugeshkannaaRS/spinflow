@@ -24,6 +24,7 @@ from app.schemas.auth import (
     MeResponse, MillSettingsOut, CompanyInfo,
 )
 from app.models.masters import Company, CompanyModule, MillSettings
+from app.models.ui_config import ColumnConfig
 from pydantic import BaseModel, Field
 
 MAX_FAILED_ATTEMPTS = 5
@@ -210,6 +211,17 @@ async def get_me(current_user: User = Depends(get_current_user), db: AsyncSessio
                 current_user_count=user_count,
             )
 
+    column_configs_version = None
+    if current_user.mill_id:
+        cv_result = await db.execute(
+            select(func.max(ColumnConfig.updated_at)).where(
+                ColumnConfig.mill_id == current_user.mill_id,
+            )
+        )
+        max_updated = cv_result.scalar()
+        if max_updated:
+            column_configs_version = max_updated.isoformat()
+
     return MeResponse(
         user=UserResponse(
             id=current_user.id,
@@ -227,6 +239,7 @@ async def get_me(current_user: User = Depends(get_current_user), db: AsyncSessio
         allowed_modules=allowed_modules,
         mill_settings=mill_settings,
         company=company_info,
+        column_configs_version=column_configs_version,
     )
 
 

@@ -47,6 +47,7 @@ import {
 } from "lucide-react";
 import type { MaintenanceTask } from "@/lib/types";
 import * as XLSX from "xlsx";
+import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/maintenance")({
   head: () => ({ meta: [{ title: "Maintenance — SpinFlow ERP" }] }),
@@ -55,14 +56,14 @@ export const Route = createFileRoute("/_app/maintenance")({
 
 // ─── Template generators ─────────────────────────────────────────────────────
 
-function downloadScheduleTemplate() {
+function downloadScheduleTemplate(getLabel: (key: string) => string) {
   const ws = XLSX.utils.aoa_to_sheet([
     [
-      "Machine Code",
-      "Task Description",
-      "Frequency (daily/weekly/monthly)",
-      "Last Done Date (DD/MM/YYYY)",
-      "Next Due Date (DD/MM/YYYY)",
+      getLabel("machine_code"),
+      getLabel("description"),
+      getLabel("frequency_days"),
+      getLabel("last_done"),
+      getLabel("next_due"),
       "Assigned Technician Name",
     ],
     ["RI-001", "Lubrication check", "weekly", "01/05/2026", "08/05/2026", "Ravi Kumar"],
@@ -321,6 +322,8 @@ function parseParameterRow(row: any[]): Record<string, string> | null {
 function MaintenancePage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "maintenance");
+  const taskColConfig = useColumnConfig("maintenance_tasks");
+  const schedColConfig = useColumnConfig("maintenance_schedules");
   const qc = useQueryClient();
 
   const maintQ = useQuery({
@@ -482,15 +485,15 @@ function MaintenancePage() {
                   <DataTable
                     tableId="maintenance_tasks"
                     columns={[
-                      { key: "date", label: "Date", type: "date" },
-                      { key: "type", label: "Type", render: (t: any) => <Badge variant={t.type === "breakdown" ? "destructive" : t.type === "preventive" ? "default" : "secondary"}>{t.type}</Badge> },
-                      { key: "machineCode", label: "Machine", className: "font-mono text-xs" },
-                      { key: "department", label: "Department", type: "status" },
-                      { key: "description", label: "Description", className: "max-w-[250px] truncate" },
-                      { key: "technician", label: "Technician" },
-                      { key: "downtimeMin", label: "Downtime", render: (t: any) => `${t.downtimeMin} min` },
-                      { key: "spareUsed", label: "Spare", render: (t: any) => t.spareUsed || "—" },
-                      { key: "status", label: "Status", type: "status", render: (t: any) => <Badge variant={t.status === "completed" ? "default" : t.status === "in-progress" ? "secondary" : "destructive"}>{t.status}</Badge> },
+                      { key: "date", label: taskColConfig.getLabel("date"), type: "date" },
+                      { key: "type", label: taskColConfig.getLabel("type"), render: (t: any) => <Badge variant={t.type === "breakdown" ? "destructive" : t.type === "preventive" ? "default" : "secondary"}>{t.type}</Badge> },
+                      { key: "machineCode", label: taskColConfig.getLabel("machine_code"), className: "font-mono text-xs" },
+                      { key: "department", label: taskColConfig.getLabel("department"), type: "status" },
+                      { key: "description", label: taskColConfig.getLabel("description"), className: "max-w-[250px] truncate" },
+                      { key: "technician", label: taskColConfig.getLabel("technician") },
+                      { key: "downtimeMin", label: taskColConfig.getLabel("downtime_min"), render: (t: any) => `${t.downtimeMin} min` },
+                      { key: "spareUsed", label: taskColConfig.getLabel("spare_used"), render: (t: any) => t.spareUsed || "—" },
+                      { key: "status", label: taskColConfig.getLabel("status"), type: "status", render: (t: any) => <Badge variant={t.status === "completed" ? "default" : t.status === "in-progress" ? "secondary" : "destructive"}>{t.status}</Badge> },
                     ] satisfies ColDef[]}
                     data={tasks}
                     loading={maintQ.isLoading}
@@ -518,13 +521,13 @@ function MaintenancePage() {
                   <DataTable
                     tableId="maintenance_schedules"
                     columns={[
-                      { key: "machine_code", label: "Machine Code", className: "font-mono text-xs" },
-                      { key: "type", label: "Type", render: (s: any) => <Badge variant="secondary">{s.type}</Badge> },
-                      { key: "frequency_days", label: "Frequency (days)" },
-                      { key: "last_done", label: "Last Done", render: (s: any) => s.last_done || "—" },
-                      { key: "next_due", label: "Next Due", render: (s: any) => s.next_due || "—" },
-                      { key: "description", label: "Description", className: "max-w-[300px] truncate" },
-                      { key: "is_active", label: "Active", render: (s: any) => <Badge variant={s.is_active ? "default" : "secondary"}>{s.is_active ? "Active" : "Inactive"}</Badge> },
+                      { key: "machine_code", label: schedColConfig.getLabel("machine_code"), className: "font-mono text-xs" },
+                      { key: "type", label: schedColConfig.getLabel("type"), render: (s: any) => <Badge variant="secondary">{s.type}</Badge> },
+                      { key: "frequency_days", label: schedColConfig.getLabel("frequency_days") },
+                      { key: "last_done", label: schedColConfig.getLabel("last_done"), render: (s: any) => s.last_done || "—" },
+                      { key: "next_due", label: schedColConfig.getLabel("next_due"), render: (s: any) => s.next_due || "—" },
+                      { key: "description", label: schedColConfig.getLabel("description"), className: "max-w-[300px] truncate" },
+                      { key: "is_active", label: schedColConfig.getLabel("is_active"), render: (s: any) => <Badge variant={s.is_active ? "default" : "secondary"}>{s.is_active ? "Active" : "Inactive"}</Badge> },
                     ] satisfies ColDef[]}
                     data={schedules}
                     loading={schedulesQ.isLoading}
@@ -586,7 +589,7 @@ function MaintenancePage() {
           ]}
           parseRow={parseScheduleRow}
           onConfirm={(rows) => scheduleMutation.mutateAsync(rows)}
-          onDownloadTemplate={downloadScheduleTemplate}
+          onDownloadTemplate={() => downloadScheduleTemplate(schedColConfig.getLabel)}
           isSubmitting={scheduleMutation.isPending}
         />
         <ImportDialog

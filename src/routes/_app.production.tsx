@@ -32,6 +32,7 @@ import type { ColDef } from "@/components/ui/DataTable";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid } from "lucide-react";
+import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/production")({
   head: () => ({ meta: [{ title: "Production — SpinFlow ERP" }] }),
@@ -60,7 +61,7 @@ type GridRow = {
 };
 
 function buildRows(machines: any[]): GridRow[] {
-  return machines.map((m: any) => ({
+  return (machines ?? []).map((m: any) => ({
     machineCode: m.code ?? "",
     machineName: m.name ?? m.code ?? "",
     operator: "",
@@ -84,6 +85,7 @@ function ShiftGrid() {
   const [shift, setShift] = useState<"A" | "B" | "C">("A");
   const [department, setDepartment] = useState(DEPARTMENTS[4]);
   const [count, setCount] = useState("30s");
+  const config = useColumnConfig("production_entries");
 
   const machinesQ = useQuery({
     queryKey: ["machines", department],
@@ -179,7 +181,7 @@ function ShiftGrid() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">
-                Date <span className="text-destructive">*</span>
+                {config.getLabel('date')}{config.isRequired('date') && <span className="text-destructive"> *</span>}
               </Label>
               <Input
                 type="date"
@@ -198,7 +200,7 @@ function ShiftGrid() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">
-                Shift <span className="text-destructive">*</span>
+                {config.getLabel('shift')}{config.isRequired('shift') && <span className="text-destructive"> *</span>}
               </Label>
               <Select
                 value={shift}
@@ -226,7 +228,7 @@ function ShiftGrid() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">
-                Department <span className="text-destructive">*</span>
+                {config.getLabel('department')}{config.isRequired('department') && <span className="text-destructive"> *</span>}
               </Label>
               <Select
                 value={department}
@@ -256,7 +258,7 @@ function ShiftGrid() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">
-                Count / Yarn <span className="text-destructive">*</span>
+                {config.getLabel('count')}{config.isRequired('count') && <span className="text-destructive"> *</span>}
               </Label>
               <Input
                 value={count}
@@ -331,19 +333,19 @@ function ShiftGrid() {
               <Table className="min-w-[900px] w-full text-sm">
                 <TableHeader>
                   <TableRow className="bg-muted/40">
-                    <TableHead className="w-24 pl-4">Code</TableHead>
-                    <TableHead className="w-36">Name</TableHead>
-                    <TableHead className="w-32">Operator</TableHead>
-                    <TableHead className="w-20">Count</TableHead>
-                    <TableHead className="w-28">Produced kg</TableHead>
-                    <TableHead className="w-24">Waste kg</TableHead>
-                    <TableHead className="w-28">Stoppage min</TableHead>
-                    <TableHead className="w-40">Stoppage Reason</TableHead>
-                    <TableHead className="w-32">Status</TableHead>
+                    <TableHead className="w-24 pl-4">{config.getLabel('machine_code')}</TableHead>
+                    <TableHead className="w-36">{(() => { const l = config.getLabel('machine_name'); return l === 'machine_name' ? 'name' : l; })()}</TableHead>
+                    <TableHead className="w-32">{config.getLabel('operator')}</TableHead>
+                    <TableHead className="w-20">{config.getLabel('count')}</TableHead>
+                    <TableHead className="w-28">{config.getLabel('produced_kg')}</TableHead>
+                    <TableHead className="w-24">{config.getLabel('waste_kg')}</TableHead>
+                    <TableHead className="w-28">{config.getLabel('stoppage_mins')}</TableHead>
+                    <TableHead className="w-40">{config.getLabel('stoppage_reason')}</TableHead>
+                    <TableHead className="w-32">{config.getLabel('machine_status')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row, idx) => {
+                  {(rows ?? []).map((row, idx) => {
                     const hasData = Number(row.producedKg) > 0;
                     return (
                       <TableRow
@@ -461,6 +463,8 @@ function ProductionPage() {
   const machines = (machinesQ.data ?? []) as any[];
   const shifts = (shiftsQ.data ?? []) as any[];
   const downtime = (downQ.data ?? []) as any[];
+  const machineColConfig = useColumnConfig("production_entries");
+  const downColConfig = useColumnConfig("production_downtime");
 
   const totalProduced = machines.reduce(
     (s: number, m: any) => s + (m.produced_kg ?? m.producedKg ?? 0),
@@ -580,12 +584,12 @@ function ProductionPage() {
                   <DataTable
                     tableId="production_machines"
                     columns={[
-                      { key: "code", label: "Code", className: "font-mono text-xs" },
-                      { key: "department", label: "Department", type: "status" },
+                      { key: "code", label: machineColConfig.getLabel('code'), className: "font-mono text-xs" },
+                      { key: "department", label: machineColConfig.getLabel('department'), type: "status" },
                       { key: "target_kg", label: "Target (kg)", render: (m: any) => ((m.target_kg ?? m.targetKg) ?? 0).toLocaleString() },
                       { key: "produced_kg", label: "Produced (kg)", render: (m: any) => ((m.produced_kg ?? m.producedKg) ?? 0).toLocaleString() },
                       { key: "efficiency", label: "Efficiency", render: (m: any) => <span className={(m.efficiency ?? 0) >= 85 ? "text-green-600 font-medium" : (m.efficiency ?? 0) >= 70 ? "" : "text-destructive font-medium"}>{m.efficiency ?? 0}%</span> },
-                      { key: "current_status", label: "Status", type: "status", render: (m: any) => <Badge variant={(m.current_status ?? m.status) === "running" ? "default" : (m.current_status ?? m.status) === "breakdown" ? "destructive" : "secondary"}>{m.current_status ?? m.status}</Badge> },
+                      { key: "current_status", label: machineColConfig.getLabel('machine_status'), type: "status", render: (m: any) => <Badge variant={(m.current_status ?? m.status) === "running" ? "default" : (m.current_status ?? m.status) === "breakdown" ? "destructive" : "secondary"}>{m.current_status ?? m.status}</Badge> },
                     ] satisfies ColDef[]}
                     data={machines}
                     loading={machinesQ.isLoading}
@@ -603,15 +607,15 @@ function ProductionPage() {
                   <DataTable
                     tableId="production_shifts"
                     columns={[
-                      { key: "date", label: "Date", type: "date" },
-                      { key: "shift", label: "Shift", render: (s: any) => <Badge variant="outline">{s.shift}</Badge> },
-                      { key: "machineCode", label: "Machine", className: "font-mono text-xs" },
-                      { key: "department", label: "Department", type: "status" },
-                      { key: "operator", label: "Operator" },
-                      { key: "count", label: "Count" },
-                      { key: "producedKg", label: "Produced", render: (s: any) => `${s.producedKg} kg` },
-                      { key: "wasteKg", label: "Waste", render: (s: any) => <span className="text-muted-foreground">{s.wasteKg} kg</span> },
-                      { key: "status", label: "Status", type: "status", render: (s: any) => <Badge variant={s.status === "approved" ? "default" : s.status === "rejected" ? "destructive" : "secondary"}>{s.status === "approved" && <CheckCircle2 className="size-3 mr-1 inline" />}{s.status}</Badge> },
+                      { key: "date", label: machineColConfig.getLabel('date'), type: "date" },
+                      { key: "shift", label: machineColConfig.getLabel('shift'), render: (s: any) => <Badge variant="outline">{s.shift}</Badge> },
+                      { key: "machineCode", label: machineColConfig.getLabel('machine_code'), className: "font-mono text-xs" },
+                      { key: "department", label: machineColConfig.getLabel('department'), type: "status" },
+                      { key: "operator", label: machineColConfig.getLabel('operator') },
+                      { key: "count", label: machineColConfig.getLabel('count') },
+                      { key: "producedKg", label: machineColConfig.getLabel('produced_kg'), render: (s: any) => `${s.producedKg} kg` },
+                      { key: "wasteKg", label: machineColConfig.getLabel('waste_kg'), render: (s: any) => <span className="text-muted-foreground">{s.wasteKg} kg</span> },
+                      { key: "status", label: machineColConfig.getLabel('status'), type: "status", render: (s: any) => <Badge variant={s.status === "approved" ? "default" : s.status === "rejected" ? "destructive" : "secondary"}>{s.status === "approved" && <CheckCircle2 className="size-3 mr-1 inline" />}{s.status}</Badge> },
                     ] satisfies ColDef[]}
                     data={shifts}
                     loading={shiftsQ.isLoading}

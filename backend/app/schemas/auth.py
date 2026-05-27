@@ -57,6 +57,7 @@ class MeResponse(BaseModel):
     allowed_modules: list[str]
     mill_settings: Optional[MillSettingsOut] = None
     company: Optional[CompanyInfo] = None
+    column_configs_version: Optional[str] = None
 
 
 class LoginResponse(BaseModel):

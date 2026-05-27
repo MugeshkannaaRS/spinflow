@@ -33,6 +33,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, CheckCircle2, XCircle, FlaskConical, AlertTriangle } from "lucide-react";
 import type { QualityTest } from "@/lib/types";
+import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/quality")({
   head: () => ({ meta: [{ title: "Quality — SpinFlow ERP" }] }),
@@ -66,6 +67,9 @@ function QualityPage() {
   const lots: any[] = lotsQ.data ?? [];
   const rejections: any[] = rejQ.data ?? [];
 
+  const testColConfig = useColumnConfig("quality_tests");
+  const lotColConfig = useColumnConfig("quality_approvals");
+  const rejColConfig = useColumnConfig("quality_tests");
 
   const passRate = tests.length
     ? Math.round((tests.filter((t) => t.status === "pass").length / tests.length) * 100)
@@ -156,15 +160,15 @@ function QualityPage() {
                   <DataTable
                     tableId="quality_tests"
                     columns={[
-                      { key: "date", label: "Date", type: "date" },
-                      { key: "type", label: "Type", type: "status", render: (t: any) => <Badge variant="outline">{t.type}</Badge> },
-                      { key: "lotId", label: "Lot", className: "font-mono text-xs" },
-                      { key: "machineCode", label: "Machine", className: "font-mono text-xs" },
-                      { key: "sampleRef", label: "Sample" },
-                      { key: "result", label: "Result", render: (t: any) => `${t.result} ${t.unit}` },
-                      { key: "standard", label: "Standard", render: (t: any) => `${t.standard} ${t.unit}` },
-                      { key: "status", label: "Status", type: "status", render: (t: any) => <Badge variant={t.status === "pass" ? "default" : t.status === "fail" ? "destructive" : "secondary"}>{t.status === "pass" && <CheckCircle2 className="size-3 mr-1 inline" />}{t.status}</Badge> },
-                      { key: "testedBy", label: "Tested By" },
+                      { key: "date", label: testColConfig.getLabel('date'), type: "date" },
+                      { key: "type", label: testColConfig.getLabel('type'), type: "status", render: (t: any) => <Badge variant="outline">{t.type}</Badge> },
+                      { key: "lotId", label: testColConfig.getLabel('lotId'), className: "font-mono text-xs" },
+                      { key: "machineCode", label: testColConfig.getLabel('machineCode'), className: "font-mono text-xs" },
+                      { key: "sampleRef", label: testColConfig.getLabel('sampleRef') },
+                      { key: "result", label: testColConfig.getLabel('result'), render: (t: any) => `${t.result} ${t.unit}` },
+                      { key: "standard", label: testColConfig.getLabel('standard'), render: (t: any) => `${t.standard} ${t.unit}` },
+                      { key: "status", label: testColConfig.getLabel('status'), type: "status", render: (t: any) => <Badge variant={t.status === "pass" ? "default" : t.status === "fail" ? "destructive" : "secondary"}>{t.status === "pass" && <CheckCircle2 className="size-3 mr-1 inline" />}{t.status}</Badge> },
+                      { key: "testedBy", label: testColConfig.getLabel('testedBy') },
                     ] satisfies ColDef[]}
                     data={tests}
                     loading={testsQ.isLoading}
@@ -203,14 +207,14 @@ function QualityPage() {
                   <DataTable
                     tableId="quality_lots"
                     columns={[
-                      { key: "lotNo", label: "Lot No", className: "font-mono text-xs" },
-                      { key: "department", label: "Department", type: "status" },
-                      { key: "producedKg", label: "Qty (kg)" },
-                      { key: "cspResult", label: "CSP" },
-                      { key: "countResult", label: "Count" },
-                      { key: "moistureResult", label: "Moisture", render: (l: any) => l.moistureResult != null ? `${l.moistureResult}%` : "—" },
-                      { key: "strengthResult", label: "Strength" },
-                      { key: "status", label: "Status", type: "status", render: (l: any) => <Badge variant={l.status === "approved" ? "default" : l.status === "rejected" ? "destructive" : "secondary"}>{l.status}</Badge> },
+                      { key: "lotNo", label: lotColConfig.getLabel('lotNo'), className: "font-mono text-xs" },
+                      { key: "department", label: lotColConfig.getLabel('department'), type: "status" },
+                      { key: "producedKg", label: lotColConfig.getLabel('producedKg') },
+                      { key: "cspResult", label: lotColConfig.getLabel('cspResult') },
+                      { key: "countResult", label: lotColConfig.getLabel('countResult') },
+                      { key: "moistureResult", label: lotColConfig.getLabel('moistureResult'), render: (l: any) => l.moistureResult != null ? `${l.moistureResult}%` : "—" },
+                      { key: "strengthResult", label: lotColConfig.getLabel('strengthResult') },
+                      { key: "status", label: lotColConfig.getLabel('status'), type: "status", render: (l: any) => <Badge variant={l.status === "approved" ? "default" : l.status === "rejected" ? "destructive" : "secondary"}>{l.status}</Badge> },
                     ] satisfies ColDef[]}
                     data={lots}
                     loading={lotsQ.isLoading}
@@ -231,13 +235,13 @@ function QualityPage() {
                   <DataTable
                     tableId="quality_rejections"
                     columns={[
-                      { key: "date", label: "Date", type: "date" },
-                      { key: "lotId", label: "Lot", className: "font-mono text-xs" },
-                      { key: "category", label: "Category", type: "status", render: (r: any) => <Badge variant="destructive">{r.category}</Badge> },
-                      { key: "quantityKg", label: "Qty (kg)" },
-                      { key: "reason", label: "Reason", className: "max-w-xs truncate" },
-                      { key: "disposition", label: "Disposition", type: "status", render: (r: any) => <Badge variant="outline">{r.disposition}</Badge> },
-                      { key: "notedBy", label: "Noted By" },
+                      { key: "date", label: rejColConfig.getLabel('date'), type: "date" },
+                      { key: "lotId", label: rejColConfig.getLabel('lotId'), className: "font-mono text-xs" },
+                      { key: "category", label: rejColConfig.getLabel('category'), type: "status", render: (r: any) => <Badge variant="destructive">{r.category}</Badge> },
+                      { key: "quantityKg", label: rejColConfig.getLabel('quantityKg') },
+                      { key: "reason", label: rejColConfig.getLabel('reason'), className: "max-w-xs truncate" },
+                      { key: "disposition", label: rejColConfig.getLabel('disposition'), type: "status", render: (r: any) => <Badge variant="outline">{r.disposition}</Badge> },
+                      { key: "notedBy", label: rejColConfig.getLabel('notedBy') },
                     ] satisfies ColDef[]}
                     data={rejections}
                     loading={rejQ.isLoading}
@@ -258,6 +262,7 @@ function NewTestDialog() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [requiredErrors, setRequiredErrors] = useState<Record<string, string>>({});
+  const testColConfig = useColumnConfig("quality_tests");
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
     type: "CSP" as QualityTest["type"],
@@ -328,7 +333,7 @@ function NewTestDialog() {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>
-                Date <span className="text-destructive">*</span>
+                {testColConfig.getLabel('date')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 type="date"
@@ -345,7 +350,7 @@ function NewTestDialog() {
             </div>
             <div className="space-y-1.5">
               <Label>
-                Type <span className="text-destructive">*</span>
+                {testColConfig.getLabel('type')} <span className="text-destructive">*</span>
               </Label>
               <Select
                 value={form.type}
@@ -371,7 +376,7 @@ function NewTestDialog() {
             </div>
             <div className="space-y-1.5">
               <Label>
-                Lot ID <span className="text-destructive">*</span>
+                {testColConfig.getLabel('lotId')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 value={form.lotId}
@@ -387,7 +392,7 @@ function NewTestDialog() {
             </div>
             <div className="space-y-1.5">
               <Label>
-                Machine code <span className="text-destructive">*</span>
+                {testColConfig.getLabel('machineCode')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 value={form.machineCode}
@@ -403,7 +408,7 @@ function NewTestDialog() {
             </div>
             <div className="space-y-1.5">
               <Label>
-                Sample ref <span className="text-destructive">*</span>
+                {testColConfig.getLabel('sampleRef')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 value={form.sampleRef}
@@ -419,7 +424,7 @@ function NewTestDialog() {
             </div>
             <div className="space-y-1.5">
               <Label>
-                Unit <span className="text-destructive">*</span>
+                {testColConfig.getLabel('unit')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 value={form.unit}
@@ -435,7 +440,7 @@ function NewTestDialog() {
             </div>
             <div className="space-y-1.5">
               <Label>
-                Result <span className="text-destructive">*</span>
+                {testColConfig.getLabel('result')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 type="number"
@@ -453,7 +458,7 @@ function NewTestDialog() {
             </div>
             <div className="space-y-1.5">
               <Label>
-                Standard <span className="text-destructive">*</span>
+                {testColConfig.getLabel('standard')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 type="number"
@@ -471,7 +476,7 @@ function NewTestDialog() {
             </div>
             <div className="space-y-1.5">
               <Label>
-                Tested by <span className="text-destructive">*</span>
+                {testColConfig.getLabel('testedBy')} <span className="text-destructive">*</span>
               </Label>
               <Input
                 value={form.testedBy}

@@ -60,6 +60,7 @@ import {
   Blocks,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/users")({
   head: () => ({ meta: [{ title: "Users & Roles — SpinFlow ERP" }] }),
@@ -124,6 +125,7 @@ function UsersPage() {
   const qc = useQueryClient();
   const currentUser = useAuth((s) => s.user);
   const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
+  const userColConfig = useColumnConfig("hr_employees");
 
   const usersQ = useQuery({
     queryKey: ["system-users"],
@@ -516,11 +518,11 @@ function UsersPage() {
                   <DataTable
                     tableId="users_list"
                     columns={[
-                      { key: "full_name", label: "Name", render: (u: any) => <span className="font-medium">{u.full_name}</span> },
-                      { key: "email", label: "Email" },
+                      { key: "full_name", label: userColConfig.getLabel("name"), render: (u: any) => <span className="font-medium">{u.full_name}</span> },
+                      { key: "email", label: userColConfig.getLabel("email") },
                       {
                         key: "role",
-                        label: "Role",
+                        label: userColConfig.getLabel("role"),
                         type: "status",
                         render: (u: any) => (
                           <Badge className={cn("font-medium", ROLE_BADGE_COLORS[u.role] ?? "")}>
@@ -528,16 +530,16 @@ function UsersPage() {
                           </Badge>
                         ),
                       },
-                      { key: "department", label: "Department" },
+                      { key: "department", label: userColConfig.getLabel("department") },
                       {
                         key: "mill_id",
-                        label: "Mill",
+                        label: userColConfig.getLabel("mill_id"),
                         render: (u: any) => mills.find((m: any) => m.id === u.mill_id)?.name ?? "—",
                         filterable: false,
                       },
                       {
                         key: "company_id",
-                        label: "Company",
+                        label: userColConfig.getLabel("company_id"),
                         render: (u: any) => {
                           const mill = mills.find((m: any) => m.id === u.mill_id);
                           return companies.find((c: any) => c.id === (u.company_id || mill?.company_id))?.name ?? "—";
@@ -546,7 +548,7 @@ function UsersPage() {
                       },
                       {
                         key: "last_login",
-                        label: "Last Login",
+                        label: userColConfig.getLabel("last_login"),
                         render: (u: any) =>
                           u.last_login ? (
                             <span className="text-xs text-muted-foreground">
@@ -556,7 +558,7 @@ function UsersPage() {
                       },
                       {
                         key: "is_active",
-                        label: "Status",
+                        label: userColConfig.getLabel("is_active"),
                         type: "status",
                         render: (u: any) => (
                           <Badge variant={u.is_active ? "default" : "secondary"}>

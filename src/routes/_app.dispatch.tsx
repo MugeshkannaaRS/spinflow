@@ -22,6 +22,7 @@ import type { ColDef } from "@/components/ui/DataTable";
 import { toast } from "sonner";
 import { Truck, ClipboardList, Loader2 } from "lucide-react";
 import type { DispatchEntry } from "@/lib/types";
+import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/dispatch")({
   head: () => ({ meta: [{ title: "Dispatch — SpinFlow ERP" }] }),
@@ -31,6 +32,8 @@ export const Route = createFileRoute("/_app/dispatch")({
 function DispatchPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "dispatch");
+  const orderColConfig = useColumnConfig("dispatch_sales_orders");
+  const dispatchColConfig = useColumnConfig("dispatch_trips");
   const ordersQ = useQuery({ queryKey: ["sales-orders"], queryFn: dispatchApi.getOrders, staleTime: 60_000, retry: 1 });
   const dispatchQ = useQuery({ queryKey: ["dispatches"], queryFn: dispatchApi.getOrders, staleTime: 60_000, retry: 1 });
 
@@ -47,15 +50,15 @@ function DispatchPage() {
   if (ordersQ.isError) return (<><Topbar title="Dispatch" subtitle="Error" /><div className="p-6 text-sm text-destructive">Error loading data.</div></>);
 
   const orderCols: ColDef[] = [
-    { key: "orderNo", label: "Order No", className: "font-mono text-xs" },
-    { key: "customer", label: "Customer", render: (o: any) => <span className="font-medium">{o.customer}</span> },
-    { key: "date", label: "Date", type: "date" },
-    { key: "deliveryDate", label: "Delivery", type: "date" },
-    { key: "items", label: "Items" },
-    { key: "quantityKg", label: "Qty (kg)" },
-    { key: "value", label: "Value", render: (o: any) => `₹${(o.value ?? 0).toLocaleString()}` },
+    { key: "orderNo", label: orderColConfig.getLabel('order_no'), className: "font-mono text-xs" },
+    { key: "customer", label: orderColConfig.getLabel('customer'), render: (o: any) => <span className="font-medium">{o.customer}</span> },
+    { key: "date", label: orderColConfig.getLabel('date'), type: "date" },
+    { key: "deliveryDate", label: orderColConfig.getLabel('delivery_date'), type: "date" },
+    { key: "items", label: orderColConfig.getLabel('items') },
+    { key: "quantityKg", label: orderColConfig.getLabel('quantity_kg') },
+    { key: "value", label: orderColConfig.getLabel('value'), render: (o: any) => `₹${(o.value ?? 0).toLocaleString()}` },
     {
-      key: "status", label: "Status", type: "status",
+      key: "status", label: orderColConfig.getLabel('status'), type: "status",
       render: (o: any) => (
         <Badge variant={["delivered", "dispatched"].includes(o.status) ? "default" : ["loaded", "processing"].includes(o.status) ? "secondary" : "outline"}>{o.status}</Badge>
       ),
@@ -63,16 +66,16 @@ function DispatchPage() {
   ];
 
   const dispatchCols: ColDef[] = [
-    { key: "dispatchNo", label: "Dispatch No", className: "font-mono text-xs" },
-    { key: "date", label: "Date", type: "date" },
-    { key: "orderNo", label: "Order", className: "font-mono text-xs" },
-    { key: "customer", label: "Customer" },
-    { key: "lotNo", label: "Lot", className: "font-mono text-xs" },
-    { key: "quantityKg", label: "Qty (kg)" },
-    { key: "vehicleNo", label: "Vehicle", className: "font-mono text-xs" },
-    { key: "ewayBillNo", label: "E-Way Bill", className: "font-mono text-xs" },
+    { key: "dispatchNo", label: dispatchColConfig.getLabel('dispatch_no'), className: "font-mono text-xs" },
+    { key: "date", label: dispatchColConfig.getLabel('date'), type: "date" },
+    { key: "orderNo", label: dispatchColConfig.getLabel('order_no'), className: "font-mono text-xs" },
+    { key: "customer", label: dispatchColConfig.getLabel('customer') },
+    { key: "lotNo", label: dispatchColConfig.getLabel('lot_no'), className: "font-mono text-xs" },
+    { key: "quantityKg", label: dispatchColConfig.getLabel('quantity_kg') },
+    { key: "vehicleNo", label: dispatchColConfig.getLabel('vehicle_no'), className: "font-mono text-xs" },
+    { key: "ewayBillNo", label: dispatchColConfig.getLabel('eway_bill_no'), className: "font-mono text-xs" },
     {
-      key: "status", label: "Status", type: "status",
+      key: "status", label: dispatchColConfig.getLabel('status'), type: "status",
       render: (d: any) => (
         <Badge variant={["dispatched", "delivered"].includes(d.status) ? "default" : d.status === "loaded" ? "secondary" : "outline"}>{d.status}</Badge>
       ),

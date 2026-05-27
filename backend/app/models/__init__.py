@@ -15,6 +15,7 @@ from app.models.attachment import DocumentAttachment
 from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician
 from app.models.masters import Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route, CompanyModule, MillSettings, DepartmentType, VehicleType
 from app.models.stock import StockLedger, StockBalance, SalesOrder, SalesOrderLine, StockTransfer
+from app.models.ui_config import ColumnConfig, ColumnDropdownOption
 
 __all__ = [
     "Base",
@@ -36,4 +37,5 @@ __all__ = [
     "DepartmentType", "VehicleType",
     "StockLedger", "StockBalance", "SalesOrder", "SalesOrderLine", "StockTransfer",
     "Trip", "TripItem", "TripScanLog",
+    "ColumnConfig", "ColumnDropdownOption",
 ]

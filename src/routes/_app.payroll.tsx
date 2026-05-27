@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { IndianRupee, CheckCircle2, XCircle, Loader2, Download } from "lucide-react";
 import { exportApi } from "@/lib/api-service";
 import type { PayrollMonth, PayslipEntry } from "@/lib/types";
+import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/payroll")({
   head: () => ({ meta: [{ title: "Payroll — SpinFlow ERP" }] }),
@@ -364,6 +365,7 @@ function PayslipsTab({ millId, year }: { millId: string; year: number }) {
   const currentMonth = new Date().getMonth() + 1;
   const [month, setMonth] = useState(String(currentMonth));
   const [dept, setDept] = useState("");
+  const payslipColConfig = useColumnConfig("hr_payroll");
 
   const monthsQ = useQuery({
     queryKey: ["payroll-summary", millId, year],
@@ -422,16 +424,16 @@ function PayslipsTab({ millId, year }: { millId: string; year: number }) {
           <DataTable
             tableId="payroll_payslips"
             columns={[
-              { key: "employee_code", label: "Emp Code", className: "font-mono text-xs" },
-              { key: "employee_name", label: "Name", render: (p: any) => <span className="font-medium">{p.employee_name}</span> },
-              { key: "department", label: "Dept", type: "status" },
-              { key: "present_days", label: "Present" },
-              { key: "overtime_hours", label: "OT Hrs" },
-              { key: "gross_wage", label: "Gross", render: (p: any) => `₹${(p.gross_wage ?? 0).toLocaleString()}` },
-              { key: "pf_employee", label: "PF", render: (p: any) => `₹${(p.pf_employee ?? 0).toLocaleString()}` },
-              { key: "esic_employee", label: "ESIC", render: (p: any) => `₹${(p.esic_employee ?? 0).toLocaleString()}` },
-              { key: "net_wage", label: "Net", render: (p: any) => <span className="font-medium">₹{(p.net_wage ?? 0).toLocaleString()}</span> },
-              { key: "status", label: "Status", type: "status", render: (p: any) => <Badge variant={p.status === "paid" ? "default" : "secondary"}>{p.status}</Badge> },
+              { key: "employee_code", label: payslipColConfig.getLabel('employee_code'), className: "font-mono text-xs" },
+              { key: "employee_name", label: payslipColConfig.getLabel('employee_name'), render: (p: any) => <span className="font-medium">{p.employee_name}</span> },
+              { key: "department", label: payslipColConfig.getLabel('department'), type: "status" },
+              { key: "present_days", label: payslipColConfig.getLabel('present_days') },
+              { key: "overtime_hours", label: payslipColConfig.getLabel('overtime_hours') },
+              { key: "gross_wage", label: payslipColConfig.getLabel('gross_wage'), render: (p: any) => `₹${(p.gross_wage ?? 0).toLocaleString()}` },
+              { key: "pf_employee", label: payslipColConfig.getLabel('pf_employee'), render: (p: any) => `₹${(p.pf_employee ?? 0).toLocaleString()}` },
+              { key: "esic_employee", label: payslipColConfig.getLabel('esic_employee'), render: (p: any) => `₹${(p.esic_employee ?? 0).toLocaleString()}` },
+              { key: "net_wage", label: payslipColConfig.getLabel('net_wage'), render: (p: any) => <span className="font-medium">₹{(p.net_wage ?? 0).toLocaleString()}</span> },
+              { key: "status", label: payslipColConfig.getLabel('status'), type: "status", render: (p: any) => <Badge variant={p.status === "paid" ? "default" : "secondary"}>{p.status}</Badge> },
             ] satisfies ColDef[]}
             data={payslips}
             loading={payslipsQ.isLoading}
