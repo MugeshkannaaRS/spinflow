@@ -493,9 +493,9 @@ async def get_all_column_configs(
 
 @router.put("/ui-config/columns", response_model=TableConfigResponse)
 async def update_column_config(
+    req: ColumnConfigUpdateRequest,
     table: str = Query(...),
     mill_id: str = Query(...),
-    req: ColumnConfigUpdateRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
