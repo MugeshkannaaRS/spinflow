@@ -37,9 +37,10 @@ import {
 } from "@/components/ui/sheet";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
+import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, Upload } from "lucide-react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/production")({
@@ -459,6 +460,27 @@ function ShiftGrid() {
   );
 }
 
+function ImportShiftEntriesDialog() {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <Upload className="size-4 mr-1" />
+        Import Excel
+      </Button>
+      <UniversalImportModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        tableName="production_entries"
+        endpoint="/api/v1/production/entries/bulk"
+        onSuccess={() => qc.invalidateQueries({ queryKey: ["shifts"] })}
+        title="Import Production Entries"
+      />
+    </>
+  );
+}
+
 function ProductionPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "production");
@@ -811,7 +833,10 @@ function ProductionPage() {
 
             <TabsContent value="shifts">
               <Card>
-                <CardHeader><CardTitle className="text-base">Shift Production Entries</CardTitle></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">Shift Production Entries</CardTitle>
+                  {canEdit && <ImportShiftEntriesDialog />}
+                </CardHeader>
                 <CardContent>
                   <DataTable
                     tableId="production_shifts"

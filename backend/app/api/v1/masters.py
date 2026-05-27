@@ -2,6 +2,8 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Any, Dict, List
+from pydantic import BaseModel
 
 from app.db.session import get_db
 
@@ -21,6 +23,7 @@ from app.models.user import User
 from app.models.masters import (
     Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route,
 )
+from app.models.production import Machine
 
 router = APIRouter()
 
@@ -466,3 +469,117 @@ async def update_route(
 ):
     service = MastersService(db, current_user)
     return await service.update_route(id, req, updated_by=current_user.id)
+
+
+class MachineBulkRequest(BaseModel):
+    items: List[Dict[str, Any]]
+
+
+class CustomerBulkRequest(BaseModel):
+    items: List[Dict[str, Any]]
+
+
+@router.post("/masters/machines/bulk")
+async def bulk_create_machines(
+    req: MachineBulkRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("masters", write=True)),
+):
+    scope = await get_mill_scope(current_user)
+    mill_id = scope.get("mill_id")
+    if not mill_id:
+        raise HTTPException(400, "mill_id is required")
+    created = 0
+    skipped = 0
+    errors: List[str] = []
+    for i, row in enumerate(req.items):
+        try:
+            code = str(row.get("code") or "").strip()
+            if not code:
+                skipped += 1
+                errors.append(f"Row {i + 1}: missing code")
+                continue
+            existing = await db.execute(
+                select(Machine).where(Machine.code == code, Machine.mill_id == mill_id)
+            )
+            if existing.scalar_one_or_none():
+                skipped += 1
+                continue
+            dept_id = row.get("department_id") or None
+            dept_name = str(row.get("department") or "").strip()
+            if dept_name and not dept_id:
+                dept_result = await db.execute(
+                    select(Department).where(
+                        Department.name == dept_name,
+                        Department.mill_id == mill_id,
+                        Department.is_active == True,
+                    )
+                )
+                dept = dept_result.scalar_one_or_none()
+                if dept:
+                    dept_id = dept.id
+            machine = Machine(
+                code=code,
+                name=str(row.get("name") or "").strip() or None,
+                machine_type=str(row.get("machine_type") or "").strip() or None,
+                department_id=dept_id,
+                department=dept_name or None,
+                target_kg=float(row.get("target_kg") or 0),
+                spindles=int(row.get("spindles") or 0) if row.get("spindles") else None,
+                current_status=str(row.get("current_status") or "running").strip(),
+                status=row.get("is_active", True) if isinstance(row.get("is_active"), bool) else True,
+                mill_id=mill_id,
+            )
+            db.add(machine)
+            created += 1
+        except Exception as e:
+            skipped += 1
+            errors.append(f"Row {i + 1}: {str(e)}")
+    await db.flush()
+    return {"created": created, "skipped": skipped, "errors": errors}
+
+
+@router.post("/masters/customers/bulk")
+async def bulk_create_customers(
+    req: CustomerBulkRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("masters", write=True)),
+):
+    scope = await get_mill_scope(current_user)
+    mill_id = scope.get("mill_id")
+    if not mill_id:
+        raise HTTPException(400, "mill_id is required")
+    created = 0
+    skipped = 0
+    errors: List[str] = []
+    for i, row in enumerate(req.items):
+        try:
+            code = str(row.get("code") or "").strip()
+            name = str(row.get("name") or "").strip()
+            if not code or not name:
+                skipped += 1
+                errors.append(f"Row {i + 1}: missing code or name")
+                continue
+            existing = await db.execute(
+                select(Customer).where(Customer.code == code)
+            )
+            if existing.scalar_one_or_none():
+                skipped += 1
+                continue
+            customer = Customer(
+                mill_id=mill_id,
+                code=code,
+                name=name,
+                gstin=str(row.get("gstin") or "").strip() or None,
+                city=str(row.get("city") or "").strip() or None,
+                phone=str(row.get("phone") or "").strip() or None,
+                credit_limit=float(row.get("credit_limit") or 0),
+                is_active=row.get("is_active", True) if isinstance(row.get("is_active"), bool) else True,
+            )
+            db.add(customer)
+            created += 1
+        except Exception as e:
+            skipped += 1
+            errors.append(f"Row {i + 1}: {str(e)}")
+    await db.flush()
+    return {"created": created, "skipped": skipped, "errors": errors}

@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
-import { ImportButton } from "@/components/ui/ImportButton";
+import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,7 +38,7 @@ import {
 } from "@/components/ui/sheet";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, CheckCircle2, XCircle, FlaskConical, AlertTriangle } from "lucide-react";
+import { Plus, CheckCircle2, XCircle, FlaskConical, AlertTriangle, Upload } from "lucide-react";
 import type { QualityTest } from "@/lib/types";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 
@@ -182,25 +182,7 @@ function QualityPage() {
                     rowKey={(t) => t.id}
                     exportFilename="quality_tests"
                     toolbar={
-                      canEdit ? (
-                        <ImportButton
-                          label="Import"
-                          endpoint="/quality/tests/bulk"
-                          templateCols={[
-                            { key: "date", label: "Date (DD/MM/YYYY)", required: true, type: "date", candidates: ["date"] },
-                            { key: "lot_number", label: "Lot Number", required: true, candidates: ["lot", "lot number", "lot no"] },
-                            { key: "count", label: "Count", required: true, candidates: ["count", "yarn count"] },
-                            { key: "mic", label: "MIC", type: "number", candidates: ["mic", "micronaire"] },
-                            { key: "staple", label: "Staple", type: "number", candidates: ["staple", "staple length"] },
-                            { key: "strength", label: "Strength", type: "number", candidates: ["strength", "tenacity"] },
-                            { key: "uniformity", label: "Uniformity", type: "number", candidates: ["uniformity", "unf"] },
-                            { key: "sfi", label: "SFI", type: "number", candidates: ["sfi", "short fiber"] },
-                            { key: "result", label: "Result (pass/fail)", required: true, candidates: ["result", "status"] },
-                          ]}
-                          exampleRow={{ date: "01/01/2025", lot_number: "LOT001", count: "30s", mic: "4.2", staple: "30", strength: "28", uniformity: "84", sfi: "6", result: "pass" }}
-                          onSuccess={() => testsQ.refetch()}
-                        />
-                      ) : undefined
+                      canEdit ? <ImportTestsDialog /> : undefined
                     }
                   />
                 </CardContent>
@@ -261,6 +243,27 @@ function QualityPage() {
           </Tabs>
         </div>
       </AccessGuard>
+    </>
+  );
+}
+
+function ImportTestsDialog() {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <Upload className="size-4 mr-1" />
+        Import Excel
+      </Button>
+      <UniversalImportModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        tableName="quality_tests"
+        endpoint="/api/v1/quality/tests/bulk"
+        onSuccess={() => qc.invalidateQueries({ queryKey: ["quality-tests"] })}
+        title="Import Test Results"
+      />
     </>
   );
 }

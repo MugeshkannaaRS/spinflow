@@ -16,6 +16,7 @@ from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technici
 from app.models.masters import Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route, CompanyModule, MillSettings, DepartmentType, VehicleType
 from app.models.stock import StockLedger, StockBalance, SalesOrder, SalesOrderLine, StockTransfer
 from app.models.ui_config import ColumnConfig, ColumnDropdownOption
+from app.models.import_mapping import ImportMapping
 
 __all__ = [
     "Base",

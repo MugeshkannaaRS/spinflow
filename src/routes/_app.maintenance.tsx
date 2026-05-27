@@ -48,6 +48,7 @@ import {
 import type { MaintenanceTask } from "@/lib/types";
 import * as XLSX from "xlsx";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 
 export const Route = createFileRoute("/_app/maintenance")({
   head: () => ({ meta: [{ title: "Maintenance — SpinFlow ERP" }] }),
@@ -55,25 +56,6 @@ export const Route = createFileRoute("/_app/maintenance")({
 });
 
 // ─── Template generators ─────────────────────────────────────────────────────
-
-function downloadScheduleTemplate(getLabel: (key: string) => string) {
-  const ws = XLSX.utils.aoa_to_sheet([
-    [
-      getLabel("machine_code"),
-      getLabel("description"),
-      getLabel("frequency_days"),
-      getLabel("last_done"),
-      getLabel("next_due"),
-      "Assigned Technician Name",
-    ],
-    ["RI-001", "Lubrication check", "weekly", "01/05/2026", "08/05/2026", "Ravi Kumar"],
-    ["BL-002", "Belt tension check", "monthly", "01/04/2026", "01/05/2026", "Suresh P"],
-  ]);
-  ws["!cols"] = [20, 30, 30, 22, 22, 25].map((w) => ({ wch: w }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "PM Schedules");
-  XLSX.writeFile(wb, "pm_schedule_template.xlsx");
-}
 
 function downloadParameterTemplate() {
   const ws = XLSX.utils.aoa_to_sheet([
@@ -287,22 +269,6 @@ function ImportDialog({
 
 // ─── Row parsers ──────────────────────────────────────────────────────────────
 
-function parseScheduleRow(row: any[]): Record<string, string> | null {
-  const machineCode = String(row[0] ?? "").trim();
-  const taskDescription = String(row[1] ?? "").trim();
-  if (!machineCode || !taskDescription) return null;
-  return {
-    machine_code: machineCode,
-    task_description: taskDescription,
-    frequency: String(row[2] ?? "monthly")
-      .trim()
-      .toLowerCase(),
-    last_done_date: String(row[3] ?? "").trim() || "",
-    next_due_date: String(row[4] ?? "").trim() || "",
-    technician_name: String(row[5] ?? "").trim(),
-  };
-}
-
 function parseParameterRow(row: any[]): Record<string, string> | null {
   const machineCode = String(row[0] ?? "").trim();
   const parameterName = String(row[1] ?? "").trim();
@@ -349,22 +315,7 @@ function MaintenancePage() {
   const schedules: any[] = schedulesQ.data ?? [];
   const parameters: any[] = paramsQ.data ?? [];
 
-  const [scheduleImportOpen, setScheduleImportOpen] = useState(false);
   const [paramImportOpen, setParamImportOpen] = useState(false);
-
-  const scheduleMutation = useMutation({
-    mutationFn: (rows: Record<string, string>[]) =>
-      maintenanceApi.bulkCreateSchedules({ items: rows }),
-    onSuccess: (res: any) => {
-      toast.success(
-        `${res.created} schedules imported${res.skipped > 0 ? `, ${res.skipped} skipped` : ""}`,
-      );
-      res.errors?.forEach((e: string) => toast.warning(e));
-      qc.invalidateQueries({ queryKey: ["maintenance-schedules"] });
-      setScheduleImportOpen(false);
-    },
-    onError: () => toast.error("Import failed"),
-  });
 
   const paramMutation = useMutation({
     mutationFn: (rows: Record<string, string>[]) =>
@@ -510,12 +461,7 @@ function MaintenancePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Preventive Maintenance Schedules</CardTitle>
-                  {canEdit && (
-                    <Button size="sm" onClick={() => setScheduleImportOpen(true)}>
-                      <Upload className="size-3.5 mr-1.5" />
-                      Import Schedule
-                    </Button>
-                  )}
+                  {canEdit && <ImportScheduleDialog />}
                 </CardHeader>
                 <CardContent>
                   <DataTable
@@ -576,23 +522,6 @@ function MaintenancePage() {
 
         {/* ── Import dialogs ── */}
         <ImportDialog
-          open={scheduleImportOpen}
-          onClose={() => setScheduleImportOpen(false)}
-          title="Import PM Schedules from Excel"
-          columns={[
-            "Machine Code",
-            "Task Description",
-            "Frequency",
-            "Last Done",
-            "Next Due",
-            "Technician",
-          ]}
-          parseRow={parseScheduleRow}
-          onConfirm={(rows) => scheduleMutation.mutateAsync(rows)}
-          onDownloadTemplate={() => downloadScheduleTemplate(schedColConfig.getLabel)}
-          isSubmitting={scheduleMutation.isPending}
-        />
-        <ImportDialog
           open={paramImportOpen}
           onClose={() => setParamImportOpen(false)}
           title="Import Machine Parameters from Excel"
@@ -610,6 +539,27 @@ function MaintenancePage() {
           isSubmitting={paramMutation.isPending}
         />
       </AccessGuard>
+    </>
+  );
+}
+
+function ImportScheduleDialog() {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  return (
+    <>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        <Upload className="size-3.5 mr-1.5" />
+        Import Schedule
+      </Button>
+      <UniversalImportModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        tableName="maintenance_schedules"
+        endpoint="/api/v1/maintenance/schedules/bulk"
+        onSuccess={() => qc.invalidateQueries({ queryKey: ["maintenance-schedules"] })}
+        title="Import PM Schedules"
+      />
     </>
   );
 }

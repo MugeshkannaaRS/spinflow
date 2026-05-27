@@ -30,13 +30,13 @@ import {
   SheetClose,
 } from "@/components/ui/sheet";
 import { FileUpload, type UploadedFile } from "@/components/ui/file-upload";
+import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import { Textarea } from "@/components/ui/textarea";
 import { useState, useEffect } from "react";
 import { DataTable } from "@/components/ui/DataTable";
-import { ImportButton } from "@/components/ui/ImportButton";
 import type { ColDef } from "@/components/ui/DataTable";
 import { toast } from "sonner";
-import { Plus, Warehouse, AlertTriangle, Package, Pencil } from "lucide-react";
+import { Plus, Warehouse, AlertTriangle, Package, Pencil, Upload } from "lucide-react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/stores")({
@@ -129,20 +129,7 @@ function StoresPage() {
                       canEdit ? (
                         <div className="flex gap-2">
                           <AddSpareSheet />
-                          <ImportButton
-                            label="Import"
-                            endpoint="/stores/spares/bulk"
-                            templateCols={[
-                              { key: "item_code", label: "Spare Code", required: true, candidates: ["code", "spare code", "item code"] },
-                              { key: "name", label: "Name", required: true, candidates: ["name", "item name", "spare name"] },
-                              { key: "category", label: "Category", required: true, candidates: ["category", "type"] },
-                              { key: "unit", label: "Unit", required: true, candidates: ["unit", "uom"] },
-                              { key: "reorder_level", label: "Min Stock", type: "number", candidates: ["min stock", "reorder", "minimum"] },
-                              { key: "current_stock", label: "Max Stock", type: "number", candidates: ["max stock", "stock", "quantity"] },
-                            ]}
-                            exampleRow={{ item_code: "SP001", name: "Bearing 6205", category: "Bearings", unit: "Nos", reorder_level: "5", current_stock: "20" }}
-                            onSuccess={() => itemsQ.refetch()}
-                          />
+                          <ImportSparesDialog />
                         </div>
                       ) : undefined
                     }
@@ -478,6 +465,27 @@ function EditSpareSheet({ item }: { item: any }) {
         </form>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function ImportSparesDialog() {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <Upload className="size-4 mr-1" />
+        Import Excel
+      </Button>
+      <UniversalImportModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        tableName="stores_spares"
+        endpoint="/api/v1/stores/spares/bulk"
+        onSuccess={() => qc.invalidateQueries({ queryKey: ["spare-items"] })}
+        title="Import Spares"
+      />
+    </>
   );
 }
 

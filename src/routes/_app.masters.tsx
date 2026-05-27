@@ -31,9 +31,10 @@ import {
 } from "@/components/ui/sheet";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { Plus, Search, Settings, Blocks } from "lucide-react";
+import { Plus, Search, Settings, Blocks, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import type {
   Company,
   Mill,
@@ -311,6 +312,7 @@ function MastersPage() {
                 onAdd={<CustomerForm mills={millsData} />}
                 onEdit={(item) => <CustomerForm item={item} mills={millsData} />}
                 onDeactivate={canEdit ? deactivateCustomer : undefined}
+                headerExtra={canEdit ? <ImportCustomersDialog /> : undefined}
               />
             </TabsContent>
 
@@ -365,6 +367,7 @@ function MastersPage() {
                 canEdit={canEdit}
                 onAdd={<MachineForm departments={deptsData} />}
                 onEdit={(item) => <MachineForm item={item} departments={deptsData} />}
+                headerExtra={canEdit ? <ImportMachinesDialog /> : undefined}
               />
             </TabsContent>
 
@@ -473,6 +476,7 @@ function MasterTable<T = any>({
   onEdit,
   onDeactivate,
   extraActions,
+  headerExtra,
 }: {
   title: string;
   data: T[];
@@ -484,6 +488,7 @@ function MasterTable<T = any>({
   onEdit: (item: T) => React.ReactElement;
   onDeactivate?: (id: string) => void;
   extraActions?: (item: T) => React.ReactElement;
+  headerExtra?: React.ReactNode;
 }) {
   const [adding, setAdding] = useState(false);
   const tableId = `masters_${title.toLowerCase().replace(/\s+/g, "_")}`;
@@ -536,6 +541,7 @@ function MasterTable<T = any>({
             </SheetContent>
           </Sheet>
         )}
+        {headerExtra}
       </CardHeader>
       <CardContent>
         <DataTable
@@ -1749,6 +1755,48 @@ function RouteForm({ item, mills }: { item?: MasterRoute; mills: Mill[] }) {
         </Button>
       </SheetFooter>
     </form>
+  );
+}
+
+function ImportMachinesDialog() {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <Upload className="size-4 mr-1" />
+        Import Excel
+      </Button>
+      <UniversalImportModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        tableName="masters_machines"
+        endpoint="/api/v1/masters/machines/bulk"
+        onSuccess={() => qc.invalidateQueries({ queryKey: ["masters", "machines"] })}
+        title="Import Machines"
+      />
+    </>
+  );
+}
+
+function ImportCustomersDialog() {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <Upload className="size-4 mr-1" />
+        Import Excel
+      </Button>
+      <UniversalImportModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        tableName="masters_customers"
+        endpoint="/api/v1/masters/customers/bulk"
+        onSuccess={() => qc.invalidateQueries({ queryKey: ["masters", "customers"] })}
+        title="Import Customers"
+      />
+    </>
   );
 }
 

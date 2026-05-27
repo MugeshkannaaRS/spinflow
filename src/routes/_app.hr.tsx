@@ -56,6 +56,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { FileUpload, type UploadedFile } from "@/components/ui/file-upload";
+import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import { cn } from "@/lib/utils";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -1660,355 +1661,25 @@ async function downloadEmployeeTemplate(columns: ColumnConfig[]) {
 }
 
 function ImportEmployeeDialog() {
-  const empColConfig = useColumnConfig("hr_employees");
-  const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [fileName, setFileName] = useState("");
-  const [headers, setHeaders] = useState<string[]>([]);
-  const [colMap, setColMap] = useState<Record<string, number>>({});
-  const [rows, setRows] = useState<EmpImportRow[]>([]);
-  const [rawRows, setRawRows] = useState<any[][]>([]);
-  const [activeTab, setActiveTab] = useState<"mapping" | "preview">("mapping");
-  const [editingCell, setEditingCell] = useState<{ row: number; field: string } | null>(null);
-  const [dirtyCells, setDirtyCells] = useState<Set<string>>(new Set());
-  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
-  const editInputRef = useRef<HTMLInputElement>(null);
-
-  const importMutation = useMutation({
-    mutationFn: async (items: any[]) => {
-      const CHUNK = 50;
-      const total = items.length;
-      let created = 0;
-      const allErrors: string[] = [];
-      for (let i = 0; i < total; i += CHUNK) {
-        const chunk = items.slice(i, i + CHUNK);
-        setImportProgress({ current: Math.min(i + CHUNK, total), total });
-        const res = await hrApi.bulkCreateEmployees({ items: chunk });
-        if (res.errors?.length) allErrors.push(...res.errors);
-        created += res.created ?? 0;
-      }
-      return { created, errors: allErrors };
-    },
-  });
-
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const wb = XLSX.read(ev.target?.result, { type: "array", cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const raw: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-      const hdrs = (raw[0] ?? []).map((h: any) => String(h ?? "").replace(/\n/g, " ").replace(/\s+/g, " ").trim());
-      setHeaders(hdrs);
-
-      const auto: Record<string, number> = {};
-      for (const [field, candidates] of Object.entries(FIELD_CANDIDATES)) {
-        const idx = detectColumn(hdrs, candidates);
-        if (idx !== null) auto[field] = idx;
-      }
-      setColMap(auto);
-      setRawRows(raw.slice(1));
-      setRows([]);
-      setDirtyCells(new Set());
-      setEditingCell(null);
-      setActiveTab("mapping");
-    };
-    reader.readAsArrayBuffer(file);
-    e.target.value = "";
-  }
-
-  function applyMapping() {
-    const parsed = rawRows
-      .filter((row) => {
-        const nameIdx = colMap["name"];
-        if (nameIdx === undefined) return true;
-        return String(row[nameIdx] ?? "").trim() !== "";
-      })
-      .map((row, i) => parseEmployeeRow(row, colMap, i))
-      .filter((r): r is EmpImportRow => r !== null);
-    setRows(parsed);
-    setDirtyCells(new Set());
-    setEditingCell(null);
-    setActiveTab("preview");
-  }
-
-  function updateCell(rowIdx: number, field: keyof EmpImportRow, value: string) {
-    setRows((prev) => {
-      const next = [...prev];
-      const updated = { ...next[rowIdx], [field]: value as any };
-      updated._error = recalcError(updated);
-      next[rowIdx] = updated;
-      return next;
-    });
-    setDirtyCells((prev) => {
-      const next = new Set(prev);
-      next.add(`${rowIdx}:${field}`);
-      return next;
-    });
-  }
-
-  async function handleConfirm() {
-    const validated = rows.map((r) => ({ ...r, shift: normalizeShift(r.shift) || "General" }));
-    const valid = validated.filter((r) => !r._error);
-    if (!valid.length) return;
-    const items = valid.map((r) => ({
-      employee_code: r.employee_code,
-      full_name: r.full_name,
-      department: r.department || "General",
-      designation: r.designation || null,
-      section: r.section || null,
-      shift: normalizeShift(r.shift) || "General",
-      date_of_joining: r.date_of_joining || null,
-      dob: r.dob || null,
-      gen: r.gen || null,
-      age: r.age ? parseInt(r.age) : null,
-      gender: r.gender || null,
-      grade: r.grade ? parseInt(r.grade) : null,
-      phone: r.phone || null,
-      sl_no: r.sl_no ? parseInt(r.sl_no) : null,
-      bank_account_no: r.bank_account_no || null,
-      basic: r.basic ? parseFloat(r.basic) : 0,
-      house_rent: r.house_rent ? parseFloat(r.house_rent) : 0,
-      medical: r.medical ? parseFloat(r.medical) : 0,
-      conveyance: r.conveyance ? parseFloat(r.conveyance) : 0,
-      food_allowance: r.food_allowance ? parseFloat(r.food_allowance) : 0,
-      wages: r.wages ? parseFloat(r.wages) : 0,
-      increment: r.increment ? parseFloat(r.increment) : 0,
-      total_salary: r.total_salary ? parseFloat(r.total_salary) : null,
-      days_of_month: r.days_of_month ? parseInt(r.days_of_month) : 30,
-      mobile_bill: r.mobile_bill ? parseFloat(r.mobile_bill) : 0,
-      shift_benefit: r.shift_benefit ? parseFloat(r.shift_benefit) : 0,
-      wages_of_month: r.wages_of_month ? parseFloat(r.wages_of_month) : 0,
-      shift_qty: r.shift_qty ? parseInt(r.shift_qty) : 0,
-      shift_tk: r.shift_amount ? parseFloat(r.shift_amount) : 0,
-      roster_qty: r.roster_qty ? parseInt(r.roster_qty) : 0,
-      roster_tk: r.roster_amount ? parseFloat(r.roster_amount) : 0,
-      calculate_days: r.calculate_days ? parseFloat(r.calculate_days) : 0,
-      actual_attendance: r.actual_attendance ? parseInt(r.actual_attendance) : 0,
-      day_off: r.day_off ? parseInt(r.day_off) : 0,
-      cl: r.cl ? parseInt(r.cl) : 0,
-      sl: r.sl ? parseInt(r.sl) : 0,
-      el: r.el ? parseInt(r.el) : 0,
-      comp_leave: r.comp_leave ? parseInt(r.comp_leave) : 0,
-      festival_holiday: r.festival_holiday ? parseInt(r.festival_holiday) : 0,
-      absent_days: r.absent_days ? parseInt(r.absent_days) : 0,
-      payable_days: r.payable_days ? parseFloat(r.payable_days) : 0,
-      payable_salary: r.payable_salary ? parseFloat(r.payable_salary) : 0,
-      ot_hours: r.ot_hours ? parseFloat(r.ot_hours) : 0,
-      ot_amount: r.ot_amount ? parseFloat(r.ot_amount) : 0,
-      festival_duty_benefit: r.festival_duty_benefit ? parseFloat(r.festival_duty_benefit) : 0,
-      festival_holiday_allowance: r.festival_holiday_allowance ? parseFloat(r.festival_holiday_allowance) : 0,
-      ifter_days: r.ifter_days ? parseInt(r.ifter_days) : 0,
-      ifter_allowance: r.ifter_allowance ? parseFloat(r.ifter_allowance) : 0,
-      special_food: r.special_food ? parseFloat(r.special_food) : 0,
-      attendance_bonus: r.attendance_bonus ? parseFloat(r.attendance_bonus) : 0,
-      arrear_others: r.arrear_others ? parseFloat(r.arrear_others) : 0,
-      absent_deduction: r.absent_deduction ? parseFloat(r.absent_deduction) : 0,
-      advance_deduction: r.advance_deduction ? parseFloat(r.advance_deduction) : 0,
-      tax_deduction: r.tax_deduction ? parseFloat(r.tax_deduction) : 0,
-      net_payable: r.net_payable ? parseFloat(r.net_payable) : 0,
-    }));
-    try {
-      const res = await importMutation.mutateAsync(items);
-      setImportProgress(null);
-      if (res.errors?.length) {
-        toast.error(`Import errors: ${res.errors.slice(0, 3).join("; ")}`);
-      } else {
-        const payrollMsg = items.some((i) => i.payable_salary || i.net_payable) ? `, ${items.length} payroll records created` : "";
-        toast.success(`${res.created} employees imported${payrollMsg}`);
-        qc.invalidateQueries({ queryKey: ["hr-employees"] });
-        setOpen(false);
-        setFileName("");
-        setHeaders([]);
-        setColMap({});
-        setRows([]);
-        setRawRows([]);
-        setDirtyCells(new Set());
-        setEditingCell(null);
-        setActiveTab("mapping");
-      }
-    } catch {
-      setImportProgress(null);
-      toast.error("Failed to import employees");
-    }
-  }
-
-  const validCount = rows.filter((r) => !r._error).length;
-  const errorCount = rows.filter((r) => !!r._error).length;
-
-  function renderEditableCell(rowIdx: number, field: keyof EmpImportRow, value: string) {
-    const isEditing = editingCell?.row === rowIdx && editingCell?.field === field;
-    const isDirty = dirtyCells.has(`${rowIdx}:${field}`);
-
-    if (isEditing) {
-      return (
-        <TableCell key={`edit-${rowIdx}-${field}`} className="p-0">
-          <input
-            ref={editInputRef}
-            value={value}
-            onChange={(e) => updateCell(rowIdx, field, e.target.value)}
-            onBlur={() => setEditingCell(null)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === "Escape") setEditingCell(null);
-            }}
-            autoFocus
-            className="w-full h-full px-2 py-1 text-xs border-0 ring-1 ring-primary outline-none bg-white"
-          />
-        </TableCell>
-      );
-    }
-
-    return (
-      <TableCell
-        key={`cell-${rowIdx}-${field}`}
-        className={cn("cursor-pointer max-w-[160px] truncate", isDirty && "bg-yellow-100")}
-        title={value}
-        onClick={() => setEditingCell({ row: rowIdx, field })}
-      >
-        {value}
-      </TableCell>
-    );
-  }
-
+  const qc = useQueryClient();
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
-          <Upload className="size-4 mr-1" />
-          Import Excel
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Import Employees from Excel</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <Button size="sm" variant="outline" onClick={() => downloadEmployeeTemplate(empColConfig.columns)}>
-              <Download className="size-4 mr-1" />
-              Download Template
-            </Button>
-            <label className="cursor-pointer">
-              <Button size="sm" asChild>
-                <span>
-                  <Upload className="size-4 mr-1" />
-                  {fileName ? fileName : "Choose File"}
-                </span>
-              </Button>
-              <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile} />
-            </label>
-            {activeTab === "preview" && rows.length > 0 && (
-              <span className="text-sm text-muted-foreground">{validCount} valid, {errorCount} errors</span>
-            )}
-          </div>
-
-          {activeTab === "mapping" && headers.length > 0 && (
-            <div className="space-y-3">
-              <p className="text-sm font-medium">Column Mapping</p>
-              <div className="border rounded-md">
-                <Table className="text-xs">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Field</TableHead>
-                      <TableHead>Excel Column</TableHead>
-                      <TableHead className="w-10">Detected</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {Object.entries(FIELD_CANDIDATES).map(([field]) => {
-                      const detectedIdx = colMap[field];
-                      const detectedHeader = detectedIdx !== undefined ? headers[detectedIdx] : null;
-                      return (
-                        <TableRow key={field}>
-                          <TableCell className="font-medium">{FIELD_TO_LABEL[field]}</TableCell>
-                          <TableCell>
-                            <Select value={detectedIdx !== undefined ? String(detectedIdx) : "__none__"} onValueChange={(v) => setColMap((prev) => ({ ...prev, [field]: v && v !== "__none__" ? Number(v) : (undefined as any) }))}>
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue placeholder="Select column..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__none__">(none)</SelectItem>
-                                {headers.map((h, i) => (
-                                  <SelectItem key={i} value={String(i)}>{h || `Column ${i + 1}`}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            {detectedHeader ? <span className="text-green-600 text-sm">&#10003;</span> : <span className="text-muted-foreground">&#8212;</span>}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-              <div className="flex justify-end">
-                <Button size="sm" onClick={applyMapping}>Apply Mapping</Button>
-              </div>
-            </div>
-          )}
-
-          {activeTab === "preview" && rows.length > 0 && (
-            <div className="border rounded-md max-h-80 overflow-auto">
-              <Table className="min-w-[960px] w-full text-xs">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-8">#</TableHead>
-                    <TableHead>{empColConfig.getLabel('employee_id')}</TableHead>
-                    <TableHead>{empColConfig.getLabel('name')}</TableHead>
-                    <TableHead>{empColConfig.getLabel('department')}</TableHead>
-                    <TableHead>{empColConfig.getLabel('designation')}</TableHead>
-                    <TableHead>{empColConfig.getLabel('shift')}</TableHead>
-                    <TableHead>{empColConfig.getLabel('joining_date')}</TableHead>
-                    <TableHead>{empColConfig.getLabel('phone')}</TableHead>
-                    <TableHead>{empColConfig.getLabel('wages')}</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.slice(0, 50).map((r, i) => (
-                    <TableRow key={i} className={r._error ? "bg-destructive/10" : ""}>
-                      <TableCell className="text-muted-foreground">{i + 1}</TableCell>
-                      {renderEditableCell(i, "employee_code", r.employee_code)}
-                      {renderEditableCell(i, "full_name", r.full_name)}
-                      {renderEditableCell(i, "department", r.department)}
-                      {renderEditableCell(i, "designation", r.designation)}
-                      {renderEditableCell(i, "shift", r.shift)}
-                      {renderEditableCell(i, "date_of_joining", r.date_of_joining)}
-                      {renderEditableCell(i, "phone", r.phone)}
-                      {renderEditableCell(i, "daily_wage", r.daily_wage)}
-                      <TableCell className={cn("max-w-[140px] truncate", r._error ? "text-destructive" : "text-green-600")} title={r._error}>
-                        {r._error || "OK"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              {rows.length > 50 && (
-                <div className="text-xs text-center text-muted-foreground py-2 border-t">Showing 50 of {rows.length} rows</div>
-              )}
-            </div>
-          )}
-
-          {activeTab === "preview" && rows.length === 0 && headers.length > 0 && (
-            <div className="text-sm text-muted-foreground text-center py-8">No valid data rows found. Check your column mapping.</div>
-          )}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => { setOpen(false); setFileName(""); setHeaders([]); setColMap({}); setRows([]); setRawRows([]); setDirtyCells(new Set()); setEditingCell(null); setActiveTab("mapping"); }}>
-            Cancel
-          </Button>
-          {activeTab === "preview" && (
-            <Button onClick={handleConfirm} disabled={validCount === 0 || importMutation.isPending}>
-              {importProgress ? `Importing... ${importProgress.current}/${importProgress.total}` : importMutation.isPending ? "Importing..." : `Import ${validCount} Employee(s)`}
-            </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <Upload className="size-4 mr-1" />
+        Import Excel
+      </Button>
+      <UniversalImportModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        tableName="hr_employees"
+        endpoint="/api/v1/hr/employees/bulk"
+        onSuccess={() => {
+          qc.invalidateQueries({ queryKey: ["hr-employees"] });
+        }}
+        title="Import Employees"
+      />
+    </>
   );
 }
 
@@ -2350,68 +2021,21 @@ function MarkAttendanceSheet({
 
 function ImportAttendanceDialog({ month, year, onSuccess }: { month: number; year: number; onSuccess: () => void }) {
   const [open, setOpen] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const qc = useQueryClient();
-
-  const m = useMutation({
-    mutationFn: async () => {
-      if (!file) throw new Error("No file selected");
-      const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const json: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-      const rows = json.slice(1).filter((r: any[]) => r[0]).map((r: any[]) => ({
-        employee_code: String(r[0] ?? "").trim(),
-        date: r[1] ? String(r[1]).trim() : "",
-        status: String(r[2] ?? "").trim().charAt(0).toUpperCase(),
-        ot_hours: parseFloat(r[3]) || 0,
-      }));
-      return hrApi.bulkImportAttendance({ month, year, records: rows });
-    },
-  });
-
-  const handleImport = async () => {
-    try {
-      await m.mutateAsync();
-      toast.success("Attendance imported");
-      qc.invalidateQueries({ queryKey: ["hr-attendance"] });
-      onSuccess();
-      setOpen(false);
-      setFile(null);
-    } catch {
-      toast.error("Failed to import attendance");
-    }
-  };
-
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
-          <Upload className="size-4 mr-1" />
-          Import Excel
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Import Attendance</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Upload an Excel file with columns: Employee Code, Date, Status (P/A/H/CL/SL/EL/OD/WO), OT Hours
-          </p>
-          <label className="cursor-pointer block">
-            <Button size="sm" asChild variant="outline" className="w-full">
-              <span><Upload className="size-4 mr-1" />{file ? file.name : "Choose Excel File"}</span>
-            </Button>
-            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-          </label>
-        </div>
-        <DialogFooter>
-          <Button onClick={handleImport} disabled={!file || m.isPending}>
-            {m.isPending ? "Importing…" : "Import Attendance"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <Upload className="size-4 mr-1" />
+        Import Excel
+      </Button>
+      <UniversalImportModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        tableName="hr_attendance"
+        endpoint="/api/v1/hr/attendance/bulk"
+        onSuccess={() => onSuccess()}
+        title="Import Attendance"
+      />
+    </>
   );
 }
 
