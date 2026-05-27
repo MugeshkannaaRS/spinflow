@@ -93,7 +93,10 @@ function ShiftGrid() {
     staleTime: 60_000,
   });
 
-  const machines = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[];
+  const machines = useMemo(
+    () => (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[],
+    [machinesQ.data],
+  );
   const [rows, setRows] = useState<GridRow[]>(() => buildRows(machines));
 
   useEffect(() => {

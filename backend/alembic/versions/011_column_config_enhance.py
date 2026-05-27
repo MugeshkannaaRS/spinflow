@@ -16,31 +16,42 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("column_configs", sa.Column("placeholder_text", sa.String(200), nullable=True))
-    op.add_column("column_configs", sa.Column("help_text", sa.String(500), nullable=True))
-    op.add_column("column_configs", sa.Column("validation_regex", sa.String(200), nullable=True))
-    op.add_column("column_configs", sa.Column("min_value", sa.Numeric(), nullable=True))
-    op.add_column("column_configs", sa.Column("max_value", sa.Numeric(), nullable=True))
-    op.add_column("column_configs", sa.Column("default_value", sa.Text(), nullable=True))
-    op.add_column("column_configs", sa.Column("group_name", sa.String(100), nullable=True))
-    op.add_column("column_configs", sa.Column("is_searchable", sa.Boolean(), server_default=sa.text("true"), nullable=True))
-    op.add_column("column_configs", sa.Column("is_sortable", sa.Boolean(), server_default=sa.text("true"), nullable=True))
-    op.add_column("column_configs", sa.Column("is_exportable", sa.Boolean(), server_default=sa.text("true"), nullable=True))
-    op.add_column("column_configs", sa.Column("is_importable", sa.Boolean(), server_default=sa.text("true"), nullable=True))
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing = {c["name"] for c in inspector.get_columns("column_configs")}
 
-    op.create_table(
-        "column_dropdown_options",
-        sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("mill_id", sa.String(36), nullable=False),
-        sa.Column("column_key", sa.String(100), nullable=False),
-        sa.Column("table_name", sa.String(100), nullable=False),
-        sa.Column("option_value", sa.String(200), nullable=False),
-        sa.Column("option_label", sa.String(200), nullable=False),
-        sa.Column("display_order", sa.Integer(), server_default=sa.text("0"), nullable=True),
-        sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=True),
-        sa.UniqueConstraint("mill_id", "column_key", "table_name", "option_value", name="uq_dropdown_option"),
-    )
+    new_cols = [
+        ("placeholder_text", sa.Column("placeholder_text", sa.String(200), nullable=True)),
+        ("help_text",         sa.Column("help_text",         sa.String(500), nullable=True)),
+        ("validation_regex",  sa.Column("validation_regex",  sa.String(200), nullable=True)),
+        ("min_value",         sa.Column("min_value",         sa.Numeric(),   nullable=True)),
+        ("max_value",         sa.Column("max_value",         sa.Numeric(),   nullable=True)),
+        ("default_value",     sa.Column("default_value",     sa.Text(),      nullable=True)),
+        ("group_name",        sa.Column("group_name",        sa.String(100), nullable=True)),
+        ("is_searchable",     sa.Column("is_searchable",     sa.Boolean(),   server_default=sa.text("true"), nullable=True)),
+        ("is_sortable",       sa.Column("is_sortable",       sa.Boolean(),   server_default=sa.text("true"), nullable=True)),
+        ("is_exportable",     sa.Column("is_exportable",     sa.Boolean(),   server_default=sa.text("true"), nullable=True)),
+        ("is_importable",     sa.Column("is_importable",     sa.Boolean(),   server_default=sa.text("true"), nullable=True)),
+    ]
+    for col_name, col_def in new_cols:
+        if col_name not in existing:
+            op.add_column("column_configs", col_def)
+
+    existing_tables = inspector.get_table_names()
+    if "column_dropdown_options" not in existing_tables:
+        op.create_table(
+            "column_dropdown_options",
+            sa.Column("id", sa.String(36), primary_key=True),
+            sa.Column("mill_id", sa.String(36), nullable=False),
+            sa.Column("column_key", sa.String(100), nullable=False),
+            sa.Column("table_name", sa.String(100), nullable=False),
+            sa.Column("option_value", sa.String(200), nullable=False),
+            sa.Column("option_label", sa.String(200), nullable=False),
+            sa.Column("display_order", sa.Integer(), server_default=sa.text("0"), nullable=True),
+            sa.Column("is_active", sa.Boolean(), server_default=sa.text("true"), nullable=True),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=True),
+            sa.UniqueConstraint("mill_id", "column_key", "table_name", "option_value", name="uq_dropdown_option"),
+        )
 
 
 def downgrade() -> None:

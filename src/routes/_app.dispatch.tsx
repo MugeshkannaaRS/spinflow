@@ -22,7 +22,7 @@ export const Route = createFileRoute("/_app/dispatch")({
 function DispatchPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "dispatch");
-  const orderColConfig = useColumnConfig("dispatch_orders");
+  const orderColConfig = useColumnConfig("dispatch_sales_orders");
   const tripColConfig = useColumnConfig("dispatch_trips");
 
   const [page, setPage] = useState(1);
