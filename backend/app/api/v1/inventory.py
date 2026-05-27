@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List, Optional
@@ -91,10 +91,29 @@ async def create_transfer(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
     loc = await db.execute(select(Warehouse).where(Warehouse.name == req.from_location))
     from_wh = loc.scalar_one_or_none()
     loc2 = await db.execute(select(Warehouse).where(Warehouse.name == req.to_location))
     to_wh = loc2.scalar_one_or_none()
+    if req.from_location:
+        stmt = select(Warehouse).where(Warehouse.name == req.from_location)
+        if scope["mill_id"]:
+            stmt = stmt.where(Warehouse.mill_id == scope["mill_id"])
+        elif scope["company_id"]:
+            stmt = stmt.join(Mill, Warehouse.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+        from_result = await db.execute(stmt)
+        if not from_result.scalar_one_or_none():
+            raise HTTPException(status_code=403, detail="Source warehouse not in your scope")
+    if req.to_location:
+        stmt = select(Warehouse).where(Warehouse.name == req.to_location)
+        if scope["mill_id"]:
+            stmt = stmt.where(Warehouse.mill_id == scope["mill_id"])
+        elif scope["company_id"]:
+            stmt = stmt.join(Mill, Warehouse.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+        to_result = await db.execute(stmt)
+        if not to_result.scalar_one_or_none():
+            raise HTTPException(status_code=403, detail="Destination warehouse not in your scope")
     movement = StockMovement(
         lot_no=req.bag_id,
         from_location=req.from_location,
@@ -115,6 +134,12 @@ async def create_lot(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
+    mill_id = scope["mill_id"] or current_user.mill_id
+    if not mill_id:
+        if scope["company_id"]:
+            raise HTTPException(status_code=400, detail="mill_id is required for MILL_OWNER")
+        mill_id = ""
     lot = Lot(
         lot_no=req.lot_no or "",
         type=req.count,
@@ -123,7 +148,7 @@ async def create_lot(
         warehouse_id=req.warehouse_id,
         unit="kg",
         status="in-stock",
-        mill_id=current_user.mill_id or "",
+        mill_id=mill_id,
     )
     db.add(lot)
     await db.flush()
@@ -158,12 +183,17 @@ async def create_warehouse(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
+    mill_id = scope["mill_id"] or current_user.mill_id
+    if not mill_id and scope["company_id"]:
+        raise HTTPException(status_code=400, detail="mill_id is required for MILL_OWNER")
     wh = Warehouse(
         code=req.code,
         name=req.name,
         location=req.location,
         capacity_bags=req.capacity_bags,
         is_active=True,
+        mill_id=mill_id,
     )
     db.add(wh)
     await db.flush()

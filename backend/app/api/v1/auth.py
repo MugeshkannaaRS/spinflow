@@ -82,14 +82,6 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
             message="Account is inactive",
         )
 
-    if user.must_change_password:
-        raise SpinFlowException(
-            status_code=403,
-            code=ErrorCode.INSUFFICIENT_PERMISSIONS,
-            message="Password reset required before login",
-            detail={"must_change_password": True, "user_id": str(user.id)},
-        )
-
     user.failed_login_attempts = 0
     user.locked_until = None
     user.last_login = datetime.now(timezone.utc)
@@ -124,6 +116,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
             company_id=user.company_id,
             is_active=user.is_active,
             last_login=user.last_login,
+            must_change_password=user.must_change_password,
         ),
     )
 
@@ -209,6 +202,7 @@ async def get_me(current_user: User = Depends(get_current_user), db: AsyncSessio
                 name=company.name,
                 max_users=company.max_users,
                 current_user_count=user_count,
+                subscription_plan=getattr(company, "subscription_plan", None),
             )
 
     column_configs_version = None
@@ -235,6 +229,7 @@ async def get_me(current_user: User = Depends(get_current_user), db: AsyncSessio
             company_id=current_user.company_id,
             is_active=current_user.is_active,
             last_login=current_user.last_login,
+            must_change_password=current_user.must_change_password,
         ),
         allowed_modules=allowed_modules,
         mill_settings=mill_settings,
@@ -252,6 +247,7 @@ async def change_password(
     if not verify_password(req.current_password, current_user.password_hash):
         raise SpinFlowException.bad_request("Current password is incorrect", ErrorCode.INVALID_VALUE)
     current_user.password_hash = hash_password(req.new_password)
+    current_user.must_change_password = False
     await db.flush()
     return {"message": "Password changed successfully"}
 
@@ -432,5 +428,6 @@ async def force_change_password(
             company_id=user.company_id,
             is_active=user.is_active,
             last_login=user.last_login,
+            must_change_password=user.must_change_password,
         ),
     )

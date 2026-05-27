@@ -62,6 +62,10 @@ async def create_spare(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
+    mill_id = scope["mill_id"] or current_user.mill_id
+    if not mill_id and scope["company_id"]:
+        raise HTTPException(status_code=400, detail="Cannot determine mill_id for MILL_OWNER")
     spare = Spare(
         code=req.item_code,
         name=req.name,
@@ -70,6 +74,7 @@ async def create_spare(
         stock=req.current_stock,
         min_stock=req.reorder_level,
         location=req.location,
+        mill_id=mill_id,
     )
     db.add(spare)
     await db.flush()
@@ -154,15 +159,25 @@ async def create_issue(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
+    mill_id = scope["mill_id"] or current_user.mill_id
+    if not mill_id and scope["company_id"]:
+        raise HTTPException(status_code=400, detail="Cannot determine mill_id for MILL_OWNER")
     issue = SpareIssue(
         date=datetime.now().strftime("%Y-%m-%d"),
         spare_id=req.item_id,
         quantity=req.quantity,
         purpose=req.purpose,
         issued_by=current_user.name,
+        mill_id=mill_id,
     )
     db.add(issue)
-    spare_result = await db.execute(select(Spare).where(Spare.id == req.item_id))
+    stmt = select(Spare).where(Spare.id == req.item_id)
+    if scope["mill_id"]:
+        stmt = stmt.where(Spare.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Spare.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    spare_result = await db.execute(stmt)
     spare = spare_result.scalar_one_or_none()
     if not spare:
         raise HTTPException(status_code=404, detail="Spare not found")
@@ -180,7 +195,13 @@ async def update_spare(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores", write=True)),
 ):
-    result = await db.execute(select(Spare).where(Spare.id == spare_id))
+    scope = await get_mill_scope(current_user)
+    stmt = select(Spare).where(Spare.id == spare_id)
+    if scope["mill_id"]:
+        stmt = stmt.where(Spare.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Spare.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
     spare = result.scalar_one_or_none()
     if not spare:
         raise HTTPException(status_code=404, detail="Spare not found")
@@ -209,7 +230,13 @@ async def receive_spare_stock(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores", write=True)),
 ):
-    result = await db.execute(select(Spare).where(Spare.id == spare_id))
+    scope = await get_mill_scope(current_user)
+    stmt = select(Spare).where(Spare.id == spare_id)
+    if scope["mill_id"]:
+        stmt = stmt.where(Spare.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Spare.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
     spare = result.scalar_one_or_none()
     if not spare:
         raise HTTPException(status_code=404, detail="Spare not found")

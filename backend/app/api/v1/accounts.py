@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List, Optional
@@ -59,6 +59,10 @@ async def create_invoice(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
+    mill_id = scope["mill_id"] or current_user.mill_id
+    if not mill_id and scope["company_id"]:
+        raise HTTPException(status_code=400, detail="mill_id is required for MILL_OWNER")
     invoice = Invoice(
         invoice_no=f"INV-{datetime.now().strftime('%Y%m%d%H%M%S')}",
         date=req.invoice_date.isoformat(),
@@ -69,6 +73,7 @@ async def create_invoice(
         total=req.total_amount if hasattr(req, 'total_amount') else req.taxable_amount,
         status="draft",
         due_date=req.due_date.isoformat() if req.due_date else None,
+        mill_id=mill_id,
     )
     db.add(invoice)
     await db.flush()
@@ -82,7 +87,13 @@ async def update_invoice(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts", write=True)),
 ):
-    result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
+    scope = await get_mill_scope(current_user)
+    stmt = select(Invoice).where(Invoice.id == invoice_id)
+    if scope["mill_id"]:
+        stmt = stmt.where(Invoice.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Invoice.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
     invoice = result.scalar_one_or_none()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
@@ -136,6 +147,7 @@ async def create_payment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
     payment = Payment(
         invoice_id=req.invoice_id,
         date=req.payment_date.isoformat(),
@@ -145,7 +157,12 @@ async def create_payment(
         notes=req.remarks,
     )
     db.add(payment)
-    inv_result = await db.execute(select(Invoice).where(Invoice.id == req.invoice_id))
+    inv_stmt = select(Invoice).where(Invoice.id == req.invoice_id)
+    if scope["mill_id"]:
+        inv_stmt = inv_stmt.where(Invoice.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        inv_stmt = inv_stmt.join(Mill, Invoice.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    inv_result = await db.execute(inv_stmt)
     invoice = inv_result.scalar_one_or_none()
     if invoice:
         invoice.status = "paid"

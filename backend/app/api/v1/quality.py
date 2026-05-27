@@ -98,6 +98,7 @@ async def bulk_create_tests(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
     created = 0
     skipped = 0
     errors: List[str] = []
@@ -111,10 +112,32 @@ async def bulk_create_tests(
                 skipped += 1
                 errors.append(f"Row {i + 1}: missing date, type, or result")
                 continue
+            lot_no = str(row.get("lot_no") or "").strip() or None
+            if lot_no:
+                lot_result = await db.execute(
+                    select(Lot).where(Lot.lot_no == lot_no)
+                )
+                lot = lot_result.scalar_one_or_none()
+                if not lot:
+                    skipped += 1
+                    errors.append(f"Row {i + 1}: lot '{lot_no}' not found")
+                    continue
+                if scope["mill_id"] and lot.mill_id != scope["mill_id"]:
+                    skipped += 1
+                    errors.append(f"Row {i + 1}: lot '{lot_no}' not in your scope")
+                    continue
+                if scope["company_id"] and not scope["mill_id"]:
+                    mill_result = await db.execute(
+                        select(Mill).where(Mill.id == lot.mill_id, Mill.company_id == scope["company_id"])
+                    )
+                    if not mill_result.scalar_one_or_none():
+                        skipped += 1
+                        errors.append(f"Row {i + 1}: lot '{lot_no}' not in your company")
+                        continue
             test = QualityTest(
                 date=date,
                 type=test_type,
-                lot_no=str(row.get("lot_no") or "").strip() or None,
+                lot_no=lot_no,
                 result=float(result_val),
                 standard=float(standard_val) if standard_val is not None else 0.0,
                 unit=str(row.get("unit") or "").strip() or None,
@@ -270,7 +293,12 @@ async def approve_or_reject_approval(
 
     action_status = "approved" if action == "approve" else "rejected"
 
-    stmt = select(QualityApproval).where(QualityApproval.id == approval_id)
+    scope = await get_mill_scope(current_user)
+    stmt = select(QualityApproval).join(Lot, QualityApproval.lot_id == Lot.id).where(QualityApproval.id == approval_id)
+    if scope["mill_id"]:
+        stmt = stmt.where(Lot.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     result = await db.execute(stmt)
     approval = result.scalar_one_or_none()
 

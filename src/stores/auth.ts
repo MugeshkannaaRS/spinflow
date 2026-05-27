@@ -11,7 +11,8 @@ export interface AuthUser {
   millId: string;
   millName: string;
   companyId?: string;
-  allowedModules?: string[];
+   allowedModules?: string[];
+   mustChangePassword?: boolean;
 }
 
 interface AuthState {

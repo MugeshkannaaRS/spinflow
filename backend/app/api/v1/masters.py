@@ -35,10 +35,18 @@ async def list_companies(
     current_user: User = Depends(require_module("masters")),
 ):
     scope = await get_mill_scope(current_user)
-    if scope["company_id"] is not None:
-        raise HTTPException(status_code=403, detail="Only SUPER_ADMIN can list companies")
     try:
         service = MastersService(db, current_user)
+        if scope["company_id"] is not None:
+            company = await service.get_company(scope["company_id"])
+            data = [CompanyOut.model_validate(company).model_dump()] if company else []
+            return {
+                "total": len(data),
+                "page": 1,
+                "page_size": 20,
+                "pages": 1,
+                "data": data,
+            }
         return await service.list_companies(page=page, page_size=page_size, include_inactive=include_inactive)
     except Exception as e:
         logger.error(f"masters.companies list error: {e}")

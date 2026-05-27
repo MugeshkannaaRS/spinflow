@@ -234,7 +234,13 @@ async def dispatch_trip(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dispatch", write=True)),
 ):
-    result = await db.execute(select(Trip).where(Trip.id == trip_id))
+    scope = await get_mill_scope(current_user)
+    stmt = select(Trip).where(Trip.id == trip_id)
+    if scope["mill_id"]:
+        stmt = stmt.where(Trip.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Trip.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
     trip = result.scalar_one_or_none()
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
@@ -256,7 +262,13 @@ async def deliver_trip(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dispatch", write=True)),
 ):
-    result = await db.execute(select(Trip).where(Trip.id == trip_id))
+    scope = await get_mill_scope(current_user)
+    stmt = select(Trip).where(Trip.id == trip_id)
+    if scope["mill_id"]:
+        stmt = stmt.where(Trip.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Trip.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
     trip = result.scalar_one_or_none()
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")

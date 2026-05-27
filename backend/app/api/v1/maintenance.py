@@ -54,12 +54,25 @@ async def get_tasks(
         return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
+async def _validate_machine_in_scope(db: AsyncSession, machine_code: str, scope: dict):
+    stmt = select(Machine).where(Machine.code == machine_code)
+    if scope["mill_id"]:
+        stmt = stmt.where(Machine.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=403, detail="Machine not in your scope")
+
+
 @router.post("/maintenance/tasks", response_model=MaintenanceOut)
 async def create_task(
     req: MaintenanceCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
+    await _validate_machine_in_scope(db, req.machine_id, scope)
     task = MaintenanceLog(
         date=datetime.now().strftime("%Y-%m-%d"),
         machine_code=req.machine_id,
@@ -80,7 +93,13 @@ async def update_task_status(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
-    result = await db.execute(select(MaintenanceLog).where(MaintenanceLog.id == task_id))
+    scope = await get_mill_scope(current_user)
+    stmt = select(MaintenanceLog).join(Machine, MaintenanceLog.machine_code == Machine.code).where(MaintenanceLog.id == task_id)
+    if scope["mill_id"]:
+        stmt = stmt.where(Machine.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
     task = result.scalar_one_or_none()
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
@@ -133,6 +152,8 @@ async def create_schedule(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
+    await _validate_machine_in_scope(db, req.machine_id, scope)
     schedule = MaintenanceSchedule(
         machine_code=req.machine_id,
         type=req.schedule_type,
@@ -154,6 +175,7 @@ async def bulk_create_schedules(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
     created = 0
     skipped = 0
     errors: List[str] = []
@@ -161,6 +183,12 @@ async def bulk_create_schedules(
         try:
             if not item.machine_code or not item.task_description:
                 errors.append(f"Row missing machine_code or task_description")
+                skipped += 1
+                continue
+            try:
+                await _validate_machine_in_scope(db, item.machine_code, scope)
+            except HTTPException:
+                errors.append(f"{item.machine_code}: machine not in scope")
                 skipped += 1
                 continue
             freq_days = _FREQ_MAP.get(item.frequency.strip().lower(), 30)
@@ -192,7 +220,13 @@ async def update_schedule(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
-    result = await db.execute(select(MaintenanceSchedule).where(MaintenanceSchedule.id == schedule_id))
+    scope = await get_mill_scope(current_user)
+    stmt = select(MaintenanceSchedule).join(Machine, MaintenanceSchedule.machine_code == Machine.code).where(MaintenanceSchedule.id == schedule_id)
+    if scope["mill_id"]:
+        stmt = stmt.where(Machine.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
     schedule = result.scalar_one_or_none()
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
@@ -246,6 +280,7 @@ async def bulk_create_parameters(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
     created = 0
     skipped = 0
     errors: List[str] = []
@@ -253,6 +288,12 @@ async def bulk_create_parameters(
         try:
             if not item.machine_code or not item.parameter_name:
                 errors.append("Row missing machine_code or parameter_name")
+                skipped += 1
+                continue
+            try:
+                await _validate_machine_in_scope(db, item.machine_code, scope)
+            except HTTPException:
+                errors.append(f"{item.machine_code}: machine not in scope")
                 skipped += 1
                 continue
             param = MachineParameter(

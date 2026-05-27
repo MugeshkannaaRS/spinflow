@@ -30,6 +30,7 @@ class UserResponse(BaseModel):
     company_id: Optional[str] = None
     is_active: bool
     last_login: Optional[datetime] = None
+    must_change_password: bool = False
 
     class Config:
         from_attributes = True
@@ -50,6 +51,7 @@ class CompanyInfo(BaseModel):
     name: str
     max_users: int
     current_user_count: int = 0
+    subscription_plan: Optional[str] = None
 
 
 class MeResponse(BaseModel):

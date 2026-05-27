@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
@@ -62,7 +62,12 @@ async def create_machine(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
     machine = Machine(**req.model_dump())
+    if scope["mill_id"]:
+        machine.mill_id = scope["mill_id"]
+    elif scope["company_id"]:
+        raise HTTPException(status_code=400, detail="mill_id is required for MILL_OWNER")
     db.add(machine)
     await db.flush()
     return machine
@@ -93,7 +98,12 @@ async def create_shift(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
     shift = Shift(**req.model_dump())
+    if scope["mill_id"]:
+        shift.mill_id = scope["mill_id"]
+    elif scope["company_id"]:
+        raise HTTPException(status_code=400, detail="mill_id is required for MILL_OWNER")
     db.add(shift)
     await db.flush()
     return shift

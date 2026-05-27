@@ -50,6 +50,8 @@ const NAV: Array<{
   { to: "/audit", label: "Audit Logs", icon: FileText, module: "audit" },
   { to: "/masters", label: "Masters", icon: Database, module: "masters" },
   { to: "/reports", label: "Reports", icon: BarChart3, module: "reports" },
+  { to: "/admin", label: "Admin Panel", icon: Settings, module: "masters", superAdminOnly: true },
+  { to: "/admin", label: "Admin Panel", icon: Settings, module: "users", superAdminOnly: true },
   { to: "/admin/column-config", label: "Column Config", icon: Settings, module: "masters", superAdminOnly: true },
 ];
 
@@ -59,6 +61,36 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   if (!user) return null;
+
+  if (user.allowedModules !== undefined && user.allowedModules.length === 0) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="px-5 py-5 border-b border-sidebar-border flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="size-8 rounded-md bg-primary flex items-center justify-center text-primary-foreground font-bold">
+              S
+            </div>
+            <div>
+              <div className="font-semibold text-sidebar-accent-foreground leading-tight">
+                SpinFlow ERP
+              </div>
+              <div className="text-[11px] text-sidebar-foreground/70 leading-tight">
+                {user.millName}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-2 py-3 space-y-0.5">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 rounded-md px-3 py-2">
+              <div className="size-4 rounded bg-sidebar-foreground/20 animate-pulse" />
+              <div className="h-3 rounded bg-sidebar-foreground/20 animate-pulse flex-1 max-w-[120px]" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const items = NAV.filter((n) => {
     if (n.superAdminOnly && user.role !== "SUPER_ADMIN") return false;

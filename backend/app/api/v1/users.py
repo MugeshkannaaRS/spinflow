@@ -65,6 +65,12 @@ async def create_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("users", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
+
+    # Require mill_id for non-owner roles
+    if req.role not in ("SUPER_ADMIN", "MILL_OWNER") and not req.mill_id:
+        raise HTTPException(status_code=400, detail="mill_id is required for this role")
+
     existing = await db.execute(select(User).where(User.email == req.email, User.deleted_at.is_(None)))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
@@ -74,7 +80,7 @@ async def create_user(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid role: {req.role}")
 
     # Resolve mill_id and company_id
-    mill_id = req.mill_id or current_user.mill_id
+    mill_id = req.mill_id or scope.get("mill_id")
     company_id = current_user.company_id
 
     if mill_id:
@@ -84,9 +90,8 @@ async def create_user(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mill not found")
         company_id = mill.company_id
 
-        # If current user is MILL_OWNER, validate mill belongs to their company
-        current_role = current_user.role
-        if current_role == "MILL_OWNER" and mill.company_id != current_user.company_id:
+        # Validate mill belongs to creator's company scope
+        if scope.get("company_id") and mill.company_id != scope["company_id"]:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Mill does not belong to your company")
 
     # Check user limit for company
@@ -143,7 +148,14 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("users", write=True)),
 ):
-    result = await db.execute(select(User).options(selectinload(User.role_rel)).where(User.id == user_id, User.deleted_at.is_(None)))
+    scope = await get_mill_scope(current_user)
+    stmt = select(User).options(selectinload(User.role_rel)).where(User.id == user_id, User.deleted_at.is_(None))
+    if scope["mill_id"]:
+        stmt = stmt.where(User.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        mill_ids_subq = select(Mill.id).where(Mill.company_id == scope["company_id"])
+        stmt = stmt.where(User.mill_id.in_(mill_ids_subq))
+    result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -185,7 +197,14 @@ async def deactivate_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("users", write=True)),
 ):
-    result = await db.execute(select(User).options(selectinload(User.role_rel)).where(User.id == user_id, User.deleted_at.is_(None)))
+    scope = await get_mill_scope(current_user)
+    stmt = select(User).options(selectinload(User.role_rel)).where(User.id == user_id, User.deleted_at.is_(None))
+    if scope["mill_id"]:
+        stmt = stmt.where(User.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        mill_ids_subq = select(Mill.id).where(Mill.company_id == scope["company_id"])
+        stmt = stmt.where(User.mill_id.in_(mill_ids_subq))
+    result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -213,7 +232,14 @@ async def reset_user_password(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("users", write=True)),
 ):
-    result = await db.execute(select(User).options(selectinload(User.role_rel)).where(User.id == user_id, User.deleted_at.is_(None)))
+    scope = await get_mill_scope(current_user)
+    stmt = select(User).options(selectinload(User.role_rel)).where(User.id == user_id, User.deleted_at.is_(None))
+    if scope["mill_id"]:
+        stmt = stmt.where(User.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        mill_ids_subq = select(Mill.id).where(Mill.company_id == scope["company_id"])
+        stmt = stmt.where(User.mill_id.in_(mill_ids_subq))
+    result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")

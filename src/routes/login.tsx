@@ -86,7 +86,11 @@ function LoginPage() {
                   setFailedAttempts(0);
                   setAuth(r.user, r.token);
                   toast.success(`Welcome, ${r.user.name}`);
-                  navigate({ to: "/dashboard" });
+                  if (r.user.mustChangePassword) {
+                    navigate({ to: "/change-password" });
+                  } else {
+                    navigate({ to: "/dashboard" });
+                  }
                 },
                 onError: (e: Error) => {
                   setFailedAttempts((n) => n + 1);
@@ -140,7 +144,11 @@ function LoginPage() {
                           onSuccess: (r) => {
                             setAuth(r.user, r.token);
                             toast.success(`Welcome, ${r.user.name}`);
-                            navigate({ to: "/dashboard" });
+                            if (r.user.mustChangePassword) {
+                              navigate({ to: "/change-password" });
+                            } else {
+                              navigate({ to: "/dashboard" });
+                            }
                           },
                           onError: (e: Error) => toast.error(e.message),
                         });

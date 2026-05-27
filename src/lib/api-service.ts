@@ -29,6 +29,7 @@ export const authApi = {
             role: (u.role ?? "OPERATOR") as Role,
             millId: u.mill_id || "m1",
             millName: u.mill_name || "SpinFlow Coimbatore Unit-1",
+            mustChangePassword: u.must_change_password ?? false,
           },
         };
       }),
@@ -36,6 +37,8 @@ export const authApi = {
   refresh: (refreshToken: string) =>
     api.post("/auth/refresh", { refresh_token: refreshToken }).then((r) => r.data),
   me: () => api.get("/auth/me").then((r) => r.data),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    api.post("/auth/change-password", { current_password: currentPassword, new_password: newPassword }).then((r) => r.data),
 };
 
 // Production
@@ -469,6 +472,8 @@ export const adminApi = {
   getCompanyModules: (companyId: string) =>
     api.get(`/admin/companies/${companyId}/modules`).then((r) => r.data),
   updateCompanyModules: (companyId: string, modules: Record<string, boolean>) =>
+    api.put(`/admin/companies/${companyId}/modules`, { modules }).then((r) => r.data),
+  createCompanyModules: (companyId: string, modules: string[]) =>
     api.put(`/admin/companies/${companyId}/modules`, { modules }).then((r) => r.data),
   getMillSettings: (millId: string) =>
     api.get(`/admin/mills/${millId}/settings`).then((r) => r.data),
