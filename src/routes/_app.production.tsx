@@ -594,22 +594,24 @@ function ProductionPage() {
     (m: any) => (m.current_status ?? m.status) === "breakdown",
   ).length;
 
+  const anyError = machinesQ.isError || shiftsQ.isError || downQ.isError;
+
   if (!user) return null;
 
-  if (machinesQ.isLoading)
+  if (machinesQ.isLoading || shiftsQ.isLoading)
     return (
       <>
         <Topbar title="Production" subtitle="Loading..." />
         <div className="p-6 text-sm text-muted-foreground">Loading data…</div>
       </>
     );
-  if (machinesQ.isError)
+  if (anyError)
     return (
       <>
         <Topbar title="Production" subtitle="Error" />
         <div className="p-6 text-sm text-destructive space-y-2">
           <p>Failed to load production data.</p>
-          <Button size="sm" variant="outline" onClick={() => machinesQ.refetch()}>Retry</Button>
+          <Button size="sm" variant="outline" onClick={() => window.location.reload()}>Reload Page</Button>
         </div>
       </>
     );
@@ -921,7 +923,7 @@ function ProductionPage() {
                       >
                         <SelectTrigger><SelectValue placeholder="Select machine" /></SelectTrigger>
                         <SelectContent>
-                          {machines.map((m: any) => (
+                          {machines.filter((m: any) => m?.id).map((m: any) => (
                             <SelectItem key={m.id} value={m.id}>
                               {m.code} — {m.name ?? ""}
                             </SelectItem>

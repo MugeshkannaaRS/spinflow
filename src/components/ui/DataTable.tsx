@@ -200,6 +200,7 @@ export function DataTable<T = any>({
   const loading = isLoading ?? loadingProp;
   const actionNodes = rowActions ?? actionsProp;
   const isServer = pageProp !== undefined;
+  const safeData = Array.isArray(data) ? data : [];
 
   // Column config
   const colConfig = useColumnConfig(tableName ?? "");
@@ -289,16 +290,16 @@ export function DataTable<T = any>({
 
   // ── Filtered + sorted rows (client-side) ─────────────────────────────────
   const processed = useMemo(() => {
-    if (isServer) return data;
+    if (isServer) return safeData;
     const q = clientSearch || searchValue || "";
-    let rows = data;
+    let rows = safeData;
     if (q) rows = rows.filter((r) => matchesSearch(r, searchableKeys, q));
     return sortRows(rows, activeSort);
-  }, [data, clientSearch, searchValue, activeSort, searchableKeys, isServer]);
+  }, [safeData, clientSearch, searchValue, activeSort, searchableKeys, isServer]);
 
   const currentPage = isServer ? (pageProp ?? 1) : clientPage;
   const currentPageSize = isServer ? (pageSizeProp ?? 20) : clientPageSize;
-  const total = isServer ? (totalProp ?? data.length) : processed.length;
+  const total = isServer ? (totalProp ?? safeData.length) : processed.length;
   const totalPages = Math.max(1, Math.ceil(total / currentPageSize));
   const safePage = Math.min(currentPage, totalPages);
   const pageRows = isServer ? data : processed.slice((safePage - 1) * currentPageSize, safePage * currentPageSize);

@@ -396,6 +396,11 @@ async def get_column_config(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if not table or not table.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="table parameter is required and cannot be empty"
+        )
     role_name = current_user.role_rel.code if current_user.role_rel else ""
     effective_mill_id = mill_id
     if role_name != "SUPER_ADMIN":

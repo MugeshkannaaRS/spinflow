@@ -330,6 +330,7 @@ export interface UseColumnConfigReturn {
 export function useColumnConfig(tableName: string): UseColumnConfigReturn {
   const user = useAuth((s) => s.user);
   const millId = user?.millId ?? "default";
+  const isValid = Boolean(tableName && tableName.trim() !== "");
 
   const query = useQuery({
     queryKey: ["column-config", tableName, millId],
@@ -339,9 +340,24 @@ export function useColumnConfig(tableName: string): UseColumnConfigReturn {
       });
       return res.data.columns as any[];
     },
+    enabled: isValid,
     staleTime: 5 * 60 * 1000,
     retry: 1,
   });
+
+  if (!isValid) {
+    return {
+      getLabel: (key: string) => key,
+      getConfig: (_key: string) => undefined,
+      getVisibleColumns: () => [],
+      getGroup: (_group: string) => [],
+      getOptions: (_key: string) => [],
+      isRequired: (_key: string) => false,
+      isVisible: (_key: string) => true,
+      isLoading: false,
+      columns: [],
+    };
+  }
 
   const serverColumns: ColumnConfig[] = (query.data ?? []).map((c: any) => ({
     key: c.key,

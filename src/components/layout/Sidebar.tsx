@@ -51,7 +51,6 @@ const NAV: Array<{
   { to: "/masters", label: "Masters", icon: Database, module: "masters" },
   { to: "/reports", label: "Reports", icon: BarChart3, module: "reports" },
   { to: "/admin", label: "Admin Panel", icon: Settings, module: "masters", superAdminOnly: true },
-  { to: "/admin", label: "Admin Panel", icon: Settings, module: "users", superAdminOnly: true },
   { to: "/admin/column-config", label: "Column Config", icon: Settings, module: "masters", superAdminOnly: true },
 ];
 
