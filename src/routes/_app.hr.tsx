@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DataTable, type ColDef } from "@/components/ui/DataTable";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -383,56 +384,12 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
     { key: "monthly", label: "Monthly", columns: ["joining_date", "bank_account_no", "days_of_month"] },
   ];
 
-  const ALL_COLUMNS = COLUMN_GROUPS.flatMap((g) => g.columns);
-
-  const PRIMARY_COLUMNS = new Set(["sl_no", "code", "name", "department", "designation", "grade", "gen", "basic", "wages", "total_salary", "status", "actions"]);
-  const SECONDARY_COLUMNS = ALL_COLUMNS.filter((c) => !PRIMARY_COLUMNS.has(c));
-
   const stored = typeof window !== "undefined" ? localStorage.getItem("hr-column-groups") : null;
-  const [visibleGroups, setVisibleGroups] = useState<Set<string>>(new Set(stored ? JSON.parse(stored) : ["monthly"]));
+  const [visibleGroups, setVisibleGroups] = useState<Set<string>>(new Set(stored ? JSON.parse(stored) : ["personal", "job", "salary"]));
 
   useEffect(() => {
     localStorage.setItem("hr-column-groups", JSON.stringify([...visibleGroups]));
   }, [visibleGroups]);
-
-  const visibleSecondary = new Set<string>();
-  COLUMN_GROUPS.forEach((g) => {
-    if (visibleGroups.has(g.key)) {
-      g.columns.forEach((c) => visibleSecondary.add(c));
-    }
-  });
-
-  const PRIMARY_HEADERS: { key: string; label: string; className?: string }[] = [
-    { key: "sl_no", label: "Sl No", className: "w-12" },
-    { key: "code", label: "Emp ID" },
-    { key: "name", label: "Name" },
-    { key: "department", label: "Department" },
-    { key: "designation", label: "Designation" },
-    { key: "grade", label: "Grade", className: "w-12" },
-    { key: "gen", label: "Gen", className: "w-16" },
-    { key: "basic", label: "Basic", className: "w-24" },
-    { key: "wages", label: "Wages", className: "w-24" },
-    { key: "total_salary", label: "Total Salary", className: "w-28" },
-    { key: "status", label: "Status", className: "w-20" },
-    { key: "actions", label: "Actions", className: "w-28" },
-  ];
-
-  const SECONDARY_HEADERS: { key: string; label: string }[] = [
-    { key: "section", label: "Section" },
-    { key: "dob", label: "DOB" },
-    { key: "age", label: "Age" },
-    { key: "gender", label: "Gender" },
-    { key: "joining_date", label: "Joining Date" },
-    { key: "bank_account_no", label: "Bank A/C No" },
-    { key: "house_rent", label: "House Rent" },
-    { key: "medical", label: "Medical" },
-    { key: "conveyance", label: "Conveyance" },
-    { key: "food_allowance", label: "Food Allow" },
-    { key: "increment", label: "Increment" },
-    { key: "mobile_bill", label: "Mobile Bill" },
-    { key: "shift_benefit", label: "Shift Ben." },
-    { key: "days_of_month", label: "Days/Month" },
-  ];
 
   const filtered = useMemo(() => {
     return employees.filter((e) => {
@@ -475,29 +432,57 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
     }
   };
 
-  const cellVal = (emp: EmployeeRow, key: string): string => {
-    if (key === "sl_no") return String(emp.sl_no ?? emp.employee_id ?? "");
-    if (key === "code") return emp.code || "";
-    if (key === "name") return emp.name || "";
-    if (key === "gender") return emp.gender || "-";
-    if (key === "grade") return emp.grade ?? "-";
-    if (key === "department") return emp.department || "-";
-    if (key === "designation") return emp.designation ?? emp.role ?? "-";
-    if (key === "section") return emp.section ?? "-";
-    if (key === "gen") return emp.gen ?? "-";
-    if (key === "age") return emp.age != null ? String(emp.age) : emp.date_of_birth ? String(calcAge(emp.date_of_birth)) : "-";
-    if (key === "dob") return emp.dob ? formatDate(emp.dob) : emp.date_of_birth ? formatDate(emp.date_of_birth) : "-";
-    if (key === "joining_date") return emp.date_of_joining ? formatDate(emp.date_of_joining) : "-";
-    if (key === "bank_account_no") return emp.bank_account_no ?? emp.bank_account ?? "-";
-    if (key === "phone") return emp.phone ?? "-";
-    if (key === "shift") return emp.shift ?? "General";
-    if (["basic", "house_rent", "medical", "conveyance", "food_allowance", "wages", "increment", "total_salary", "mobile_bill", "shift_benefit"].includes(key)) {
-      const v = emp[key] ?? 0;
-      return `₹${Number(v).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-    }
-    if (key === "days_of_month") return String(emp.days_of_month ?? 26);
-    return String((emp as any)[key] ?? "");
+  const currencyRender = (v: number | undefined | null) =>
+    v != null ? `₹${Number(v).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : "—";
+
+  const dateRender = (d: string | undefined | null) => d ? formatDate(d) : "—";
+
+  const alwaysCols: ColDef<EmployeeRow>[] = [
+    { key: "sl_no", label: empColConfig.getLabel('sl_no'), className: "w-14", render: (e) => <span className="text-xs text-muted-foreground">{e.sl_no ?? e.employee_id ?? ""}</span> },
+    { key: "code", label: empColConfig.getLabel('code'), className: "font-mono text-xs", render: (e) => <span className="font-mono text-xs">{e.code || ""}</span> },
+    { key: "name", label: empColConfig.getLabel('name'), render: (e) => <span className="font-medium">{e.name || ""}</span> },
+    { key: "department", label: empColConfig.getLabel('department') },
+    { key: "designation", label: empColConfig.getLabel('designation'), render: (e) => e.designation ?? e.role ?? "—" },
+    { key: "grade", label: empColConfig.getLabel('grade'), render: (e) => e.grade ?? "—" },
+    { key: "gen", label: empColConfig.getLabel('gen'), render: (e) => e.gen ?? "—" },
+    { key: "basic", label: empColConfig.getLabel('basic'), type: "number", render: (e) => currencyRender(e.basic) },
+    { key: "wages", label: empColConfig.getLabel('wages'), type: "number", render: (e) => currencyRender(e.wages) },
+    { key: "total_salary", label: empColConfig.getLabel('total_salary'), type: "number", render: (e) => currencyRender(e.total_salary) },
+    { key: "is_active", label: empColConfig.getLabel('is_active') || "Status", type: "status", render: (e) => <Badge variant={e.is_active ? "default" : "secondary"}>{e.is_active ? "Active" : "Inactive"}</Badge> },
+  ];
+
+  const groupColMap: Record<string, ColDef<EmployeeRow>[]> = {
+    allowances: [
+      { key: "house_rent", label: empColConfig.getLabel('house_rent'), type: "number", render: (e) => currencyRender(e.house_rent) },
+      { key: "medical", label: empColConfig.getLabel('medical'), type: "number", render: (e) => currencyRender(e.medical) },
+      { key: "conveyance", label: empColConfig.getLabel('conveyance'), type: "number", render: (e) => currencyRender(e.conveyance) },
+      { key: "food_allowance", label: empColConfig.getLabel('food_allowance'), type: "number", render: (e) => currencyRender(e.food_allowance) },
+      { key: "mobile_bill", label: empColConfig.getLabel('mobile_bill'), type: "number", render: (e) => currencyRender(e.mobile_bill) },
+      { key: "increment", label: empColConfig.getLabel('increment'), type: "number", render: (e) => currencyRender(e.increment) },
+      { key: "shift_benefit", label: empColConfig.getLabel('shift_benefit'), type: "number", render: (e) => currencyRender(e.shift_benefit) },
+    ],
+    monthly: [
+      { key: "joining_date", label: empColConfig.getLabel('joining_date'), type: "date", render: (e) => dateRender(e.date_of_joining) },
+      { key: "dob", label: empColConfig.getLabel('dob'), type: "date", render: (e) => dateRender(e.dob) },
+      { key: "age", label: empColConfig.getLabel('age'), type: "number", render: (e) => e.age ?? (e.date_of_birth ? calcAge(e.date_of_birth) : "—") },
+      { key: "gender", label: empColConfig.getLabel('gender') },
+      { key: "section", label: empColConfig.getLabel('section') },
+      { key: "bank_account_no", label: empColConfig.getLabel('bank_account_no') },
+      { key: "days_of_month", label: empColConfig.getLabel('days_of_month'), type: "number", render: (e) => e.days_of_month ?? 26 },
+    ],
   };
+
+  const groupColumns = useMemo(() => {
+    const cols: ColDef<EmployeeRow>[] = [];
+    COLUMN_GROUPS.forEach((g) => {
+      if (visibleGroups.has(g.key) && groupColMap[g.key]) {
+        cols.push(...groupColMap[g.key]);
+      }
+    });
+    return cols;
+  }, [visibleGroups]);
+
+  const dataTableColumns = useMemo(() => [...alwaysCols, ...groupColumns], [groupColumns]);
 
   const depts = useMemo(() => [...new Set(employees.map((e) => e.department).filter((d): d is string => !!d))].sort(), [employees]);
   const grades = useMemo(() => [...new Set(employees.map((e) => e.grade).filter((g): g is string => !!g))].sort(), [employees]);
@@ -539,37 +524,17 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
         </Select>
         {canEdit && <AddEmployeeSheet employees={employees} />}
         {canEdit && <ImportEmployeeDialog />}
-        <Button size="sm" variant="outline" onClick={() => {
-          const wb = XLSX.utils.book_new();
-          const ws = XLSX.utils.json_to_sheet(filtered.map((e) => ({
-            "Sl No": e.sl_no,
-            "Emp ID": e.code,
-            Name: e.name,
-            Department: e.department,
-            Designation: e.designation,
-            Grade: e.grade,
-            Gender: e.gender,
-            Basic: e.basic,
-            "Total Salary": e.total_salary,
-            Status: e.is_active ? "Active" : "Inactive",
-          })));
-          XLSX.utils.book_append_sheet(wb, ws, "Employees");
-          XLSX.writeFile(wb, `employees_${new Date().toISOString().slice(0, 10)}.xlsx`);
-        }}>
-          <Download className="size-4 mr-1" />
-          Export
-        </Button>
         <Popover>
           <PopoverTrigger asChild>
             <Button size="sm" variant="outline">
               <Settings2 className="size-4 mr-1" />
-              Columns
+              Groups
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-56 p-3" align="end">
+          <PopoverContent className="w-48 p-3" align="end">
             <p className="text-xs font-medium text-muted-foreground mb-2">Column Groups</p>
             <div className="space-y-2">
-              {COLUMN_GROUPS.filter((g) => g.key !== "personal" && g.key !== "job" && g.key !== "salary").map((g) => (
+              {COLUMN_GROUPS.map((g) => (
                 <label key={g.key} className="flex items-center gap-2 text-sm cursor-pointer">
                   <Checkbox
                     checked={visibleGroups.has(g.key)}
@@ -587,70 +552,32 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
         </Popover>
       </div>
 
-      <div className="border rounded-md overflow-x-auto">
-        <Table className="min-w-[1200px] w-full">
-          <TableHeader>
-            <TableRow>
-              {PRIMARY_HEADERS.map((h) => (
-                <TableHead key={h.key} className={h.className}>{empColConfig.getLabel(h.key)}</TableHead>
-              ))}
-              {SECONDARY_HEADERS.filter((h) => visibleSecondary.has(h.key)).map((h) => (
-                <TableHead key={h.key} className="whitespace-nowrap">{empColConfig.getLabel(h.key)}</TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {(filtered ?? []).map((emp, i) => emp ? (
-              <TableRow key={emp.id ?? i} className="cursor-pointer hover:bg-muted/50" onClick={() => handleView(emp)}>
-                <TableCell className="text-xs text-muted-foreground">{cellVal(emp, "sl_no")}</TableCell>
-                <TableCell className="font-mono text-xs">{cellVal(emp, "code")}</TableCell>
-                <TableCell className="font-medium">{cellVal(emp, "name")}</TableCell>
-                <TableCell>{cellVal(emp, "department")}</TableCell>
-                <TableCell>{cellVal(emp, "designation")}</TableCell>
-                <TableCell>{cellVal(emp, "grade")}</TableCell>
-                <TableCell>{cellVal(emp, "gen")}</TableCell>
-                <TableCell>{cellVal(emp, "basic")}</TableCell>
-                <TableCell>{cellVal(emp, "wages")}</TableCell>
-                <TableCell>{cellVal(emp, "total_salary")}</TableCell>
-                <TableCell>
-                  <Badge variant={emp.is_active ? "default" : "secondary"}>
-                    {emp.is_active ? "Active" : "Inactive"}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                    {canEdit && (
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEdit(emp)} title="Edit">
-                        <Pencil className="size-3.5" />
-                      </Button>
-                    )}
-                    {canEdit && (
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleView(emp)} title="View">
-                        <Eye className="size-3.5" />
-                      </Button>
-                    )}
-                    {canEdit && emp.is_active && (
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => handleDeactivate(emp)} title="Deactivate">
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
-                {SECONDARY_HEADERS.filter((h) => visibleSecondary.has(h.key)).map((h) => (
-                  <TableCell key={h.key} className="text-xs whitespace-nowrap">{cellVal(emp, h.key)}</TableCell>
-                ))}
-              </TableRow>
-            ) : null)}
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={PRIMARY_HEADERS.length + SECONDARY_HEADERS.filter((h) => visibleSecondary.has(h.key)).length} className="text-center text-muted-foreground py-8">
-                  No employees found
-                </TableCell>
-              </TableRow>
+      <DataTable
+        tableId="hr_employees"
+        columns={dataTableColumns}
+        data={filtered}
+        loading={false}
+        rowKey={(e) => e.id}
+        onRowClick={handleView}
+        exportFilename="hr_employees"
+        actions={(e) => (
+          <div className="flex gap-1">
+            {canEdit && (
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEdit(e)} title="Edit">
+                <Pencil className="size-3.5" />
+              </Button>
             )}
-          </TableBody>
-        </Table>
-      </div>
+            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleView(e)} title="View">
+              <Eye className="size-3.5" />
+            </Button>
+            {canEdit && e.is_active && (
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => handleDeactivate(e)} title="Deactivate">
+                <Trash2 className="size-3.5" />
+              </Button>
+            )}
+          </div>
+        )}
+      />
 
       {editOpen && editingEmp && (
         <EditEmployeeSheet open={editOpen} onOpenChange={setEditOpen} employee={editingEmp} />

@@ -77,6 +77,8 @@ export const dispatchApi = {
   createOrder: (data: any) => api.post("/dispatch/orders", data).then((r) => r.data),
   updateStatus: (id: string, data: any) =>
     api.put(`/dispatch/orders/${id}/status`, data).then((r) => r.data),
+  getTrips: (params?: Record<string, string | number>) =>
+    api.get("/dispatch/trips", { params }).then((r) => r.data),
 };
 
 // Purchase

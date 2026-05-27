@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, asc, desc
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timezone, date as date_type
 from pydantic import BaseModel
@@ -34,6 +34,30 @@ router = APIRouter()
 # ── Employees ──────────────────────────────────────────────────────────────
 
 
+SORTABLE_EMPLOYEE_COLUMNS = {
+    "name": Employee.name,
+    "code": Employee.code,
+    "department": Employee.department,
+    "designation": Employee.designation,
+    "grade": Employee.grade,
+    "section": Employee.section,
+    "shift": Employee.shift,
+    "basic": Employee.basic,
+    "wages": Employee.wages,
+    "total_salary": Employee.total_salary,
+    "house_rent": Employee.house_rent,
+    "medical": Employee.medical,
+    "conveyance": Employee.conveyance,
+    "food_allowance": Employee.food_allowance,
+    "mobile_bill": Employee.mobile_bill,
+    "joining_date": Employee.joining_date,
+    "dob": Employee.dob,
+    "sl_no": Employee.sl_no,
+    "is_active": Employee.is_active,
+    "created_at": Employee.created_at,
+}
+
+
 @router.get("/hr/employees")
 async def get_employees(
     page: int = Query(1, ge=1),
@@ -42,6 +66,8 @@ async def get_employees(
     grade: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    sort_dir: Optional[str] = Query("asc"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
@@ -72,6 +98,13 @@ async def get_employees(
                 Employee.designation.ilike(pattern),
             )
         )
+
+    sort_col = SORTABLE_EMPLOYEE_COLUMNS.get(sort_by) if sort_by else None
+    if sort_col:
+        order_fn = desc if sort_dir == "desc" else asc
+        stmt = stmt.order_by(order_fn(sort_col), Employee.name.asc())
+    else:
+        stmt = stmt.order_by(Employee.name.asc(), Employee.code.asc())
 
     try:
         count_stmt = select(func.count()).select_from(stmt.subquery())

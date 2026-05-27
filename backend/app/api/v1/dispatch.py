@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Body
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, asc, desc
 from typing import List, Optional
 
 from app.db.session import get_db
@@ -10,14 +10,75 @@ logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.dispatch import Dispatch, DispatchItem
+from app.models.lotrac import Trip
 from app.models.inventory import Lot
 from app.models.masters import Mill
 from app.schemas.dispatch import (
     DispatchResponse, DispatchCreate, DispatchStatusUpdate, QRScanRequest,
 )
+from app.schemas.lotrac import TripOut
 from app.services.dispatch_service import DispatchService
 
 router = APIRouter()
+
+
+@router.get("/dispatch/trips")
+async def get_trips(
+    status: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    sort_by: Optional[str] = Query(None),
+    sort_dir: Optional[str] = Query("desc"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("dispatch")),
+):
+    scope = await get_mill_scope(current_user)
+    stmt = select(Trip)
+    if scope["mill_id"]:
+        stmt = stmt.where(Trip.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        from app.models.masters import Mill as MillModel
+        stmt = stmt.join(MillModel, Trip.mill_id == MillModel.id).where(MillModel.company_id == scope["company_id"])
+    if status:
+        stmt = stmt.where(Trip.status == status)
+    if search:
+        pattern = f"%{search}%"
+        stmt = stmt.where(
+            Trip.trip_no.ilike(pattern) |
+            Trip.vehicle_no.ilike(pattern) |
+            Trip.driver_name.ilike(pattern) |
+            Trip.destination_name.ilike(pattern)
+        )
+    sort_map = {
+        "trip_no": Trip.trip_no,
+        "status": Trip.status,
+        "vehicle_no": Trip.vehicle_no,
+        "driver_name": Trip.driver_name,
+        "destination_name": Trip.destination_name,
+        "planned_bags": Trip.planned_bags,
+        "planned_weight_kg": Trip.planned_weight_kg,
+        "created_at": Trip.created_at,
+    }
+    sort_col = sort_map.get(sort_by) if sort_by else Trip.created_at
+    order_fn = desc if sort_dir == "desc" else asc
+    stmt = stmt.order_by(order_fn(sort_col))
+    try:
+        count_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(count_stmt)).scalar() or 0
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+        result = await db.execute(stmt)
+        items = list(result.scalars().all())
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": [TripOut.model_validate(t).model_dump() for t in items],
+        }
+    except Exception as e:
+        logger.error(f"dispatch.trips list error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
 @router.get("/dispatch/orders")
