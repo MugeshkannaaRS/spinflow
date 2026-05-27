@@ -332,6 +332,53 @@ class EmployeeBulkItem(BaseModel):
     net_payable: Optional[float] = None
 
 
+class PayrollBulkItem(BaseModel):
+    employee_code: str = ""
+    employee_id: Optional[str] = None
+    days_of_month: Optional[int] = None
+    calculate_days: Optional[float] = None
+    actual_attendance: Optional[int] = None
+    day_off: Optional[int] = None
+    cl: Optional[int] = None
+    sl: Optional[int] = None
+    el: Optional[int] = None
+    comp_leave: Optional[int] = None
+    festival_holiday: Optional[int] = None
+    absent_days: Optional[int] = None
+    payable_days: Optional[float] = None
+    payable_salary: Optional[float] = None
+    ot_hours: Optional[float] = None
+    ot_amount: Optional[float] = None
+    festival_duty_benefit: Optional[float] = None
+    festival_holiday_allowance: Optional[float] = None
+    ifter_days: Optional[int] = None
+    ifter_allowance: Optional[float] = None
+    special_food: Optional[float] = None
+    attendance_bonus: Optional[float] = None
+    arrear_others: Optional[float] = None
+    shift_qty: Optional[int] = None
+    shift_amount: Optional[float] = None
+    roster_qty: Optional[int] = None
+    roster_amount: Optional[float] = None
+    absent_deduction: Optional[float] = None
+    advance_deduction: Optional[float] = None
+    tax_deduction: Optional[float] = None
+    net_payable: Optional[float] = None
+
+
+class PayrollBulkCreate(BaseModel):
+    records: List[PayrollBulkItem]
+    month: int
+    year: int
+    mill_id: str
+
+
+class PayrollBulkResponse(BaseModel):
+    created: int = 0
+    updated: int = 0
+    errors: List[str] = []
+
+
 class EmployeeBulkCreate(BaseModel):
     items: List[EmployeeBulkItem]
 

@@ -69,7 +69,7 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="px-5 py-5 border-b border-sidebar-border">
+      <div className="px-5 py-5 border-b border-sidebar-border flex-shrink-0">
         <div className="flex items-center gap-2">
           <div className="size-8 rounded-md bg-primary flex items-center justify-center text-primary-foreground font-bold">
             S
@@ -108,7 +108,7 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-sidebar-border p-3">
+      <div className="mt-auto border-t border-sidebar-border p-3 flex-shrink-0">
         <div className="px-2 pb-2">
           <div className="text-sm font-medium text-sidebar-accent-foreground">{user.name}</div>
           <div className="text-xs text-sidebar-foreground/70">{ROLE_LABELS[user.role]}</div>
@@ -130,7 +130,7 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
 export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => void }) {
   return (
     <>
-      <aside className="fixed top-0 left-0 h-screen w-64 overflow-y-auto flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border z-30">
+      <aside className="fixed top-0 left-0 h-screen w-64 flex flex-col overflow-hidden bg-sidebar text-sidebar-foreground border-r border-sidebar-border z-30">
         <SidebarContent />
       </aside>
 

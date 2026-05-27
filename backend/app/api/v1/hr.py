@@ -23,6 +23,7 @@ from app.schemas.hr import (
     AttendanceCreate, AttendanceOut, AttendanceBulkCreate, AttendanceSummary,
     LeaveRequestCreate, LeaveRequestOut, LeaveActionRequest,
     EmployeeBulkCreate, EmployeeBulkResponse,
+    PayrollBulkCreate, PayrollBulkResponse,
     MonthlyPayrollCreate, MonthlyPayrollOut, MonthlyPayrollUpdate,
     MonthlyPayrollListResponse, PayrollCalculateRequest, PayrollFinalizeRequest,
 )
@@ -352,6 +353,110 @@ async def bulk_create_employees(
         await db.rollback()
         return EmployeeBulkResponse(created=imported, errors=[f"Commit error: {str(exc)}"])
     return EmployeeBulkResponse(created=imported, errors=[])
+
+
+@router.post("/hr/payroll/bulk", response_model=PayrollBulkResponse)
+async def bulk_create_payroll(
+    req: PayrollBulkCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("hr", write=True)),
+):
+    scope = await get_mill_scope(current_user)
+    if scope.get("mill_id") and req.mill_id != scope["mill_id"]:
+        raise HTTPException(403, "Cannot create payroll for a different mill")
+
+    created = 0
+    updated = 0
+    errors: List[str] = []
+
+    for i, rec in enumerate(req.records):
+        row_label = f"Row {i+1}"
+        try:
+            emp = None
+            if rec.employee_code:
+                emp_result = await db.execute(
+                    select(Employee).where(
+                        Employee.code == rec.employee_code.strip(),
+                        Employee.mill_id == req.mill_id,
+                    )
+                )
+                emp = emp_result.scalar_one_or_none()
+            if not emp and rec.employee_id:
+                emp = await db.get(Employee, rec.employee_id)
+
+            if not emp:
+                errors.append(f"{row_label}: employee not found (code='{rec.employee_code}', id='{rec.employee_id}')")
+                continue
+
+            existing = await db.execute(
+                select(MonthlyPayroll).where(
+                    MonthlyPayroll.employee_id == emp.id,
+                    MonthlyPayroll.month == req.month,
+                    MonthlyPayroll.year == req.year,
+                )
+            )
+            payroll = existing.scalar_one_or_none()
+
+            if payroll:
+                for field in ("days_of_month", "calculate_days", "actual_attendance", "day_off",
+                              "cl", "sl", "el", "comp_leave", "festival_holiday", "absent_days",
+                              "payable_days", "payable_salary", "ot_hours", "ot_amount",
+                              "festival_duty_benefit", "festival_holiday_allowance", "ifter_days",
+                              "ifter_allowance", "special_food", "attendance_bonus", "arrear_others",
+                              "shift_qty", "shift_amount", "roster_qty", "roster_amount",
+                              "absent_deduction", "advance_deduction", "tax_deduction", "net_payable"):
+                    val = getattr(rec, field, None)
+                    if val is not None:
+                        setattr(payroll, field, val)
+                updated += 1
+            else:
+                payroll = MonthlyPayroll(
+                    employee_id=emp.id,
+                    mill_id=req.mill_id,
+                    month=req.month,
+                    year=req.year,
+                    days_of_month=rec.days_of_month or 26,
+                    calculate_days=rec.calculate_days or 0,
+                    actual_attendance=rec.actual_attendance or 0,
+                    day_off=rec.day_off or 0,
+                    cl=rec.cl or 0,
+                    sl=rec.sl or 0,
+                    el=rec.el or 0,
+                    comp_leave=rec.comp_leave or 0,
+                    festival_holiday=rec.festival_holiday or 0,
+                    absent_days=rec.absent_days or 0,
+                    payable_days=rec.payable_days or 0,
+                    payable_salary=rec.payable_salary or 0,
+                    ot_hours=rec.ot_hours or 0,
+                    ot_amount=rec.ot_amount or 0,
+                    festival_duty_benefit=rec.festival_duty_benefit or 0,
+                    festival_holiday_allowance=rec.festival_holiday_allowance or 0,
+                    ifter_days=rec.ifter_days or 0,
+                    ifter_allowance=rec.ifter_allowance or 0,
+                    special_food=rec.special_food or 0,
+                    attendance_bonus=rec.attendance_bonus or 0,
+                    arrear_others=rec.arrear_others or 0,
+                    shift_qty=rec.shift_qty or 0,
+                    shift_amount=rec.shift_amount or 0,
+                    roster_qty=rec.roster_qty or 0,
+                    roster_amount=rec.roster_amount or 0,
+                    absent_deduction=rec.absent_deduction or 0,
+                    advance_deduction=rec.advance_deduction or 0,
+                    tax_deduction=rec.tax_deduction or 0,
+                    net_payable=rec.net_payable or 0,
+                )
+                db.add(payroll)
+                created += 1
+        except Exception as exc:
+            errors.append(f"{row_label}: {str(exc)}")
+
+    try:
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        return PayrollBulkResponse(created=created, updated=updated, errors=[f"Commit error: {str(exc)}"])
+
+    return PayrollBulkResponse(created=created, updated=updated, errors=errors)
 
 
 # ── Payroll ────────────────────────────────────────────────────────────────

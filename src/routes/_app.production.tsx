@@ -93,7 +93,7 @@ function ShiftGrid() {
     staleTime: 60_000,
   });
 
-  const machines = (machinesQ.data ?? []) as any[];
+  const machines = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[];
   const [rows, setRows] = useState<GridRow[]>(() => buildRows(machines));
 
   useEffect(() => {
@@ -460,9 +460,9 @@ function ProductionPage() {
     retry: 1,
   });
 
-  const machines = (machinesQ.data ?? []) as any[];
-  const shifts = (shiftsQ.data ?? []) as any[];
-  const downtime = (downQ.data ?? []) as any[];
+  const machines = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[];
+  const shifts = (Array.isArray(shiftsQ.data) ? shiftsQ.data : (shiftsQ.data?.data ?? [])) as any[];
+  const downtime = (Array.isArray(downQ.data) ? downQ.data : (downQ.data?.data ?? [])) as any[];
   const machineColConfig = useColumnConfig("production_entries");
   const downColConfig = useColumnConfig("production_downtime");
 
@@ -492,7 +492,10 @@ function ProductionPage() {
     return (
       <>
         <Topbar title="Production" subtitle="Error" />
-        <div className="p-6 text-sm text-destructive">Error loading data.</div>
+        <div className="p-6 text-sm text-destructive space-y-2">
+          <p>Failed to load production data.</p>
+          <Button size="sm" variant="outline" onClick={() => machinesQ.refetch()}>Retry</Button>
+        </div>
       </>
     );
 

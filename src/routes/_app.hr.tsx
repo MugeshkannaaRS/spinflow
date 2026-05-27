@@ -1,7 +1,8 @@
 import * as XLSX from "xlsx";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { useColumnConfig, type ColumnConfig } from "@/hooks/useColumnConfig";
+import { fuzzyMatchColumns, parseExcelDate, filterBlankRows, normalizeShift, generateImportTemplate } from "@/lib/excel-import";
 import { hrApi, uploadApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
@@ -1474,31 +1475,42 @@ const FIELD_CANDIDATES: Record<string, string[]> = {
   net_payable: ["net payable", "column1"],
 };
 
-function excelToDate(v: any): string | null {
-  if (!v) return null
-  if (v instanceof Date) return v.toISOString().split('T')[0]
-  if (typeof v === 'number') {
-    const d = new Date(Math.round((v - 25569) * 86400 * 1000))
-    return d.toISOString().split('T')[0]
-  }
-  return String(v)
-}
-
-function normalizeShift(v: any): string {
-  const map: Record<string, string> = {
-    '0': 'General', '1': 'A', '2': 'B', '3': 'C',
-    'general': 'General', 'a': 'A', 'b': 'B', 'c': 'C',
-    'morning': 'A', 'evening': 'B', 'night': 'C',
-  }
-  return map[String(v).toLowerCase().trim()] ?? 'General'
-}
-
 function detectColumn(headers: string[], candidates: string[]): number | null {
-  for (let i = 0; i < headers.length; i++) {
-    const h = headers[i].toLowerCase().trim();
-    if (candidates.some((c) => h === c.toLowerCase().trim())) return i;
+  const lowerHeaders = headers.map((h) => h.toLowerCase().trim());
+
+  for (const cand of candidates) {
+    const lowerCand = cand.toLowerCase().trim();
+    const idx = lowerHeaders.findIndex((h) => h === lowerCand);
+    if (idx !== -1) return idx;
   }
-  return null;
+
+  // Fuzzy fallback
+  function levenshtein(a: string, b: string): number {
+    const m = a.length; const n = b.length;
+    const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++)
+      for (let j = 1; j <= n; j++)
+        dp[i][j] = a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    return dp[m][n];
+  }
+
+  let bestIdx: number | null = null;
+  let bestScore = Infinity;
+  for (let i = 0; i < lowerHeaders.length; i++) {
+    for (const cand of candidates) {
+      const score = levenshtein(lowerHeaders[i], cand.toLowerCase().trim());
+      const threshold = Math.max(3, Math.floor(lowerHeaders[i].length * 0.4));
+      if (score < threshold && score < bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
+    }
+  }
+  return bestIdx;
 }
 
 interface EmpImportRow {
@@ -1579,8 +1591,8 @@ function parseEmployeeRow(row: any[], colMap: Record<string, number>, rowIndex: 
 
   const dojCol = colMap["joining_date"];
   const dobCol = colMap["dob"];
-  const date_of_joining = dojCol !== undefined ? excelToDate(row[dojCol]) : null;
-  const dob = dobCol !== undefined ? excelToDate(row[dobCol]) : null;
+  const date_of_joining = dojCol !== undefined ? parseExcelDate(row[dojCol]) : null;
+  const dob = dobCol !== undefined ? parseExcelDate(row[dobCol]) : null;
 
   const rawGrade = get("grade");
   const finalGrade = rawGrade !== "" ? rawGrade : "";
@@ -1710,19 +1722,14 @@ const FIELD_TO_LABEL: Record<string, string> = {
   net_payable: "Net Payable",
 };
 
-function downloadEmployeeTemplate() {
-  const hdrs = ["Sl no", "name", "employee_id", "Joining Date", "Gen", "DOB", "Age", "Gender", "Grade", "Designation", "Section", "Department", "Bank A/C No.", "Basic", "House Rent", "Medical", "Conveyance", "Food Allow", "Wages", "Increment", "Total Salary", "Wages of Month", "Days of Month", "Mobile Bill", "shift Benifit", "Phone", "Shift",
-    "Calculate Days", "Acctual Atten.", "Day Off", "CL", "SL", "EL", "Com.L.", "Festival Holiday", "Absent Days", "Payable Days", "Payable Salary",
-    "OT Hour", "OT Tk.", "Festival Duty Benifte", "Festival Holiday Allow", "Ifter Days", "Ifter Allow", "Special Food Tk.", "Atten. Bonus Tk.",
-    "Arear/ others Tk.", "shift Qty", "Shift TK", "Roster Qty", "Roster TK", "Absent Ded. Tk.", "Adv. Ded. Tk.", "TAX Ded. Tk.", "Net Payable"];
-  const sample = ["1", "Ravi Kumar", "EMP001", "01/06/2024", "M", "15/03/1990", "34", "Male", "Grade A", "Operator", "Section 1", "Spinning", "123456789", "10000", "2000", "1500", "800", "500", "5000", "300", "20100", "5000", "26", "500", "500", "01712345678", "General",
-    "26", "26", "4", "1", "0", "0", "0", "1", "1", "26", "19500",
-    "0", "0", "0", "0", "0", "0", "0", "0",
-    "0", "0", "0", "0", "0", "0", "0", "0", "19500"];
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([hdrs, sample]);
-  XLSX.utils.book_append_sheet(wb, ws, "Employees");
-  XLSX.writeFile(wb, "employee_import_template.xlsx");
+async function downloadEmployeeTemplate(columns: ColumnConfig[]) {
+  const blob = await generateImportTemplate(columns, "hr_employees");
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "SpinFlow_Employee_Template.xlsx";
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function ImportEmployeeDialog() {
@@ -1952,7 +1959,7 @@ function ImportEmployeeDialog() {
         </DialogHeader>
         <div className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
-            <Button size="sm" variant="outline" onClick={downloadEmployeeTemplate}>
+            <Button size="sm" variant="outline" onClick={() => downloadEmployeeTemplate(empColConfig.columns)}>
               <Download className="size-4 mr-1" />
               Download Template
             </Button>
