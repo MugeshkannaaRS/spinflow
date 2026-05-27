@@ -146,7 +146,7 @@ export function UniversalImportModal({
   const handleFileRead = useCallback(
     async (f: File) => {
       const buf = await f.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
       if (!ws) {
         toast.error("No sheets found in the file");
@@ -175,6 +175,16 @@ export function UniversalImportModal({
         newMapping[h] = matched?.key ?? null;
         newConfidence[h] = matched ? computeConfidence(h, matched) : 0;
       }
+      for (const h of hdrs) {
+        if (h.toLowerCase() === "column1" && !newMapping[h]) {
+          const netPayableCol = colConfigs.find(c => c.key === "net_payable");
+          if (netPayableCol) {
+            newMapping[h] = "net_payable";
+            newConfidence[h] = 100;
+          }
+        }
+      }
+
       setMapping(newMapping);
       setConfidence(newConfidence);
 
@@ -359,12 +369,38 @@ export function UniversalImportModal({
     [colConfigs],
   );
 
+  const FIELD_MAP: Record<string, Record<string, string>> = {
+    hr_employees: {
+      name: "full_name",
+      employee_id: "employee_code",
+      joining_date: "date_of_joining",
+    },
+    stores_spares: {
+      code: "item_code",
+      stock: "current_stock",
+      min_stock: "reorder_level",
+    },
+  };
+
+  const TABLE_KEY_FIELDS: Record<string, string[]> = {
+    hr_employees: ["name", "employee_id", "sl_no"],
+  };
+
   const handleImport = useCallback(async () => {
+    const keyFields = TABLE_KEY_FIELDS[tableName];
     const nonBlank = filterBlankRows(
       previewRecords.map((r) => r.data),
+      keyFields,
     );
 
-    const validRecords = nonBlank;
+    const fieldMap = FIELD_MAP[tableName] ?? {};
+    const validRecords = nonBlank.map((rec) => {
+      const mapped: Record<string, any> = {};
+      for (const [key, value] of Object.entries(rec)) {
+        mapped[fieldMap[key] ?? key] = value;
+      }
+      return mapped;
+    });
     if (validRecords.length === 0) {
       toast.error("No valid records to import");
       return;
@@ -398,7 +434,7 @@ export function UniversalImportModal({
     });
     setStep(5);
     onSuccess?.(successCount);
-  }, [previewRecords, endpoint, millId, onSuccess]);
+  }, [previewRecords, endpoint, millId, onSuccess, tableName]);
 
   const validCount = previewRecords.filter((r) => r.errors.length === 0).length;
   const errorCount = previewRecords.filter((r) => r.errors.length > 0).length;

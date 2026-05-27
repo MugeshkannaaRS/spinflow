@@ -193,7 +193,18 @@ export const reportsApi = {
       const qs = d.quality_summary ?? {};
       const ds = d.dispatch_summary ?? {};
       const fs = d.financial_summary ?? {};
+      const hs = d.hr_summary ?? {};
+      const ss = d.stock_summary ?? {};
       return {
+        hrSummary: {
+          total_employees: hs.total_employees ?? 0,
+          present_today: hs.present_today ?? 0,
+          pending_leaves: hs.pending_leaves ?? 0,
+        },
+        stockSummary: {
+          total_lots: ss.total_lots ?? 0,
+          sellable_stock_kg: ss.sellable_stock_kg ?? 0,
+        },
         productionSummary: {
           totalProduced: ps.total_produced ?? 0,
           totalTarget: ps.total_target ?? 0,

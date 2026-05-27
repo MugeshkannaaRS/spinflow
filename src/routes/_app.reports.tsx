@@ -87,6 +87,8 @@ function ReportsPage() {
   const qual = data.qualitySummary;
   const disp = data.dispatchSummary;
   const fin = data.financialSummary;
+  const hr = data.hrSummary ?? { total_employees: 0, present_today: 0, pending_leaves: 0 };
+  const stock = data.stockSummary ?? { total_lots: 0, sellable_stock_kg: 0 };
 
   const summaryData = [
     {
@@ -327,6 +329,46 @@ function ReportsPage() {
                   <div className="text-xl font-semibold mt-1">
                     ₹{((fin.gstCollected ?? 0) / 100000).toFixed(2)}L
                   </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">HR Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 grid-cols-3">
+                <div className="rounded-lg border p-4 text-center">
+                  <div className="text-2xl font-semibold">{hr.total_employees}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Total Employees</div>
+                </div>
+                <div className="rounded-lg border p-4 text-center">
+                  <div className="text-2xl font-semibold text-green-600">{hr.present_today}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Present Today</div>
+                </div>
+                <div className="rounded-lg border p-4 text-center">
+                  <div className="text-2xl font-semibold text-yellow-600">{hr.pending_leaves}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Pending Leaves</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Stock Summary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 grid-cols-2">
+                <div className="rounded-lg border p-4 text-center">
+                  <div className="text-2xl font-semibold">{stock.total_lots}</div>
+                  <div className="text-xs text-muted-foreground mt-1">Total Lots</div>
+                </div>
+                <div className="rounded-lg border p-4 text-center">
+                  <div className="text-2xl font-semibold">{stock.sellable_stock_kg.toLocaleString()} kg</div>
+                  <div className="text-xs text-muted-foreground mt-1">Sellable Stock</div>
                 </div>
               </div>
             </CardContent>

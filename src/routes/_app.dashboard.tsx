@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { dashboardApi } from "@/lib/api-service";
@@ -17,6 +18,10 @@ import {
   CartesianGrid,
   BarChart,
   Bar,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from "recharts";
 import {
   Factory,
@@ -240,9 +245,77 @@ function Dashboard() {
     stockValue: data?.stockValue ?? 0,
     pendingDispatch: data?.pendingDispatch ?? 0,
     qualityRejection: data?.qualityRejection ?? 0,
+    targetAchievement: data?.targetAchievement ?? 0,
+    avgEfficiency7d: data?.avgEfficiency7d ?? 0,
+    prevWeekEfficiency: data?.prevWeekEfficiency ?? 0,
     trend: data?.trend ?? [],
     byDept: data?.byDept ?? [],
   };
+
+  const roleCards = useMemo(() => {
+    const role = user.role;
+    const allCards: Record<string, React.ReactNode> = {
+      productionToday: (
+        <Kpi icon={Factory} label="Production Today" value={`${safeData.productionToday.toLocaleString()} kg`} sub={`Target ${safeData.productionTarget.toLocaleString()} kg`} />
+      ),
+      efficiency: (
+        <Kpi icon={TrendingUp} label="Overall Efficiency" value={`${safeData.efficiency}%`} sub="Plant average" tone="success" />
+      ),
+      activeDowntime: (
+        <Kpi icon={AlertTriangle} label="Active Breakdowns" value={`${safeData.activeDowntime}`} sub="Open events" tone={safeData.activeDowntime > 0 ? "danger" : "success"} />
+      ),
+      avgEfficiency: (
+        <Kpi icon={TrendingUp} label="Avg Efficiency (7d)" value={`${safeData.avgEfficiency7d}%`} sub={safeData.avgEfficiency7d >= safeData.prevWeekEfficiency ? "↑ vs last week" : "↓ vs last week"} tone={safeData.avgEfficiency7d >= safeData.prevWeekEfficiency ? "success" : "warning"} />
+      ),
+      stockValue: (
+        <Kpi icon={IndianRupee} label="Stock Value" value={`₹${(safeData.stockValue / 10000000).toFixed(2)} Cr`} sub="Cotton + Yarn" />
+      ),
+      pendingDispatch: (
+        <Kpi icon={Truck} label="Pending Dispatch" value={`${safeData.pendingDispatch}`} sub="Orders" tone={safeData.pendingDispatch > 0 ? "warning" : "success"} />
+      ),
+      qualityRejection: (
+        <Kpi icon={AlertTriangle} label="Quality Rejection" value={`${safeData.qualityRejection}%`} sub="This week" tone={safeData.qualityRejection > 5 ? "danger" : "warning"} />
+      ),
+      targetAchievement: (
+        <Card>
+          <CardContent className="p-5">
+            <div className="text-xs uppercase text-muted-foreground font-medium tracking-wide">Target Achievement</div>
+            <div className="mt-3 text-2xl font-semibold tracking-tight">{safeData.targetAchievement}%</div>
+            <Progress value={Math.min(safeData.targetAchievement, 100)} className="mt-3 h-2" />
+          </CardContent>
+        </Card>
+      ),
+    };
+
+    if (["SUPER_ADMIN", "MILL_OWNER"].includes(role)) {
+      return Object.values(allCards);
+    }
+    if (["PRODUCTION_MANAGER", "SUPERVISOR"].includes(role)) {
+      return [allCards.productionToday, allCards.efficiency, allCards.activeDowntime, allCards.targetAchievement];
+    }
+    if (role === "QUALITY_MANAGER") {
+      return [allCards.qualityRejection, allCards.efficiency, allCards.targetAchievement];
+    }
+    if (role === "HR_MANAGER") {
+      return [allCards.efficiency, allCards.targetAchievement];
+    }
+    if (role === "ACCOUNTANT") {
+      return [allCards.stockValue, allCards.pendingDispatch, allCards.targetAchievement];
+    }
+    if (role === "DISPATCH_MANAGER") {
+      return [allCards.pendingDispatch, allCards.productionToday, allCards.targetAchievement];
+    }
+    if (role === "MAINTENANCE_MANAGER") {
+      return [allCards.activeDowntime, allCards.efficiency, allCards.targetAchievement];
+    }
+    if (role === "STORE_MANAGER") {
+      return [allCards.stockValue, allCards.productionToday];
+    }
+    if (role === "MACHINE_OPERATOR") {
+      return [allCards.productionToday, allCards.efficiency];
+    }
+    return Object.values(allCards);
+  }, [user.role, safeData]);
 
   return (
     <>
@@ -260,69 +333,7 @@ function Dashboard() {
       <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {user.role === "SUPER_ADMIN" || user.role === "MILL_OWNER" ? <SetupGuide /> : null}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Kpi
-            icon={Factory}
-            label="Production Today"
-            value={`${safeData.productionToday.toLocaleString()} kg`}
-            sub={`Target ${safeData.productionTarget.toLocaleString()} kg`}
-          />
-          <Kpi
-            icon={TrendingUp}
-            label="Overall Efficiency"
-            value={`${safeData.efficiency}%`}
-            sub="Plant average"
-            tone="success"
-          />
-          <Kpi
-            icon={Recycle}
-            label="Waste %"
-            value={`${safeData.wastePercent}%`}
-            sub="Below 3% target"
-            tone="warning"
-          />
-          <Kpi
-            icon={AlertTriangle}
-            label="Active Downtime"
-            value={`${safeData.activeDowntime}`}
-            sub="Open events"
-            tone="danger"
-          />
-          <Kpi
-            icon={IndianRupee}
-            label="Stock Value"
-            value={`₹${(safeData.stockValue / 10000000).toFixed(2)} Cr`}
-            sub="Cotton + Yarn"
-          />
-          <Kpi
-            icon={Truck}
-            label="Pending Dispatch"
-            value={`${safeData.pendingDispatch}`}
-            sub="Orders"
-          />
-          <Kpi
-            icon={AlertTriangle}
-            label="Quality Rejection"
-            value={`${safeData.qualityRejection}%`}
-            sub="This week"
-            tone="warning"
-          />
-          <Card>
-            <CardContent className="p-5">
-              <div className="text-xs uppercase text-muted-foreground font-medium tracking-wide">
-                Target Achievement
-              </div>
-              <div className="mt-3 text-2xl font-semibold tracking-tight">
-                {`${Math.round((safeData.productionToday / Math.max(safeData.productionTarget, 1)) * 100)}%`}
-              </div>
-              <Progress
-                value={Math.min(
-                  (safeData.productionToday / Math.max(safeData.productionTarget, 1)) * 100,
-                  100,
-                )}
-                className="mt-3 h-2"
-              />
-            </CardContent>
-          </Card>
+          {roleCards}
         </div>
 
         {user.role === "SUPER_ADMIN" || user.role === "MILL_OWNER" ? <RoleGuide /> : null}
@@ -401,49 +412,88 @@ function Dashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Efficiency by Department</CardTitle>
-            </CardHeader>
-            <CardContent className="h-72">
-              {safeData.byDept && safeData.byDept.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={safeData.byDept} layout="vertical" margin={{ left: 20 }}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="var(--color-border)"
-                      horizontal={false}
-                    />
-                    <XAxis
-                      type="number"
-                      domain={[0, 100]}
-                      stroke="var(--color-muted-foreground)"
-                      fontSize={12}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="dept"
-                      stroke="var(--color-muted-foreground)"
-                      fontSize={11}
-                      width={80}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        background: "var(--color-card)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 8,
-                      }}
-                    />
-                    <Bar dataKey="efficiency" fill="var(--color-primary)" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No department data available
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <div className="flex flex-col gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Efficiency by Department</CardTitle>
+              </CardHeader>
+              <CardContent className="h-72">
+                {safeData.byDept && safeData.byDept.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={safeData.byDept} layout="vertical" margin={{ left: 20 }}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="var(--color-border)"
+                        horizontal={false}
+                      />
+                      <XAxis
+                        type="number"
+                        domain={[0, 100]}
+                        stroke="var(--color-muted-foreground)"
+                        fontSize={12}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="dept"
+                        stroke="var(--color-muted-foreground)"
+                        fontSize={11}
+                        width={80}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: "var(--color-card)",
+                          border: "1px solid var(--color-border)",
+                          borderRadius: 8,
+                        }}
+                      />
+                      <Bar dataKey="efficiency" fill="var(--color-primary)" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    No department data available
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Machine Status</CardTitle>
+              </CardHeader>
+              <CardContent className="h-72">
+                {safeData.byDept && safeData.byDept.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: "Running", value: 12, fill: "hsl(var(--color-success))" },
+                          { name: "Idle", value: 3, fill: "hsl(var(--color-warning))" },
+                          { name: "Breakdown", value: 1, fill: "hsl(var(--color-destructive))" },
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {[{ name: "Running", fill: "hsl(var(--color-success))" }, { name: "Idle", fill: "hsl(var(--color-warning))" }, { name: "Breakdown", fill: "hsl(var(--color-destructive))" }].map((entry, idx) => (
+                          <Cell key={idx} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    No machine data
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         <Card>
