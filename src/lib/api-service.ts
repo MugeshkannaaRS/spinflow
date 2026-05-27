@@ -49,6 +49,8 @@ export const productionApi = {
   getDowntime: () => api.get("/production/downtime").then((r: any) => extractList(r.data)),
   createDowntime: (data: any) => api.post("/production/downtime", data).then((r) => r.data),
   approveEntry: (id: string) => api.put(`/production/entries/${id}/approve`).then((r) => r.data),
+  rejectEntry: (id: string) => api.patch(`/production/entries/${id}/reject`).then((r) => r.data),
+  updateMachineStatus: (id: string, data: any) => api.patch(`/production/machines/${id}/status`, data).then((r) => r.data),
   getShifts: () => api.get("/production/shifts").then((r: any) => extractList(r.data)),
   createShift: (data: any) => api.post("/production/shifts", data).then((r) => r.data),
 };
@@ -60,6 +62,7 @@ export const qualityApi = {
   getApprovals: () => api.get("/quality/approvals").then((r: any) => extractList(r.data)),
   approveOrReject: (data: any) => api.post("/quality/approvals/action", data).then((r) => r.data),
   getRejections: () => api.get("/quality/rejections").then((r: any) => extractList(r.data)),
+  getLots: () => api.get("/quality/lots").then((r: any) => extractList(r.data)),
 };
 
 // Inventory
@@ -79,6 +82,9 @@ export const dispatchApi = {
     api.put(`/dispatch/orders/${id}/status`, data).then((r) => r.data),
   getTrips: (params?: Record<string, string | number>) =>
     api.get("/dispatch/trips", { params }).then((r) => r.data),
+  createTrip: (data: any) => api.post("/dispatch/trips", data).then((r) => r.data),
+  dispatchTrip: (id: string) => api.put(`/dispatch/trips/${id}/dispatch`).then((r) => r.data),
+  deliverTrip: (id: string) => api.put(`/dispatch/trips/${id}/deliver`).then((r) => r.data),
 };
 
 // Purchase
@@ -102,6 +108,9 @@ export const storesApi = {
   getSpares: () => api.get("/stores/spares").then((r: any) => extractList(r.data)),
   getIssues: () => api.get("/stores/issues").then((r: any) => extractList(r.data)),
   createIssue: (data: any) => api.post("/stores/issues", data).then((r) => r.data),
+  createSpare: (data: any) => api.post("/stores/spares", data).then((r) => r.data),
+  updateSpare: (id: string, data: any) => api.put(`/stores/spares/${id}`, data).then((r) => r.data),
+  receiveStock: (id: string, data: any) => api.post(`/stores/spares/${id}/receive`, data).then((r) => r.data),
 };
 
 // HR
@@ -147,6 +156,9 @@ export const hrApi = {
 export const accountsApi = {
   getInvoices: () => api.get("/accounts/invoices").then((r: any) => extractList(r.data)),
   getReceivables: () => api.get("/accounts/receivables").then((r: any) => extractList(r.data)),
+  createInvoice: (data: any) => api.post("/accounts/invoices", data).then((r) => r.data),
+  updateInvoice: (id: string, data: any) => api.put(`/accounts/invoices/${id}`, data).then((r) => r.data),
+  deleteInvoice: (id: string) => api.delete(`/accounts/invoices/${id}`).then((r) => r.data),
 };
 
 // Maintenance

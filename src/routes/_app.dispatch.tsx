@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
-import { dispatchApi } from "@/lib/api-service";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { dispatchApi, mastersApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
@@ -8,10 +8,23 @@ import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
-import { Truck, ClipboardList, Loader2, MapPin } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Truck, ClipboardList, Loader2, MapPin, Plus } from "lucide-react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/dispatch")({
@@ -24,10 +37,21 @@ function DispatchPage() {
   const canEdit = canWrite(user?.role ?? "OPERATOR", "dispatch");
   const orderColConfig = useColumnConfig("dispatch_sales_orders");
   const tripColConfig = useColumnConfig("dispatch_trips");
+  const queryClient = useQueryClient();
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState("");
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [form, setForm] = useState({
+    customer_id: "",
+    vehicle_no: "",
+    driver_name: "",
+    driver_phone: "",
+    dispatch_date: new Date().toISOString().slice(0, 10),
+    e_way_bill_no: "",
+    notes: "",
+  });
 
   const ordersQ = useQuery({ queryKey: ["dispatch-orders"], queryFn: dispatchApi.getOrders, staleTime: 60_000, retry: 1 });
   const tripsQ = useQuery({
@@ -36,15 +60,71 @@ function DispatchPage() {
     staleTime: 30_000,
     retry: 1,
   });
+  const customersQ = useQuery({
+    queryKey: ["masters", "customers"],
+    queryFn: () => mastersApi.getCustomers(),
+    staleTime: 60_000,
+    retry: 1,
+  });
 
   const orders: any[] = ordersQ.data ?? [];
   const tripsData: any = tripsQ.data ?? { total: 0, data: [] };
   const trips: any[] = tripsData.data ?? [];
+  const customers: any[] = customersQ.data ?? [];
 
   const pendingOrders = orders.filter((o: any) => o.status === "pending").length;
   const activeTrips = trips.filter((t: any) => ["draft", "loading"].includes(t.status)).length;
   const totalDispatched = trips.reduce((s: number, t: any) => s + (t.planned_weight_kg ?? 0), 0);
   const deliveredTrips = trips.filter((t: any) => t.status === "delivered").length;
+
+  const createTripM = useMutation({
+    mutationFn: (data: any) => dispatchApi.createTrip(data),
+    onSuccess: () => {
+      toast.success("Trip created");
+      setSheetOpen(false);
+      setForm({
+        customer_id: "",
+        vehicle_no: "",
+        driver_name: "",
+        driver_phone: "",
+        dispatch_date: new Date().toISOString().slice(0, 10),
+        e_way_bill_no: "",
+        notes: "",
+      });
+      queryClient.invalidateQueries({ queryKey: ["dispatch-trips"] });
+    },
+    onError: () => toast.error("Failed to create trip"),
+  });
+
+  const dispatchM = useMutation({
+    mutationFn: (id: string) => dispatchApi.dispatchTrip(id),
+    onSuccess: () => {
+      toast.success("Trip dispatched");
+      queryClient.invalidateQueries({ queryKey: ["dispatch-trips"] });
+    },
+    onError: () => toast.error("Failed to dispatch trip"),
+  });
+
+  const deliverM = useMutation({
+    mutationFn: (id: string) => dispatchApi.deliverTrip(id),
+    onSuccess: () => {
+      toast.success("Trip delivered");
+      queryClient.invalidateQueries({ queryKey: ["dispatch-trips"] });
+    },
+    onError: () => toast.error("Failed to deliver trip"),
+  });
+
+  function handleCreateTrip() {
+    createTripM.mutate({
+      customer_id: form.customer_id || undefined,
+      vehicle_no: form.vehicle_no || undefined,
+      driver_name: form.driver_name || undefined,
+      driver_phone: form.driver_phone || undefined,
+      dispatch_date: form.dispatch_date || undefined,
+      e_way_bill_no: form.e_way_bill_no || undefined,
+      notes: form.notes || undefined,
+    });
+  }
 
   if (!user) return null;
 
@@ -119,6 +199,28 @@ function DispatchPage() {
                 rowKey={(t) => t.id}
                 exportFilename="dispatch_trips"
                 onRowClick={(t: any) => t.id ? window.open(`/trips/${t.id}`, '_blank') : null}
+                rowActions={(t: any) => (
+                  <div className="flex gap-1">
+                    {t.status === "draft" && (
+                      <Button size="sm" onClick={() => dispatchM.mutate(t.id)} disabled={dispatchM.isPending}>
+                        {dispatchM.isPending ? <Loader2 className="size-3 animate-spin" /> : null}
+                        Dispatch
+                      </Button>
+                    )}
+                    {t.status === "dispatched" && (
+                      <Button size="sm" onClick={() => deliverM.mutate(t.id)} disabled={deliverM.isPending}>
+                        {deliverM.isPending ? <Loader2 className="size-3 animate-spin" /> : null}
+                        Deliver
+                      </Button>
+                    )}
+                  </div>
+                )}
+                toolbar={
+                  <Button size="sm" className="h-8 gap-1" onClick={() => setSheetOpen(true)}>
+                    <Plus className="size-3.5" />
+                    New Trip
+                  </Button>
+                }
               />
             </TabsContent>
 
@@ -134,6 +236,97 @@ function DispatchPage() {
             </TabsContent>
           </Tabs>
         </div>
+
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Create New Trip</SheetTitle>
+            </SheetHeader>
+            <div className="space-y-4 mt-6">
+              <div className="space-y-2">
+                <Label htmlFor="customer">Customer</Label>
+                <Select
+                  value={form.customer_id}
+                  onValueChange={(v) => setForm({ ...form, customer_id: v })}
+                >
+                  <SelectTrigger id="customer">
+                    <SelectValue placeholder="Select customer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.filter((c: any) => c?.id).map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name || c.customer_name || c.company_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vehicle_no">Vehicle No</Label>
+                <Input
+                  id="vehicle_no"
+                  value={form.vehicle_no}
+                  onChange={(e) => setForm({ ...form, vehicle_no: e.target.value })}
+                  placeholder="TN-38-AB-1234"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="driver_name">Driver Name</Label>
+                  <Input
+                    id="driver_name"
+                    value={form.driver_name}
+                    onChange={(e) => setForm({ ...form, driver_name: e.target.value })}
+                    placeholder="Driver name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="driver_phone">Driver Phone</Label>
+                  <Input
+                    id="driver_phone"
+                    value={form.driver_phone}
+                    onChange={(e) => setForm({ ...form, driver_phone: e.target.value })}
+                    placeholder="9876543210"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dispatch_date">Dispatch Date</Label>
+                <Input
+                  id="dispatch_date"
+                  type="date"
+                  value={form.dispatch_date}
+                  onChange={(e) => setForm({ ...form, dispatch_date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="eway">E-Way Bill No</Label>
+                <Input
+                  id="eway"
+                  value={form.e_way_bill_no}
+                  onChange={(e) => setForm({ ...form, e_way_bill_no: e.target.value })}
+                  placeholder="E-way bill number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  placeholder="Additional notes..."
+                  rows={3}
+                />
+              </div>
+            </div>
+            <SheetFooter className="mt-6">
+              <Button onClick={handleCreateTrip} disabled={createTripM.isPending} className="w-full">
+                {createTripM.isPending ? <Loader2 className="size-4 mr-1 animate-spin" /> : null}
+                Create Trip
+              </Button>
+            </SheetFooter>
+          </SheetContent>
+        </Sheet>
       </AccessGuard>
     </>
   );

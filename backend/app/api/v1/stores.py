@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List, Optional, Any, Dict
@@ -164,7 +164,57 @@ async def create_issue(
     db.add(issue)
     spare_result = await db.execute(select(Spare).where(Spare.id == req.item_id))
     spare = spare_result.scalar_one_or_none()
-    if spare:
-        spare.stock -= req.quantity
+    if not spare:
+        raise HTTPException(status_code=404, detail="Spare not found")
+    if spare.stock < req.quantity:
+        raise HTTPException(status_code=400, detail=f"Insufficient stock. Available: {spare.stock}, Requested: {req.quantity}")
+    spare.stock -= req.quantity
     await db.flush()
     return issue
+
+
+@router.put("/stores/spares/{spare_id}", response_model=SpareItemOut)
+async def update_spare(
+    spare_id: str,
+    req: SpareItemUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("stores", write=True)),
+):
+    result = await db.execute(select(Spare).where(Spare.id == spare_id))
+    spare = result.scalar_one_or_none()
+    if not spare:
+        raise HTTPException(status_code=404, detail="Spare not found")
+    if req.name is not None:
+        spare.name = req.name
+    if req.category is not None:
+        spare.category = req.category
+    if req.unit is not None:
+        spare.unit = req.unit
+    if req.current_stock is not None:
+        spare.stock = req.current_stock
+    if req.reorder_level is not None:
+        spare.min_stock = req.reorder_level
+    if req.location is not None:
+        spare.location = req.location
+    if req.unit_price is not None:
+        spare.unit_price = req.unit_price
+    await db.flush()
+    return spare
+
+
+@router.post("/stores/spares/{spare_id}/receive", response_model=SpareItemOut)
+async def receive_spare_stock(
+    spare_id: str,
+    req: SpareInward,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("stores", write=True)),
+):
+    result = await db.execute(select(Spare).where(Spare.id == spare_id))
+    spare = result.scalar_one_or_none()
+    if not spare:
+        raise HTTPException(status_code=404, detail="Spare not found")
+    spare.stock = (spare.stock or 0) + req.quantity
+    if req.unit_price is not None:
+        spare.unit_price = req.unit_price
+    await db.flush()
+    return spare

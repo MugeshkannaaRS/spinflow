@@ -84,6 +84,28 @@ async def confirm_order(
     )
 
 
+@router.put("/sales/orders/{so_id}", response_model=SalesOrderOut)
+async def update_order(
+    so_id: str,
+    req: SalesOrderCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("sales", write=True)),
+):
+    svc = SalesOrderService(db, current_user)
+    result = await svc.update_order(
+        so_id=so_id,
+        customer_id=req.customer_id,
+        order_date=req.order_date,
+        delivery_date=req.delivery_date,
+        yarn_count=req.yarn_count,
+        notes=req.notes,
+        incoterms=req.incoterms,
+        lines=[l.model_dump() for l in req.lines],
+        updater_id=current_user.id,
+    )
+    return result
+
+
 @router.post("/sales/orders/{so_id}/cancel", response_model=SalesOrderOut)
 async def cancel_order(
     so_id: str,

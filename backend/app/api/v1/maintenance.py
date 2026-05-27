@@ -185,6 +185,33 @@ async def bulk_create_schedules(
     return BulkResponse(created=created, skipped=skipped, errors=errors)
 
 
+@router.put("/maintenance/schedules/{schedule_id}", response_model=ScheduleOut)
+async def update_schedule(
+    schedule_id: str,
+    req: ScheduleCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance", write=True)),
+):
+    result = await db.execute(select(MaintenanceSchedule).where(MaintenanceSchedule.id == schedule_id))
+    schedule = result.scalar_one_or_none()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    if req.machine_id is not None:
+        schedule.machine_code = req.machine_id
+    if req.schedule_type is not None:
+        schedule.type = req.schedule_type
+    if req.frequency_days is not None:
+        schedule.frequency_days = req.frequency_days
+    if req.description is not None:
+        schedule.description = req.description
+    if req.last_done_date is not None:
+        schedule.last_done = req.last_done_date.isoformat()
+    if req.next_due_date is not None:
+        schedule.next_due = req.next_due_date.isoformat()
+    await db.flush()
+    return schedule
+
+
 @router.get("/maintenance/parameters")
 async def get_parameters(
     machine_code: Optional[str] = Query(None),

@@ -226,6 +226,48 @@ async def get_scan_history(
         return []
 
 
+@router.put("/dispatch/trips/{trip_id}/dispatch")
+async def dispatch_trip(
+    trip_id: str,
+    vehicle_no: str = Query(None),
+    driver_name: str = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("dispatch", write=True)),
+):
+    result = await db.execute(select(Trip).where(Trip.id == trip_id))
+    trip = result.scalar_one_or_none()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    if trip.status not in ("draft", "loading"):
+        raise HTTPException(status_code=400, detail=f"Cannot dispatch trip in status: {trip.status}")
+    trip.status = "dispatched"
+    trip.departure_at = datetime.now(timezone.utc)
+    if vehicle_no:
+        trip.vehicle_no = vehicle_no
+    if driver_name:
+        trip.driver_name = driver_name
+    await db.flush()
+    return {"id": trip.id, "status": trip.status, "message": "Trip dispatched"}
+
+
+@router.put("/dispatch/trips/{trip_id}/deliver")
+async def deliver_trip(
+    trip_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("dispatch", write=True)),
+):
+    result = await db.execute(select(Trip).where(Trip.id == trip_id))
+    trip = result.scalar_one_or_none()
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    if trip.status != "dispatched":
+        raise HTTPException(status_code=400, detail=f"Cannot deliver trip in status: {trip.status}")
+    trip.status = "delivered"
+    trip.delivered_at = datetime.now(timezone.utc)
+    await db.flush()
+    return {"id": trip.id, "status": trip.status, "message": "Trip delivered"}
+
+
 @router.get("/dispatch/summary/today")
 async def dispatch_summary(
     db: AsyncSession = Depends(get_db),

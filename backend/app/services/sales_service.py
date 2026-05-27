@@ -116,6 +116,69 @@ class SalesOrderService(BaseService[SalesOrder]):
 
         return await self._load_order(so.id)
 
+    async def update_order(
+        self,
+        so_id: str,
+        *,
+        customer_id: Optional[str] = None,
+        order_date: Optional[str] = None,
+        delivery_date: Optional[str] = None,
+        yarn_count: Optional[str] = None,
+        notes: Optional[str] = None,
+        incoterms: Optional[str] = None,
+        lines: Optional[List[dict]] = None,
+        updater_id: str = "",
+    ) -> dict:
+        result = await self.db.execute(
+            select(SalesOrder)
+            .options(selectinload(SalesOrder.lines))
+            .where(SalesOrder.id == so_id)
+        )
+        so = result.scalar_one_or_none()
+        if not so:
+            raise SpinFlowException.not_found("SalesOrder")
+
+        if customer_id is not None:
+            so.customer_id = customer_id
+        if order_date is not None:
+            so.order_date = order_date
+        if delivery_date is not None:
+            so.delivery_date = delivery_date
+        if yarn_count is not None:
+            so.yarn_count = yarn_count
+        if notes is not None:
+            so.notes = notes
+        if incoterms is not None:
+            so.incoterms = incoterms
+
+        if lines is not None:
+            for old_line in so.lines:
+                await self.db.delete(old_line)
+            total_bags = sum(l["bags_ordered"] for l in lines)
+            total_weight = sum(l["weight_kg"] for l in lines)
+            so.total_bags = total_bags
+            so.total_weight_kg = total_weight
+            if lines and lines[0].get("rate_per_kg"):
+                so.rate_per_kg = lines[0]["rate_per_kg"]
+                so.total_value = total_weight * so.rate_per_kg
+            else:
+                so.rate_per_kg = None
+                so.total_value = None
+            for l in lines:
+                line = SalesOrderLine(
+                    so_id=so.id,
+                    lot_id=l["lot_id"],
+                    warehouse_id=l["warehouse_id"],
+                    bags_ordered=l["bags_ordered"],
+                    weight_kg=l["weight_kg"],
+                    rate_per_kg=l.get("rate_per_kg"),
+                    line_amount=(l.get("rate_per_kg") or 0) * l["weight_kg"] if l.get("rate_per_kg") else None,
+                )
+                self.db.add(line)
+
+        await self.db.flush()
+        return await self._load_order(so.id)
+
     async def confirm_order(
         self,
         so_id: str,

@@ -75,6 +75,29 @@ async def create_invoice(
     return invoice
 
 
+@router.put("/accounts/invoices/{invoice_id}", response_model=InvoiceOut)
+async def update_invoice(
+    invoice_id: str,
+    req: InvoiceCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("accounts", write=True)),
+):
+    result = await db.execute(select(Invoice).where(Invoice.id == invoice_id))
+    invoice = result.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    if req.party_name is not None:
+        invoice.customer_name = req.party_name
+    if req.invoice_date is not None:
+        invoice.date = req.invoice_date.isoformat()
+    if req.taxable_amount is not None:
+        invoice.amount = req.taxable_amount
+    if req.due_date is not None:
+        invoice.due_date = req.due_date.isoformat()
+    await db.flush()
+    return invoice
+
+
 @router.get("/accounts/receivables")
 async def get_receivables(
     page: int = Query(1, ge=1),

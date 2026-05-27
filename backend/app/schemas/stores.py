@@ -40,6 +40,9 @@ class SpareItemOut(BaseModel):
 
 
 class SpareItemUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    unit: Optional[str] = None
     current_stock: Optional[float] = None
     reorder_level: Optional[float] = None
     unit_price: Optional[float] = None

@@ -27,11 +27,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+} from "@/components/ui/sheet";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil } from "lucide-react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/production")({
@@ -47,6 +55,16 @@ const DEPARTMENTS = [
   "Ring Frame",
   "Winding",
   "Quality",
+];
+
+const MACHINE_TYPES = [
+  "Ring Frame",
+  "Carding",
+  "Drawing",
+  "Simplex",
+  "Winding",
+  "Blowroom",
+  "Other",
 ];
 
 type GridRow = {
@@ -462,6 +480,78 @@ function ProductionPage() {
     staleTime: 60_000,
     retry: 1,
   });
+  const qc = useQueryClient();
+
+  // Shift entry approve/reject
+  const approveEntryMutation = useMutation({
+    mutationFn: (id: string) => productionApi.approveEntry(id),
+    onSuccess: () => {
+      toast.success("Entry approved");
+      qc.invalidateQueries({ queryKey: ["shifts"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+  const rejectEntryMutation = useMutation({
+    mutationFn: (id: string) => productionApi.rejectEntry(id),
+    onSuccess: () => {
+      toast.success("Entry rejected");
+      qc.invalidateQueries({ queryKey: ["shifts"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  // Downtime form
+  const [downtimeOpen, setDowntimeOpen] = useState(false);
+  const [dtForm, setDtForm] = useState({
+    machine_id: "",
+    start_time: "",
+    end_time: "",
+    reason: "",
+    category: "",
+    notes: "",
+  });
+  const createDowntimeMutation = useMutation({
+    mutationFn: (data: any) => productionApi.createDowntime(data),
+    onSuccess: () => {
+      toast.success("Downtime logged");
+      setDowntimeOpen(false);
+      setDtForm({ machine_id: "", start_time: "", end_time: "", reason: "", category: "", notes: "" });
+      qc.invalidateQueries({ queryKey: ["downtime"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  // Machine edit
+  const [machineEditOpen, setMachineEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    code: "", name: "", type: "", make: "", model: "", capacity: "", status: "",
+  });
+  const [editMachineId, setEditMachineId] = useState<string | null>(null);
+  const updateMachineMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      productionApi.updateMachineStatus(id, data),
+    onSuccess: () => {
+      toast.success("Machine updated");
+      setMachineEditOpen(false);
+      qc.invalidateQueries({ queryKey: ["machines"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  // Machine deactivate
+  const deactivateMachineMutation = useMutation({
+    mutationFn: (id: string) => productionApi.updateMachineStatus(id, { status: "idle" }),
+    onSuccess: () => {
+      toast.success("Machine deactivated");
+      qc.invalidateQueries({ queryKey: ["machines"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+  const handleDeactivateMachine = (m: any) => {
+    if (window.confirm(`Deactivate machine ${m.code}?`)) {
+      deactivateMachineMutation.mutate(m.id);
+    }
+  };
 
   const machines = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[];
   const shifts = (Array.isArray(shiftsQ.data) ? shiftsQ.data : (shiftsQ.data?.data ?? [])) as any[];
@@ -601,9 +691,122 @@ function ProductionPage() {
                     loading={machinesQ.isLoading}
                     rowKey={(m: any) => m.id}
                     exportFilename="machines"
+                    actions={(m: any) => (
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditForm({
+                              code: m.code ?? "",
+                              name: m.name ?? "",
+                              type: m.type ?? "",
+                              make: m.make ?? "",
+                              model: m.model ?? "",
+                              capacity: m.capacity ?? "",
+                              status: m.current_status ?? m.status ?? "",
+                            });
+                            setEditMachineId(m.id);
+                            setMachineEditOpen(true);
+                          }}
+                        >
+                          <Pencil className="size-3 mr-1" /> Edit
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDeactivateMachine(m)}
+                        >
+                          Deactivate
+                        </Button>
+                      </div>
+                    )}
                   />
                 </CardContent>
               </Card>
+              <Sheet open={machineEditOpen} onOpenChange={setMachineEditOpen}>
+                <SheetContent side="right" className="w-96">
+                  <SheetHeader>
+                    <SheetTitle>Edit Machine</SheetTitle>
+                  </SheetHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Code</Label>
+                      <Input
+                        value={editForm.code}
+                        onChange={(e) => setEditForm((p) => ({ ...p, code: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Name</Label>
+                      <Input
+                        value={editForm.name}
+                        onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Type</Label>
+                      <Select
+                        value={editForm.type}
+                        onValueChange={(v) => setEditForm((p) => ({ ...p, type: v }))}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                        <SelectContent>
+                          {MACHINE_TYPES.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Make</Label>
+                      <Input
+                        value={editForm.make}
+                        onChange={(e) => setEditForm((p) => ({ ...p, make: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Model</Label>
+                      <Input
+                        value={editForm.model}
+                        onChange={(e) => setEditForm((p) => ({ ...p, model: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Capacity</Label>
+                      <Input
+                        value={editForm.capacity}
+                        onChange={(e) => setEditForm((p) => ({ ...p, capacity: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select
+                        value={editForm.status}
+                        onValueChange={(v) => setEditForm((p) => ({ ...p, status: v }))}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="running">Active</SelectItem>
+                          <SelectItem value="idle">Idle</SelectItem>
+                          <SelectItem value="breakdown">Breakdown</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <SheetFooter>
+                    <Button
+                      onClick={() =>
+                        editMachineId &&
+                        updateMachineMutation.mutate({ id: editMachineId, data: editForm })
+                      }
+                      disabled={updateMachineMutation.isPending}
+                    >
+                      {updateMachineMutation.isPending ? "Saving…" : "Save"}
+                    </Button>
+                  </SheetFooter>
+                </SheetContent>
+              </Sheet>
             </TabsContent>
 
             <TabsContent value="shifts">
@@ -627,6 +830,28 @@ function ProductionPage() {
                     loading={shiftsQ.isLoading}
                     rowKey={(s: any) => s.id}
                     exportFilename="shift_entries"
+                    actions={(s: any) =>
+                      s.status === "pending" ? (
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() => approveEntryMutation.mutate(s.id)}
+                            disabled={approveEntryMutation.isPending}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => rejectEntryMutation.mutate(s.id)}
+                            disabled={rejectEntryMutation.isPending}
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      ) : null
+                    }
                   />
                 </CardContent>
               </Card>
@@ -634,7 +859,12 @@ function ProductionPage() {
 
             <TabsContent value="downtime">
               <Card>
-                <CardHeader><CardTitle className="text-base">Downtime Logs</CardTitle></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">Downtime Logs</CardTitle>
+                  <Button size="sm" onClick={() => setDowntimeOpen(true)}>
+                    <Plus className="size-3.5 mr-1" /> Log Downtime
+                  </Button>
+                </CardHeader>
                 <CardContent>
                   <DataTable
                     tableId="production_downtime"
@@ -652,6 +882,86 @@ function ProductionPage() {
                   />
                 </CardContent>
               </Card>
+              <Sheet open={downtimeOpen} onOpenChange={setDowntimeOpen}>
+                <SheetContent side="right" className="w-96">
+                  <SheetHeader>
+                    <SheetTitle>Log Downtime</SheetTitle>
+                  </SheetHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Machine</Label>
+                      <Select
+                        value={dtForm.machine_id}
+                        onValueChange={(v) => setDtForm((p) => ({ ...p, machine_id: v }))}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Select machine" /></SelectTrigger>
+                        <SelectContent>
+                          {machines.map((m: any) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.code} — {m.name ?? ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Start Time</Label>
+                      <Input
+                        type="datetime-local"
+                        value={dtForm.start_time}
+                        onChange={(e) => setDtForm((p) => ({ ...p, start_time: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End Time</Label>
+                      <Input
+                        type="datetime-local"
+                        value={dtForm.end_time}
+                        onChange={(e) => setDtForm((p) => ({ ...p, end_time: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Reason</Label>
+                      <Input
+                        value={dtForm.reason}
+                        onChange={(e) => setDtForm((p) => ({ ...p, reason: e.target.value }))}
+                        placeholder="Reason for downtime"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Category</Label>
+                      <Select
+                        value={dtForm.category}
+                        onValueChange={(v) => setDtForm((p) => ({ ...p, category: v }))}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Mechanical">Mechanical</SelectItem>
+                          <SelectItem value="Electrical">Electrical</SelectItem>
+                          <SelectItem value="Power">Power</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Notes</Label>
+                      <Textarea
+                        value={dtForm.notes}
+                        onChange={(e) => setDtForm((p) => ({ ...p, notes: e.target.value }))}
+                        placeholder="Additional notes…"
+                      />
+                    </div>
+                  </div>
+                  <SheetFooter>
+                    <Button
+                      onClick={() => createDowntimeMutation.mutate(dtForm)}
+                      disabled={createDowntimeMutation.isPending}
+                    >
+                      {createDowntimeMutation.isPending ? "Saving…" : "Save"}
+                    </Button>
+                  </SheetFooter>
+                </SheetContent>
+              </Sheet>
             </TabsContent>
           </Tabs>
         </div>

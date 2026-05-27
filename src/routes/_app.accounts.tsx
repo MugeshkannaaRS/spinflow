@@ -1,14 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { accountsApi, financeApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { AccessGuard } from "@/components/AccessGuard";
 import { Topbar } from "@/components/layout/Topbar";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -17,6 +19,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetClose,
+  SheetFooter,
+} from "@/components/ui/sheet";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 import { useState } from "react";
 import {
   Receipt,
@@ -25,6 +37,9 @@ import {
   CheckCircle2,
   TrendingUp,
   TrendingDown,
+  Plus,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 
@@ -61,6 +76,26 @@ function AccountsPage() {
     .reduce((s, i) => s + (i.total ?? 0), 0);
   const outstandingTotal = (receivables as any[]).reduce((s, r) => s + (r.outstanding ?? 0), 0);
   const overdueCount = (receivables as any[]).filter((r) => r.status === "overdue").length;
+  const qc = useQueryClient();
+  const [invSlideOpen, setInvSlideOpen] = useState(false);
+  const [editingInv, setEditingInv] = useState<any>(null);
+
+  const deleteM = useMutation({
+    mutationFn: (id: string) => accountsApi.deleteInvoice(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+      toast.success("Invoice deleted");
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? "Failed to delete invoice");
+    },
+  });
+
+  const handleEdit = (inv: any) => { setEditingInv(inv); setInvSlideOpen(true); };
+  const handleNew = () => { setEditingInv(null); setInvSlideOpen(true); };
+  const handleDelete = (inv: any) => {
+    if (window.confirm(`Delete invoice ${inv.invoiceNo ?? ""}?`)) deleteM.mutate(inv.id);
+  };
 
   if (!user) return null;
 
@@ -162,6 +197,21 @@ function AccountsPage() {
                     loading={invQ.isLoading}
                     rowKey={(inv) => inv.id}
                     exportFilename="invoices"
+                    toolbar={
+                      <Button size="sm" className="h-8 text-xs gap-1" onClick={handleNew}>
+                        <Plus className="size-3.5" /> New Invoice
+                      </Button>
+                    }
+                    rowActions={(inv: any) => (
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="size-7" onClick={() => handleEdit(inv)}>
+                          <Pencil className="size-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => handleDelete(inv)}>
+                          <Trash2 className="size-3" />
+                        </Button>
+                      </div>
+                    )}
                   />
                 </CardContent>
               </Card>
@@ -198,7 +248,241 @@ function AccountsPage() {
           </Tabs>
         </div>
       </AccessGuard>
+      <InvoiceSlideOver
+        open={invSlideOpen}
+        onOpenChange={(open) => { setInvSlideOpen(open); if (!open) setEditingInv(null); }}
+        invoice={editingInv}
+      />
     </>
+  );
+}
+
+interface InvItem {
+  description: string;
+  hsn: string;
+  qty: number;
+  rate: number;
+  amount: number;
+}
+
+function InvoiceSlideOver({ open, onOpenChange, invoice }: { open: boolean; onOpenChange: (v: boolean) => void; invoice?: any }) {
+  const qc = useQueryClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [customerName, setCustomerName] = useState(invoice?.customer ?? "");
+  const [invoiceDate, setInvoiceDate] = useState(invoice?.date ?? today);
+  const [invoiceType, setInvoiceType] = useState(invoice?.type ?? "sale");
+  const [items, setItems] = useState<InvItem[]>(
+    invoice?.items?.length > 0
+      ? invoice.items.map((it: any) => ({
+          description: it.description ?? "",
+          hsn: it.hsn ?? "",
+          qty: it.qty ?? 1,
+          rate: it.rate ?? 0,
+          amount: (it.qty ?? 1) * (it.rate ?? 0),
+        }))
+      : [{ description: "", hsn: "", qty: 1, rate: 0, amount: 0 }],
+  );
+  const [cgst, setCgst] = useState(invoice?.cgst ?? 0);
+  const [sgst, setSgst] = useState(invoice?.sgst ?? 0);
+  const [igst, setIgst] = useState(invoice?.igst ?? 0);
+  const [dueDate, setDueDate] = useState(invoice?.dueDate ?? "");
+  const [paymentStatus, setPaymentStatus] = useState(invoice?.status ?? "unpaid");
+  const [notes, setNotes] = useState(invoice?.notes ?? "");
+
+  const subTotal = items.reduce((s, it) => s + it.amount, 0);
+  const total = subTotal + (cgst || 0) + (sgst || 0) + (igst || 0);
+
+  const m = useMutation({
+    mutationFn: (data: any) =>
+      invoice ? accountsApi.updateInvoice(invoice.id, data) : accountsApi.createInvoice(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["invoices"] });
+      toast.success(invoice ? "Invoice updated" : "Invoice created");
+      onOpenChange(false);
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? "Failed to save invoice");
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    m.mutate({
+      customer: customerName,
+      date: invoiceDate,
+      type: invoiceType,
+      items: items.map((it) => ({
+        description: it.description,
+        hsn: it.hsn,
+        qty: it.qty,
+        rate: it.rate,
+        amount: it.amount,
+      })),
+      sub_total: subTotal,
+      cgst,
+      sgst,
+      igst,
+      total,
+      due_date: dueDate,
+      status: paymentStatus,
+      notes,
+    });
+  };
+
+  const addItem = () => setItems([...items, { description: "", hsn: "", qty: 1, rate: 0, amount: 0 }]);
+
+  const removeItem = (idx: number) => {
+    if (items.length > 1) setItems(items.filter((_, i) => i !== idx));
+  };
+
+  const updateItem = (idx: number, field: keyof InvItem, value: string | number) => {
+    setItems(
+      items.map((it, i) => {
+        if (i !== idx) return it;
+        const updated = { ...it, [field]: field === "qty" || field === "rate" ? Number(value) : value };
+        if (field === "qty") updated.amount = Number(value) * it.rate;
+        else if (field === "rate") updated.amount = it.qty * Number(value);
+        return updated;
+      }),
+    );
+  };
+
+  const canSubmit = customerName.trim() && invoiceDate;
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>{invoice ? "Edit Invoice" : "New Invoice"}</SheetTitle>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="space-y-4 mt-6">
+          <div className="space-y-1">
+            <Label>Customer Name *</Label>
+            <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Customer name" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Invoice Date *</Label>
+              <Input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Invoice Type</Label>
+              <Select value={invoiceType} onValueChange={setInvoiceType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sale">Sale</SelectItem>
+                  <SelectItem value="purchase">Purchase</SelectItem>
+                  <SelectItem value="debit_note">Debit Note</SelectItem>
+                  <SelectItem value="credit_note">Credit Note</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Items</Label>
+            {items.map((it, idx) => (
+              <div key={idx} className="flex gap-1.5 items-start">
+                <Input
+                  placeholder="Description *"
+                  value={it.description}
+                  onChange={(e) => updateItem(idx, "description", e.target.value)}
+                  className="h-8 text-xs flex-1 min-w-0"
+                />
+                <Input
+                  placeholder="HSN"
+                  value={it.hsn}
+                  onChange={(e) => updateItem(idx, "hsn", e.target.value)}
+                  className="h-8 text-xs w-16 shrink-0"
+                />
+                <Input
+                  type="number"
+                  placeholder="Qty"
+                  value={it.qty}
+                  onChange={(e) => updateItem(idx, "qty", e.target.value)}
+                  className="h-8 text-xs w-16 shrink-0"
+                />
+                <Input
+                  type="number"
+                  placeholder="Rate"
+                  value={it.rate}
+                  onChange={(e) => updateItem(idx, "rate", e.target.value)}
+                  className="h-8 text-xs w-20 shrink-0"
+                />
+                <div className="h-8 flex items-center text-xs font-medium tabular-nums w-20 shrink-0 justify-end">
+                  ₹{it.amount.toFixed(2)}
+                </div>
+                <Button type="button" variant="ghost" size="icon" className="size-8 shrink-0" onClick={() => removeItem(idx)} disabled={items.length === 1}>
+                  <Trash2 className="size-3" />
+                </Button>
+              </div>
+            ))}
+            <Button type="button" variant="outline" size="sm" onClick={addItem} className="text-xs">
+              <Plus className="size-3 mr-1" /> Add Item
+            </Button>
+          </div>
+
+          <div className="flex justify-between text-sm font-medium border-t pt-2">
+            <span>Sub Total</span>
+            <span>₹{subTotal.toFixed(2)}</span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <Label>CGST (₹)</Label>
+              <Input type="number" value={cgst} onChange={(e) => setCgst(+e.target.value)} className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label>SGST (₹)</Label>
+              <Input type="number" value={sgst} onChange={(e) => setSgst(+e.target.value)} className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label>IGST (₹)</Label>
+              <Input type="number" value={igst} onChange={(e) => setIgst(+e.target.value)} className="h-8 text-xs" />
+            </div>
+          </div>
+
+          <div className="flex justify-between text-sm font-semibold border-t pt-2">
+            <span>Total</span>
+            <span>₹{total.toFixed(2)}</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Due Date</Label>
+              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label>Payment Status</Label>
+              <Select value={paymentStatus} onValueChange={setPaymentStatus}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unpaid" className="text-xs">Unpaid</SelectItem>
+                  <SelectItem value="paid" className="text-xs">Paid</SelectItem>
+                  <SelectItem value="partial" className="text-xs">Partial</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label>Notes</Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" className="text-xs" />
+          </div>
+
+          <SheetFooter className="pt-2">
+            <SheetClose asChild>
+              <Button type="button" variant="outline" size="sm">Cancel</Button>
+            </SheetClose>
+            <Button type="submit" size="sm" disabled={!canSubmit || m.isPending}>
+              {m.isPending ? "Saving..." : invoice ? "Update Invoice" : "Create Invoice"}
+            </Button>
+          </SheetFooter>
+        </form>
+      </SheetContent>
+    </Sheet>
   );
 }
 
