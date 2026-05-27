@@ -58,6 +58,7 @@ import {
   Check,
   X,
   Blocks,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
@@ -736,10 +737,6 @@ function UsersPage() {
           }}
         >
           <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>Module Overrides — {modulesUser?.full_name}</SheetTitle>
-              <SheetDescription>Override module access for this user.</SheetDescription>
-            </SheetHeader>
             {modulesUser && (
               <UserModulesPanel
                 user={modulesUser}
@@ -786,10 +783,11 @@ function UserModulesPanel({ user, onClose }: { user: any; onClose: () => void })
   });
   const [modules, setModules] = useState<Record<string, boolean>>({});
   const [initialized, setInitialized] = useState(false);
+  const companyName = modulesQ.data?.company_name ?? "Unknown Company";
 
   useMemo(() => {
-    if (modulesQ.data && !initialized) {
-      setModules(modulesQ.data);
+    if (modulesQ.data?.modules && !initialized) {
+      setModules(modulesQ.data.modules);
       setInitialized(true);
     }
   }, [modulesQ.data, initialized]);
@@ -805,22 +803,32 @@ function UserModulesPanel({ user, onClose }: { user: any; onClose: () => void })
   });
 
   return (
-    <div className="mt-4 space-y-4">
-      {ALL_USER_MODULES.map((mod) => (
-        <div key={mod} className="flex items-center justify-between py-2 border-b last:border-0">
-          <Label>{USER_MODULE_LABELS[mod]}</Label>
-          <Switch
-            checked={modules[mod] ?? false}
-            disabled={updateM.isPending}
-            onCheckedChange={(v) => setModules((prev) => ({ ...prev, [mod]: v }))}
-          />
-        </div>
-      ))}
-      <SheetFooter>
-        <Button onClick={() => updateM.mutate()} disabled={updateM.isPending}>
-          {updateM.isPending ? "Saving…" : "Save"}
-        </Button>
-      </SheetFooter>
-    </div>
+    <>
+      <SheetHeader>
+        <SheetTitle>Module Access — {companyName}</SheetTitle>
+        <SheetDescription>These settings apply to ALL users in {companyName}</SheetDescription>
+      </SheetHeader>
+      <div className="mt-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md p-3 text-sm text-amber-800 dark:text-amber-300 flex items-start gap-2">
+        <AlertTriangle className="size-4 shrink-0 mt-0.5" />
+        <span>Changing modules here affects all users in this company.</span>
+      </div>
+      <div className="mt-4 space-y-4">
+        {ALL_USER_MODULES.map((mod) => (
+          <div key={mod} className="flex items-center justify-between py-2 border-b last:border-0">
+            <Label>{USER_MODULE_LABELS[mod]}</Label>
+            <Switch
+              checked={modules[mod] ?? false}
+              disabled={updateM.isPending}
+              onCheckedChange={(v) => setModules((prev) => ({ ...prev, [mod]: v }))}
+            />
+          </div>
+        ))}
+        <SheetFooter>
+          <Button onClick={() => updateM.mutate()} disabled={updateM.isPending}>
+            {updateM.isPending ? "Saving\u2026" : "Save"}
+          </Button>
+        </SheetFooter>
+      </div>
+    </>
   );
 }

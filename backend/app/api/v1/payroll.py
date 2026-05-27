@@ -25,7 +25,7 @@ async def get_payroll_months(
     mill_id: str = Query(...),
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_module("hr")),
+    current_user: User = Depends(require_module("payroll")),
 ):
     scope = await get_mill_scope(current_user)
     if scope["mill_id"]:
@@ -47,7 +47,7 @@ async def get_payroll_months(
 async def process_payroll(
     req: PayrollProcessRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_module("hr", write=True)),
+    current_user: User = Depends(require_module("payroll", write=True)),
 ):
     svc = PayrollService(db, current_user)
     return await svc.process_payroll(
@@ -63,7 +63,7 @@ async def process_payroll(
 async def approve_payroll(
     payroll_month_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_module("hr", write=True)),
+    current_user: User = Depends(require_module("payroll", write=True)),
 ):
     svc = PayrollService(db, current_user)
     return await svc.approve_payroll(
@@ -77,7 +77,7 @@ async def approve_payroll(
 async def mark_paid(
     payroll_month_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_module("hr", write=True)),
+    current_user: User = Depends(require_module("payroll", write=True)),
 ):
     svc = PayrollService(db, current_user)
     return await svc.mark_paid(payroll_month_id, user_id=current_user.id)
@@ -88,7 +88,7 @@ async def get_payslips(
     payroll_month_id: str,
     department: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_module("hr")),
+    current_user: User = Depends(require_module("payroll")),
 ):
     scope = await get_mill_scope(current_user)
     pm = await db.get(PayrollMonth, payroll_month_id)
@@ -113,7 +113,7 @@ async def get_employee_payslip(
     month: int = Query(...),
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_module("hr")),
+    current_user: User = Depends(require_module("payroll")),
 ):
     scope = await get_mill_scope(current_user)
     if scope["mill_id"]:
@@ -135,7 +135,7 @@ async def payroll_summary(
     mill_id: str = Query(...),
     year: int = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_module("hr")),
+    current_user: User = Depends(require_module("payroll")),
 ):
     scope = await get_mill_scope(current_user)
     if scope["mill_id"]:
