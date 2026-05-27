@@ -513,6 +513,7 @@ function CompanyModulesSheet({ company }: { company: Company }) {
   const modulesQ = useQuery({
     queryKey: ["company-modules", company.id],
     queryFn: () => adminApi.getCompanyModules(company.id),
+    staleTime: 60_000,
   });
   const [modules, setModules] = useState<Record<string, boolean>>({});
   const [initialized, setInitialized] = useState(false);
@@ -581,6 +582,7 @@ function ModuleManagerTab() {
   const modulesQ = useQuery({
     queryKey: ["company-modules", selectedCompanyId],
     queryFn: () => adminApi.getCompanyModules(selectedCompanyId),
+    staleTime: 60_000,
     enabled: !!selectedCompanyId,
   });
   const [modules, setModules] = useState<Record<string, boolean>>({});

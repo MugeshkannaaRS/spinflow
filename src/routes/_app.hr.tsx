@@ -1698,6 +1698,7 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
   const { data: attendanceData, isLoading, refetch } = useQuery({
     queryKey: ["hr-attendance", month, year, deptFilter],
     queryFn: () => hrApi.getAttendance({ month, year, department: deptFilter !== "all" ? deptFilter : undefined }),
+    staleTime: 60_000,
   });
 
   const attendanceRows: AttendanceRow[] = Array.isArray(attendanceData) ? attendanceData : (attendanceData?.data ?? []);
@@ -2055,6 +2056,7 @@ function PayrollTab({ employees, canEdit, millId, userRole }: { employees: Emplo
   const { data: payrollData, isLoading, refetch } = useQuery({
     queryKey: ["hr-payroll", month, year],
     queryFn: () => hrApi.getPayroll({ month, year, mill_id: millId }),
+    staleTime: 60_000,
   });
 
   const payroll: PayrollRow[] = Array.isArray(payrollData) ? payrollData : (payrollData?.data ?? []);

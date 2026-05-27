@@ -181,6 +181,7 @@ export const maintenanceApi = {
 // Dashboard
 export const dashboardApi = {
   getKpis: (millId: string) => api.get(`/dashboard/kpis?mill_id=${millId}`).then((r) => r.data),
+  getSummary: () => api.get("/dashboard/summary").then((r) => r.data),
   getSetupStatus: (millId: string) =>
     api.get(`/dashboard/setup-status?mill_id=${millId}`).then((r) => r.data),
 };

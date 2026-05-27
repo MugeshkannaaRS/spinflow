@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, case
@@ -13,6 +13,8 @@ from app.models.quality import QualityTest
 from app.models.dispatch import Dispatch
 from app.models.hr import Employee, Attendance
 from app.models.masters import Department, Customer, Mill
+from app.models.lotrac import Trip
+from app.models.inventory import Lot
 
 router = APIRouter()
 
@@ -325,3 +327,66 @@ async def get_setup_status(
         "users": await count(User),
         "customers": await count(Customer),
     }
+
+
+@router.get("/dashboard/summary")
+async def get_dashboard_summary(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("dashboard")),
+):
+    scope = await get_mill_scope(current_user)
+    mill_id = scope.get("mill_id")
+    company_id = scope.get("company_id")
+    today = date.today()
+
+    results = {}
+
+    try:
+        q = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
+        if mill_id:
+            q = q.where(ProductionEntry.mill_id == mill_id)
+        if company_id and not mill_id:
+            q = q.join(Mill).where(Mill.company_id == company_id)
+        q = q.where(func.date(ProductionEntry.date) == today)
+        results["production_today"] = float((await db.execute(q)).scalar() or 0)
+    except Exception:
+        results["production_today"] = 0
+
+    try:
+        q = select(func.count(MaintenanceLog.id)).where(MaintenanceLog.status == "open")
+        if mill_id:
+            q = q.where(MaintenanceLog.mill_id == mill_id)
+        results["active_breakdowns"] = int((await db.execute(q)).scalar() or 0)
+    except Exception:
+        results["active_breakdowns"] = 0
+
+    try:
+        q = select(func.count(Trip.id)).where(Trip.status == "pending")
+        if mill_id:
+            q = q.where(Trip.mill_id == mill_id)
+        results["pending_dispatch"] = int((await db.execute(q)).scalar() or 0)
+    except Exception:
+        results["pending_dispatch"] = 0
+
+    try:
+        q = select(func.count(Employee.id)).where(Employee.is_active == True)
+        if mill_id:
+            q = q.where(Employee.mill_id == mill_id)
+        results["total_employees"] = int((await db.execute(q)).scalar() or 0)
+    except Exception:
+        results["total_employees"] = 0
+
+    try:
+        q = select(func.count(Lot.id)).where(Lot.status == "in-stock")
+        if mill_id:
+            q = q.where(Lot.mill_id == mill_id)
+        results["stock_lots"] = int((await db.execute(q)).scalar() or 0)
+    except Exception:
+        results["stock_lots"] = 0
+
+    results.setdefault("efficiency_today", 0)
+    results.setdefault("quality_rejection", 0)
+    results.setdefault("target_achievement", 0)
+    results.setdefault("production_target", 3000)
+
+    return results

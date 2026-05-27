@@ -1,14 +1,27 @@
 import axios from "axios";
 import { useAuth } from "@/stores/auth";
+import { toast } from "sonner";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://spinflow.onrender.com";
 export { API_BASE };
 
 export const api = axios.create({
   baseURL: API_BASE ? `${API_BASE}/api/v1` : "/api/v1",
-  timeout: 30000,
+  timeout: 60000,
   headers: { "Content-Type": "application/json" },
 });
+
+let slowToastId: string | number | null = null;
+let slowRequestTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearSlowRequest() {
+  if (slowRequestTimer) clearTimeout(slowRequestTimer);
+  slowRequestTimer = null;
+  if (slowToastId) {
+    toast.dismiss(slowToastId);
+    slowToastId = null;
+  }
+}
 
 api.interceptors.request.use((config) => {
   const state = useAuth.getState();
@@ -16,12 +29,20 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  clearSlowRequest();
+  slowRequestTimer = setTimeout(() => {
+    slowToastId = toast.info("Loading... (server is starting up, please wait)");
+  }, 3000);
   return config;
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    clearSlowRequest();
+    return response;
+  },
   async (error) => {
+    clearSlowRequest();
     if (error.response?.status === 401) {
       const { refreshToken, logout } = useAuth.getState();
       if (refreshToken && error.config && !error.config._retry) {
@@ -38,7 +59,6 @@ api.interceptors.response.use(
           return Promise.reject(error);
         }
       }
-      // No refresh token or already retried — clear session and redirect
       logout();
       window.location.href = "/login";
     }

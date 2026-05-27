@@ -618,6 +618,7 @@ function CompanyModulesPanel({ companyId, onClose }: { companyId: string; onClos
   const modulesQ = useQuery({
     queryKey: ["company-modules", companyId],
     queryFn: () => adminApi.getCompanyModules(companyId),
+    staleTime: 60_000,
   });
   const [modules, setModules] = useState<Record<string, boolean>>({});
   const [initialized, setInitialized] = useState(false);
@@ -669,6 +670,7 @@ function MillSettingsPanel({ millId, onClose }: { millId: string; onClose: () =>
   const settingsQ = useQuery({
     queryKey: ["mill-settings", millId],
     queryFn: () => adminApi.getMillSettings(millId),
+    staleTime: 60_000,
   });
   const [form, setForm] = useState({
     working_hours_per_day: 8,

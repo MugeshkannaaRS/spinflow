@@ -197,45 +197,7 @@ function Dashboard() {
 
   if (!user) return null;
 
-  if (isLoading) {
-    return (
-      <>
-        <Topbar title="Dashboard" subtitle="Loading..." />
-        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Card key={i}>
-                <CardContent className="p-5">
-                  <Skeleton className="h-3 w-20 mb-2" />
-                  <Skeleton className="h-7 w-28 mb-1" />
-                  <Skeleton className="h-3 w-16" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  if (isError) {
-    return (
-      <>
-        <Topbar title="Dashboard" subtitle="Error loading data" />
-        <div className="p-6 flex flex-col items-center gap-4 py-20 text-muted-foreground">
-          <AlertTriangle className="size-10" />
-          <p className="text-sm">Failed to load dashboard KPIs</p>
-          <p className="text-xs text-muted-foreground">{(error as Error)?.message}</p>
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isRefetching}>
-            <RefreshCw className={`size-3 mr-1 ${isRefetching ? "animate-spin" : ""}`} />
-            Retry
-          </Button>
-        </div>
-      </>
-    );
-  }
-
-  // Defensive defaults for all data properties
+  // Defensive defaults for all data properties — computed before error check so cards always render
   const safeData = {
     productionToday: data?.productionToday ?? 0,
     productionTarget: data?.productionTarget ?? 1,
@@ -316,6 +278,46 @@ function Dashboard() {
     }
     return Object.values(allCards);
   }, [user.role, safeData]);
+
+  if (isLoading) {
+    return (
+      <>
+        <Topbar title="Dashboard" subtitle="Loading..." />
+        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="p-5">
+                  <Skeleton className="h-3 w-20 mb-2" />
+                  <Skeleton className="h-7 w-28 mb-1" />
+                  <Skeleton className="h-3 w-16" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (isError) {
+    return (
+      <>
+        <Topbar title="Dashboard" subtitle="Could not load dashboard data" />
+        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          <div className="flex items-center gap-2 mb-2">
+            <p className="text-sm text-muted-foreground">
+              Could not load dashboard data.
+              <button onClick={() => refetch()} className="ml-2 underline font-medium">
+                Retry
+              </button>
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">{roleCards}</div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>

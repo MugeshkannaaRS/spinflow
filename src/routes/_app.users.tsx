@@ -780,6 +780,7 @@ function UserModulesPanel({ user, onClose }: { user: any; onClose: () => void })
   const modulesQ = useQuery({
     queryKey: ["user-modules", user.id],
     queryFn: () => adminApi.getUserModules(user.id),
+    staleTime: 60_000,
   });
   const [modules, setModules] = useState<Record<string, boolean>>({});
   const [initialized, setInitialized] = useState(false);
