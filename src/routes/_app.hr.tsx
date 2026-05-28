@@ -728,7 +728,9 @@ const GENDERS = ["Male", "Female", "Other"];
 
 function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
   const empColConfig = useColumnConfig("hr_employees");
+  const user = useAuth((s) => s.user);
   const qc = useQueryClient();
+  const millId = user?.millId ?? "";
   const [open, setOpen] = useState(false);
   const [section, setSection] = useState<"personal" | "job" | "salary">("personal");
 
@@ -818,6 +820,7 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
   const m = useMutation({
     mutationFn: () =>
       hrApi.createEmployee({
+        mill_id: millId,
         employee_code: form.employee_code || `EMP-${Date.now()}`,
         full_name: form.full_name,
         sl_no: form.sl_no,

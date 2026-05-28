@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { dashboardApi } from "@/lib/api-service";
+import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,7 +47,7 @@ import { useRecentActivity } from "@/hooks/useRecentActivity";
 import { cn } from "@/lib/utils";
 import { SetupGuide } from "@/components/SetupGuide";
 import { RoleGuide } from "@/components/RoleGuide";
-import { fmtNumber } from "@/lib/formatters";
+import { fmtNumber as fmt } from "@/lib/formatters";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — SpinFlow ERP" }] }),
@@ -178,57 +178,48 @@ function Dashboard() {
   const navigate = useNavigate();
   const recentActivity = useRecentActivity();
 
-  const {
-    data: rawData,
-    isLoading,
-    isError,
-    error,
-    refetch,
-    isRefetching,
-  } = useQuery({
-    queryKey: ["dashboard-kpis", user?.millId ?? ""],
-    queryFn: () => dashboardApi.getKpis(user!.millId),
-    enabled: !!user,
-    refetchInterval: 60000,
-    staleTime: 60_000,
-    retry: 1,
+  const summaryQ = useQuery({
+    queryKey: ["dashboard-summary", user?.millId ?? ""],
+    queryFn: () => api.get("/dashboard/summary").then(r => r.data),
+    enabled: !!user?.millId,
   });
 
-  const data = rawData ?? undefined;
+  const { data, isLoading, isError, error, refetch, isRefetching } = summaryQ;
+  const raw = data ?? {};
 
   if (!user) return null;
 
-  // Defensive defaults for all data properties — computed before error check so cards always render
   const safeData = {
-    productionToday: data?.productionToday ?? 0,
-    productionTarget: data?.productionTarget ?? 1,
-    efficiency: data?.efficiency ?? 0,
-    wastePercent: data?.wastePercent ?? 0,
-    activeDowntime: data?.activeDowntime ?? 0,
-    stockValue: data?.stockValue ?? 0,
-    pendingDispatch: data?.pendingDispatch ?? 0,
-    qualityRejection: data?.qualityRejection ?? 0,
-    targetAchievement: data?.targetAchievement ?? 0,
-    avgEfficiency7d: data?.avgEfficiency7d ?? 0,
-    prevWeekEfficiency: data?.prevWeekEfficiency ?? 0,
-    trend: data?.trend ?? [],
-    byDept: data?.byDept ?? [],
+    productionToday: Number(raw.production_today ?? 0),
+    productionTarget: Number(raw.production_target ?? 1),
+    efficiency: Number(raw.efficiency_today ?? 0),
+    wastePercent: Number(raw.waste_percent ?? 0),
+    activeDowntime: Number(raw.active_breakdowns ?? 0),
+    stockValue: Number(raw.stock_value ?? 0),
+    pendingDispatch: Number(raw.pending_dispatch ?? 0),
+    qualityRejection: Number(raw.quality_rejection ?? 0),
+    targetAchievement: Number(raw.target_achievement ?? 0),
+    avgEfficiency7d: Number(raw.avg_efficiency_7d ?? 0),
+    prevWeekEfficiency: Number(raw.prev_week_efficiency ?? 0),
+    totalEmployees: Number(raw.total_employees ?? 0),
+    trend: Array.isArray(raw.trend) ? raw.trend : [],
+    byDept: Array.isArray(raw.by_dept) ? raw.by_dept : [],
   };
 
   const roleCards = useMemo(() => {
     const role = user.role;
     const allCards: Record<string, React.ReactNode> = {
       productionToday: (
-        <Kpi icon={Factory} label="Production Today" value={`${fmtNumber(safeData.productionToday)} kg`} sub={`Target ${fmtNumber(safeData.productionTarget)} kg`} />
+        <Kpi icon={Factory} label="Production Today" value={`${fmt(safeData.productionToday)} kg`} sub={`Target ${fmt(safeData.productionTarget)} kg`} />
       ),
       efficiency: (
-        <Kpi icon={TrendingUp} label="Overall Efficiency" value={`${safeData.efficiency}%`} sub="Plant average" tone="success" />
+        <Kpi icon={TrendingUp} label="Overall Efficiency" value={`${safeData.efficiency.toFixed(1)}%`} sub="Plant average" tone="success" />
       ),
       activeDowntime: (
         <Kpi icon={AlertTriangle} label="Active Breakdowns" value={`${safeData.activeDowntime}`} sub="Open events" tone={safeData.activeDowntime > 0 ? "danger" : "success"} />
       ),
       avgEfficiency: (
-        <Kpi icon={TrendingUp} label="Avg Efficiency (7d)" value={`${safeData.avgEfficiency7d}%`} sub={safeData.avgEfficiency7d >= safeData.prevWeekEfficiency ? "↑ vs last week" : "↓ vs last week"} tone={safeData.avgEfficiency7d >= safeData.prevWeekEfficiency ? "success" : "warning"} />
+        <Kpi icon={TrendingUp} label="Avg Efficiency (7d)" value={`${safeData.avgEfficiency7d.toFixed(1)}%`} sub={safeData.avgEfficiency7d >= safeData.prevWeekEfficiency ? "↑ vs last week" : "↓ vs last week"} tone={safeData.avgEfficiency7d >= safeData.prevWeekEfficiency ? "success" : "warning"} />
       ),
       stockValue: (
         <Kpi icon={IndianRupee} label="Stock Value" value={`₹${(safeData.stockValue / 10000000).toFixed(2)} Cr`} sub="Cotton + Yarn" />
@@ -237,13 +228,13 @@ function Dashboard() {
         <Kpi icon={Truck} label="Pending Dispatch" value={`${safeData.pendingDispatch}`} sub="Orders" tone={safeData.pendingDispatch > 0 ? "warning" : "success"} />
       ),
       qualityRejection: (
-        <Kpi icon={AlertTriangle} label="Quality Rejection" value={`${safeData.qualityRejection}%`} sub="This week" tone={safeData.qualityRejection > 5 ? "danger" : "warning"} />
+        <Kpi icon={AlertTriangle} label="Quality Rejection" value={`${safeData.qualityRejection.toFixed(1)}%`} sub="This week" tone={safeData.qualityRejection > 5 ? "danger" : "warning"} />
       ),
       targetAchievement: (
         <Card>
           <CardContent className="p-5">
             <div className="text-xs uppercase text-muted-foreground font-medium tracking-wide">Target Achievement</div>
-            <div className="mt-3 text-2xl font-semibold tracking-tight">{safeData.targetAchievement}%</div>
+            <div className="mt-3 text-2xl font-semibold tracking-tight">{safeData.targetAchievement.toFixed(1)}%</div>
             <Progress value={Math.min(safeData.targetAchievement, 100)} className="mt-3 h-2" />
           </CardContent>
         </Card>

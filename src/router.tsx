@@ -5,12 +5,13 @@ import { routeTree } from "./routeTree.gen";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 2 * 60 * 1000,
-      gcTime: 5 * 60 * 1000,
+      staleTime: 3 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
       retry: 1,
-      retryDelay: 1000,
+      retryDelay: 2000,
       refetchOnWindowFocus: false,
-      refetchOnReconnect: true,
+      refetchOnMount: false,
+      refetchOnReconnect: false,
     },
   },
 });
