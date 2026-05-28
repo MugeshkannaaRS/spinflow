@@ -408,13 +408,17 @@ async def get_column_config(
     if not effective_mill_id:
         effective_mill_id = "default"
 
-    result = await db.execute(
-        select(ColumnConfig).where(
-            ColumnConfig.mill_id == effective_mill_id,
-            ColumnConfig.table_key == table,
-        ).order_by(ColumnConfig.updated_at.desc())
-    )
-    config = result.scalars().first()
+    try:
+        result = await db.execute(
+            select(ColumnConfig).where(
+                ColumnConfig.mill_id == effective_mill_id,
+                ColumnConfig.table_key == table,
+            ).order_by(ColumnConfig.updated_at.desc())
+        )
+        config = result.scalars().first()
+    except Exception as e:
+        logger.error(f"Error fetching column config for table={table}: {e}", exc_info=True)
+        config = None
 
     defaults = _get_default_columns(table)
 
@@ -431,15 +435,19 @@ async def get_column_config(
     except (json.JSONDecodeError, TypeError):
         parsed = []
 
-    # Build dropdown options map
-    do_result = await db.execute(
-        select(ColumnDropdownOption).where(
-            ColumnDropdownOption.mill_id == effective_mill_id,
-            ColumnDropdownOption.table_name == table,
-            ColumnDropdownOption.is_active == True,
-        ).order_by(ColumnDropdownOption.display_order)
-    )
-    dropdown_rows = do_result.scalars().all()
+    try:
+        do_result = await db.execute(
+            select(ColumnDropdownOption).where(
+                ColumnDropdownOption.mill_id == effective_mill_id,
+                ColumnDropdownOption.table_name == table,
+                ColumnDropdownOption.is_active == True,
+            ).order_by(ColumnDropdownOption.display_order)
+        )
+        dropdown_rows = do_result.scalars().all()
+    except Exception as e:
+        logger.error(f"Error fetching dropdown options for table={table}: {e}", exc_info=True)
+        dropdown_rows = []
+
     dropdown_map: dict = {}
     for d in dropdown_rows:
         if d.column_key not in dropdown_map:

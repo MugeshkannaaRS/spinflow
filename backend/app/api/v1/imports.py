@@ -41,26 +41,30 @@ async def get_import_mappings(
         if not mill or mill.company_id != scope["company_id"]:
             raise HTTPException(403, "Access denied")
 
-    result = await db.execute(
-        select(ImportMapping).where(
-            ImportMapping.mill_id == mill_id,
-            ImportMapping.table_name == table,
+    try:
+        result = await db.execute(
+            select(ImportMapping).where(
+                ImportMapping.mill_id == mill_id,
+                ImportMapping.table_name == table,
+            )
         )
-    )
-    mappings = result.scalars().all()
-    return [
-        {
-            "id": m.id,
-            "mill_id": m.mill_id,
-            "table_name": m.table_name,
-            "excel_header": m.excel_header,
-            "spinflow_field": m.spinflow_field,
-            "is_custom_field": m.is_custom_field,
-            "confidence": float(m.confidence) if m.confidence is not None else None,
-            "created_at": m.created_at.isoformat() if m.created_at else None,
-        }
-        for m in mappings
-    ]
+        mappings = result.scalars().all()
+        return [
+            {
+                "id": m.id,
+                "mill_id": m.mill_id,
+                "table_name": m.table_name,
+                "excel_header": m.excel_header,
+                "spinflow_field": m.spinflow_field,
+                "is_custom_field": m.is_custom_field,
+                "confidence": float(m.confidence) if m.confidence is not None else None,
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            }
+            for m in mappings
+        ]
+    except Exception as e:
+        logger.error(f"Error fetching import mappings for table={table}, mill={mill_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch import mappings")
 
 @router.post("/import/mappings")
 async def save_import_mappings(
@@ -77,25 +81,29 @@ async def save_import_mappings(
         if not mill or mill.company_id != scope["company_id"]:
             raise HTTPException(403, "Access denied")
 
-    await db.execute(
-        delete(ImportMapping).where(
-            ImportMapping.mill_id == req.mill_id,
-            ImportMapping.table_name == req.table_name,
+    try:
+        await db.execute(
+            delete(ImportMapping).where(
+                ImportMapping.mill_id == req.mill_id,
+                ImportMapping.table_name == req.table_name,
+            )
         )
-    )
 
-    count = 0
-    for item in req.mappings:
-        mapping = ImportMapping(
-            mill_id=req.mill_id,
-            table_name=req.table_name,
-            excel_header=item.excel_header,
-            spinflow_field=item.spinflow_field,
-            is_custom_field=item.is_custom_field,
-            confidence=item.confidence,
-        )
-        db.add(mapping)
-        count += 1
+        count = 0
+        for item in req.mappings:
+            mapping = ImportMapping(
+                mill_id=req.mill_id,
+                table_name=req.table_name,
+                excel_header=item.excel_header,
+                spinflow_field=item.spinflow_field,
+                is_custom_field=item.is_custom_field,
+                confidence=item.confidence,
+            )
+            db.add(mapping)
+            count += 1
 
-    await db.flush()
-    return {"saved": count, "mill_id": req.mill_id, "table_name": req.table_name}
+        await db.flush()
+        return {"saved": count, "mill_id": req.mill_id, "table_name": req.table_name}
+    except Exception as e:
+        logger.error(f"Error saving import mappings: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to save import mappings")

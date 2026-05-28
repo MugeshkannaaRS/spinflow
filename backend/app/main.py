@@ -58,15 +58,6 @@ app.add_exception_handler(429, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.parsed_cors_origins,
-    allow_origin_regex=r"^https://(.*\.ngrok(?:-free)?\.dev|.*\.onrender\.com)$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.add_middleware(
     TrustedHostMiddleware,
     allowed_hosts=[
         "localhost",
@@ -79,6 +70,16 @@ app.add_middleware(
         "*.ngrok.io",
         "*.ngrok-free.dev",
     ],
+)
+
+# CORS must be outermost middleware (added last) so it wraps all errors
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.parsed_cors_origins,
+    allow_origin_regex=r"^https://(.*\.ngrok(?:-free)?\.dev|.*\.onrender\.com)$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 API_PREFIX = "/api/v1"
