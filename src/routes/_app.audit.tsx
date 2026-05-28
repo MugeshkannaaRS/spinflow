@@ -14,6 +14,42 @@ export const Route = createFileRoute("/_app/audit")({
   component: AuditPage,
 });
 
+const ENTITY_LABELS: Record<string, string> = {
+  employee: "Employee",
+  attendance: "Attendance",
+  leave: "Leave",
+  payroll: "Payroll",
+  production: "Production",
+  dispatch: "Dispatch",
+  quality: "Quality",
+  purchase: "Purchase",
+  stores: "Stores",
+  accounts: "Accounts",
+  invoice: "Invoice",
+  user: "User",
+  company: "Company",
+  mill: "Mill",
+  module: "Module",
+  role: "Role",
+  maintenance: "Maintenance",
+  report: "Report",
+  settings: "Settings",
+};
+
+function fmtAuditTimestamp(ts: string): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return ts;
+  return d.toLocaleDateString("en-IN", {
+    year: "numeric", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  });
+}
+
+function humanEntity(entity: string): string {
+  return ENTITY_LABELS[entity] || entity.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 const ACTION_VARIANTS: Record<string, "default" | "destructive" | "secondary" | "outline"> = {
   login: "default",
   logout: "secondary",
@@ -25,8 +61,13 @@ const ACTION_VARIANTS: Record<string, "default" | "destructive" | "secondary" | 
 };
 
 const AUDIT_COLS: ColDef[] = [
-  { key: "timestamp", label: "Timestamp", type: "date" },
-  { key: "user", label: "User" },
+  {
+    key: "timestamp",
+    label: "Timestamp",
+    type: "date",
+    render: (l: any) => <span className="text-xs whitespace-nowrap">{fmtAuditTimestamp(l.timestamp)}</span>,
+  },
+  { key: "user_name", label: "User" },
   { key: "role", label: "Role", type: "status" },
   {
     key: "action",
@@ -41,13 +82,13 @@ const AUDIT_COLS: ColDef[] = [
     label: "Entity",
     render: (l: any) => (
       <span>
-        {l.entity}
-        <span className="font-mono text-xs text-muted-foreground ml-1">#{l.entityId}</span>
+        {humanEntity(l.entity)}
+        {l.entity_id && <span className="font-mono text-xs text-muted-foreground ml-1">#{l.entity_id}</span>}
       </span>
     ),
   },
   { key: "details", label: "Details", className: "max-w-xs truncate" },
-  { key: "ip", label: "IP Address", className: "font-mono text-xs" },
+  { key: "ip_address", label: "IP Address", className: "font-mono text-xs" },
 ];
 
 function AuditPage() {

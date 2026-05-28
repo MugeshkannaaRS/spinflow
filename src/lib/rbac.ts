@@ -158,6 +158,8 @@ export const ACCESS: Record<Role, Partial<Record<Module, true | "read">>> = {
     masters: true,
     stock: true,
     sales: true,
+    lotrac: true,
+    payroll: true,
   },
   MILL_OWNER: {
     dashboard: true,

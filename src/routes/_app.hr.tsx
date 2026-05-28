@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/useColumnConfig";
 import { fuzzyMatchColumns, parseExcelDate, filterBlankRows, normalizeShift, generateImportTemplate } from "@/lib/excel-import";
+import { validateForm } from "@/lib/formValidation";
 import { hrApi, uploadApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
@@ -724,7 +725,7 @@ function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; 
 
 // ─── Add Employee Sheet ─────────────────────────────────────────────────────────
 
-const GENDERS = ["Male", "Female", "Other"];
+const GENDERS = ["Male", "Female", "Other", "Prefer not to say"];
 
 function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
   const empColConfig = useColumnConfig("hr_employees");
@@ -810,9 +811,11 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
   }, [open]);
 
   const validate = (): boolean => {
-    const errs: Record<string, string> = {};
-    if (!form.full_name) errs.full_name = "Full name is required";
-    if (!form.department) errs.department = "Department is required";
+    const errs = validateForm(form, {
+      full_name: { required: true, minLength: 2 },
+      department: { required: true },
+      phone: { pattern: /^\+?\d{0,15}$/, patternMessage: "Invalid phone number" },
+    });
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -926,7 +929,12 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
                 </div>
                 <div className="space-y-1.5">
                   <Label>{empColConfig.getLabel('gen')}</Label>
-                  <Input value={form.gen} onChange={(e) => setForm({ ...form, gen: e.target.value })} placeholder="Male/Female" />
+                  <Select value={form.gen} onValueChange={(v) => setForm({ ...form, gen: v })}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      {GENDERS.map((g) => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -1110,9 +1118,11 @@ function EditEmployeeSheet({
   }, [open]);
 
   const validate = (): boolean => {
-    const errs: Record<string, string> = {};
-    if (!form.full_name) errs.full_name = "Full name is required";
-    if (!form.department) errs.department = "Department is required";
+    const errs = validateForm(form, {
+      full_name: { required: true, minLength: 2 },
+      department: { required: true },
+      phone: { pattern: /^\+?\d{0,15}$/, patternMessage: "Invalid phone number" },
+    });
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -1219,7 +1229,12 @@ function EditEmployeeSheet({
                 </div>
                 <div className="space-y-1.5">
                   <Label>{empColConfig.getLabel('gen')}</Label>
-                  <Input value={form.gen} onChange={(e) => setForm({ ...form, gen: e.target.value })} placeholder="Male/Female" />
+                  <Select value={form.gen} onValueChange={(v) => setForm({ ...form, gen: v })}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      {GENDERS.map((g) => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -2035,7 +2050,7 @@ function ImportAttendanceDialog({ month, year, onSuccess }: { month: number; yea
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="hr_attendance"
-        endpoint="/api/v1/hr/attendance/bulk"
+        endpoint="/api/v1/hr/attendance/bulk-import"
         onSuccess={() => onSuccess()}
         title="Import Attendance"
       />

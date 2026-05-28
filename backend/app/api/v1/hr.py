@@ -803,22 +803,35 @@ async def bulk_import_attendance(
     for i, row in enumerate(req.items):
         try:
             emp_code = str(row.get("employee_code") or "").strip()
+            emp_name = str(row.get("employee_name") or row.get("name") or "").strip()
             date_str = str(row.get("date") or "").strip()
             status_raw = str(row.get("status") or "").strip().lower()
-            if not emp_code or not date_str or not status_raw:
+            if not emp_code and not emp_name:
                 skipped += 1
-                errors.append(f"Row {i + 1}: missing employee_code, date, or status")
+                errors.append(f"Row {i + 1}: missing employee_code or employee_name")
+                continue
+            if not date_str or not status_raw:
+                skipped += 1
+                errors.append(f"Row {i + 1}: missing date or status")
                 continue
             norm_status = STATUS_MAP.get(status_raw)
             if not norm_status:
                 skipped += 1
                 errors.append(f"Row {i + 1}: unknown status '{status_raw}'")
                 continue
-            emp_result = await db.execute(select(Employee).where(Employee.code == emp_code))
-            emp = emp_result.scalar_one_or_none()
+            emp = None
+            if emp_code:
+                emp_result = await db.execute(select(Employee).where(Employee.code == emp_code))
+                emp = emp_result.scalar_one_or_none()
+                if not emp:
+                    emp_result = await db.execute(select(Employee).where(Employee.employee_id == emp_code))
+                    emp = emp_result.scalar_one_or_none()
+            if not emp and emp_name:
+                emp_result = await db.execute(select(Employee).where(Employee.name == emp_name))
+                emp = emp_result.scalar_one_or_none()
             if not emp:
                 skipped += 1
-                errors.append(f"Row {i + 1}: employee '{emp_code}' not found")
+                errors.append(f"Row {i + 1}: employee '{emp_code or emp_name}' not found")
                 continue
             if "/" in date_str:
                 parts = date_str.split("/")

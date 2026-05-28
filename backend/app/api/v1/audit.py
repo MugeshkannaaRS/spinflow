@@ -41,15 +41,15 @@ async def get_audit_logs(
     entity: Optional[str] = None,
 ):
     scope = await get_mill_scope(current_user)
-    query = select(AuditLog).where(AuditLog.action.isnot(None))
-    if scope["mill_id"] is None and scope["company_id"] is None:
-        pass  # SUPER_ADMIN sees all
-    else:
-        query = query.join(User, AuditLog.user_id == User.id)
-        if scope["mill_id"]:
-            query = query.where(User.mill_id == scope["mill_id"])
-        elif scope["company_id"]:
-            query = query.join(Mill, User.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    query = (
+        select(AuditLog, User.name.label("resolved_user_name"))
+        .outerjoin(User, AuditLog.user_id == User.id)
+        .where(AuditLog.action.isnot(None))
+    )
+    if scope["mill_id"]:
+        query = query.where(User.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        query = query.join(Mill, User.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     query = query.order_by(desc(AuditLog.created_at))
     if action:
         query = query.where(AuditLog.action == action)
@@ -62,17 +62,17 @@ async def get_audit_logs(
     logs = result.scalars().all()
     items = [
         AuditLogResponse(
-            id=log.id,
-            timestamp=log.created_at.isoformat() if log.created_at else "",
-            user_name=log.user_name,
-            role=log.role,
-            action=log.action,
-            entity=log.entity,
-            entity_id=log.entity_id,
-            details=log.details,
-            old_value=log.old_value,
-            new_value=log.new_value,
-            ip_address=log.ip_address,
+            id=log.AuditLog.id,
+            timestamp=log.AuditLog.created_at.isoformat() if log.AuditLog.created_at else "",
+            user_name=log.resolved_user_name or log.AuditLog.user_name or "System",
+            role=log.AuditLog.role,
+            action=log.AuditLog.action,
+            entity=log.AuditLog.entity,
+            entity_id=log.AuditLog.entity_id,
+            details=log.AuditLog.details,
+            old_value=log.AuditLog.old_value,
+            new_value=log.AuditLog.new_value,
+            ip_address=log.AuditLog.ip_address,
         )
         for log in logs
     ]

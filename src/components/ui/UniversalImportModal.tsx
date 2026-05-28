@@ -105,6 +105,7 @@ export function UniversalImportModal({
     errors: ImportError[];
   } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [showStep5Errors, setShowStep5Errors] = useState(false);
   const [dragging, setDragging] = useState(false);
 
   const colMap = useMemo(() => {
@@ -144,8 +145,20 @@ export function UniversalImportModal({
     }
   }, [isOpen, tableName, millId]);
 
+  async function validateExcelFile(file: File): Promise<boolean> {
+    const bytes = await file.slice(0, 4).arrayBuffer();
+    const header = new Uint8Array(bytes);
+    const isZip = header[0] === 0x50 && header[1] === 0x4B && header[2] === 0x03 && header[3] === 0x04;
+    if (!isZip) {
+      toast.error("Invalid file. Please upload a real Excel (.xlsx) file.");
+      return false;
+    }
+    return true;
+  }
+
   const handleFileRead = useCallback(
     async (f: File) => {
+      if (!(await validateExcelFile(f))) return;
       const buf = await f.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
@@ -313,6 +326,11 @@ export function UniversalImportModal({
         }
       }
 
+      const tableRule = TABLE_RULES[tableName];
+      if (tableRule) {
+        errors.push(...tableRule(record, colConfigArr));
+      }
+
       records.push({ data: record, errors, warnings });
     }
 
@@ -353,6 +371,62 @@ export function UniversalImportModal({
     [colMap],
   );
 
+  function validateNumericFields(
+    record: Record<string, any>,
+    configs: ColumnConfig[],
+    nonNegativeKeys: string[],
+  ): string[] {
+    const errs: string[] = [];
+    for (const key of nonNegativeKeys) {
+      const val = record[key];
+      if (val !== undefined && val !== null && val !== "") {
+        const num = Number(val);
+        if (!isNaN(num) && num < 0) {
+          const cfg = configs.find((c) => c.key === key);
+          errs.push(`${cfg?.label ?? key} cannot be negative`);
+        }
+      }
+    }
+    return errs;
+  }
+
+  function validateAttendanceStatus(record: Record<string, any>): string | null {
+    const status = record.status;
+    if (!status) return null;
+    const valid = ["present", "absent", "half-day", "leave", "holiday", "P", "A", "H", "CL", "SL", "EL", "OD", "WO"];
+    if (!valid.includes(String(status).toLowerCase())) {
+      return `Invalid attendance status '${status}'`;
+    }
+    return null;
+  }
+
+  function validateFutureDate(dateVal: any, label: string, refDate?: Date): string | null {
+    if (!dateVal) return null;
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return null;
+    const cutoff = refDate ?? new Date();
+    cutoff.setHours(23, 59, 59, 999);
+    if (d > cutoff) return `${label} cannot be in the future`;
+    return null;
+  }
+
+  const TABLE_RULES: Record<string, (record: Record<string, any>, configs: ColumnConfig[]) => string[]> = {
+    hr_employees: (rec, cfgs) => [
+      ...validateNumericFields(rec, cfgs, ["basic", "house_rent", "medical", "conveyance", "food_allowance", "wages", "increment", "total_salary", "mobile_bill", "shift_benefit"]),
+      ...(rec.date_of_joining ? (() => {
+        const e = validateFutureDate(rec.date_of_joining, "Date of Joining");
+        return e ? [e] : [];
+      })() : []),
+    ],
+    hr_attendance: (rec, cfgs) => [
+      ...(validateAttendanceStatus(rec) ? [validateAttendanceStatus(rec)!] : []),
+      ...(rec.date ? (() => {
+        const e = validateFutureDate(rec.date, "Date");
+        return e ? [e] : [];
+      })() : []),
+    ],
+  };
+
   const validateRecord = useCallback(
     (record: Record<string, any>): { errors: string[]; warnings: string[] } => {
       const errors: string[] = [];
@@ -365,9 +439,13 @@ export function UniversalImportModal({
           }
         }
       }
+      const tableRule = TABLE_RULES[tableName];
+      if (tableRule) {
+        errors.push(...tableRule(record, colConfigs));
+      }
       return { errors, warnings };
     },
-    [colConfigs],
+    [colConfigs, tableName],
   );
 
   const FIELD_MAP: Record<string, Record<string, string>> = {
@@ -375,6 +453,10 @@ export function UniversalImportModal({
       name: "full_name",
       employee_id: "employee_code",
       joining_date: "date_of_joining",
+    },
+    hr_attendance: {
+      employee_code: "employee_id",
+      employee_name: "employee_name",
     },
     stores_spares: {
       code: "item_code",
@@ -665,6 +747,11 @@ export function UniversalImportModal({
           </Table>
         </div>
 
+        {validCount === 0 && previewRecords.length > 0 && (
+          <p className="text-sm text-destructive text-center">
+            No valid records to import. Fix the errors shown above.
+          </p>
+        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => setStep(2)}>
             <ArrowLeft className="size-4 mr-1" />
@@ -705,7 +792,6 @@ export function UniversalImportModal({
   const renderStep5 = () => {
     const hasErrors = importResult && importResult.errors.length > 0;
     const isTotalFailure = importError !== null;
-    const [showErrors, setShowErrors] = useState(false);
 
     return (
       <div className="py-8 space-y-6 text-center">
@@ -754,11 +840,11 @@ export function UniversalImportModal({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowErrors(!showErrors)}
+              onClick={() => setShowStep5Errors(!showStep5Errors)}
             >
-              {showErrors ? "Hide" : "View"} Error Details
+              {showStep5Errors ? "Hide" : "View"} Error Details
             </Button>
-            {showErrors && importResult && (
+            {showStep5Errors && importResult && (
               <div className="mt-3 max-h-40 overflow-y-auto text-left border rounded-lg p-3">
                 {importResult.errors.map((e, i) => (
                   <p key={i} className="text-xs text-red-600 py-0.5">

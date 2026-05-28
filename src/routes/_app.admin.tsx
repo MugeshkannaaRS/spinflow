@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, adminApi, usersApi, auditApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { AccessGuard } from "@/components/AccessGuard";
+import { validateForm, GSTIN_REGEX } from "@/lib/formValidation";
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -181,15 +182,6 @@ function AdminPage() {
                   </Dialog>
                 </CardHeader>
                 <CardContent>
-                  <div className="relative mb-4">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search companies..."
-                      className="pl-10 max-w-sm"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                  </div>
                   <DataTable
                     tableId="admin_companies"
                     columns={[
@@ -211,11 +203,7 @@ function AdminPage() {
                         ),
                       },
                     ] satisfies ColDef[]}
-                    data={companiesData.filter((c: any) => {
-                      if (!search) return true;
-                      const q = search.toLowerCase();
-                      return c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q) || c.gstin?.toLowerCase().includes(q);
-                    })}
+                    data={companiesData}
                     rowKey={(c: any) => c.id}
                     exportFilename="admin_companies"
                     actions={(item: any) => (
@@ -367,11 +355,16 @@ function AddCompanyForm({ onDone }: { onDone: () => void }) {
     subscription_plan: "Pro",
   });
   const [loading, setLoading] = useState(false);
-
-  const isComplete = form.code && form.name;
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = async () => {
-    if (!isComplete) return;
+    const errs = validateForm(form, {
+      code: { required: true, minLength: 2 },
+      name: { required: true, minLength: 2 },
+      gstin: { pattern: GSTIN_REGEX, patternMessage: "Invalid GSTIN format" },
+    });
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
     setLoading(true);
     try {
       const company = await mastersApi.createCompany({
@@ -443,7 +436,7 @@ function AddCompanyForm({ onDone }: { onDone: () => void }) {
           </SelectContent>
         </Select>
       </div>
-      <Button className="w-full mt-4" onClick={handleSubmit} disabled={loading || !isComplete}>
+      <Button className="w-full mt-4" onClick={handleSubmit} disabled={loading || !form.code || !form.name}>
         {loading ? "Creating…" : "Create Company"}
       </Button>
     </div>
@@ -462,6 +455,15 @@ function EditCompanyForm({ item, onDone }: { item: Company; onDone: () => void }
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async () => {
+    const errs = validateForm(form, {
+      code: { required: true, minLength: 2 },
+      name: { required: true, minLength: 2 },
+      gstin: { pattern: GSTIN_REGEX, patternMessage: "Invalid GSTIN format" },
+    });
+    if (Object.keys(errs).length > 0) {
+      toast.error(Object.values(errs).join(", "));
+      return;
+    }
     setLoading(true);
     try {
       await mastersApi.updateCompany(item.id, form);

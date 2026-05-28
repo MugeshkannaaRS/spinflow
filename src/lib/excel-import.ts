@@ -29,6 +29,20 @@ function normalize(s: string): string {
     .trim();
 }
 
+const FIELD_ALIASES: Record<string, string[]> = {
+  employee_id: [
+    "code","emp id","empid","emp_id","employee id","emp no","empno",
+    "employee no","staff id","staff no","worker id","emp code",
+    "employee code","emp code",
+  ],
+  full_name: ["name","fullname","employee name","staff name","worker name"],
+  date_of_joining: ["doj","date of joining","join date","start date","joining date"],
+  basic: ["basic pay","basic salary","basic wage","base pay"],
+  total_salary: ["gross","gross salary","gross pay","total pay","ctc","total wage"],
+  house_rent: ["hra","house rent allowance","rent allowance"],
+  department: ["dept","dept.","department name"],
+};
+
 export function fuzzyMatchColumns(
   excelHeaders: string[],
   columnConfigs: ColumnConfig[],
@@ -49,6 +63,21 @@ export function fuzzyMatchColumns(
         result.set(header, matchedCol);
         continue;
       }
+    }
+
+    let exactAliasMatch: ColumnConfig | null = null;
+    for (const [fieldKey, aliases] of Object.entries(FIELD_ALIASES)) {
+      if (aliases.some((a) => normalize(a) === normalizedHeader)) {
+        const col = columnConfigs.find((c) => c.key === fieldKey);
+        if (col) {
+          exactAliasMatch = col;
+          break;
+        }
+      }
+    }
+    if (exactAliasMatch) {
+      result.set(header, exactAliasMatch);
+      continue;
     }
 
     let bestMatch: ColumnConfig | null = null;
