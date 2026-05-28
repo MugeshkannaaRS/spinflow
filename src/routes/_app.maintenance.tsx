@@ -556,7 +556,7 @@ function ImportScheduleDialog() {
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="maintenance_schedules"
-        endpoint="/api/v1/maintenance/schedules/bulk"
+        endpoint="/maintenance/schedules/bulk"
         onSuccess={() => qc.invalidateQueries({ queryKey: ["maintenance-schedules"] })}
         title="Import PM Schedules"
       />

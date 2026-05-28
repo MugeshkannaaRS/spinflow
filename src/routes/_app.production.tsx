@@ -474,7 +474,7 @@ function ImportShiftEntriesDialog() {
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="production_entries"
-        endpoint="/api/v1/production/entries/bulk"
+        endpoint="/production/entries/bulk"
         onSuccess={() => qc.invalidateQueries({ queryKey: ["shifts"] })}
         title="Import Production Entries"
       />

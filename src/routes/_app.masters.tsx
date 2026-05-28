@@ -1773,7 +1773,7 @@ function ImportMachinesDialog() {
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="masters_machines"
-        endpoint="/api/v1/masters/machines/bulk"
+        endpoint="/masters/machines/bulk"
         onSuccess={() => qc.invalidateQueries({ queryKey: ["masters", "machines"] })}
         title="Import Machines"
       />
@@ -1794,7 +1794,7 @@ function ImportCustomersDialog() {
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="masters_customers"
-        endpoint="/api/v1/masters/customers/bulk"
+        endpoint="/masters/customers/bulk"
         onSuccess={() => qc.invalidateQueries({ queryKey: ["masters", "customers"] })}
         title="Import Customers"
       />

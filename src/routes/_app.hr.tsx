@@ -1691,7 +1691,7 @@ function ImportEmployeeDialog() {
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="hr_employees"
-        endpoint="/api/v1/hr/employees/bulk"
+        endpoint="/hr/employees/bulk"
         onSuccess={() => {
           qc.invalidateQueries({ queryKey: ["hr-employees"] });
         }}
@@ -2050,7 +2050,7 @@ function ImportAttendanceDialog({ month, year, onSuccess }: { month: number; yea
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="hr_attendance"
-        endpoint="/api/v1/hr/attendance/bulk-import"
+        endpoint="/hr/attendance/bulk-import"
         onSuccess={() => onSuccess()}
         title="Import Attendance"
       />

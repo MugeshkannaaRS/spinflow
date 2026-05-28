@@ -485,7 +485,7 @@ function ImportSparesDialog() {
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="stores_spares"
-        endpoint="/api/v1/stores/spares/bulk"
+        endpoint="/stores/spares/bulk"
         onSuccess={() => qc.invalidateQueries({ queryKey: ["spare-items"] })}
         title="Import Spares"
       />

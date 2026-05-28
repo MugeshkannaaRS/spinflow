@@ -260,7 +260,7 @@ function ImportTestsDialog() {
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="quality_tests"
-        endpoint="/api/v1/quality/tests/bulk"
+        endpoint="/quality/tests/bulk"
         onSuccess={() => qc.invalidateQueries({ queryKey: ["quality-tests"] })}
         title="Import Test Results"
       />
