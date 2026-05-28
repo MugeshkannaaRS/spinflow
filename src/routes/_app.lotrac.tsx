@@ -394,7 +394,17 @@ function NewTripSheet() {
     onError: (e: any) => toast.error(e?.message || "Failed to create trip"),
   });
 
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
   const handleSubmit = () => {
+    const errs: Record<string, string> = {};
+    if (!form.vehicle_id && !form.vehicle_no) errs.vehicle = "Vehicle is required";
+    if (!form.customer_id) errs.customer = "Customer is required";
+    if (!form.destination_route_id && !form.destination_name) errs.destination = "Destination is required";
+    if ((form.planned_bags ?? 0) <= 0) errs.planned_bags = "Planned bags must be > 0";
+    if ((form.planned_weight_kg ?? 0) <= 0) errs.planned_weight_kg = "Planned weight must be > 0";
+    setFormErrors(errs);
+    if (Object.keys(errs).length > 0) return;
     m.mutate({
       mill_id: form.mill_id || "m1",
       from_warehouse_id: form.from_warehouse_id,

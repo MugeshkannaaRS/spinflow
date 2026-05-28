@@ -48,6 +48,8 @@ interface PreviewRecord {
 interface ImportError {
   row: number;
   message: string;
+  field?: string;
+  value?: string;
 }
 
 function computeConfidence(
@@ -847,9 +849,10 @@ export function UniversalImportModal({
             {showStep5Errors && importResult && (
               <div className="mt-3 max-h-40 overflow-y-auto text-left border rounded-lg p-3">
                 {importResult.errors.map((e, i) => (
-                  <p key={i} className="text-xs text-red-600 py-0.5">
-                    Row {e.row}: {e.message}
-                  </p>
+                  <div key={i} className="text-sm text-red-600 bg-red-50 dark:bg-red-950 p-2 rounded mb-1">
+                    Row {e.row}: {e.field ? <span className="font-medium">{e.field} — </span> : null}{e.message}
+                    {e.value ? <span className="block text-xs text-red-500">Value: "{e.value}"</span> : null}
+                  </div>
                 ))}
               </div>
             )}

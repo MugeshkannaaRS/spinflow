@@ -44,6 +44,11 @@ api.interceptors.response.use(
   async (error) => {
     clearSlowRequest();
     if (error.response?.status === 401) {
+      const url = error.config?.url || "";
+      const isAuthEndpoint = url.includes("/auth/");
+      if (!isAuthEndpoint && !error.response?.data?.code?.includes("TOKEN_EXPIRED")) {
+        return Promise.reject(error);
+      }
       const { refreshToken, logout } = useAuth.getState();
       if (refreshToken && error.config && !error.config._retry) {
         error.config._retry = true;

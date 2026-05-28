@@ -266,9 +266,11 @@ export const ACCESS: Record<Role, Partial<Record<Module, true | "read">>> = {
 };
 
 export function canAccess(role: Role, module: Module): boolean {
+  if (role === "SUPER_ADMIN") return true;
   return ACCESS[role]?.[module] !== undefined;
 }
 
 export function canWrite(role: Role, module: Module): boolean {
+  if (role === "SUPER_ADMIN") return true;
   return ACCESS[role]?.[module] === true;
 }

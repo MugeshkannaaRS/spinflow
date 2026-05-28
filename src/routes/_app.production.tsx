@@ -533,6 +533,7 @@ function ProductionPage() {
     category: "",
     notes: "",
   });
+  const [dtErrors, setDtErrors] = useState<Record<string, string>>({});
   const createDowntimeMutation = useMutation({
     mutationFn: (data: any) => productionApi.createDowntime(data),
     onSuccess: () => {
@@ -541,8 +542,21 @@ function ProductionPage() {
       setDtForm({ machine_id: "", start_time: "", end_time: "", reason: "", category: "", notes: "" });
       qc.invalidateQueries({ queryKey: ["downtime"] });
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail;
+      const msg = Array.isArray(detail) ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ") : detail || err.message || "Failed to log downtime";
+      toast.error(msg);
+    },
   });
+  const handleLogDowntime = () => {
+    const errs: Record<string, string> = {};
+    if (!dtForm.machine_id) errs.machine_id = "Machine is required";
+    if (!dtForm.start_time) errs.start_time = "Start Time is required";
+    if (!dtForm.reason) errs.reason = "Reason is required";
+    setDtErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+    createDowntimeMutation.mutate(dtForm);
+  };
 
   // Machine edit
   const [machineEditOpen, setMachineEditOpen] = useState(false);
@@ -920,9 +934,9 @@ function ProductionPage() {
                       <Label>Machine</Label>
                       <Select
                         value={dtForm.machine_id}
-                        onValueChange={(v) => setDtForm((p) => ({ ...p, machine_id: v }))}
+                        onValueChange={(v) => { setDtForm((p) => ({ ...p, machine_id: v })); setDtErrors((p) => ({ ...p, machine_id: "" })); }}
                       >
-                        <SelectTrigger><SelectValue placeholder="Select machine" /></SelectTrigger>
+                        <SelectTrigger className={dtErrors.machine_id ? "border-destructive" : ""}><SelectValue placeholder="Select machine" /></SelectTrigger>
                         <SelectContent>
                           {machines.filter((m: any) => m?.id).map((m: any) => (
                             <SelectItem key={m.id} value={m.id}>
@@ -931,14 +945,17 @@ function ProductionPage() {
                           ))}
                         </SelectContent>
                       </Select>
+                      {dtErrors.machine_id && <p className="text-xs text-destructive">{dtErrors.machine_id}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label>Start Time</Label>
                       <Input
                         type="datetime-local"
                         value={dtForm.start_time}
-                        onChange={(e) => setDtForm((p) => ({ ...p, start_time: e.target.value }))}
+                        onChange={(e) => { setDtForm((p) => ({ ...p, start_time: e.target.value })); setDtErrors((p) => ({ ...p, start_time: "" })); }}
+                        className={dtErrors.start_time ? "border-destructive" : ""}
                       />
+                      {dtErrors.start_time && <p className="text-xs text-destructive">{dtErrors.start_time}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label>End Time</Label>
@@ -952,9 +969,11 @@ function ProductionPage() {
                       <Label>Reason</Label>
                       <Input
                         value={dtForm.reason}
-                        onChange={(e) => setDtForm((p) => ({ ...p, reason: e.target.value }))}
+                        onChange={(e) => { setDtForm((p) => ({ ...p, reason: e.target.value })); setDtErrors((p) => ({ ...p, reason: "" })); }}
                         placeholder="Reason for downtime"
+                        className={dtErrors.reason ? "border-destructive" : ""}
                       />
+                      {dtErrors.reason && <p className="text-xs text-destructive">{dtErrors.reason}</p>}
                     </div>
                     <div className="space-y-2">
                       <Label>Category</Label>
@@ -982,7 +1001,7 @@ function ProductionPage() {
                   </div>
                   <SheetFooter>
                     <Button
-                      onClick={() => createDowntimeMutation.mutate(dtForm)}
+                      onClick={handleLogDowntime}
                       disabled={createDowntimeMutation.isPending}
                     >
                       {createDowntimeMutation.isPending ? "Saving…" : "Save"}

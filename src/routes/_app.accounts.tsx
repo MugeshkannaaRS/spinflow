@@ -302,12 +302,41 @@ function InvoiceSlideOver({ open, onOpenChange, invoice }: { open: boolean; onOp
       onOpenChange(false);
     },
     onError: (err: any) => {
-      toast.error(err?.message ?? "Failed to save invoice");
+      const detail = err?.response?.data?.detail;
+      const msg = Array.isArray(detail) ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ") : detail || err?.message || "Failed to save invoice";
+      toast.error(msg);
     },
   });
 
+  const addItem = () => setItems([...items, { description: "", hsn: "", qty: 1, rate: 0, amount: 0 }]);
+
+  const removeItem = (idx: number) => {
+    if (items.length > 1) setItems(items.filter((_, i) => i !== idx));
+  };
+
+  const updateItem = (idx: number, field: keyof InvItem, value: string | number) => {
+    setItems(
+      items.map((it, i) => {
+        if (i !== idx) return it;
+        const updated = { ...it, [field]: field === "qty" || field === "rate" ? Number(value) : value };
+        if (field === "qty") updated.amount = Number(value) * it.rate;
+        else if (field === "rate") updated.amount = it.qty * Number(value);
+        return updated;
+      }),
+    );
+  };
+
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const canSubmit = customerName.trim() && invoiceDate;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const errs: Record<string, string> = {};
+    if (!customerName.trim()) errs.customerName = "Customer name is required";
+    if (!invoiceDate) errs.invoiceDate = "Invoice date is required";
+    if (items.length === 0 || items.every((it) => !it.description.trim())) errs.items = "Add at least one line item";
+    setFormErrors(errs);
+    if (Object.keys(errs).length > 0) return;
     m.mutate({
       customer: customerName,
       date: invoiceDate,
@@ -330,26 +359,6 @@ function InvoiceSlideOver({ open, onOpenChange, invoice }: { open: boolean; onOp
     });
   };
 
-  const addItem = () => setItems([...items, { description: "", hsn: "", qty: 1, rate: 0, amount: 0 }]);
-
-  const removeItem = (idx: number) => {
-    if (items.length > 1) setItems(items.filter((_, i) => i !== idx));
-  };
-
-  const updateItem = (idx: number, field: keyof InvItem, value: string | number) => {
-    setItems(
-      items.map((it, i) => {
-        if (i !== idx) return it;
-        const updated = { ...it, [field]: field === "qty" || field === "rate" ? Number(value) : value };
-        if (field === "qty") updated.amount = Number(value) * it.rate;
-        else if (field === "rate") updated.amount = it.qty * Number(value);
-        return updated;
-      }),
-    );
-  };
-
-  const canSubmit = customerName.trim() && invoiceDate;
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
@@ -359,13 +368,14 @@ function InvoiceSlideOver({ open, onOpenChange, invoice }: { open: boolean; onOp
         <form onSubmit={handleSubmit} className="space-y-4 mt-6">
           <div className="space-y-1">
             <Label>Customer Name *</Label>
-            <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Customer name" />
+            <Input value={customerName} onChange={(e) => { setCustomerName(e.target.value); setFormErrors((p) => ({ ...p, customerName: "" })); }} placeholder="Customer name" className={formErrors.customerName ? "border-destructive" : ""} />
+            {formErrors.customerName && <p className="text-xs text-destructive">{formErrors.customerName}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label>Invoice Date *</Label>
-              <Input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} />
+              <Input type="date" value={invoiceDate} onChange={(e) => { setInvoiceDate(e.target.value); setFormErrors((p) => ({ ...p, invoiceDate: "" })); }} className={formErrors.invoiceDate ? "border-destructive" : ""} />
             </div>
             <div className="space-y-1">
               <Label>Invoice Type</Label>

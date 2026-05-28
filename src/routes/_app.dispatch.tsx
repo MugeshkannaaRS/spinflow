@@ -52,6 +52,7 @@ function DispatchPage() {
     e_way_bill_no: "",
     notes: "",
   });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const ordersQ = useQuery({ queryKey: ["dispatch-orders"], queryFn: dispatchApi.getOrders, staleTime: 60_000, retry: 1 });
   const tripsQ = useQuery({
@@ -93,7 +94,11 @@ function DispatchPage() {
       });
       queryClient.invalidateQueries({ queryKey: ["dispatch-trips"] });
     },
-    onError: () => toast.error("Failed to create trip"),
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail;
+      const msg = Array.isArray(detail) ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ") : detail || "Failed to create trip";
+      toast.error(msg);
+    },
   });
 
   const dispatchM = useMutation({
@@ -115,6 +120,12 @@ function DispatchPage() {
   });
 
   function handleCreateTrip() {
+    const errs: Record<string, string> = {};
+    if (!form.customer_id.trim()) errs.customer_id = "Customer is required";
+    if (!form.vehicle_no.trim()) errs.vehicle_no = "Vehicle No is required";
+    if (!form.dispatch_date.trim()) errs.dispatch_date = "Dispatch Date is required";
+    setFormErrors(errs);
+    if (Object.keys(errs).length > 0) return;
     createTripM.mutate({
       customer_id: form.customer_id || undefined,
       vehicle_no: form.vehicle_no || undefined,
@@ -247,9 +258,9 @@ function DispatchPage() {
                 <Label htmlFor="customer">Customer</Label>
                 <Select
                   value={form.customer_id}
-                  onValueChange={(v) => setForm({ ...form, customer_id: v })}
+                  onValueChange={(v) => { setForm({ ...form, customer_id: v }); setFormErrors((p) => ({ ...p, customer_id: "" })); }}
                 >
-                  <SelectTrigger id="customer">
+                  <SelectTrigger id="customer" className={formErrors.customer_id ? "border-destructive" : ""}>
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
                   <SelectContent>
@@ -260,15 +271,18 @@ function DispatchPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {formErrors.customer_id && <p className="text-xs text-destructive">{formErrors.customer_id}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="vehicle_no">Vehicle No</Label>
                 <Input
                   id="vehicle_no"
                   value={form.vehicle_no}
-                  onChange={(e) => setForm({ ...form, vehicle_no: e.target.value })}
+                  onChange={(e) => { setForm({ ...form, vehicle_no: e.target.value }); setFormErrors((p) => ({ ...p, vehicle_no: "" })); }}
                   placeholder="TN-38-AB-1234"
+                  className={formErrors.vehicle_no ? "border-destructive" : ""}
                 />
+                {formErrors.vehicle_no && <p className="text-xs text-destructive">{formErrors.vehicle_no}</p>}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -296,8 +310,10 @@ function DispatchPage() {
                   id="dispatch_date"
                   type="date"
                   value={form.dispatch_date}
-                  onChange={(e) => setForm({ ...form, dispatch_date: e.target.value })}
+                  onChange={(e) => { setForm({ ...form, dispatch_date: e.target.value }); setFormErrors((p) => ({ ...p, dispatch_date: "" })); }}
+                  className={formErrors.dispatch_date ? "border-destructive" : ""}
                 />
+                {formErrors.dispatch_date && <p className="text-xs text-destructive">{formErrors.dispatch_date}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="eway">E-Way Bill No</Label>

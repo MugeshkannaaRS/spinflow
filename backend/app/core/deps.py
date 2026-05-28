@@ -53,6 +53,8 @@ def require_module(module: str, write: bool = False):
         role = current_user.role_rel.code if current_user.role_rel else None
         if not role:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No role assigned")
+        if role == "SUPER_ADMIN":
+            return current_user
         if write:
             if not can_write(role, module):
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Write access denied for module: {module}")

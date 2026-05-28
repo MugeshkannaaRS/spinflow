@@ -266,8 +266,11 @@ async def bulk_create_employees(
 
     for i, item in enumerate(req.items, start=1):
         row_label = f"Row {i} ({item.employee_code or 'no code'})"
-        if not item.employee_code or not item.full_name:
-            errors.append(f"{row_label}: missing required field (code, name)")
+        if not item.employee_code:
+            errors.append(f"{row_label}: field 'employee_code' is required")
+            continue
+        if not item.full_name:
+            errors.append(f"{row_label}: field 'full_name' is required (found: '{item.full_name}')")
             continue
 
         doj = parse_date(item.date_of_joining, row_label)

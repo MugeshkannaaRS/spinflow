@@ -11,6 +11,20 @@ export interface ValidationRule {
 
 export const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
 
+export function validateRequired(
+  data: Record<string, any>,
+  fields: { key: string; label: string }[],
+): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const { key, label } of fields) {
+    const val = data[key];
+    if (val === undefined || val === null || String(val).trim() === "") {
+      errors[key] = `${label} is required`;
+    }
+  }
+  return errors;
+}
+
 export function validateForm(
   data: Record<string, any>,
   rules: Record<string, ValidationRule>,

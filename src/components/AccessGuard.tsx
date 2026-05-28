@@ -11,6 +11,7 @@ interface AccessGuardProps {
 export function AccessGuard({ module, children }: AccessGuardProps) {
   const user = useAuth((s) => s.user);
   if (!user) return null;
+  if (user.role === "SUPER_ADMIN") return <>{children}</>;
   const hasAccess = canAccess(user.role, module);
   if (hasAccess) return <>{children}</>;
   return (

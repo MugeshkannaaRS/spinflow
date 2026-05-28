@@ -300,6 +300,7 @@ function NewTestSlideOver() {
     mutationFn: (data: any) => qualityApi.createTest(data),
   });
 
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const reqFields = ["lotId", "date", "count"] as const;
   const allFilled = reqFields.every((f) => {
     const v = form[f];
@@ -308,6 +309,12 @@ function NewTestSlideOver() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const errs: Record<string, string> = {};
+    if (!form.lotId.trim()) errs.lotId = "Lot ID is required";
+    if (!form.date.trim()) errs.date = "Date is required";
+    if (!form.count.trim()) errs.count = "Count/Yarn is required";
+    setFormErrors(errs);
+    if (Object.keys(errs).length > 0) return;
     m.mutate(form, {
       onSuccess: () => {
         toast.success("Test recorded");
@@ -329,8 +336,13 @@ function NewTestSlideOver() {
           testedBy: "",
           notes: "",
         });
+        setFormErrors({});
       },
-      onError: () => toast.error("Failed to record test"),
+      onError: (err: any) => {
+        const detail = err?.response?.data?.detail;
+        const msg = Array.isArray(detail) ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ") : detail || "Failed to record test";
+        toast.error(msg);
+      },
     });
   };
 
@@ -352,9 +364,9 @@ function NewTestSlideOver() {
               <Label>Lot No <span className="text-destructive">*</span></Label>
               <Select
                 value={form.lotId}
-                onValueChange={(v) => setForm({ ...form, lotId: v })}
+                onValueChange={(v) => { setForm({ ...form, lotId: v }); setFormErrors((p) => ({ ...p, lotId: "" })); }}
               >
-                <SelectTrigger>
+                <SelectTrigger className={formErrors.lotId ? "border-destructive" : ""}>
                   <SelectValue placeholder="Select lot" />
                 </SelectTrigger>
                 <SelectContent>
@@ -365,22 +377,27 @@ function NewTestSlideOver() {
                   ))}
                 </SelectContent>
               </Select>
+              {formErrors.lotId && <p className="text-xs text-destructive">{formErrors.lotId}</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Date <span className="text-destructive">*</span></Label>
               <Input
                 type="date"
                 value={form.date}
-                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                onChange={(e) => { setForm({ ...form, date: e.target.value }); setFormErrors((p) => ({ ...p, date: "" })); }}
+                className={formErrors.date ? "border-destructive" : ""}
               />
+              {formErrors.date && <p className="text-xs text-destructive">{formErrors.date}</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Count <span className="text-destructive">*</span></Label>
               <Input
                 value={form.count}
-                onChange={(e) => setForm({ ...form, count: e.target.value })}
+                onChange={(e) => { setForm({ ...form, count: e.target.value }); setFormErrors((p) => ({ ...p, count: "" })); }}
                 placeholder="e.g. 30s"
+                className={formErrors.count ? "border-destructive" : ""}
               />
+              {formErrors.count && <p className="text-xs text-destructive">{formErrors.count}</p>}
             </div>
             <div className="space-y-1.5">
               <Label>MIC</Label>
