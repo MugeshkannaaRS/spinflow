@@ -1,7 +1,9 @@
 import asyncio
 import logging
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import List, Optional
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -10,17 +12,76 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 asyncio.set_event_loop_policy(asyncio.DefaultEventLoopPolicy())
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
 from app.core.config import settings
 from app.core.error_handler import register_error_handlers
 from app.core.limiter import limiter
 from app.db.session import engine
-from app.db.base import Base
 from app.api.v1 import auth, production, quality, inventory, dispatch, purchase, stores, hr, accounts, maintenance, dashboard, qr_system, reports, users, audit, masters, stock as stock_router, sales as sales_router, lotrac as lotrac_router, payroll as payroll_router, uploads as uploads_router, exports as exports_router, ui_config as ui_config_router, imports as imports_router
 from app.api.v1.admin import router as admin_router
 from app.ws.notifications import router as ws_router
 
 logger = logging.getLogger(__name__)
+
+
+class CORSEnsureMiddleware:
+    """Raw ASGI middleware that ensures CORS headers on every HTTP response.
+
+    Wraps the ASGI ``send`` callback so that *any* response sent by the inner
+    app — including error responses produced by FastAPI exception handlers —
+    receives the ``Access-Control-Allow-Origin`` header when the request origin
+    is allowed.  Acts as a safety net beneath the standard ``CORSMiddleware``.
+    """
+
+    def __init__(
+        self,
+        app,
+        allow_origins: Optional[List[str]] = None,
+        allow_origin_regex: Optional[str] = None,
+        allow_credentials: bool = False,
+    ):
+        self.app = app
+        self.allow_origins = allow_origins or []
+        self.allow_origin_regex = re.compile(allow_origin_regex) if allow_origin_regex else None
+        self.allow_credentials = allow_credentials
+
+    def is_origin_allowed(self, origin: str) -> bool:
+        if origin in self.allow_origins:
+            return True
+        if self.allow_origin_regex and self.allow_origin_regex.fullmatch(origin):
+            return True
+        return False
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        origin = None
+        for name, value in scope.get("headers", []):
+            if name == b"origin":
+                origin = value.decode()
+                break
+
+        if not origin or not self.is_origin_allowed(origin):
+            await self.app(scope, receive, send)
+            return
+
+        cors_headers = [
+            (b"access-control-allow-origin", origin.encode()),
+            (b"vary", b"Origin"),
+        ]
+        if self.allow_credentials:
+            cors_headers.append((b"access-control-allow-credentials", b"true"))
+
+        async def send_with_cors(message):
+            if message["type"] == "http.response.start":
+                headers = message.get("headers", [])
+                has_cors = any(k == b"access-control-allow-origin" for k, _ in headers)
+                if not has_cors:
+                    message["headers"] = list(headers) + cors_headers
+            await send(message)
+
+        await self.app(scope, receive, send_with_cors)
 
 
 def _run_alembic_upgrade() -> None:
@@ -76,10 +137,19 @@ app.add_middleware(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.parsed_cors_origins,
-    allow_origin_regex=r"^https://(.*\.ngrok(?:-free)?\.dev|.*\.onrender\.com)$",
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+# Fallback CORS middleware: ensures CORS headers on every response,
+# even when CORSMiddleware does not fire (e.g. early ASGI errors).
+app.add_middleware(
+    CORSEnsureMiddleware,
+    allow_origins=settings.parsed_cors_origins,
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX,
+    allow_credentials=True,
 )
 
 API_PREFIX = "/api/v1"

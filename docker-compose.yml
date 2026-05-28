@@ -60,7 +60,7 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-X8kLm9pQ4rT2vB6nW1cY3zA7eR5fH0jG}@redis:6379/0
       SECRET_KEY: ${SECRET_KEY}
       DEBUG: "false"
-      CORS_ORIGINS: '["https://millflow.yourdomain.com"]'
+      CORS_ORIGINS: https://millflow.yourdomain.com
     ports:
       - "127.0.0.1:8002:8000"
     volumes:

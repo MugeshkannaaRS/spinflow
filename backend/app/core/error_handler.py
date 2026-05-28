@@ -1,5 +1,6 @@
 import enum
 import logging
+import re
 from typing import Any, Optional, List, Dict
 from datetime import datetime, timezone
 
@@ -8,6 +9,33 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger("spinflow")
+
+
+_ALLOWED_ORIGINS_CACHE: Optional[List[str]] = None
+_ALLOWED_ORIGIN_REGEX_CACHE: Optional[re.Pattern] = None
+
+
+def _is_origin_allowed(origin: str) -> bool:
+    global _ALLOWED_ORIGINS_CACHE, _ALLOWED_ORIGIN_REGEX_CACHE
+    from app.core.config import settings
+    if _ALLOWED_ORIGINS_CACHE is None:
+        _ALLOWED_ORIGINS_CACHE = settings.parsed_cors_origins
+    if _ALLOWED_ORIGIN_REGEX_CACHE is None:
+        raw = getattr(settings, "CORS_ORIGIN_REGEX", None)
+        if raw:
+            _ALLOWED_ORIGIN_REGEX_CACHE = re.compile(raw)
+    if origin in _ALLOWED_ORIGINS_CACHE:
+        return True
+    if _ALLOWED_ORIGIN_REGEX_CACHE and _ALLOWED_ORIGIN_REGEX_CACHE.fullmatch(origin):
+        return True
+    return False
+
+
+def _cors_headers(request: Request) -> dict:
+    origin = request.headers.get("origin")
+    if origin and _is_origin_allowed(origin):
+        return {"Access-Control-Allow-Origin": origin, "Vary": "Origin"}
+    return {}
 
 
 class ErrorCode(str, enum.Enum):
@@ -101,6 +129,7 @@ def _build_error_response(
     detail: Any = None,
     status_code: int = 500,
 ) -> JSONResponse:
+    headers = _cors_headers(request)
     return JSONResponse(
         status_code=status_code,
         content={
@@ -111,6 +140,7 @@ def _build_error_response(
             "path": request.url.path,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         },
+        headers=headers,
     )
 
 

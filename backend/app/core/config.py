@@ -26,12 +26,13 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://:X8kLm9pQ4rT2vB6nW1cY3zA7eR5fH0jG@localhost:6379/0"
 
-    # CORS — production only, no wildcard; allow local dev and ngrok during development
-    CORS_ORIGINS: str = "https://spinflow.onrender.com,https://spinflow-f.onrender.com,http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173,https://*.ngrok.io,https://*.ngrok-free.dev"
+    # CORS — explicit origins only (no glob/wildcard), wildcard subdomains go in CORS_ORIGIN_REGEX
+    CORS_ORIGINS: str = "https://spinflow.onrender.com,https://spinflow-f.onrender.com,http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173"
+    CORS_ORIGIN_REGEX: str = r"^https://(.*\.ngrok(?:-free)?\.dev|.*\.onrender\.com)$"
 
     @property
     def parsed_cors_origins(self) -> List[str]:
-        return [item.strip() for item in self.CORS_ORIGINS.split(",") if item.strip()]
+        return [item.strip() for item in self.CORS_ORIGINS.split(",") if item.strip() and "*" not in item]
 
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
