@@ -104,6 +104,7 @@ export function UniversalImportModal({
     skipped: number;
     errors: ImportError[];
   } | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
 
   const colMap = useMemo(() => {
@@ -387,53 +388,66 @@ export function UniversalImportModal({
   };
 
   const handleImport = useCallback(async () => {
-    const keyFields = TABLE_KEY_FIELDS[tableName];
-    const nonBlank = filterBlankRows(
-      previewRecords.map((r) => r.data),
-      keyFields,
-    );
+    try {
+      const keyFields = TABLE_KEY_FIELDS[tableName];
+      const nonBlank = filterBlankRows(
+        previewRecords.map((r) => r.data),
+        keyFields,
+      );
 
-    const fieldMap = FIELD_MAP[tableName] ?? {};
-    const validRecords = nonBlank.map((rec) => {
-      const mapped: Record<string, any> = {};
-      for (const [key, value] of Object.entries(rec)) {
-        mapped[fieldMap[key] ?? key] = value;
+      const fieldMap = FIELD_MAP[tableName] ?? {};
+      const validRecords = nonBlank.map((rec) => {
+        const mapped: Record<string, any> = {};
+        for (const [key, value] of Object.entries(rec)) {
+          mapped[fieldMap[key] ?? key] = value;
+        }
+        return mapped;
+      });
+      if (validRecords.length === 0) {
+        toast.error("No valid records to import");
+        return;
       }
-      return mapped;
-    });
-    if (validRecords.length === 0) {
-      toast.error("No valid records to import");
-      return;
-    }
 
-    setStep(4);
-    setIsImporting(true);
-    setImportProgress({ current: 0, total: validRecords.length });
+      setStep(4);
+      setIsImporting(true);
+      setImportError(null);
+      setImportProgress({ current: 0, total: validRecords.length });
 
-    const BATCH_SIZE = 50;
-    let successCount = 0;
-    const errors: ImportError[] = [];
+      const BATCH_SIZE = 50;
+      let successCount = 0;
+      const errors: ImportError[] = [];
 
-    for (let i = 0; i < validRecords.length; i += BATCH_SIZE) {
-      const batch = validRecords.slice(i, i + BATCH_SIZE);
-      try {
-        await api.post(endpoint, { items: batch, mill_id: millId });
-        successCount += batch.length;
-      } catch (err: any) {
-        const msg = err?.response?.data?.detail ?? err?.message ?? "Import failed";
-        errors.push({ row: i + 1, message: msg });
+      for (let i = 0; i < validRecords.length; i += BATCH_SIZE) {
+        const batch = validRecords.slice(i, i + BATCH_SIZE);
+        try {
+          await api.post(endpoint, { items: batch, mill_id: millId });
+          successCount += batch.length;
+        } catch (err: any) {
+          const msg = err?.response?.data?.detail ?? err?.message ?? "Import failed";
+          errors.push({ row: i + 1, message: msg });
+        }
+        setImportProgress({ current: Math.min(i + BATCH_SIZE, validRecords.length), total: validRecords.length });
       }
-      setImportProgress({ current: Math.min(i + BATCH_SIZE, validRecords.length), total: validRecords.length });
-    }
 
-    setIsImporting(false);
-    setImportResult({
-      success: successCount,
-      skipped: validRecords.length - successCount,
-      errors,
-    });
-    setStep(5);
-    onSuccess?.(successCount);
+      setIsImporting(false);
+      setImportResult({
+        success: successCount,
+        skipped: validRecords.length - successCount,
+        errors,
+      });
+      setStep(5);
+      onSuccess?.(successCount);
+    } catch (err: any) {
+      setIsImporting(false);
+      const msg = err?.message ?? String(err) ?? "Unknown error during import";
+      setImportError(msg);
+      setImportResult({
+        success: 0,
+        skipped: 0,
+        errors: [{ row: 0, message: msg }],
+      });
+      setStep(5);
+    }
   }, [previewRecords, endpoint, millId, onSuccess, tableName]);
 
   const validCount = previewRecords.filter((r) => r.errors.length === 0).length;
@@ -690,11 +704,23 @@ export function UniversalImportModal({
 
   const renderStep5 = () => {
     const hasErrors = importResult && importResult.errors.length > 0;
+    const isTotalFailure = importError !== null;
     const [showErrors, setShowErrors] = useState(false);
 
     return (
       <div className="py-8 space-y-6 text-center">
-        {hasErrors ? (
+        {isTotalFailure ? (
+          <>
+            <div className="mx-auto size-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+              <XCircle className="size-8 text-red-600" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-lg font-medium">Import failed</p>
+              <p className="text-sm text-red-600">{importError}</p>
+              <p className="text-xs text-muted-foreground">No records were imported.</p>
+            </div>
+          </>
+        ) : hasErrors ? (
           <>
             <div className="mx-auto size-16 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
               <AlertTriangle className="size-8 text-yellow-600" />

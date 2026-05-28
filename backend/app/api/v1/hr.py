@@ -238,6 +238,9 @@ async def bulk_create_employees(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr", write=True)),
 ):
+    if len(req.items) > 100:
+        raise HTTPException(status_code=400, detail="Maximum 100 employees per batch")
+
     scope = await get_mill_scope(current_user)
     mill_id = scope["mill_id"]
 
@@ -340,9 +343,12 @@ async def bulk_create_employees(
             imported += len(batch)
         except Exception as exc:
             await db.rollback()
-            return EmployeeBulkResponse(created=imported, errors=[f"Batch error at row {batch_start + 1}: {str(exc)}"])
+            errors.append(f"Batch error at row {batch_start + 1}: {str(exc)}")
+            continue
 
     for emp, item in payroll_records:
+        if emp.id not in [e.id for e in employees_to_add[:imported]]:
+            continue
         mp = MonthlyPayroll(
             employee_id=emp.id,
             mill_id=mill_id,
@@ -384,8 +390,8 @@ async def bulk_create_employees(
         await db.commit()
     except Exception as exc:
         await db.rollback()
-        return EmployeeBulkResponse(created=imported, errors=[f"Commit error: {str(exc)}"])
-    return EmployeeBulkResponse(created=imported, errors=[])
+        return EmployeeBulkResponse(created=imported, errors=errors + [f"Commit error: {str(exc)}"])
+    return EmployeeBulkResponse(created=imported, errors=errors)
 
 
 @router.post("/hr/payroll/bulk", response_model=PayrollBulkResponse)
