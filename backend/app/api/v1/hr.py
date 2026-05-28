@@ -22,7 +22,7 @@ from app.schemas.hr import (
     EmployeeCreate, EmployeeOut, EmployeeUpdate,
     AttendanceCreate, AttendanceOut, AttendanceBulkCreate, AttendanceSummary,
     LeaveRequestCreate, LeaveRequestOut, LeaveActionRequest,
-    EmployeeBulkCreate, EmployeeBulkResponse,
+    EmployeeBulkCreate, EmployeeBulkResponse, ImportErrorDetail,
     PayrollBulkCreate, PayrollBulkResponse,
     MonthlyPayrollCreate, MonthlyPayrollOut, MonthlyPayrollUpdate,
     MonthlyPayrollListResponse, PayrollCalculateRequest, PayrollFinalizeRequest,
@@ -244,7 +244,10 @@ async def bulk_create_employees(
     scope = await get_mill_scope(current_user)
     mill_id = scope["mill_id"]
 
-    def parse_date(s: Optional[str], row_label: str) -> Optional[date_type]:
+    def _err(row: int, msg: str, field: Optional[str] = None, value: Optional[str] = None, severity: str = "error") -> ImportErrorDetail:
+        return ImportErrorDetail(row=row, message=msg, field=field, value=value, severity=severity)
+
+    def parse_date(s: Optional[str], row_num: int) -> Optional[date_type]:
         if not s:
             return None
         s = s.strip()
@@ -254,30 +257,31 @@ async def bulk_create_employees(
                 return dt.strptime(s, fmt).date()
             except ValueError:
                 continue
-        errors.append(f"{row_label}: invalid date format '{s}', expected DD/MM/YYYY or YYYY-MM-DD")
+        errors.append(_err(row_num, f"Invalid date format '{s}', expected DD/MM/YYYY or YYYY-MM-DD", "date_of_joining", s))
         return None
 
     employees_to_add: List[Employee] = []
     payroll_records: List[MonthlyPayroll] = []
-    errors: List[str] = []
+    errors: List[ImportErrorDetail] = []
     now = datetime.now(timezone.utc)
     cur_month = now.month
     cur_year = now.year
 
     for i, item in enumerate(req.items, start=1):
+        row = i
         row_label = f"Row {i} ({item.employee_code or 'no code'})"
         if not item.employee_code:
-            errors.append(f"{row_label}: field 'employee_code' is required")
+            errors.append(_err(row, "Field 'employee_code' is required", "employee_code"))
             continue
         if not item.full_name:
-            errors.append(f"{row_label}: field 'full_name' is required (found: '{item.full_name}')")
+            errors.append(_err(row, "Field 'full_name' is required", "full_name", item.full_name))
             continue
 
-        doj = parse_date(item.date_of_joining, row_label)
+        doj = parse_date(item.date_of_joining, row)
         if item.date_of_joining and not doj:
             continue
 
-        dob = parse_date(item.dob, row_label)
+        dob = parse_date(item.dob, row)
         if item.dob and not dob:
             continue
 
@@ -288,10 +292,17 @@ async def bulk_create_employees(
         def _str(v):
             return str(v).strip() if v is not None else None
 
+        dept_name = (item.department or "General").strip()
+        if dept_name != "General":
+            dept_result = await db.execute(select(Department).where(Department.name.ilike(dept_name)))
+            dept = dept_result.scalar_one_or_none()
+            if not dept:
+                errors.append(_err(row, f"Department '{dept_name}' not found in Masters. Employee imported but department not linked. Add department in Masters → Departments first.", "department", dept_name, "warning"))
+
         emp = Employee(
             code=item.employee_code.strip(),
             name=item.full_name.strip(),
-            department=(item.department or "General").strip(),
+            department=dept_name,
             designation=_str(item.designation),
             section=_str(item.section),
             shift=item.shift or "General",
@@ -332,7 +343,8 @@ async def bulk_create_employees(
         if has_payroll:
             payroll_records.append((emp, item))
 
-    if errors:
+    hard_errors = [e for e in errors if e.severity != "warning"]
+    if hard_errors:
         return EmployeeBulkResponse(created=0, errors=errors)
 
     BATCH_SIZE = 50
@@ -346,7 +358,7 @@ async def bulk_create_employees(
             imported += len(batch)
         except Exception as exc:
             await db.rollback()
-            errors.append(f"Batch error at row {batch_start + 1}: {str(exc)}")
+            errors.append(_err(batch_start + 1, str(exc)))
             continue
 
     for emp, item in payroll_records:
@@ -393,7 +405,7 @@ async def bulk_create_employees(
         await db.commit()
     except Exception as exc:
         await db.rollback()
-        return EmployeeBulkResponse(created=imported, errors=errors + [f"Commit error: {str(exc)}"])
+        return EmployeeBulkResponse(created=imported, errors=errors + [_err(0, str(exc))])
     return EmployeeBulkResponse(created=imported, errors=errors)
 
 

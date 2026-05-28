@@ -383,6 +383,13 @@ class EmployeeBulkCreate(BaseModel):
     items: List[EmployeeBulkItem]
 
 
+class ImportErrorDetail(BaseModel):
+    row: int
+    field: Optional[str] = None
+    value: Optional[str] = None
+    message: str
+    severity: str = "error"
+
 class EmployeeBulkResponse(BaseModel):
     created: int
-    errors: List[str]
+    errors: List[ImportErrorDetail]

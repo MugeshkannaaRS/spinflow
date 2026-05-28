@@ -376,6 +376,7 @@ function InvoiceSlideOver({ open, onOpenChange, invoice }: { open: boolean; onOp
             <div className="space-y-1">
               <Label>Invoice Date *</Label>
               <Input type="date" value={invoiceDate} onChange={(e) => { setInvoiceDate(e.target.value); setFormErrors((p) => ({ ...p, invoiceDate: "" })); }} className={formErrors.invoiceDate ? "border-destructive" : ""} />
+              {formErrors.invoiceDate && <p className="text-xs text-destructive">{formErrors.invoiceDate}</p>}
             </div>
             <div className="space-y-1">
               <Label>Invoice Type</Label>

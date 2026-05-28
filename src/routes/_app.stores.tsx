@@ -270,6 +270,10 @@ function AddSpareSheet() {
         setForm({ code: "", name: "", category: "", unit: "Nos", currentStock: 0, reorderLevel: 0, location: "", unitPrice: 0 });
         setOpen(false);
       },
+      onError: (err: any) => {
+        const msg = err?.response?.data?.detail || err?.message || "Failed to create spare";
+        toast.error(typeof msg === "string" ? msg : "Failed to create spare");
+      },
     });
   };
 

@@ -504,8 +504,20 @@ export function UniversalImportModal({
       for (let i = 0; i < validRecords.length; i += BATCH_SIZE) {
         const batch = validRecords.slice(i, i + BATCH_SIZE);
         try {
-          await api.post(endpoint, { items: batch, mill_id: millId });
-          successCount += batch.length;
+          const res = await api.post(endpoint, { items: batch, mill_id: millId });
+          const data: any = res.data;
+          if (data?.errors?.length > 0) {
+            for (const e of data.errors) {
+              errors.push({
+                row: e.row ?? i + 1,
+                message: e.message ?? "Import error",
+                field: e.field,
+                value: e.value,
+              });
+            }
+          } else {
+            successCount += batch.length;
+          }
         } catch (err: any) {
           const msg = err?.response?.data?.detail ?? err?.message ?? "Import failed";
           errors.push({ row: i + 1, message: msg });
@@ -847,13 +859,36 @@ export function UniversalImportModal({
               {showStep5Errors ? "Hide" : "View"} Error Details
             </Button>
             {showStep5Errors && importResult && (
-              <div className="mt-3 max-h-40 overflow-y-auto text-left border rounded-lg p-3">
-                {importResult.errors.map((e, i) => (
-                  <div key={i} className="text-sm text-red-600 bg-red-50 dark:bg-red-950 p-2 rounded mb-1">
-                    Row {e.row}: {e.field ? <span className="font-medium">{e.field} — </span> : null}{e.message}
-                    {e.value ? <span className="block text-xs text-red-500">Value: "{e.value}"</span> : null}
-                  </div>
-                ))}
+              <div className="mt-3 max-h-48 overflow-y-auto text-left space-y-2">
+                {(() => {
+                  const hardErrors = importResult.errors.filter(e => !e.field && !e.value)
+                  const warnings = importResult.errors.filter(e => e.field || e.value)
+                  return (
+                    <>
+                      {hardErrors.length > 0 && (
+                        <div className="border rounded-lg p-2">
+                          <p className="text-xs font-semibold text-red-600 mb-1">{hardErrors.length} rows failed:</p>
+                          {hardErrors.map((e, i) => (
+                            <div key={i} className="text-sm text-red-600 bg-red-50 dark:bg-red-950 p-2 rounded mb-1">
+                              Row {e.row}: {e.field ? <span className="font-medium">{e.field} — </span> : null}{e.message}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {warnings.length > 0 && (
+                        <div className="border rounded-lg p-2">
+                          <p className="text-xs font-semibold text-yellow-600 mb-1">{warnings.length} warnings:</p>
+                          {warnings.map((w, i) => (
+                            <div key={i} className="text-sm text-yellow-700 bg-yellow-50 dark:bg-yellow-950 p-2 rounded mb-1">
+                              Row {w.row}: {w.field ? <span className="font-medium">{w.field} — </span> : null}{w.message}
+                              {w.value ? <span className="block text-xs text-yellow-600">Value: "{w.value}"</span> : null}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
             )}
           </div>

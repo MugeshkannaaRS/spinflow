@@ -31,16 +31,19 @@ function normalize(s: string): string {
 
 const FIELD_ALIASES: Record<string, string[]> = {
   employee_id: [
-    "code","emp id","empid","emp_id","employee id","emp no","empno",
+    "code","emp id","empid","emp_id","employee id","emp no","emp no.","empno",
     "employee no","staff id","staff no","worker id","emp code",
-    "employee code","emp code",
+    "employee code","emp code","id","serial no","sr no","sl no",
   ],
-  full_name: ["name","fullname","employee name","staff name","worker name"],
-  date_of_joining: ["doj","date of joining","join date","start date","joining date"],
-  basic: ["basic pay","basic salary","basic wage","base pay"],
-  total_salary: ["gross","gross salary","gross pay","total pay","ctc","total wage"],
+  full_name: ["name","fullname","employee name","staff name","worker name","emp name","person name"],
+  date_of_joining: ["doj","date of joining","join date","start date","joining date","joining","date joined"],
+  basic: ["basic pay","basic salary","basic wage","base pay","base salary"],
+  total_salary: ["gross","gross salary","gross pay","total pay","total wage","total wages","ctc"],
   house_rent: ["hra","house rent allowance","rent allowance"],
   department: ["dept","dept.","department name"],
+  food_allowance: ["food allow","food","meal allowance"],
+  mobile_bill: ["mobile","phone bill","mobile allowance","mobile allow"],
+  shift_benefit: ["shift benifit","shift benefit","shift allow","shift allowance"],
 };
 
 export function fuzzyMatchColumns(
