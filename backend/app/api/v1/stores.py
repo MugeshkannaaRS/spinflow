@@ -245,3 +245,23 @@ async def receive_spare_stock(
         spare.unit_price = req.unit_price
     await db.flush()
     return spare
+
+
+@router.get("/stores/page-init")
+async def stores_page_init(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("stores")),
+):
+    result: Dict[str, Any] = {}
+    try:
+        rows = await db.execute(
+            select(Spare.category, func.count().label("count"))
+            .where(Spare.category != None, Spare.category != "")
+            .group_by(Spare.category)
+            .order_by(Spare.category)
+        )
+        result["categories"] = [{"name": r.category, "count": r.count} for r in rows]
+    except Exception as e:
+        logger.error(f"stores.page-init error: {e}")
+        result["categories"] = []
+    return result

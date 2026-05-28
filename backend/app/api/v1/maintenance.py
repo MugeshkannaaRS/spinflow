@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from datetime import datetime, timezone
 
 from app.db.session import get_db
@@ -312,3 +312,32 @@ async def bulk_create_parameters(
             skipped += 1
     await db.commit()
     return BulkResponse(created=created, skipped=skipped, errors=errors)
+
+
+@router.get("/maintenance/page-init")
+async def maintenance_page_init(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance")),
+):
+    scope = await get_mill_scope(current_user)
+    result: Dict[str, Any] = {}
+    try:
+        mach_query = select(Machine.id, Machine.code, Machine.name, Machine.department).where(Machine.status == True)
+        if scope["mill_id"]:
+            mach_query = mach_query.where(Machine.mill_id == scope["mill_id"])
+        mach_rows = await db.execute(mach_query.order_by(Machine.code))
+        result["machines"] = [{"id": r.id, "code": r.code, "name": r.name} for r in mach_rows]
+    except Exception as e:
+        logger.error(f"maintenance.page-init machines error: {e}")
+        result["machines"] = []
+    try:
+        tech_rows = await db.execute(
+            select(Technician.id, Technician.code, Technician.name, Technician.specialization)
+            .where(Technician.is_active == True)
+            .order_by(Technician.name)
+        )
+        result["technicians"] = [{"id": r.id, "code": r.code, "name": r.name, "specialization": r.specialization} for r in tech_rows]
+    except Exception as e:
+        logger.error(f"maintenance.page-init technicians error: {e}")
+        result["technicians"] = []
+    return result

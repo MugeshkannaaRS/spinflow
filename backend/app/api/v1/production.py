@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 
 from sqlalchemy import select, func
 from app.db.session import get_db
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.production import Machine, Shift, ProductionEntry, DowntimeLog
-from app.models.masters import Mill, Department
+from app.models.masters import Mill, Department, YarnCount
 from app.schemas.production import (
     MachineCreate, MachineResponse, ProductionEntryResponse, ProductionEntryCreate,
     DowntimeResponse, DowntimeCreate, ShiftCreate, ShiftOut,
@@ -286,3 +286,39 @@ async def efficiency_trend(
 ):
     svc = ProductionService(db, current_user)
     return await svc.efficiency_trend(days)
+
+
+@router.get("/production/page-init")
+async def production_page_init(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production")),
+):
+    scope = await get_mill_scope(current_user)
+    result: Dict[str, Any] = {}
+    try:
+        dept_query = select(Department.id, Department.name, Department.code).where(
+            Department.is_active == True
+        )
+        if scope["mill_id"]:
+            dept_query = dept_query.where(Department.mill_id == scope["mill_id"])
+        dept_rows = await db.execute(dept_query.order_by(Department.name))
+        result["departments"] = [{"id": r.id, "name": r.name, "code": r.code} for r in dept_rows]
+    except Exception as e:
+        logger.error(f"production.page-init departments error: {e}")
+        result["departments"] = []
+    try:
+        shift_rows = await db.execute(select(Shift.id, Shift.code, Shift.name, Shift.start_time, Shift.end_time).order_by(Shift.code))
+        result["shifts"] = [{"id": r.id, "code": r.code, "name": r.name, "start_time": r.start_time, "end_time": r.end_time} for r in shift_rows]
+    except Exception as e:
+        logger.error(f"production.page-init shifts error: {e}")
+        result["shifts"] = []
+    try:
+        yc_query = select(YarnCount.id, YarnCount.count, YarnCount.blend).where(YarnCount.is_active == True)
+        if scope["mill_id"]:
+            yc_query = yc_query.where(YarnCount.mill_id == scope["mill_id"])
+        yc_rows = await db.execute(yc_query.order_by(YarnCount.count))
+        result["yarn_counts"] = [{"id": r.id, "count": r.count, "blend": r.blend} for r in yc_rows]
+    except Exception as e:
+        logger.error(f"production.page-init yarn_counts error: {e}")
+        result["yarn_counts"] = []
+    return result

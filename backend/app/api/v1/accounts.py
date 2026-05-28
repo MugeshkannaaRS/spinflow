@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from datetime import datetime, timezone, date
 
 from app.db.session import get_db
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.accounts import Invoice, Payment
-from app.models.masters import Mill
+from app.models.masters import Mill, Customer
 from app.schemas.accounts import (
     InvoiceCreate, InvoiceOut, InvoiceListResponse,
     PaymentCreate, PaymentOut, AccountsSummary,
@@ -267,3 +267,22 @@ async def get_cogs(
             mill_id = mill_ids[0]
     svc = AccountsService(db, current_user)
     return await svc.get_cogs(mill_id, date_from, date_to)
+
+
+@router.get("/accounts/page-init")
+async def accounts_page_init(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("accounts")),
+):
+    scope = await get_mill_scope(current_user)
+    result: Dict[str, Any] = {}
+    try:
+        cust_query = select(Customer.id, Customer.name, Customer.code).where(Customer.is_active == True)
+        if scope["mill_id"]:
+            cust_query = cust_query.where(Customer.mill_id == scope["mill_id"])
+        cust_rows = await db.execute(cust_query.order_by(Customer.name))
+        result["customers"] = [{"id": r.id, "name": r.name, "code": r.code} for r in cust_rows]
+    except Exception as e:
+        logger.error(f"accounts.page-init error: {e}")
+        result["customers"] = []
+    return result

@@ -5,6 +5,7 @@ import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { Topbar } from "@/components/layout/Topbar";
+import { fmtNumber } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -631,14 +632,14 @@ function ProductionPage() {
                   Produced Today
                 </div>
                 <div className="text-2xl font-semibold mt-2">
-                  {totalProduced.toLocaleString()} kg
+                  {fmtNumber(totalProduced)} kg
                 </div>
                 <Progress
                   value={totalTarget > 0 ? (totalProduced / totalTarget) * 100 : 0}
                   className="h-1.5 mt-3"
                 />
                 <div className="text-xs text-muted-foreground mt-1">
-                  of {totalTarget.toLocaleString()} kg target
+                  of {fmtNumber(totalTarget)} kg target
                 </div>
               </CardContent>
             </Card>
@@ -706,8 +707,8 @@ function ProductionPage() {
                     columns={[
                       { key: "code", label: machineColConfig.getLabel('code'), className: "font-mono text-xs" },
                       { key: "department", label: machineColConfig.getLabel('department'), type: "status" },
-                      { key: "target_kg", label: "Target (kg)", render: (m: any) => ((m.target_kg ?? m.targetKg) ?? 0).toLocaleString() },
-                      { key: "produced_kg", label: "Produced (kg)", render: (m: any) => ((m.produced_kg ?? m.producedKg) ?? 0).toLocaleString() },
+                      { key: "target_kg", label: "Target (kg)", render: (m: any) => fmtNumber(m.target_kg ?? m.targetKg) },
+                      { key: "produced_kg", label: "Produced (kg)", render: (m: any) => fmtNumber(m.produced_kg ?? m.producedKg) },
                       { key: "efficiency", label: "Efficiency", render: (m: any) => <span className={(m.efficiency ?? 0) >= 85 ? "text-green-600 font-medium" : (m.efficiency ?? 0) >= 70 ? "" : "text-destructive font-medium"}>{m.efficiency ?? 0}%</span> },
                       { key: "current_status", label: machineColConfig.getLabel('machine_status'), type: "status", render: (m: any) => <Badge variant={(m.current_status ?? m.status) === "running" ? "default" : (m.current_status ?? m.status) === "breakdown" ? "destructive" : "secondary"}>{m.current_status ?? m.status}</Badge> },
                     ] satisfies ColDef[]}

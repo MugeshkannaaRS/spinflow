@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, asc, desc
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 
 from app.db.session import get_db
 
@@ -12,7 +12,7 @@ from app.models.user import User
 from app.models.dispatch import Dispatch, DispatchItem
 from app.models.lotrac import Trip
 from app.models.inventory import Lot
-from app.models.masters import Mill
+from app.models.masters import Mill, Customer, MasterVehicle
 from app.schemas.dispatch import (
     DispatchResponse, DispatchCreate, DispatchStatusUpdate, QRScanRequest,
 )
@@ -287,3 +287,33 @@ async def dispatch_summary(
 ):
     svc = DispatchService(db, current_user)
     return await svc.dispatch_summary()
+
+
+@router.get("/dispatch/page-init")
+async def dispatch_page_init(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("dispatch")),
+):
+    scope = await get_mill_scope(current_user)
+    result: Dict[str, Any] = {}
+    try:
+        cust_query = select(Customer.id, Customer.name, Customer.code).where(Customer.is_active == True)
+        if scope["mill_id"]:
+            cust_query = cust_query.where(Customer.mill_id == scope["mill_id"])
+        cust_rows = await db.execute(cust_query.order_by(Customer.name))
+        result["customers"] = [{"id": r.id, "name": r.name, "code": r.code} for r in cust_rows]
+    except Exception as e:
+        logger.error(f"dispatch.page-init customers error: {e}")
+        result["customers"] = []
+    try:
+        veh_query = select(MasterVehicle.id, MasterVehicle.vehicle_no, MasterVehicle.vehicle_type, MasterVehicle.driver_name).where(
+            MasterVehicle.is_active == True
+        )
+        if scope["mill_id"]:
+            veh_query = veh_query.where(MasterVehicle.mill_id == scope["mill_id"])
+        veh_rows = await db.execute(veh_query.order_by(MasterVehicle.vehicle_no))
+        result["vehicles"] = [{"id": r.id, "vehicle_no": r.vehicle_no, "vehicle_type": r.vehicle_type, "driver_name": r.driver_name} for r in veh_rows]
+    except Exception as e:
+        logger.error(f"dispatch.page-init vehicles error: {e}")
+        result["vehicles"] = []
+    return result

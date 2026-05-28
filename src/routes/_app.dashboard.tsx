@@ -47,6 +47,7 @@ import { useRecentActivity } from "@/hooks/useRecentActivity";
 import { cn } from "@/lib/utils";
 import { SetupGuide } from "@/components/SetupGuide";
 import { RoleGuide } from "@/components/RoleGuide";
+import { fmtNumber } from "@/lib/formatters";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — SpinFlow ERP" }] }),
@@ -218,7 +219,7 @@ function Dashboard() {
     const role = user.role;
     const allCards: Record<string, React.ReactNode> = {
       productionToday: (
-        <Kpi icon={Factory} label="Production Today" value={`${safeData.productionToday.toLocaleString()} kg`} sub={`Target ${safeData.productionTarget.toLocaleString()} kg`} />
+        <Kpi icon={Factory} label="Production Today" value={`${fmtNumber(safeData.productionToday)} kg`} sub={`Target ${fmtNumber(safeData.productionTarget)} kg`} />
       ),
       efficiency: (
         <Kpi icon={TrendingUp} label="Overall Efficiency" value={`${safeData.efficiency}%`} sub="Plant average" tone="success" />

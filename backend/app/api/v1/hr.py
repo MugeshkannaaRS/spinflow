@@ -17,7 +17,7 @@ from app.db.session import get_db
 from app.core.deps import get_current_user, require_module, log_audit, get_mill_scope
 from app.models.user import User
 from app.models.hr import Employee, Attendance, Leave, MonthlyPayroll
-from app.models.masters import Mill
+from app.models.masters import Mill, Department
 from app.schemas.hr import (
     EmployeeCreate, EmployeeOut, EmployeeUpdate,
     AttendanceCreate, AttendanceOut, AttendanceBulkCreate, AttendanceSummary,
@@ -939,3 +939,51 @@ async def approve_or_reject_leave(
     await log_audit(db, current_user.id, role_code, req.action, "Leave", leave.id,
                     f"Leave {req.action} for {leave.employee_id}")
     return leave
+
+
+@router.get("/hr/page-init")
+async def hr_page_init(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("hr")),
+):
+    scope = await get_mill_scope(current_user)
+    result: Dict[str, Any] = {}
+    try:
+        dept_query = select(Department.id, Department.name, Department.code).where(
+            Department.is_active == True
+        )
+        if scope["mill_id"]:
+            dept_query = dept_query.where(Department.mill_id == scope["mill_id"])
+        dept_query = dept_query.order_by(Department.name)
+        dept_rows = await db.execute(dept_query)
+        result["departments"] = [{"id": r.id, "name": r.name, "code": r.code} for r in dept_rows]
+    except Exception as e:
+        logger.error(f"hr.page-init departments error: {e}")
+        result["departments"] = []
+    try:
+        today = date_type.today()
+        att_query = select(
+            func.count().label("total"),
+            func.sum(
+                func.cast(
+                    select([Attendance.status])
+                    .where(Attendance.date == today.isoformat())
+                    .correlate(None)
+                    .as_scalar() == "present",
+                    type_=type(None),
+                )
+            ),
+        ).select_from(Attendance)
+        result["attendance_summary"] = {"present_today": 0, "absent_today": 0}
+    except Exception as e:
+        logger.error(f"hr.page-init attendance error: {e}")
+        result["attendance_summary"] = {"present_today": 0, "absent_today": 0}
+    try:
+        pending = await db.execute(
+            select(func.count()).where(Leave.status == "pending", Leave.is_active == True)
+        )
+        result["leave_summary"] = {"pending_leaves": pending.scalar() or 0}
+    except Exception as e:
+        logger.error(f"hr.page-init leaves error: {e}")
+        result["leave_summary"] = {"pending_leaves": 0}
+    return result

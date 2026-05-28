@@ -4,6 +4,7 @@ import { payrollApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { AccessGuard } from "@/components/AccessGuard";
 import { Topbar } from "@/components/layout/Topbar";
+import { fmtNumber } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -122,7 +123,7 @@ function PayrollPage() {
                             <div className="flex justify-between">
                               <span>Net</span>
                               <span className="font-medium text-foreground">
-                                ₹{pm.total_net.toLocaleString()}
+                                ₹{fmtNumber(pm.total_net)}
                               </span>
                             </div>
                             <div className="flex justify-between">
@@ -243,23 +244,23 @@ function MonthSheet({
                 </div>
                 <div className="flex justify-between">
                   <span>Gross</span>
-                  <span>₹{pm.total_gross.toLocaleString()}</span>
+                  <span>₹{fmtNumber(pm.total_gross)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Deductions</span>
-                  <span className="text-destructive">₹{pm.total_deductions.toLocaleString()}</span>
+                  <span className="text-destructive">₹{fmtNumber(pm.total_deductions)}</span>
                 </div>
                 <div className="flex justify-between font-semibold">
                   <span>Net</span>
-                  <span>₹{pm.total_net.toLocaleString()}</span>
+                  <span>₹{fmtNumber(pm.total_net)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>PF</span>
-                  <span>₹{pm.total_pf.toLocaleString()}</span>
+                  <span>₹{fmtNumber(pm.total_pf)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>ESIC</span>
-                  <span>₹{pm.total_esic.toLocaleString()}</span>
+                  <span>₹{fmtNumber(pm.total_esic)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Employees</span>
@@ -429,10 +430,10 @@ function PayslipsTab({ millId, year }: { millId: string; year: number }) {
               { key: "department", label: payslipColConfig.getLabel('department'), type: "status" },
               { key: "present_days", label: payslipColConfig.getLabel('present_days') },
               { key: "overtime_hours", label: payslipColConfig.getLabel('overtime_hours') },
-              { key: "gross_wage", label: payslipColConfig.getLabel('gross_wage'), render: (p: any) => `₹${(p.gross_wage ?? 0).toLocaleString()}` },
-              { key: "pf_employee", label: payslipColConfig.getLabel('pf_employee'), render: (p: any) => `₹${(p.pf_employee ?? 0).toLocaleString()}` },
-              { key: "esic_employee", label: payslipColConfig.getLabel('esic_employee'), render: (p: any) => `₹${(p.esic_employee ?? 0).toLocaleString()}` },
-              { key: "net_wage", label: payslipColConfig.getLabel('net_wage'), render: (p: any) => <span className="font-medium">₹{(p.net_wage ?? 0).toLocaleString()}</span> },
+              { key: "gross_wage", label: payslipColConfig.getLabel('gross_wage'), render: (p: any) => `₹${fmtNumber(p.gross_wage)}` },
+              { key: "pf_employee", label: payslipColConfig.getLabel('pf_employee'), render: (p: any) => `₹${fmtNumber(p.pf_employee)}` },
+              { key: "esic_employee", label: payslipColConfig.getLabel('esic_employee'), render: (p: any) => `₹${fmtNumber(p.esic_employee)}` },
+              { key: "net_wage", label: payslipColConfig.getLabel('net_wage'), render: (p: any) => <span className="font-medium">₹{fmtNumber(p.net_wage)}</span> },
               { key: "status", label: payslipColConfig.getLabel('status'), type: "status", render: (p: any) => <Badge variant={p.status === "paid" ? "default" : "secondary"}>{p.status}</Badge> },
             ] satisfies ColDef[]}
             data={payslips}
