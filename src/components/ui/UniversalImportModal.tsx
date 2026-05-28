@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import {
   fuzzyMatchColumns, parseExcelDate, filterBlankRows, generateImportTemplate,
+  FIELD_ALIASES,
   type ImportMapping,
 } from "@/lib/excel-import";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/useColumnConfig";
@@ -50,6 +51,7 @@ interface ImportError {
   message: string;
   field?: string;
   value?: string;
+  severity?: string;
 }
 
 function computeConfidence(
@@ -57,6 +59,9 @@ function computeConfidence(
   col: ColumnConfig,
 ): number {
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim();
+  const nh = norm(header);
+  const aliases = FIELD_ALIASES[col.key];
+  if (aliases && aliases.some((a) => norm(a) === nh)) return 100;
   const levenshtein = (a: string, b: string): number => {
     const m = a.length; const n = b.length;
     const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
@@ -71,7 +76,6 @@ function computeConfidence(
     }
     return dp[m][n];
   };
-  const nh = norm(header);
   const keyScore = levenshtein(nh, norm(col.key.replace(/_/g, " ")));
   const labelScore = levenshtein(nh, norm(col.label));
   const score = Math.min(keyScore, labelScore);
@@ -859,36 +863,19 @@ export function UniversalImportModal({
               {showStep5Errors ? "Hide" : "View"} Error Details
             </Button>
             {showStep5Errors && importResult && (
-              <div className="mt-3 max-h-48 overflow-y-auto text-left space-y-2">
-                {(() => {
-                  const hardErrors = importResult.errors.filter(e => !e.field && !e.value)
-                  const warnings = importResult.errors.filter(e => e.field || e.value)
-                  return (
-                    <>
-                      {hardErrors.length > 0 && (
-                        <div className="border rounded-lg p-2">
-                          <p className="text-xs font-semibold text-red-600 mb-1">{hardErrors.length} rows failed:</p>
-                          {hardErrors.map((e, i) => (
-                            <div key={i} className="text-sm text-red-600 bg-red-50 dark:bg-red-950 p-2 rounded mb-1">
-                              Row {e.row}: {e.field ? <span className="font-medium">{e.field} — </span> : null}{e.message}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {warnings.length > 0 && (
-                        <div className="border rounded-lg p-2">
-                          <p className="text-xs font-semibold text-yellow-600 mb-1">{warnings.length} warnings:</p>
-                          {warnings.map((w, i) => (
-                            <div key={i} className="text-sm text-yellow-700 bg-yellow-50 dark:bg-yellow-950 p-2 rounded mb-1">
-                              Row {w.row}: {w.field ? <span className="font-medium">{w.field} — </span> : null}{w.message}
-                              {w.value ? <span className="block text-xs text-yellow-600">Value: "{w.value}"</span> : null}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )
-                })()}
+              <div className="mt-3 max-h-48 overflow-y-auto text-left space-y-1">
+                {importResult.errors.map((err, i) => (
+                  <div key={i} className={`text-sm p-2 rounded border ${
+                    err.severity === 'warning'
+                      ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                      : 'bg-red-50 text-red-700 border-red-200'
+                  }`}>
+                    <span className="font-medium">Row {err.row}</span>
+                    {err.field ? ` — ${err.field}` : ''}
+                    {err.value ? ` ("${err.value}")` : ''}
+                    : {err.message || 'Unknown error'}
+                  </div>
+                ))}
               </div>
             )}
           </div>

@@ -29,7 +29,7 @@ function normalize(s: string): string {
     .trim();
 }
 
-const FIELD_ALIASES: Record<string, string[]> = {
+export const FIELD_ALIASES: Record<string, string[]> = {
   employee_id: [
     "code","emp id","empid","emp_id","employee id","emp no","emp no.","empno",
     "employee no","staff id","staff no","worker id","emp code",
