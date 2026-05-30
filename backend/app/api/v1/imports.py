@@ -106,4 +106,4 @@ async def save_import_mappings(
         return {"saved": count, "mill_id": req.mill_id, "table_name": req.table_name}
     except Exception as e:
         logger.error(f"Error saving import mappings: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to save import mappings")
+        return {"saved": False, "error": str(e)}

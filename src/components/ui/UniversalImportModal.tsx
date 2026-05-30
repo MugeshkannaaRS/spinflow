@@ -284,6 +284,9 @@ export function UniversalImportModal({
         table_name: tableName,
         mappings: mappingsToSave,
       }),
+    onError: () => {
+      console.warn("Could not save import mappings");
+    },
   });
 
   const applyMapping = useCallback(() => {
@@ -348,7 +351,11 @@ export function UniversalImportModal({
         excel_header: header,
         spinflow_field: field,
       }));
-    saveMappingsMutation.mutate(mappingsToSave);
+    try {
+      saveMappingsMutation.mutate(mappingsToSave);
+    } catch {
+      // non-critical, ignore
+    }
 
     setStep(3);
   }, [rawRows, headers, mapping, colConfigs, millId, tableName, saveMappingsMutation]);
@@ -517,7 +524,9 @@ export function UniversalImportModal({
           }));
           const res = await api.post(endpoint, { items: sanitized, mill_id: millId });
           const data: any = res.data;
-          successCount += data?.created ?? batch.length;
+          console.log("batch response data:", data);
+          const batchCreated = typeof data?.created === "number" ? data.created : batch.length;
+          successCount += batchCreated;
           if (data?.errors?.length > 0) {
             for (const e of data.errors) {
               errors.push({
