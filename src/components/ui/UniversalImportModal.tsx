@@ -477,6 +477,7 @@ export function UniversalImportModal({
 
   const handleImport = useCallback(async () => {
     try {
+      await api.get("/auth/me");
       const keyFields = TABLE_KEY_FIELDS[tableName];
       const nonBlank = filterBlankRows(
         previewRecords.map((r) => r.data),

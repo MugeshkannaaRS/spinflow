@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "3b14cff4f6ce9e395b89e738a277c30e4bb692824c1a63657c4a5eadad78bf41"
     REFRESH_SECRET_KEY: str = "e76756cc9ab58da55e48df07667f00c9ed86a386ce6509e734bf09739afea9c3"
     JWT_ALGORITHM: str = "HS512"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # Redis

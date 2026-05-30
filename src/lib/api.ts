@@ -45,27 +45,33 @@ api.interceptors.response.use(
     clearSlowRequest();
     if (error.response?.status === 401) {
       const url = error.config?.url || "";
-      const isAuthEndpoint = url.includes("/auth/");
-      if (!isAuthEndpoint && !error.response?.data?.code?.includes("TOKEN_EXPIRED")) {
+
+      if (url.includes("/auth/refresh")) {
+        useAuth.getState().logout();
+        window.location.href = "/login";
         return Promise.reject(error);
       }
-      const { refreshToken, logout } = useAuth.getState();
-      if (refreshToken && error.config && !error.config._retry) {
-        error.config._retry = true;
-        try {
-          const res = await api.post("/auth/refresh", { refresh_token: refreshToken });
-          const { access_token, refresh_token } = res.data;
-          useAuth.getState().setTokens(access_token, refresh_token);
-          error.config.headers.Authorization = `Bearer ${access_token}`;
-          return api(error.config);
-        } catch {
-          logout();
-          window.location.href = "/login";
-          return Promise.reject(error);
+
+      if (!url.includes("/auth/")) {
+        const { refreshToken, logout } = useAuth.getState();
+        if (refreshToken && error.config && !error.config._retry) {
+          error.config._retry = true;
+          try {
+            const res = await api.post("/auth/refresh", { refresh_token: refreshToken });
+            const { access_token, refresh_token } = res.data;
+            useAuth.getState().setTokens(access_token, refresh_token);
+            error.config.headers.Authorization = `Bearer ${access_token}`;
+            return api(error.config);
+          } catch {
+            logout();
+            window.location.href = "/login";
+            return Promise.reject(error);
+          }
         }
+        logout();
+        window.location.href = "/login";
       }
-      logout();
-      window.location.href = "/login";
+      return Promise.reject(error);
     }
     return Promise.reject(error);
   },
