@@ -350,7 +350,26 @@ async def bulk_create_employees(
     for batch_start in range(0, len(employees_to_add), BATCH_SIZE):
         batch = employees_to_add[batch_start:batch_start + BATCH_SIZE]
         for emp in batch:
-            db.add(emp)
+            existing_result = await db.execute(
+                select(Employee).where(
+                    Employee.code == emp.code,
+                    Employee.mill_id == mill_id
+                )
+            )
+            existing = existing_result.scalar_one_or_none()
+            if existing:
+                for field in ["name", "department", "designation", "section", "shift",
+                              "joining_date", "dob", "gen", "age", "gender", "grade",
+                              "phone", "bank_account_no", "basic", "house_rent", "medical",
+                              "conveyance", "food_allowance", "wages", "increment",
+                              "total_salary", "mobile_bill", "shift_benefit", "wages_of_month",
+                              "days_of_month", "sl_no"]:
+                    val = getattr(emp, field, None)
+                    if val is not None:
+                        setattr(existing, field, val)
+                db.add(existing)
+            else:
+                db.add(emp)
         try:
             await db.flush()
             imported += len(batch)

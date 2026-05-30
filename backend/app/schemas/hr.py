@@ -186,13 +186,14 @@ class AttendanceCreate(BaseModel):
     out_time: Optional[str] = None
     overtime_hours: float = Field(default=0.0, ge=0)
 
-    @field_validator("status")
+    @field_validator("status", mode="before")
     @classmethod
-    def validate_status(cls, v: str) -> str:
-        allowed = {"present", "absent", "half_day", "leave"}
-        if v not in allowed:
-            raise ValueError(f"status must be one of {allowed}")
-        return v
+    def normalize_status(cls, v):
+        if not v:
+            return "present"
+        mapping = {"p": "present", "a": "absent", "l": "leave", "h": "holiday"}
+        normalized = str(v).lower().strip()
+        return mapping.get(normalized, normalized)
 
 
 class AttendanceOut(BaseModel):

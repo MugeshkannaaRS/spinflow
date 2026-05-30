@@ -509,38 +509,53 @@ export function UniversalImportModal({
       setImportError(null);
       setImportProgress({ current: 0, total: validRecords.length });
 
-      const BATCH_SIZE = 50;
+      const BATCH_SIZE = 20;
+      const MAX_RETRIES = 2;
       let successCount = 0;
       const errors: ImportError[] = [];
 
       for (let i = 0; i < validRecords.length; i += BATCH_SIZE) {
         const batch = validRecords.slice(i, i + BATCH_SIZE);
-        try {
-          const sanitized = batch.map(record => ({
-            ...record,
-            employee_code: record.employee_code != null ? String(record.employee_code).trim() : "",
-            gen: record.gen != null ? String(record.gen).trim() : null,
-            grade: record.grade != null ? String(record.grade).trim() : null,
-          }));
-          const res = await api.post(endpoint, { items: sanitized, mill_id: millId });
-          const data: any = res.data;
-          console.log("batch response data:", data);
-          const batchCreated = typeof data?.created === "number" ? data.created : batch.length;
-          successCount += batchCreated;
-          if (data?.errors?.length > 0) {
-            for (const e of data.errors) {
-              errors.push({
-                row: (i + (e.row ?? 1)),
-                message: e.message ?? "Import error",
-                field: e.field,
-                value: e.value,
-                severity: e.severity ?? "error",
-              });
+        const sanitized = batch.map(record => ({
+          ...record,
+          employee_code: record.employee_code != null ? String(record.employee_code).trim() : "",
+          gen: record.gen != null ? String(record.gen).trim() : null,
+          grade: record.grade != null ? String(record.grade).trim() : null,
+        }));
+
+        let res;
+        let lastErr: any;
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            res = await api.post(endpoint, { items: sanitized, mill_id: millId });
+            break;
+          } catch (err: any) {
+            lastErr = err;
+            if (attempt < MAX_RETRIES) {
+              await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
             }
           }
-        } catch (err: any) {
-          const msg = err?.response?.data?.detail ?? err?.message ?? "Import failed";
-          errors.push({ row: i + 1, message: msg });
+        }
+        if (!res) {
+          errors.push({ row: i + 1, message: `Network error after ${MAX_RETRIES} retries: ${lastErr?.message}`, severity: "error" });
+          setImportProgress({ current: Math.min(i + BATCH_SIZE, validRecords.length), total: validRecords.length });
+          continue;
+        }
+
+        const data: any = res.data;
+        console.log("batch response data:", data);
+        const batchCreated = typeof data?.created === "number" ? data.created : batch.length;
+        successCount += batchCreated;
+        if (data?.errors?.length > 0) {
+          for (const e of data.errors) {
+            errors.push({
+              row: (i + (e.row ?? 1)),
+              message: e.message ?? "Import error",
+              field: e.field,
+              value: e.value,
+              severity: e.severity ?? "error",
+            });
+          }
         }
         setImportProgress({ current: Math.min(i + BATCH_SIZE, validRecords.length), total: validRecords.length });
       }
