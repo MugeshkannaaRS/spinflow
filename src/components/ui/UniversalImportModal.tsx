@@ -509,7 +509,13 @@ export function UniversalImportModal({
       for (let i = 0; i < validRecords.length; i += BATCH_SIZE) {
         const batch = validRecords.slice(i, i + BATCH_SIZE);
         try {
-          const res = await api.post(endpoint, { items: batch, mill_id: millId });
+          const sanitized = batch.map(record => ({
+            ...record,
+            employee_code: record.employee_code != null ? String(record.employee_code).trim() : "",
+            gen: record.gen != null ? String(record.gen).trim() : null,
+            grade: record.grade != null ? String(record.grade).trim() : null,
+          }));
+          const res = await api.post(endpoint, { items: sanitized, mill_id: millId });
           const data: any = res.data;
           successCount += data?.created ?? batch.length;
           if (data?.errors?.length > 0) {

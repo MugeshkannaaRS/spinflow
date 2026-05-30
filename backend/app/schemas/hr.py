@@ -287,6 +287,20 @@ class EmployeeBulkItem(BaseModel):
     age: Optional[int] = None
     gender: Optional[str] = None
     grade: Optional[str] = None
+
+    @field_validator("employee_code", mode="before")
+    @classmethod
+    def coerce_employee_code(cls, v):
+        if v is None or v == "":
+            return ""
+        return str(v).strip()
+
+    @field_validator("gen", "grade", mode="before")
+    @classmethod
+    def coerce_optional_str(cls, v):
+        if v is None or v == "":
+            return None
+        return str(v).strip()
     phone: Optional[str] = None
     sl_no: Optional[int] = None
     bank_account_no: Optional[str] = None
