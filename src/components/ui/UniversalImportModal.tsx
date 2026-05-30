@@ -510,17 +510,17 @@ export function UniversalImportModal({
         try {
           const res = await api.post(endpoint, { items: batch, mill_id: millId });
           const data: any = res.data;
+          successCount += data?.created ?? batch.length;
           if (data?.errors?.length > 0) {
             for (const e of data.errors) {
               errors.push({
-                row: e.row ?? i + 1,
+                row: (i + (e.row ?? 1)),
                 message: e.message ?? "Import error",
                 field: e.field,
                 value: e.value,
+                severity: e.severity ?? "error",
               });
             }
-          } else {
-            successCount += batch.length;
           }
         } catch (err: any) {
           const msg = err?.response?.data?.detail ?? err?.message ?? "Import failed";
@@ -808,7 +808,10 @@ export function UniversalImportModal({
   };
 
   const renderStep5 = () => {
-    const hasErrors = importResult && importResult.errors.length > 0;
+    const hardErrors = importResult?.errors.filter(e => !e.severity || e.severity === "error") ?? [];
+    const warnings = importResult?.errors.filter(e => e.severity === "warning") ?? [];
+    const hasErrors = hardErrors.length > 0 || warnings.length > 0;
+    const hasHardErrors = hardErrors.length > 0;
     const isTotalFailure = importError !== null;
 
     return (
@@ -824,7 +827,7 @@ export function UniversalImportModal({
               <p className="text-xs text-muted-foreground">No records were imported.</p>
             </div>
           </>
-        ) : hasErrors ? (
+        ) : hasHardErrors ? (
           <>
             <div className="mx-auto size-16 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
               <AlertTriangle className="size-8 text-yellow-600" />
@@ -848,6 +851,9 @@ export function UniversalImportModal({
               <p className="text-lg font-medium">Import complete!</p>
               <p className="text-sm text-muted-foreground">
                 {importResult?.success ?? 0} records imported successfully
+                  {warnings.length > 0 && (
+                    <span className="text-yellow-600"> ({warnings.length} warnings)</span>
+                  )}
               </p>
             </div>
           </>
@@ -862,18 +868,22 @@ export function UniversalImportModal({
             >
               {showStep5Errors ? "Hide" : "View"} Error Details
             </Button>
-            {showStep5Errors && importResult && (
+            {showStep5Errors && (hasHardErrors || warnings.length > 0) && (
               <div className="mt-3 max-h-48 overflow-y-auto text-left space-y-1">
-                {importResult.errors.map((err, i) => (
-                  <div key={i} className={`text-sm p-2 rounded border ${
-                    err.severity === 'warning'
-                      ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                      : 'bg-red-50 text-red-700 border-red-200'
-                  }`}>
+                {hardErrors.map((err, i) => (
+                  <div key={i} className="text-sm p-2 rounded border bg-red-50 text-red-700 border-red-200">
                     <span className="font-medium">Row {err.row}</span>
                     {err.field ? ` — ${err.field}` : ''}
                     {err.value ? ` ("${err.value}")` : ''}
                     : {err.message || 'Unknown error'}
+                  </div>
+                ))}
+                {warnings.map((err, i) => (
+                  <div key={`w-${i}`} className="text-sm p-2 rounded border bg-yellow-50 text-yellow-700 border-yellow-200">
+                    <span className="font-medium">Row {err.row}</span>
+                    {err.field ? ` — ${err.field}` : ''}
+                    {err.value ? ` ("${err.value}")` : ''}
+                    : {err.message || 'Unknown warning'}
                   </div>
                 ))}
               </div>

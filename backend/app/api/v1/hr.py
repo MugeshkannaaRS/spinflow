@@ -343,9 +343,7 @@ async def bulk_create_employees(
         if has_payroll:
             payroll_records.append((emp, item))
 
-    hard_errors = [e for e in errors if e.severity != "warning"]
-    if hard_errors:
-        return EmployeeBulkResponse(created=0, errors=errors)
+    # Don't abort — skip only the bad rows, import the rest
 
     BATCH_SIZE = 50
     imported = 0
