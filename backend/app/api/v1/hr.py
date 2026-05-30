@@ -292,7 +292,17 @@ async def bulk_create_employees(
         def _str(v):
             return str(v).strip() if v is not None else None
 
-        dept_name = (item.department or "").strip()
+        dept_name = (item.department or "General").strip()
+        if dept_name != "General":
+            dept_result = await db.execute(
+                select(Department).where(
+                    Department.name.ilike(dept_name),
+                    Department.mill_id == mill_id
+                )
+            )
+            dept = dept_result.scalar_one_or_none()
+            if not dept:
+                errors.append(_err(row, f"Department '{dept_name}' not found in Masters. Employee imported but department not linked. Add department in Masters → Departments first.", "department", dept_name, "warning"))
 
         emp = Employee(
             code=item.employee_code.strip(),
