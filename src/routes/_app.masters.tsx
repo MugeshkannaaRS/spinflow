@@ -465,6 +465,12 @@ function matchesSearch(item: any, search: string): boolean {
   );
 }
 
+function singularize(word: string): string {
+  if (word.endsWith("ies")) return word.slice(0, -3) + "y";
+  if (word.endsWith("s")) return word.slice(0, -1);
+  return word;
+}
+
 function MasterTable<T = any>({
   title,
   data,
@@ -532,11 +538,11 @@ function MasterTable<T = any>({
           <Sheet open={adding} onOpenChange={(o) => { if (!o) setAdding(false); }}>
             <SheetTrigger asChild>
               <Button size="sm" onClick={() => setAdding(true)}>
-                <Plus className="size-4 mr-1" /> Add {title.slice(0, -1)}
+                <Plus className="size-4 mr-1" /> Add {singularize(title)}
               </Button>
             </SheetTrigger>
             <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-              <SheetHeader><SheetTitle>Add {title.slice(0, -1)}</SheetTitle></SheetHeader>
+              <SheetHeader><SheetTitle>Add {singularize(title)}</SheetTitle></SheetHeader>
               <div className="mt-4">{onAdd}</div>
             </SheetContent>
           </Sheet>
@@ -562,7 +568,7 @@ function MasterTable<T = any>({
                       <Button size="sm" variant="outline">Edit</Button>
                     </SheetTrigger>
                     <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-                      <SheetHeader><SheetTitle>Edit {title.slice(0, -1)}</SheetTitle></SheetHeader>
+                      <SheetHeader><SheetTitle>Edit {singularize(title)}</SheetTitle></SheetHeader>
                       <div className="mt-4">{onEdit(item)}</div>
                     </SheetContent>
                   </Sheet>

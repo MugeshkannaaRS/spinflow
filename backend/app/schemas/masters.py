@@ -13,13 +13,14 @@ class CompanyCreate(BaseModel):
     email: Optional[str] = None
     logo_url: Optional[str] = None
 
-    @field_validator("gstin")
+    @field_validator("gstin", mode="before")
     @classmethod
-    def validate_gstin(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None:
-            v = v.strip()
-            if len(v) != 15 or not v.isalnum():
-                raise ValueError("GSTIN must be exactly 15 alphanumeric characters")
+    def validate_gstin(cls, v):
+        if not v or str(v).strip() == "":
+            return None
+        v = str(v).strip().upper()
+        if not re.match(r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$', v):
+            raise ValueError("Invalid GSTIN format (e.g. 29ABCDE1234F1Z5)")
         return v
 
 
@@ -33,13 +34,14 @@ class CompanyUpdate(BaseModel):
     logo_url: Optional[str] = None
     is_active: Optional[bool] = None
 
-    @field_validator("gstin")
+    @field_validator("gstin", mode="before")
     @classmethod
-    def validate_gstin(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None:
-            v = v.strip()
-            if len(v) != 15 or not v.isalnum():
-                raise ValueError("GSTIN must be exactly 15 alphanumeric characters")
+    def validate_gstin(cls, v):
+        if not v or str(v).strip() == "":
+            return None
+        v = str(v).strip().upper()
+        if not re.match(r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$', v):
+            raise ValueError("Invalid GSTIN format (e.g. 29ABCDE1234F1Z5)")
         return v
 
 
@@ -108,7 +110,7 @@ class DepartmentCreate(BaseModel):
     mill_id: str
     code: str = Field(..., min_length=1, max_length=50)
     name: str = Field(..., min_length=1, max_length=200)
-    department_type: str = Field(..., pattern=r"^(blowroom|carding|drawing|simplex|ring_frame|winding|quality|stores|dispatch|hr|accounts|maintenance|admin)$")
+    department_type: Optional[str] = "general"
 
 
 class DepartmentUpdate(BaseModel):
@@ -200,14 +202,12 @@ class CustomerCreate(BaseModel):
     credit_limit: Optional[float] = 0
     payment_terms_days: int = 30
 
-    @field_validator("phone")
+    @field_validator("phone", mode="before")
     @classmethod
-    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None:
-            v = v.strip()
-            if not re.match(r"^\d{10}$", v):
-                raise ValueError("Phone must be exactly 10 digits")
-        return v
+    def validate_phone(cls, v):
+        if not v or str(v).strip() == "":
+            return None
+        return str(v).strip()
 
 
 class CustomerUpdate(BaseModel):
@@ -256,7 +256,7 @@ class CustomerOut(BaseModel):
 class MasterVehicleCreate(BaseModel):
     mill_id: str
     vehicle_no: str = Field(..., min_length=1, max_length=50)
-    vehicle_type: str = Field(..., pattern=r"^(truck|mini_truck|lorry|tempo|other)$")
+    vehicle_type: Optional[str] = None
     make: Optional[str] = None
     model: Optional[str] = None
     capacity_kg: Optional[float] = None
@@ -264,13 +264,12 @@ class MasterVehicleCreate(BaseModel):
     driver_phone: Optional[str] = None
     driver_license: Optional[str] = None
 
-    @field_validator("vehicle_no")
+    @field_validator("vehicle_no", mode="before")
     @classmethod
-    def validate_vehicle_no(cls, v: str) -> str:
-        v = v.strip()
-        if not re.match(r"^[A-Z]{2}\s?\d{2}\s?[A-Z]{1,2}\s?\d{4}$", v):
-            raise ValueError("Vehicle number must match Indian format e.g. 'TN 11 AB 1234'")
-        return v
+    def validate_vehicle_no(cls, v):
+        if not v or str(v).strip() == "":
+            raise ValueError("Vehicle number is required")
+        return str(v).strip()
 
 
 class MasterVehicleUpdate(BaseModel):

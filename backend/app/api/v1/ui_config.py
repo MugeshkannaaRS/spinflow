@@ -396,19 +396,19 @@ async def get_column_config(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not table or not table.strip():
-        raise HTTPException(
-            status_code=400,
-            detail="table parameter is required and cannot be empty"
-        )
-    role_name = current_user.role_rel.code if current_user.role_rel else ""
-    effective_mill_id = mill_id
-    if role_name != "SUPER_ADMIN":
-        effective_mill_id = current_user.mill_id
-    if not effective_mill_id:
-        effective_mill_id = "default"
-
     try:
+        if not table or not table.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="table parameter is required and cannot be empty"
+            )
+        role_name = current_user.role_rel.code if current_user.role_rel else ""
+        effective_mill_id = mill_id
+        if role_name != "SUPER_ADMIN":
+            effective_mill_id = current_user.mill_id
+        if not effective_mill_id:
+            effective_mill_id = "default"
+
         result = await db.execute(
             select(ColumnConfig).where(
                 ColumnConfig.mill_id == effective_mill_id,
@@ -416,54 +416,60 @@ async def get_column_config(
             ).order_by(ColumnConfig.updated_at.desc())
         )
         config = result.scalars().first()
-    except Exception as e:
-        logger.error(f"Error fetching column config for table={table}: {e}", exc_info=True)
-        config = None
 
-    defaults = _get_default_columns(table)
+        defaults = _get_default_columns(table)
 
-    if not config:
+        if not config:
+            return TableConfigResponse(
+                table=table,
+                mill_id=effective_mill_id,
+                columns=defaults,
+            )
+
+        import json
+        try:
+            parsed = json.loads(config.columns)
+        except (json.JSONDecodeError, TypeError):
+            parsed = []
+
+        try:
+            do_result = await db.execute(
+                select(ColumnDropdownOption).where(
+                    ColumnDropdownOption.mill_id == effective_mill_id,
+                    ColumnDropdownOption.table_name == table,
+                    ColumnDropdownOption.is_active == True,
+                ).order_by(ColumnDropdownOption.display_order)
+            )
+            dropdown_rows = do_result.scalars().all()
+        except Exception as e:
+            logger.error(f"Error fetching dropdown options for table={table}: {e}", exc_info=True)
+            dropdown_rows = []
+
+        dropdown_map: dict = {}
+        for d in dropdown_rows:
+            if d.column_key not in dropdown_map:
+                dropdown_map[d.column_key] = []
+            dropdown_map[d.column_key].append({
+                "value": d.option_value,
+                "label": d.option_label,
+            })
+
+        columns = _build_column_response(parsed, dropdown_map)
+
         return TableConfigResponse(
             table=table,
             mill_id=effective_mill_id,
-            columns=defaults,
+            columns=columns,
         )
-
-    import json
-    try:
-        parsed = json.loads(config.columns)
-    except (json.JSONDecodeError, TypeError):
-        parsed = []
-
-    try:
-        do_result = await db.execute(
-            select(ColumnDropdownOption).where(
-                ColumnDropdownOption.mill_id == effective_mill_id,
-                ColumnDropdownOption.table_name == table,
-                ColumnDropdownOption.is_active == True,
-            ).order_by(ColumnDropdownOption.display_order)
-        )
-        dropdown_rows = do_result.scalars().all()
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error fetching dropdown options for table={table}: {e}", exc_info=True)
-        dropdown_rows = []
-
-    dropdown_map: dict = {}
-    for d in dropdown_rows:
-        if d.column_key not in dropdown_map:
-            dropdown_map[d.column_key] = []
-        dropdown_map[d.column_key].append({
-            "value": d.option_value,
-            "label": d.option_label,
-        })
-
-    columns = _build_column_response(parsed, dropdown_map)
-
-    return TableConfigResponse(
-        table=table,
-        mill_id=effective_mill_id,
-        columns=columns,
-    )
+        logger.error(f"Error in get_column_config for table={table}: {e}", exc_info=True)
+        return TableConfigResponse(
+            table=table,
+            mill_id="default",
+            columns=[],
+        )
 
 
 @router.get("/ui-config/columns/all", response_model=dict)
