@@ -201,10 +201,9 @@ function formatDate(d: string | Date): string {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;
   if (isNaN(date.getTime())) return String(d);
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
+  return `${day} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 function formatCurrency(n: number | undefined | null): string {
