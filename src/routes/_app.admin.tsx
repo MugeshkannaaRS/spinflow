@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, adminApi, usersApi, auditApi } from "@/lib/api-service";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
+import { z } from "zod";
 
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,7 +64,14 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { Company } from "@/lib/types";
 
+const AdminSearchSchema = z.object({
+  tab: z.string().optional(),
+  action: z.string().optional(),
+  company: z.string().optional(),
+}).optional().default({});
+
 export const Route = createFileRoute("/_app/admin")({
+  validateSearch: (search) => AdminSearchSchema.parse(search),
   head: () => ({ meta: [{ title: "Admin — SpinFlow ERP" }] }),
   component: AdminPage,
 });
@@ -92,15 +100,16 @@ const ALL_MODULES = Object.keys(MODULE_LABELS);
 function AdminPage() {
   const user = useAuth((s) => s.user);
   const qc = useQueryClient();
-  const [tab, setTab] = useState("companies");
-  const [search, setSearch] = useState("");
+  const searchParams = useSearch({ from: "/_app/admin" });
+  const [tab, setTab] = useState(searchParams?.tab ?? "companies");
+  const [localSearch, setLocalSearch] = useState("");
 
-  const [addCompanyOpen, setAddCompanyOpen] = useState(false);
+  const [addCompanyOpen, setAddCompanyOpen] = useState(searchParams?.action === "add" ? true : false);
   const [editCompany, setEditCompany] = useState<Company | null>(null);
   const [modulesCompany, setModulesCompany] = useState<Company | null>(null);
   const [suspendCompany, setSuspendCompany] = useState<Company | null>(null);
   const [showCreateUser, setShowCreateUser] = useState(false);
-  const [filterCompanyId, setFilterCompanyId] = useState("");
+  const [filterCompanyId, setFilterCompanyId] = useState(searchParams?.company ?? "");
   const [resetPwUser, setResetPwUser] = useState<{ id: string; name: string } | null>(null);
   const [newPw, setNewPw] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -112,6 +121,7 @@ function AdminPage() {
       toast.success(`${company.name} has been ${status}`);
       setSuspendCompany(null);
       qc.invalidateQueries({ queryKey: ["masters"] });
+      qc.invalidateQueries({ queryKey: ["admin-summary"] });
     } catch {
       toast.error("Failed to update company status");
     }
@@ -293,8 +303,8 @@ function AdminPage() {
                     )}
                   />
                 </CardContent>
-                <EditCompanyDialog company={editCompany} onClose={() => setEditCompany(null)} onDone={() => { qc.invalidateQueries({ queryKey: ["masters"] }); setEditCompany(null); }} />
-                <ModulesDialog company={modulesCompany} onClose={() => setModulesCompany(null)} onDone={() => { qc.invalidateQueries({ queryKey: ["masters"] }); setModulesCompany(null); }} />
+                <EditCompanyDialog company={editCompany} onClose={() => setEditCompany(null)} onDone={() => { qc.invalidateQueries({ queryKey: ["masters"] }); qc.invalidateQueries({ queryKey: ["admin-summary"] }); setEditCompany(null); }} />
+                <ModulesDialog company={modulesCompany} onClose={() => setModulesCompany(null)} onDone={() => { qc.invalidateQueries({ queryKey: ["masters"] }); qc.invalidateQueries({ queryKey: ["admin-summary"] }); setModulesCompany(null); }} />
                 <AlertDialog open={!!suspendCompany} onOpenChange={() => setSuspendCompany(null)}>
                   <AlertDialogContent>
                     <AlertDialogHeader>
@@ -453,7 +463,7 @@ function AdminPage() {
                 open={showCreateUser}
                 onOpenChange={setShowCreateUser}
                 companies={companiesData}
-                onDone={() => { qc.invalidateQueries({ queryKey: ["admin-users"] }); qc.invalidateQueries({ queryKey: ["system-users"] }); }}
+                onDone={() => { qc.invalidateQueries({ queryKey: ["admin-users"] }); qc.invalidateQueries({ queryKey: ["system-users"] }); qc.invalidateQueries({ queryKey: ["admin-summary"] }); }}
               />
 
               {/* Reset Password Dialog */}
@@ -591,6 +601,7 @@ function EditLimitDialog({ company }: { company: Company }) {
               toast.success(`User limit updated to ${newLimit} for ${company.name}`);
               setOpen(false);
               qc.invalidateQueries({ queryKey: ["admin-user-limits"] });
+              qc.invalidateQueries({ queryKey: ["admin-summary"] });
             } catch {
               toast.error("Failed to update limit");
             }
@@ -699,6 +710,7 @@ function AddCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
       setStep(3);
       qc.invalidateQueries({ queryKey: ["masters"] });
       qc.invalidateQueries({ queryKey: ["system-users"] });
+      qc.invalidateQueries({ queryKey: ["admin-summary"] });
     } catch (err: any) {
       toast.error(err?.response?.data?.detail ?? "Onboarding failed");
     } finally {
