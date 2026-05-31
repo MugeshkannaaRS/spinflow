@@ -6,11 +6,11 @@ import { useAuth } from "@/stores/auth";
 import { Topbar } from "@/components/layout/Topbar";
 import { StatCard } from "@/components/ui/StatCard";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle, X,
   Factory, Trash2, Users, Cpu, IndianRupee, AlertCircle,
+  CheckCircle2, Circle,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -21,6 +21,7 @@ import {
   Tooltip,
   CartesianGrid,
   Cell,
+  ReferenceLine,
 } from "recharts";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -101,27 +102,23 @@ function Dashboard() {
     <>
       <Topbar title={`Good day, ${user?.name?.split(" ")[0] ?? "User"}`} subtitle="Live operations overview" />
 
-      <div className="space-y-4">
+      <div className="space-y-6 p-6 max-w-[1400px] mx-auto">
         {hasCriticalAlerts && (
-          <div className="flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3">
-            <div className="flex items-center gap-2 text-sm">
-              <AlertTriangle className="size-4 text-red-500 shrink-0" />
-              <span className="font-semibold text-red-700 dark:text-red-300">Action Required:</span>
-              <span className="text-red-600 dark:text-red-400">Machine #12 down · Cotton stock critical · 2 payments overdue</span>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Link to="/audit" className="text-xs font-medium text-red-600 dark:text-red-400 hover:underline">View All</Link>
-              <button onClick={() => setAlertDismissed(true)} className="text-red-400 hover:text-red-600">
-                <X className="size-4" />
-              </button>
-            </div>
+          <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm">
+            <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
+            <span className="text-red-700 dark:text-red-300">
+              <strong>Action Required:</strong> Machine #12 down · Cotton stock critical · 2 payments overdue
+            </span>
+            <button onClick={() => setAlertDismissed(true)} className="ml-auto text-red-400 hover:text-red-600">
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 
         {isLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="bg-[var(--bg-primary)] rounded-xl p-5 shadow-[var(--card-shadow)]">
+              <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-gray-100 dark:border-slate-700 shadow-sm">
                 <Skeleton className="h-3 w-20 mb-2" />
                 <Skeleton className="h-7 w-28 mb-1" />
                 <Skeleton className="h-3 w-16" />
@@ -129,7 +126,7 @@ function Dashboard() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <StatCard
               title="Today's Production"
               value={`${demoData.productionToday.toLocaleString()} kg`}
@@ -184,49 +181,51 @@ function Dashboard() {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-[var(--bg-primary)] rounded-xl p-5 shadow-[var(--card-shadow)]">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Production vs Target — Last 7 Days</h3>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-gray-100 dark:border-slate-700 shadow-sm">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-4">Production vs Target — Last 7 Days</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={productionData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={12} />
-                  <YAxis stroke="var(--text-muted)" fontSize={12} />
+                <BarChart data={productionData} barSize={28}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                  <XAxis dataKey="day" tick={{ fontSize: 12, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 12, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                   <Tooltip
                     contentStyle={{
-                      background: "var(--bg-primary)",
-                      border: "1px solid var(--border)",
+                      background: "white",
+                      border: "1px solid #e5e7eb",
                       borderRadius: 8,
                       fontSize: 12,
+                      boxShadow: "0 4px 6px rgba(0,0,0,0.07)",
                     }}
                   />
-                  <Bar dataKey="target" fill="var(--bg-tertiary)" radius={[4, 4, 0, 0]} name="Target" />
-                  <Bar dataKey="produced" fill="var(--brand-500)" radius={[4, 4, 0, 0]} name="Produced" />
+                  <ReferenceLine y={5000} stroke="#6366f1" strokeDasharray="4 4" label={{ value: "Target", position: "right", fontSize: 11, fill: "#6366f1" }} />
+                  <Bar dataKey="produced" fill="#6366f1" radius={[4, 4, 0, 0]} name="Produced (kg)" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="bg-[var(--bg-primary)] rounded-xl p-5 shadow-[var(--card-shadow)]">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Department Attendance Today</h3>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-gray-100 dark:border-slate-700 shadow-sm">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300 mb-4">Department Attendance Today</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={deptAttendance} layout="vertical" margin={{ left: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
-                  <XAxis type="number" domain={[0, 100]} stroke="var(--text-muted)" fontSize={12} tickFormatter={(v) => `${v}%`} />
-                  <YAxis type="category" dataKey="dept" stroke="var(--text-muted)" fontSize={11} width={80} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
+                  <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 12, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
+                  <YAxis type="category" dataKey="dept" tick={{ fontSize: 11, fill: "#9ca3af" }} width={80} axisLine={false} tickLine={false} />
                   <Tooltip
                     formatter={(value: number) => [`${value}%`, "Attendance"]}
                     contentStyle={{
-                      background: "var(--bg-primary)",
-                      border: "1px solid var(--border)",
+                      background: "white",
+                      border: "1px solid #e5e7eb",
                       borderRadius: 8,
                       fontSize: 12,
+                      boxShadow: "0 4px 6px rgba(0,0,0,0.07)",
                     }}
                   />
                   <Bar dataKey="pct" radius={[0, 4, 4, 0]}>
                     {deptAttendance.map((entry, idx) => (
-                      <Cell key={idx} fill={entry.color} />
+                      <Cell key={idx} fill={entry.pct >= 90 ? "#10b981" : entry.pct >= 80 ? "#f59e0b" : "#ef4444"} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -236,68 +235,89 @@ function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="bg-[var(--bg-primary)] rounded-xl p-5 shadow-[var(--card-shadow)]">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Live Alerts</h3>
-              <Badge variant="destructive" className="text-[10px] h-5">{liveAlerts.length}</Badge>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300">Live Alerts</h3>
+              <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                {liveAlerts.length}
+              </span>
             </div>
-            <div className="space-y-0">
+            <div className="divide-y divide-gray-50 dark:divide-slate-700/50">
               {liveAlerts.map((alert, i) => (
-                <div key={i} className="flex items-center gap-3 py-2.5 border-b border-[var(--border)] last:border-0">
+                <div key={i} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                   <span className={cn(
-                    "size-2 rounded-full shrink-0",
+                    "w-2 h-2 rounded-full shrink-0",
                     alert.severity === "critical" ? "bg-red-500" : "bg-yellow-500",
                   )} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-[var(--text-primary)] truncate">{alert.message}</p>
-                    <p className="text-[10px] text-[var(--text-muted)]">{alert.time}</p>
+                    <p className="text-sm text-gray-700 dark:text-slate-300 truncate">{alert.message}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{alert.time}</p>
                   </div>
                 </div>
               ))}
             </div>
-            <Link to="/audit" className="block text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] mt-3 text-center">
+            <Link to="/audit" className="block text-xs font-medium text-center py-3 text-gray-400 hover:text-gray-600 dark:hover:text-slate-300 transition-colors border-t border-gray-50 dark:border-slate-700/50">
               View all alerts
             </Link>
           </div>
 
-          <div className="bg-[var(--bg-primary)] rounded-xl p-5 shadow-[var(--card-shadow)]">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Pending Actions</h3>
-            <div className="space-y-2">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300">Pending Actions</h3>
+            </div>
+            <div className="divide-y divide-gray-50 dark:divide-slate-700/50">
               {pendingActions.map((action, i) => (
                 <button
                   key={i}
                   onClick={() => navigate({ to: "/audit" })}
-                  className="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors text-left"
+                  className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors text-left"
                 >
-                  <span className="text-xs text-[var(--text-primary)]">{action.label}</span>
-                  <Badge variant="secondary" className="text-[10px] h-5 shrink-0 ml-2">{action.count}</Badge>
+                  <span className="text-sm text-gray-600 dark:text-slate-400">{action.label}</span>
+                  <span className="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-semibold px-2.5 py-0.5 rounded-full">{action.count}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="bg-[var(--bg-primary)] rounded-xl p-5 shadow-[var(--card-shadow)]">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Today's Schedule</h3>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 text-xs">
-                <span className="text-emerald-500">✅</span>
-                <span className="text-[var(--text-primary)]">A Shift started 6:00 AM</span>
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300">Today's Schedule</h3>
+            </div>
+            <div className="divide-y divide-gray-50 dark:divide-slate-700/50">
+              <div className="flex items-center gap-3 px-5 py-3">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                <div>
+                  <p className="text-sm text-gray-700 dark:text-slate-300">A Shift started 6:00 AM</p>
+                  <p className="text-xs text-gray-400">6:00 AM</p>
+                </div>
               </div>
-              <div className="flex items-center gap-3 text-xs">
-                <span className="text-amber-500">🕐</span>
-                <span className="text-[var(--text-primary)]">B Shift starts 2:00 PM</span>
+              <div className="flex items-center gap-3 px-5 py-3">
+                <Circle className="w-4 h-4 text-gray-300 shrink-0" />
+                <div>
+                  <p className="text-sm text-gray-700 dark:text-slate-300">B Shift starts 2:00 PM</p>
+                  <p className="text-xs text-gray-400">2:00 PM</p>
+                </div>
               </div>
-              <div className="flex items-center gap-3 text-xs">
-                <span className="text-amber-500">🕐</span>
-                <span className="text-[var(--text-primary)]">C Shift starts 10:00 PM</span>
+              <div className="flex items-center gap-3 px-5 py-3">
+                <Circle className="w-4 h-4 text-gray-300 shrink-0" />
+                <div>
+                  <p className="text-sm text-gray-700 dark:text-slate-300">C Shift starts 10:00 PM</p>
+                  <p className="text-xs text-gray-400">10:00 PM</p>
+                </div>
               </div>
-              <div className="flex items-center gap-3 text-xs">
-                <span className="text-blue-500">📦</span>
-                <span className="text-[var(--text-primary)]">Cotton delivery expected</span>
+              <div className="flex items-center gap-3 px-5 py-3">
+                <Circle className="w-4 h-4 text-gray-300 shrink-0" />
+                <div>
+                  <p className="text-sm text-gray-700 dark:text-slate-300">Cotton delivery expected</p>
+                  <p className="text-xs text-gray-400">Today</p>
+                </div>
               </div>
-              <div className="flex items-center gap-3 text-xs">
-                <span className="text-purple-500">🚛</span>
-                <span className="text-[var(--text-primary)]">5 dispatches scheduled today</span>
+              <div className="flex items-center gap-3 px-5 py-3">
+                <Circle className="w-4 h-4 text-gray-300 shrink-0" />
+                <div>
+                  <p className="text-sm text-gray-700 dark:text-slate-300">5 dispatches scheduled today</p>
+                  <p className="text-xs text-gray-400">All day</p>
+                </div>
               </div>
             </div>
           </div>

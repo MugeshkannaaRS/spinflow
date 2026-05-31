@@ -1,4 +1,9 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse
+
+logger = logging.getLogger(__name__)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, delete
 from pydantic import BaseModel
@@ -389,7 +394,7 @@ def _build_column_response(col_defs: list[dict], dropdown_map: dict) -> list[Col
     return result
 
 
-@router.get("/ui-config/columns", response_model=TableConfigResponse)
+@router.get("/ui-config/columns")
 async def get_column_config(
     table: str = Query(..., description="Table name e.g. hr_employees"),
     mill_id: Optional[str] = Query(None, description="Mill ID (super_admin only)"),
@@ -398,10 +403,8 @@ async def get_column_config(
 ):
     try:
         if not table or not table.strip():
-            raise HTTPException(
-                status_code=400,
-                detail="table parameter is required and cannot be empty"
-            )
+            return _empty_config(table)
+
         role_name = current_user.role_rel.code if current_user.role_rel else ""
         effective_mill_id = mill_id
         if role_name != "SUPER_ADMIN":
@@ -420,11 +423,11 @@ async def get_column_config(
         defaults = _get_default_columns(table)
 
         if not config:
-            return TableConfigResponse(
-                table=table,
-                mill_id=effective_mill_id,
-                columns=defaults,
-            )
+            return {
+                "table": table,
+                "mill_id": effective_mill_id,
+                "columns": [d.model_dump() for d in defaults],
+            }
 
         import json
         try:
@@ -432,18 +435,14 @@ async def get_column_config(
         except (json.JSONDecodeError, TypeError):
             parsed = []
 
-        try:
-            do_result = await db.execute(
-                select(ColumnDropdownOption).where(
-                    ColumnDropdownOption.mill_id == effective_mill_id,
-                    ColumnDropdownOption.table_name == table,
-                    ColumnDropdownOption.is_active == True,
-                ).order_by(ColumnDropdownOption.display_order)
-            )
-            dropdown_rows = do_result.scalars().all()
-        except Exception as e:
-            logger.error(f"Error fetching dropdown options for table={table}: {e}", exc_info=True)
-            dropdown_rows = []
+        do_result = await db.execute(
+            select(ColumnDropdownOption).where(
+                ColumnDropdownOption.mill_id == effective_mill_id,
+                ColumnDropdownOption.table_name == table,
+                ColumnDropdownOption.is_active == True,
+            ).order_by(ColumnDropdownOption.display_order)
+        )
+        dropdown_rows = do_result.scalars().all()
 
         dropdown_map: dict = {}
         for d in dropdown_rows:
@@ -454,22 +453,19 @@ async def get_column_config(
                 "label": d.option_label,
             })
 
-        columns = _build_column_response(parsed, dropdown_map)
+        columns = [c.model_dump() for c in _build_column_response(parsed, dropdown_map)]
 
-        return TableConfigResponse(
-            table=table,
-            mill_id=effective_mill_id,
-            columns=columns,
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error in get_column_config for table={table}: {e}", exc_info=True)
-        return TableConfigResponse(
-            table=table,
-            mill_id="default",
-            columns=[],
-        )
+        return {
+            "table": table,
+            "mill_id": effective_mill_id,
+            "columns": columns,
+        }
+    except Exception:
+        return _empty_config(table)
+
+
+def _empty_config(table: str) -> dict:
+    return {"table": table, "mill_id": "default", "columns": []}
 
 
 @router.get("/ui-config/columns/all", response_model=dict)

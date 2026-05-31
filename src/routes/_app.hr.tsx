@@ -492,10 +492,6 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 items-center">
-        <div className="relative w-64">
-          <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input placeholder="Search employees..." className="pl-8 h-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
         <Select value={deptFilter} onValueChange={setDeptFilter}>
           <SelectTrigger className="w-36 h-9">
             <SelectValue placeholder="Department" />
@@ -1708,10 +1704,13 @@ function ImportEmployeeDialog() {
 function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdit: boolean }) {
   const attColConfig = useColumnConfig("hr_attendance");
   const now = new Date();
+  const today = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
   const [deptFilter, setDeptFilter] = useState("all");
   const [shiftFilter, setShiftFilter] = useState("all");
+  const [mobileCardEmp, setMobileCardEmp] = useState<EmployeeRow | null>(null);
+  const [mobileCardOpen, setMobileCardOpen] = useState(false);
 
   const { data: attendanceData, isLoading, refetch } = useQuery({
     queryKey: ["hr-attendance", month, year, deptFilter],
@@ -1770,37 +1769,73 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
     }
   };
 
+  const cycleStatus = (empId: string, day: number, current: string) => {
+    const order = ["P", "A", "H", "L", ""];
+    const idx = order.indexOf(current);
+    const next = order[(idx + 1) % order.length];
+    if (next) updateCellStatus(empId, day, next);
+  };
+
+  const statusColor = (s: string) => {
+    switch (s) {
+      case "P": return "bg-green-100 text-green-700";
+      case "A": return "bg-red-100 text-red-700";
+      case "H": return "bg-blue-100 text-blue-700";
+      case "L": return "bg-yellow-100 text-yellow-700";
+      case "CL": return "bg-yellow-100 text-yellow-700";
+      case "SL": return "bg-orange-100 text-orange-700";
+      case "EL": return "bg-purple-100 text-purple-700";
+      default: return "bg-gray-50 text-gray-400";
+    }
+  };
+
+  const isToday = (d: number) => {
+    return d === today.getDate() && month === today.getMonth() + 1 && year === today.getFullYear();
+  };
+
+  const dayLetters = ["S", "M", "T", "W", "T", "F", "S"];
+
+  const dayOfWeek = (d: number) => {
+    return dayLetters[new Date(year, month - 1, d).getDay()];
+  };
+
+  const dayTotals = (day: number) => {
+    let p = 0, a = 0, h = 0, l = 0;
+    for (const emp of filteredEmployees) {
+      const s = getStatus(emp.id, day);
+      if (s === "P") p++;
+      else if (s === "A") a++;
+      else if (s === "H") h++;
+      else if (s === "L" || s === "CL" || s === "SL" || s === "EL") l++;
+    }
+    return { present: p, absent: a, holiday: h, leave: l };
+  };
+
   if (isLoading) return <div className="text-sm text-muted-foreground p-4">Loading attendance…</div>;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 items-center">
-        <div className="space-y-1">
-          <Label className="text-xs">Month</Label>
-          <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-            <SelectTrigger className="w-32 h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((m, i) => (
-                <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Year</Label>
-          <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-            <SelectTrigger className="w-24 h-9">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[2023, 2024, 2025, 2026, 2027].map((y) => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
+          <SelectTrigger className="w-32 h-9">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MONTHS.map((m, i) => (
+              <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+          <SelectTrigger className="w-24 h-9">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[2023, 2024, 2025, 2026, 2027].map((y) => (
+              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={deptFilter} onValueChange={setDeptFilter}>
           <SelectTrigger className="w-36 h-9">
             <SelectValue placeholder="Department" />
@@ -1819,18 +1854,37 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
             {shifts.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
           </SelectContent>
         </Select>
-        {canEdit && <MarkAttendanceSheet employees={filteredEmployees} month={month} year={year} onSuccess={refetch} />}
+        {canEdit && (
+          <Button size="sm" style={{ backgroundColor: "#6366f1", color: "#ffffff" }}>
+            <ClipboardCheck className="size-4 mr-1" />
+            <MarkAttendanceSheet employees={filteredEmployees} month={month} year={year} onSuccess={refetch} />
+          </Button>
+        )}
         {canEdit && <ImportAttendanceDialog month={month} year={year} onSuccess={refetch} />}
       </div>
 
-      <div className="border rounded-md overflow-x-auto">
-        <Table className="min-w-[800px] w-full text-xs">
+      {/* Desktop table */}
+      <div className="hidden md:block border rounded-md overflow-x-auto">
+        <Table className="min-w-[900px] w-full text-xs">
           <TableHeader>
             <TableRow>
-              <TableHead className="sticky left-0 bg-background z-10 min-w-[140px]">{attColConfig.getLabel('employee')}</TableHead>
-              <TableHead className="sticky left-[140px] bg-background z-10 min-w-[80px]">{attColConfig.getLabel('department')}</TableHead>
+              <TableHead className="sticky left-0 bg-background z-10 min-w-[160px]" style={{ left: 0 }}>
+                {attColConfig.getLabel('employee')}
+              </TableHead>
+              <TableHead className="sticky bg-background z-10 min-w-[120px]" style={{ left: "160px" }}>
+                {attColConfig.getLabel('department')}
+              </TableHead>
               {Array.from({ length: days }, (_, i) => i + 1).map((d) => (
-                <TableHead key={d} className="text-center w-8 min-w-[28px] p-1">{d}</TableHead>
+                <TableHead
+                  key={d}
+                  className={cn(
+                    "text-center w-[52px] min-w-[52px] p-1",
+                    isToday(d) && "bg-brand-50 border-brand-200",
+                  )}
+                >
+                  <div className="text-xs font-semibold">{d}</div>
+                  <div className="text-[10px] text-muted-foreground">{dayOfWeek(d)}</div>
+                </TableHead>
               ))}
               <TableHead className="text-center min-w-[50px]">P</TableHead>
               <TableHead className="text-center min-w-[50px]">A</TableHead>
@@ -1841,53 +1895,161 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(filteredEmployees ?? []).map((emp, i) => {
+            {(filteredEmployees ?? []).map((emp) => {
               if (!emp) return null;
               const totals = calcTotals(emp.id);
               return (
-                <TableRow key={emp.id ?? i}>
-                  <TableCell className="sticky left-0 bg-background z-10 font-medium whitespace-nowrap">{emp.name}</TableCell>
-                  <TableCell className="sticky left-[140px] bg-background z-10">{emp.department}</TableCell>
+                <TableRow key={emp.id}>
+                  <TableCell
+                    className="sticky left-0 bg-background z-10 font-medium whitespace-nowrap text-sm"
+                    style={{ left: 0 }}
+                  >
+                    {emp.name}
+                  </TableCell>
+                  <TableCell
+                    className="sticky bg-background z-10 text-xs"
+                    style={{ left: "160px" }}
+                  >
+                    {emp.department}
+                  </TableCell>
                   {Array.from({ length: days }, (_, i) => i + 1).map((d) => {
                     const status = getStatus(emp.id, d);
                     return (
-                      <TableCell key={d} className="text-center p-1">
+                      <TableCell
+                        key={d}
+                        className={cn(
+                          "text-center p-0",
+                          isToday(d) && "bg-brand-50/50",
+                        )}
+                        style={{ width: 44, height: 32 }}
+                      >
                         {canEdit ? (
-                          <Select value={status} onValueChange={(v) => updateCellStatus(emp.id, d, v)}>
-                            <SelectTrigger className={cn("h-6 w-8 p-0 text-[10px]", status === "P" ? "text-green-600" : status === "A" ? "text-red-500" : "")}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ATTENDANCE_STATUSES.map((s) => (
-                                <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <button
+                            type="button"
+                            className={cn(
+                              "w-full h-full text-[11px] font-medium rounded cursor-pointer border-0",
+                              statusColor(status),
+                            )}
+                            onClick={() => cycleStatus(emp.id, d, status)}
+                            title="Click to cycle: P → A → H → L"
+                          >
+                            {status || "－"}
+                          </button>
                         ) : (
-                          <span className={cn(status === "P" ? "text-green-600" : status === "A" ? "text-red-500" : "")}>{status || "-"}</span>
+                          <span className={cn("text-[11px] font-medium", statusColor(status))}>
+                            {status || "－"}
+                          </span>
                         )}
                       </TableCell>
                     );
                   })}
-                  <TableCell className="text-center font-medium text-green-600">{totals.present}</TableCell>
-                  <TableCell className="text-center text-red-500">{totals.absent}</TableCell>
-                  <TableCell className="text-center">{totals.cl}</TableCell>
-                  <TableCell className="text-center">{totals.sl}</TableCell>
-                  <TableCell className="text-center">{totals.el}</TableCell>
-                  <TableCell className="text-center">{totals.ot.toFixed(1)}</TableCell>
+                  <TableCell className="text-center font-medium text-green-600 text-xs">{totals.present}</TableCell>
+                  <TableCell className="text-center text-red-500 text-xs">{totals.absent}</TableCell>
+                  <TableCell className="text-center text-xs">{totals.cl}</TableCell>
+                  <TableCell className="text-center text-xs">{totals.sl}</TableCell>
+                  <TableCell className="text-center text-xs">{totals.el}</TableCell>
+                  <TableCell className="text-center text-xs">{totals.ot.toFixed(1)}</TableCell>
                 </TableRow>
               );
             })}
-            {filteredEmployees.length === 0 && (
+          </TableBody>
+          {filteredEmployees.length > 0 && (
+            <TableFooter>
+              <TableRow>
+                <TableCell className="sticky left-0 bg-background z-10 font-semibold text-xs" style={{ left: 0 }}>Total</TableCell>
+                <TableCell className="sticky bg-background z-10" style={{ left: "160px" }} />
+                {Array.from({ length: days }, (_, i) => i + 1).map((d) => {
+                  const dt = dayTotals(d);
+                  return (
+                    <TableCell key={d} className={cn("text-center p-1", isToday(d) && "bg-brand-50/50")}>
+                      <div className="text-[9px] text-green-600">{dt.present}</div>
+                      <div className="text-[9px] text-red-500">{dt.absent}</div>
+                    </TableCell>
+                  );
+                })}
+                <TableCell colSpan={6} />
+              </TableRow>
+            </TableFooter>
+          )}
+          {filteredEmployees.length === 0 && (
+            <TableBody>
               <TableRow>
                 <TableCell colSpan={days + 9} className="text-center text-muted-foreground py-8">
                   No employees found for the selected filters
                 </TableCell>
               </TableRow>
-            )}
-          </TableBody>
+            </TableBody>
+          )}
         </Table>
       </div>
+
+      {/* Mobile card view */}
+      <div className="md:hidden space-y-2">
+        {(filteredEmployees ?? []).map((emp) => {
+          if (!emp) return null;
+          const totals = calcTotals(emp.id);
+          return (
+            <Card
+              key={emp.id}
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => {
+                setMobileCardEmp(emp);
+                setMobileCardOpen(true);
+              }}
+            >
+              <CardContent className="p-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-sm font-medium">{emp.name}</p>
+                    <p className="text-xs text-muted-foreground">{emp.department}</p>
+                  </div>
+                  <div className="text-right text-xs space-y-0.5">
+                    <span className="text-green-600 font-medium">P:{totals.present} </span>
+                    <span className="text-red-500 font-medium">A:{totals.absent} </span>
+                    <span className="text-yellow-600 font-medium">L:{totals.cl + totals.sl + totals.el}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+        {filteredEmployees.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-8">No employees found</p>
+        )}
+      </div>
+
+      {/* Mobile detail modal */}
+      <Sheet open={mobileCardOpen} onOpenChange={setMobileCardOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{mobileCardEmp?.name}</SheetTitle>
+          </SheetHeader>
+          {mobileCardEmp && (
+            <div className="py-4">
+              <p className="text-xs text-muted-foreground mb-4">{mobileCardEmp.department}</p>
+              <div className="grid grid-cols-7 gap-1">
+                {Array.from({ length: days }, (_, i) => i + 1).map((d) => {
+                  const status = getStatus(mobileCardEmp.id, d);
+                  return (
+                    <div
+                      key={d}
+                      className={cn(
+                        "text-center p-1 rounded text-xs",
+                        isToday(d) ? "bg-brand-50 border border-brand-200" : "bg-gray-50",
+                      )}
+                    >
+                      <div className="text-[10px] text-muted-foreground">{d}</div>
+                      <div className={cn("font-medium", statusColor(status))}>
+                        {status || "－"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

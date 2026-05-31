@@ -71,12 +71,20 @@ async def get_employees(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
+    # SQL to fix existing employees with null mill_id (run in Supabase SQL editor):
+    #   SELECT COUNT(*) FROM employees WHERE mill_id IS NULL;
+    #   SELECT id, name FROM mills LIMIT 5;
+    #   UPDATE employees
+    #   SET mill_id = (SELECT id FROM mills WHERE name ILIKE '%spinflow%' OR name ILIKE '%arafath%' LIMIT 1)
+    #   WHERE mill_id IS NULL;
     scope = await get_mill_scope(current_user)
+    mill_id = scope.get("mill_id")
+
     stmt = select(Employee)
 
-    if scope["mill_id"]:
-        stmt = stmt.where(Employee.mill_id == scope["mill_id"])
-    elif scope["company_id"]:
+    if mill_id:
+        stmt = stmt.where(Employee.mill_id == mill_id)
+    elif scope.get("company_id"):
         stmt = stmt.join(Mill, Employee.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
 
     if department:

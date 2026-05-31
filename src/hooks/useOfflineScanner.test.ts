@@ -137,6 +137,9 @@ describe("useOfflineScanner", () => {
     (loTracApi.receiverScan as any).mockResolvedValue({ result: "success" });
 
     const { result } = renderHook(() => useOfflineScanner());
+    // wait for initial syncQueue to finish (called on mount), then reset counts
+    await act(async () => {});
+    vi.clearAllMocks();
 
     const syncResult = await act(async () => {
       return result.current.syncQueue();
@@ -156,6 +159,12 @@ describe("useOfflineScanner", () => {
     (loTracApi.loaderScan as any).mockRejectedValue(serverError);
 
     const { result } = renderHook(() => useOfflineScanner());
+    await act(async () => {});
+    vi.clearAllMocks();
+    mockGetPendingScans.mockResolvedValue([
+      { id: 1, trip_id: "t1", scan_type: "loader", qr_string: "qr1", retry_count: 0 },
+    ]);
+    (loTracApi.loaderScan as any).mockRejectedValue(serverError);
 
     const syncResult = await act(async () => {
       return result.current.syncQueue();
@@ -178,6 +187,16 @@ describe("useOfflineScanner", () => {
       .mockRejectedValueOnce(networkError);
 
     const { result } = renderHook(() => useOfflineScanner());
+    await act(async () => {});
+    // initial sync consumed the Once mocks; re-setup for test
+    vi.clearAllMocks();
+    mockGetPendingScans.mockResolvedValue([
+      { id: 3, trip_id: "t1", scan_type: "loader", qr_string: "qr1", retry_count: 0 },
+      { id: 4, trip_id: "t2", scan_type: "loader", qr_string: "qr2", retry_count: 0 },
+    ]);
+    (loTracApi.loaderScan as any)
+      .mockResolvedValueOnce({ result: "success" })
+      .mockRejectedValueOnce(networkError);
 
     const syncResult = await act(async () => {
       return result.current.syncQueue();

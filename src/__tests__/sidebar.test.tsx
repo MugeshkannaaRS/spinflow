@@ -1,0 +1,141 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { useAuth } from "@/stores/auth";
+import { MODULE_ACCESS } from "@/lib/rbac";
+
+vi.mock("@/stores/auth", () => ({
+  useAuth: vi.fn(() => ({
+    user: {
+      name: "Test User",
+      role: "MILL_OWNER",
+      millName: "Test Mill",
+      allowedModules: undefined,
+      millId: "mill-1",
+    },
+    logout: vi.fn(),
+  })),
+}));
+
+vi.mock("@/hooks/useTheme", () => ({
+  useTheme: vi.fn(() => ({
+    theme: "light",
+    toggle: vi.fn(),
+  })),
+}));
+
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ children, to, onClick, className }: any) => (
+    <a href={to} onClick={onClick} className={className}>{children}</a>
+  ),
+  useNavigate: () => vi.fn(),
+  useRouterState: vi.fn((opts?: { select: (s: any) => any }) => {
+    const state = { location: { pathname: "/dashboard" } };
+    return opts?.select ? opts.select(state) : state;
+  }),
+}));
+
+vi.mock("@/lib/rbac", () => ({
+  MODULE_ACCESS: {
+    MILL_OWNER: [
+      "dashboard", "production", "quality", "maintenance", "hr", "payroll",
+      "purchase", "stores", "inventory", "dispatch", "lotrac", "accounts",
+      "sales", "masters", "users", "audit",
+    ],
+    SUPER_ADMIN: [
+      "dashboard", "production", "quality", "maintenance", "hr", "payroll",
+      "purchase", "stores", "inventory", "dispatch", "lotrac", "accounts",
+      "sales", "masters", "users", "audit", "admin",
+    ],
+  },
+  ROLE_LABELS: { MILL_OWNER: "Mill Owner", SUPER_ADMIN: "Super Admin" },
+}));
+
+vi.mock("@/components/ui/tooltip", () => ({
+  Tooltip: ({ children }: any) => <div data-testid="tooltip-wrapper">{children}</div>,
+  TooltipContent: ({ children }: any) => <div data-testid="tooltip-content">{children}</div>,
+  TooltipProvider: ({ children }: any) => <div data-testid="tooltip-provider">{children}</div>,
+  TooltipTrigger: ({ children, asChild }: any) => <div data-testid="tooltip-trigger">{children}</div>,
+}));
+
+describe("Sidebar", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("renders SpinFlow logo when expanded", () => {
+    render(<Sidebar />);
+    expect(screen.getByText("SpinFlow")).toBeTruthy();
+  });
+
+  it("renders SF monogram when collapsed", () => {
+    localStorage.setItem("spinflow_sidebar_collapsed", "true");
+    render(<Sidebar />);
+    expect(screen.getByText("SF")).toBeTruthy();
+  });
+
+  it("collapsed state persists in localStorage", () => {
+    localStorage.setItem("spinflow_sidebar_collapsed", "true");
+    render(<Sidebar />);
+    expect(screen.getByText("SF")).toBeTruthy();
+  });
+
+  it("shows Dashboard navigation link", () => {
+    render(<Sidebar />);
+    expect(screen.getByText("Dashboard")).toBeTruthy();
+  });
+});
+
+describe("Sidebar - SUPER_ADMIN visibility", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.mocked(useAuth).mockImplementation(() => ({
+      user: {
+        name: "Admin User",
+        role: "SUPER_ADMIN",
+        millName: "Test Mill",
+        allowedModules: ["dashboard", "production", "quality", "maintenance", "hr", "payroll",
+          "purchase", "stores", "inventory", "dispatch", "lotrac", "accounts",
+          "sales", "masters", "users", "audit", "admin"],
+      },
+      logout: vi.fn(),
+    }));
+  });
+
+  it("SUPER_ADMIN sees Admin Panel link", () => {
+    render(<Sidebar />);
+    expect(screen.getByText("Admin Panel")).toBeTruthy();
+  });
+
+  it("SUPER_ADMIN sees Column Config link", () => {
+    render(<Sidebar />);
+    expect(screen.getByText("Column Config")).toBeTruthy();
+  });
+});
+
+describe("Sidebar - MILL_OWNER visibility", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.mocked(useAuth).mockImplementation(() => ({
+      user: {
+        name: "Mill Owner",
+        role: "MILL_OWNER",
+        millName: "Test Mill",
+        allowedModules: ["dashboard", "production", "quality", "maintenance", "hr", "payroll",
+          "purchase", "stores", "inventory", "dispatch", "lotrac", "accounts",
+          "sales", "masters", "users", "audit"],
+      },
+      logout: vi.fn(),
+    }));
+  });
+
+  it("MILL_OWNER does not see Admin Panel", () => {
+    render(<Sidebar />);
+    expect(screen.queryByText("Admin Panel")).toBeNull();
+  });
+
+  it("MILL_OWNER does not see Column Config", () => {
+    render(<Sidebar />);
+    expect(screen.queryByText("Column Config")).toBeNull();
+  });
+});

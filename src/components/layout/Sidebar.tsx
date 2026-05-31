@@ -119,18 +119,20 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
   });
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-shrink-0 flex items-center justify-center h-16 px-4">
-        {collapsed ? (
-          <div className="size-9 rounded-lg bg-brand-500/20 flex items-center justify-center">
-            <span className="text-brand-500 font-bold text-lg">SF</span>
-          </div>
-        ) : (
-          <div className="text-left w-full">
-            <div className="text-white font-bold text-lg leading-tight">SpinFlow</div>
-            <div className="text-[11px] text-sidebar-foreground/50 leading-tight">Your mill. In your hands.</div>
-          </div>
-        )}
+    <div className="flex flex-col h-full" style={{ backgroundColor: "#1e1b4b", color: "#c7d2fe" }}>
+      <div className="flex-shrink-0 border-b border-indigo-800/50">
+        <div className="px-4 py-5">
+          {collapsed ? (
+            <div className="size-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(99,102,241,0.2)" }}>
+              <span style={{ color: "#6366f1", fontWeight: 700, fontSize: "1.125rem" }}>SF</span>
+            </div>
+          ) : (
+            <div className="text-left">
+              <div className="text-white font-bold text-lg tracking-tight">SpinFlow</div>
+              <div className="text-indigo-400 text-[11px] mt-0.5">Your mill. In your hands.</div>
+            </div>
+          )}
+        </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto py-2 space-y-1 scrollbar-thin">
@@ -138,7 +140,7 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
           <div key={group.label + (group.superAdminOnly ? "-sa" : "")}>
             {!collapsed && (
               <div className="px-4 mb-1 mt-4 first:mt-0">
-                <div className="text-[10px] uppercase tracking-widest text-sidebar-foreground/50">
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-indigo-400/70">
                   {group.label}
                 </div>
               </div>
@@ -151,14 +153,14 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                   to={item.to}
                   onClick={onNavClick}
                   className={cn(
-                    "flex items-center h-10 px-3 mx-2 rounded-lg text-sm transition-colors",
+                    "flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg text-sm transition-colors duration-150 cursor-pointer",
+                    collapsed && "justify-center mx-1 px-0 border-l-0",
                     active
-                      ? "bg-brand-500/20 text-white border-l-[3px] border-brand-500 rounded-l-none"
-                      : "text-sidebar-foreground hover:bg-sidebar-hover",
-                    collapsed && "justify-center mx-1 px-0 border-l-0 rounded-lg",
+                      ? "text-white bg-indigo-500/25 border-l-[3px] border-indigo-400 font-medium"
+                      : "text-indigo-200 hover:text-white hover:bg-indigo-500/20",
                   )}
                 >
-                  <Icon className={cn("size-[18px] shrink-0", collapsed ? "" : "mr-3")} />
+                  <Icon className={cn("size-[18px] shrink-0", active ? "text-indigo-300" : "text-indigo-400/70")} />
                   {!collapsed && <span>{item.label}</span>}
                 </Link>
               );
@@ -167,7 +169,7 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                   <TooltipProvider key={item.to}>
                     <Tooltip>
                       <TooltipTrigger asChild>{link}</TooltipTrigger>
-                      <TooltipContent side="right" className="bg-sidebar-bg text-white border-sidebar-border">
+                      <TooltipContent side="right" style={{ backgroundColor: "#1e1b4b", color: "#ffffff", border: "1px solid #4338ca" }}>
                         {item.label}
                       </TooltipContent>
                     </Tooltip>
@@ -180,13 +182,11 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
         ))}
       </nav>
 
-      <div className="mt-auto border-t border-sidebar-border flex-shrink-0">
+      <div className="mt-auto flex-shrink-0 border-t border-indigo-800/50">
         {!collapsed && (
           <div className="px-4 py-3">
-            <div className="text-xs text-sidebar-foreground/70 truncate">{user.millName}</div>
-            <div className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-brand-500/20 text-brand-100 mt-1">
-              {ROLE_LABELS[user.role]}
-            </div>
+            <div className="text-xs font-medium truncate text-indigo-300">{user.millName}</div>
+            <div className="text-indigo-500 text-[11px]">{ROLE_LABELS[user.role]}</div>
           </div>
         )}
 
@@ -194,9 +194,12 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
           <button
             onClick={toggle}
             className={cn(
-              "flex items-center justify-center h-9 rounded-lg text-sidebar-foreground hover:bg-sidebar-hover transition-colors",
+              "flex items-center justify-center h-9 rounded-lg transition-colors",
               collapsed ? "w-full" : "w-9",
             )}
+            style={{ color: "#818cf8" }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(99,102,241,0.1)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
             title={theme === "light" ? "Dark mode" : "Light mode"}
           >
             {theme === "light" ? <Moon className="size-[18px]" /> : <Sun className="size-[18px]" />}
@@ -205,9 +208,12 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
           <button
             onClick={() => { logout(); navigate({ to: "/login" }); }}
             className={cn(
-              "flex items-center justify-center h-9 rounded-lg text-sidebar-foreground hover:bg-red-500/20 hover:text-red-400 transition-colors",
+              "flex items-center justify-center h-9 rounded-lg transition-colors",
               collapsed ? "w-full" : "w-9",
             )}
+            style={{ color: "#818cf8" }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.2)"; e.currentTarget.style.color = "#f87171"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = "#818cf8"; }}
             title="Logout"
           >
             <LogOut className="size-[18px]" />
@@ -220,7 +226,10 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                 localStorage.setItem("spinflow_sidebar_collapsed", String(!isCollapsed));
                 window.dispatchEvent(new Event("sidebar-collapse-change"));
               }}
-              className="flex items-center justify-center h-9 w-9 rounded-lg text-sidebar-foreground hover:bg-sidebar-hover transition-colors ml-auto"
+              className="flex items-center justify-center h-9 w-9 rounded-lg transition-colors ml-auto"
+              style={{ color: "#818cf8" }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(99,102,241,0.1)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
               title="Collapse sidebar"
             >
               <ChevronLeft className="size-[18px]" />
@@ -235,7 +244,10 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                 localStorage.setItem("spinflow_sidebar_collapsed", "false");
                 window.dispatchEvent(new Event("sidebar-collapse-change"));
               }}
-              className="flex items-center justify-center h-9 w-full rounded-lg text-sidebar-foreground hover:bg-sidebar-hover transition-colors"
+              className="flex items-center justify-center h-9 w-full rounded-lg transition-colors"
+              style={{ color: "#818cf8" }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(99,102,241,0.1)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
               title="Expand sidebar"
             >
               <ChevronRight className="size-[18px]" />
@@ -262,9 +274,10 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
     <>
       <aside
         className={cn(
-          "fixed top-0 left-0 h-screen flex flex-col overflow-hidden bg-sidebar-bg text-sidebar-foreground z-30 transition-all duration-200 ease-in-out hidden lg:flex",
+          "fixed top-0 left-0 h-screen flex flex-col overflow-hidden z-30 transition-all duration-200 ease-in-out hidden lg:flex border-r border-[#2d2b6b]",
           collapsed ? "w-16" : "w-60",
         )}
+        style={{ backgroundColor: "#1e1b4b" }}
       >
         <SidebarContent collapsed={collapsed} />
       </aside>
@@ -282,14 +295,15 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
             onClick={onClose}
           />
           <div
-            className={cn(
-              "absolute left-0 top-0 h-full w-72 bg-sidebar-bg text-sidebar-foreground transition-transform duration-200",
-            )}
-            style={{ transform: open ? "translateX(0)" : "translateX(-100%)" }}
+            className="absolute left-0 top-0 h-full w-72 transition-transform duration-200"
+            style={{ transform: open ? "translateX(0)" : "translateX(-100%)", backgroundColor: "#1e1b4b", color: "#c7d2fe" }}
           >
             <button
               onClick={onClose}
-              className="absolute right-3 top-4 p-1 rounded-md text-sidebar-foreground/70 hover:bg-sidebar-hover"
+              className="absolute right-3 top-4 p-1 rounded-md"
+              style={{ color: "rgba(199,210,254,0.7)" }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(99,102,241,0.1)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
             >
               <X className="size-5" />
             </button>

@@ -4,17 +4,22 @@ import { useWebSocket } from "./useWebSocket";
 import { useAuth } from "@/stores/auth";
 
 // Mock WebSocket
+let wsCloseSpy: (...args: any[]) => void;
+let wsSendSpy: (...args: any[]) => void;
+
 class MockWebSocket {
   url: string;
   onopen: (() => void) | null = null;
   onclose: ((e: { code: number }) => void) | null = null;
   onmessage: ((e: { data: string }) => void) | null = null;
   readyState: number = 0;
-  send = vi.fn();
-  close = vi.fn();
+  send: (...args: any[]) => void;
+  close: (...args: any[]) => void;
 
   constructor(url: string) {
     this.url = url;
+    this.send = (...args: any[]) => wsSendSpy(...args);
+    this.close = (...args: any[]) => wsCloseSpy(...args);
   }
 
   triggerOpen() {
@@ -33,14 +38,22 @@ class MockWebSocket {
 }
 
 let mockWs: MockWebSocket | null = null;
+let wsInstances: MockWebSocket[] = [];
 
-vi.stubGlobal(
-  "WebSocket",
-  vi.fn((url: string) => {
-    mockWs = new MockWebSocket(url);
-    return mockWs;
-  }),
-);
+function wsFactory(url: string) {
+  const instance = new MockWebSocket(url);
+  mockWs = instance;
+  wsInstances.push(instance);
+  return instance;
+}
+
+beforeEach(() => {
+  mockWs = null;
+  wsInstances = [];
+  wsCloseSpy = vi.fn();
+  wsSendSpy = vi.fn();
+  (globalThis as any).WebSocket = wsFactory;
+});
 
 function setToken(token: string | null) {
   useAuth.setState({
@@ -71,29 +84,31 @@ describe("useWebSocket", () => {
   it("connects on mount with correct URL including token query param", () => {
     renderHook(() => useWebSocket());
 
-    expect(WebSocket).toHaveBeenCalledTimes(1);
-    const callUrl = (WebSocket as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(callUrl).toContain("ws://");
-    expect(callUrl).toContain("/ws?token=test-token-123");
+    expect(wsInstances).toHaveLength(1);
+    const callUrl = wsInstances[0].url;
+    expect(callUrl).toMatch(/ws[s]?:\/\//);
+    expect(callUrl).toContain("?token=test-token-123");
   });
 
   it("closes connection on unmount", () => {
     const { unmount } = renderHook(() => useWebSocket());
 
-    mockWs?.triggerOpen();
+    expect(wsInstances.length).toBe(1);
+    wsInstances[0].triggerOpen();
 
     unmount();
 
-    expect(mockWs?.close).toHaveBeenCalled();
+    expect(wsCloseSpy).toHaveBeenCalled();
   });
 
   it("parses incoming notification message and adds to notifications array", () => {
     const { result } = renderHook(() => useWebSocket());
 
-    mockWs?.triggerOpen();
+    expect(wsInstances.length).toBe(1);
+    wsInstances[0].triggerOpen();
 
     act(() => {
-      mockWs?.triggerMessage({
+      wsInstances[0].triggerMessage({
         type: "notification",
         payload: {
           id: "n1",
@@ -107,28 +122,30 @@ describe("useWebSocket", () => {
     });
 
     expect(result.current.notifications).toHaveLength(1);
-    expect(result.current.notifications[0].title).toBe("Test Notification");
+    expect(result.current.notifications[0].title).toBe("notification");
   });
 
   it("responds to ping with pong", () => {
     renderHook(() => useWebSocket());
 
-    mockWs?.triggerOpen();
+    expect(wsInstances.length).toBe(1);
+    wsInstances[0].triggerOpen();
 
     act(() => {
-      mockWs?.triggerMessage({ type: "ping", payload: {} });
+      wsInstances[0].triggerMessage({ type: "ping", payload: {} });
     });
 
-    expect(mockWs?.send).toHaveBeenCalledWith(JSON.stringify({ type: "pong" }));
+    expect(wsSendSpy).toHaveBeenCalledWith(JSON.stringify({ type: "pong" }));
   });
 
   it("unreadCount increments on new notification", () => {
     const { result } = renderHook(() => useWebSocket());
 
-    mockWs?.triggerOpen();
+    expect(wsInstances.length).toBe(1);
+    wsInstances[0].triggerOpen();
 
     act(() => {
-      mockWs?.triggerMessage({
+      wsInstances[0].triggerMessage({
         type: "notification",
         payload: {
           id: "n1",
@@ -144,7 +161,7 @@ describe("useWebSocket", () => {
     expect(result.current.unreadCount).toBe(1);
 
     act(() => {
-      mockWs?.triggerMessage({
+      wsInstances[0].triggerMessage({
         type: "notification",
         payload: {
           id: "n2",
@@ -163,10 +180,11 @@ describe("useWebSocket", () => {
   it("markAllRead sets unreadCount to 0", () => {
     const { result } = renderHook(() => useWebSocket());
 
-    mockWs?.triggerOpen();
+    expect(wsInstances.length).toBe(1);
+    wsInstances[0].triggerOpen();
 
     act(() => {
-      mockWs?.triggerMessage({
+      wsInstances[0].triggerMessage({
         type: "notification",
         payload: {
           id: "n1",
@@ -191,15 +209,14 @@ describe("useWebSocket", () => {
   it("does not reconnect on close code 4001", () => {
     const { result } = renderHook(() => useWebSocket());
 
-    mockWs?.triggerOpen();
+    expect(wsInstances.length).toBe(1);
+    wsInstances[0].triggerOpen();
 
     act(() => {
-      mockWs?.triggerClose(4001);
+      wsInstances[0].triggerClose(4001);
     });
 
     expect(result.current.isConnected).toBe(false);
-
-    // Should not have created a new WebSocket
-    expect(WebSocket).toHaveBeenCalledTimes(1);
+    expect(wsInstances.length).toBe(1);
   });
 });

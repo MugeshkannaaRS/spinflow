@@ -79,7 +79,7 @@ function AppShell() {
         )}
       >
         <AlertBanner />
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-16 lg:pb-6">
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-slate-900 p-4 lg:p-6 pb-16 lg:pb-6">
           <Outlet />
         </main>
       </div>

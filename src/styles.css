@@ -95,6 +95,12 @@
   --sidebar-text: #c7d2fe;
   --sidebar-active: #6366f1;
   --sidebar-hover: rgba(99,102,241,0.15);
+  --sidebar-label: #818cf8;
+  --sidebar-icon: #818cf8;
+  --sidebar-bottom: #94a3b8;
+  --sidebar-active-text: #ffffff;
+  --sidebar-active-icon: #a5b4fc;
+  --sidebar-hover-text: #e0e7ff;
   --card-shadow: 0 1px 3px rgba(0,0,0,0.1);
   --card-shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
 }
@@ -148,8 +154,15 @@
     font-family: 'Inter', -apple-system, sans-serif;
     font-size: 14px;
     line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
 
 @layer utilities {
   .responsive-pad {
