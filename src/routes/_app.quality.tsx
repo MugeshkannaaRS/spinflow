@@ -4,7 +4,7 @@ import { qualityApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
-import { Topbar } from "@/components/layout/Topbar";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -89,23 +89,25 @@ function QualityPage() {
   if (testsQ.isLoading)
     return (
       <>
-        <Topbar title="Quality Control" subtitle="Loading..." />
+        <PageHeader title="Quality Control" subtitle="Loading..." />
         <div className="p-6 text-sm text-muted-foreground">Loading data…</div>
       </>
     );
   if (testsQ.isError)
     return (
       <>
-        <Topbar title="Quality Control" subtitle="Error" />
+        <PageHeader title="Quality Control" subtitle="Error" />
         <div className="p-6 text-sm text-destructive">Error loading data.</div>
       </>
     );
 
   return (
     <>
-      <Topbar
+      <PageHeader
         title="Quality Control"
         subtitle="CSP testing, lot approvals, rejection analysis & lab register"
+        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["quality-tests"] })}
+        isRefreshing={testsQ.isFetching}
       />
       <AccessGuard module="quality">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">

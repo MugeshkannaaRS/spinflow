@@ -4,7 +4,7 @@ import { productionApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
-import { Topbar } from "@/components/layout/Topbar";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { fmtNumber } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -621,14 +621,14 @@ function ProductionPage() {
   if (machinesQ.isLoading || shiftsQ.isLoading)
     return (
       <>
-        <Topbar title="Production" subtitle="Loading..." />
+        <PageHeader title="Production" subtitle="Loading..." />
         <div className="p-6 text-sm text-muted-foreground">Loading data…</div>
       </>
     );
   if (anyError)
     return (
       <>
-        <Topbar title="Production" subtitle="Error" />
+        <PageHeader title="Production" subtitle="Error" />
         <div className="p-6 text-sm text-destructive space-y-2">
           <p>Failed to load production data.</p>
           <Button size="sm" variant="outline" onClick={() => window.location.reload()}>Reload Page</Button>
@@ -638,9 +638,11 @@ function ProductionPage() {
 
   return (
     <>
-      <Topbar
+      <PageHeader
         title="Production"
         subtitle="Shift entries, machine efficiency, downtime & waste tracking"
+        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["machines"] })}
+        isRefreshing={machinesQ.isFetching}
       />
       <AccessGuard module="production">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">

@@ -4,7 +4,7 @@ import { maintenanceApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
-import { Topbar } from "@/components/layout/Topbar";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -343,23 +343,25 @@ function MaintenancePage() {
   if (maintQ.isLoading)
     return (
       <>
-        <Topbar title="Maintenance" subtitle="Loading..." />
+        <PageHeader title="Maintenance" subtitle="Loading..." />
         <div className="p-6 text-sm text-muted-foreground">Loading data…</div>
       </>
     );
   if (maintQ.isError)
     return (
       <>
-        <Topbar title="Maintenance" subtitle="Error" />
+        <PageHeader title="Maintenance" subtitle="Error" />
         <div className="p-6 text-sm text-destructive">Error loading data.</div>
       </>
     );
 
   return (
     <>
-      <Topbar
+      <PageHeader
         title="Maintenance"
         subtitle="Breakdown logging, preventive maintenance, technician tracking & MTTR/MTBF"
+        onRefresh={() => qc.invalidateQueries({ queryKey: ["maintenance-tasks"] })}
+        isRefreshing={maintQ.isFetching}
       />
       <AccessGuard module="maintenance">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">

@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { accountsApi, financeApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { AccessGuard } from "@/components/AccessGuard";
-import { Topbar } from "@/components/layout/Topbar";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -102,23 +102,25 @@ function AccountsPage() {
   if (invQ.isLoading)
     return (
       <>
-        <Topbar title="Accounts" subtitle="Loading..." />
+        <PageHeader title="Accounts" subtitle="Loading..." />
         <div className="p-6 text-sm text-muted-foreground">Loading data…</div>
       </>
     );
   if (invQ.isError)
     return (
       <>
-        <Topbar title="Accounts" subtitle="Error" />
+        <PageHeader title="Accounts" subtitle="Error" />
         <div className="p-6 text-sm text-destructive">Error loading data.</div>
       </>
     );
 
   return (
     <>
-      <Topbar
+      <PageHeader
         title="Accounts"
         subtitle="GST invoices, sales/purchase register, outstanding tracking & Tally export"
+        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["invoices"] })}
+        isRefreshing={invQ.isFetching}
       />
       <AccessGuard module="accounts">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">

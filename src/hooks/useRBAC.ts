@@ -23,26 +23,46 @@ const ROLE_MODULES: Record<string, string[]> = {
   AUDITOR: ["dashboard", "production", "quality", "hr", "accounts"],
 };
 
+const KEY_MAP: Record<string, string> = {
+  "column_config": "column_config",
+  "column-config": "column_config",
+};
+
+function normaliseKey(key: string): string {
+  return KEY_MAP[key] ?? key.replace(/-/g, "_");
+}
+
 export function useRBAC() {
   const user = useAuth(s => s.user);
   const role = user?.role ?? "MACHINE_OPERATOR";
   const isSuperAdmin = role === "SUPER_ADMIN";
 
-  const { data: companyModules } = useQuery({
+  const { data: companyModules, isFetched } = useQuery({
     queryKey: ["company-modules", user?.companyId],
-    queryFn: () => api.get(`/admin/companies/${user?.companyId}/modules`).then(r => r.data),
+    queryFn: () => api.get(`/admin/companies/${user?.companyId}/modules`).then(r => r.data as Record<string, boolean>),
     enabled: !!user?.companyId && !isSuperAdmin,
-    staleTime: 10 * 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
   });
 
   const allowedModules = ROLE_MODULES[role] ?? ["dashboard"];
+  const companyModulesLoaded = isFetched || isSuperAdmin || !user?.companyId;
 
   function canAccess(module: string): boolean {
-    if (isSuperAdmin) return ["dashboard", "admin", "column_config"].includes(module);
+    if (isSuperAdmin) {
+      return ["dashboard", "admin", "column_config"].includes(normaliseKey(module));
+    }
     const roleAllows = allowedModules.includes(module);
-    const companyAllows = !companyModules || companyModules[module] === true;
-    return roleAllows && companyAllows;
+    if (!roleAllows) return false;
+
+    if (companyModules !== null && companyModules !== undefined) {
+      const key = normaliseKey(module);
+      if (["dashboard", "users", "masters"].includes(key)) return true;
+      return companyModules[key] === true;
+    }
+
+    return roleAllows;
   }
 
-  return { role, isSuperAdmin, canAccess, allowedModules };
+  return { role, isSuperAdmin, canAccess, allowedModules, companyModulesLoaded };
 }

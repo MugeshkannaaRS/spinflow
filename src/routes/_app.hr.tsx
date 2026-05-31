@@ -8,7 +8,7 @@ import { hrApi, uploadApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
-import { Topbar } from "@/components/layout/Topbar";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -273,23 +273,25 @@ function HRPage() {
   if (empQ.isLoading)
     return (
       <>
-        <Topbar title="Human Resources" subtitle="Loading..." />
+        <PageHeader title="Human Resources" subtitle="Loading..." />
         <div className="p-6 text-sm text-muted-foreground">Loading data…</div>
       </>
     );
   if (empQ.isError)
     return (
       <>
-        <Topbar title="Human Resources" subtitle="Error" />
+        <PageHeader title="Human Resources" subtitle="Error" />
         <div className="p-6 text-sm text-destructive">Error loading data.</div>
       </>
     );
 
   return (
     <>
-      <Topbar
+      <PageHeader
         title="Human Resources"
         subtitle="Employees, Attendance, Payroll & Leave Management"
+        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["hr-employees"] })}
+        isRefreshing={empQ.isFetching}
       />
       <AccessGuard module="hr">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">

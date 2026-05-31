@@ -4,7 +4,7 @@ import { storesApi, uploadApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
-import { Topbar } from "@/components/layout/Topbar";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -62,8 +62,8 @@ function StoresPage() {
   const issueColConfig = useColumnConfig("stores_issues");
 
   if (!user) return null;
-  if (itemsQ.isLoading) return (<><Topbar title="Stores & Spares" subtitle="Loading..." /><div className="p-6 text-sm text-muted-foreground">Loading data…</div></>);
-  if (itemsQ.isError) return (<><Topbar title="Stores & Spares" subtitle="Error" /><div className="p-6 text-sm text-destructive">Error loading data.</div></>);
+  if (itemsQ.isLoading) return (<><PageHeader title="Stores & Spares" subtitle="Loading..." /><div className="p-6 text-sm text-muted-foreground">Loading data…</div></>);
+  if (itemsQ.isError) return (<><PageHeader title="Stores & Spares" subtitle="Error" /><div className="p-6 text-sm text-destructive">Error loading data.</div></>);
 
   const itemCols: ColDef[] = [
     { key: "code", label: spareColConfig.getLabel('code'), className: "font-mono text-xs" },
@@ -98,7 +98,12 @@ function StoresPage() {
 
   return (
     <>
-      <Topbar title="Stores & Spares" subtitle="Spare inventory, reorder alerts, issue notes & vendor management" />
+      <PageHeader
+        title="Stores & Spares"
+        subtitle="Spare inventory, reorder alerts, issue notes & vendor management"
+        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["spare-items"] })}
+        isRefreshing={itemsQ.isFetching}
+      />
       <AccessGuard module="stores">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           <div className="grid gap-4 grid-cols-2 md:grid-cols-4">

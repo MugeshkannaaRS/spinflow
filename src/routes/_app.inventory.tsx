@@ -4,7 +4,7 @@ import { inventoryApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
-import { Topbar } from "@/components/layout/Topbar";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -48,8 +48,8 @@ function InventoryPage() {
   const lowStock = lots.filter((l) => l.quantity < 3000).length;
 
   if (!user) return null;
-  if (lotsQ.isLoading) return (<><Topbar title="Inventory" subtitle="Loading..." /><div className="p-6 text-sm text-muted-foreground">Loading data…</div></>);
-  if (lotsQ.isError) return (<><Topbar title="Inventory" subtitle="Error" /><div className="p-6 text-sm text-destructive">Error loading data.</div></>);
+  if (lotsQ.isLoading) return (<><PageHeader title="Inventory" subtitle="Loading..." /><div className="p-6 text-sm text-muted-foreground">Loading data…</div></>);
+  if (lotsQ.isError) return (<><PageHeader title="Inventory" subtitle="Error" /><div className="p-6 text-sm text-destructive">Error loading data.</div></>);
 
   const lotCols: ColDef[] = [
     { key: "lotNo", label: lotColConfig.getLabel('lot_no'), className: "font-mono text-xs" },
@@ -85,7 +85,12 @@ function InventoryPage() {
 
   return (
     <>
-      <Topbar title="Inventory" subtitle="Lot tracking, godown stock, transfers & ageing analysis" />
+      <PageHeader
+        title="Inventory"
+        subtitle="Lot tracking, godown stock, transfers & ageing analysis"
+        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["inventory-lots"] })}
+        isRefreshing={lotsQ.isFetching}
+      />
       <AccessGuard module="inventory">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           <div className="grid gap-4 grid-cols-2 md:grid-cols-4">

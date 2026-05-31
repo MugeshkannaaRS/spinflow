@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { payrollApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { AccessGuard } from "@/components/AccessGuard";
-import { Topbar } from "@/components/layout/Topbar";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { fmtNumber } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -75,7 +75,12 @@ function PayrollPage() {
 
   return (
     <>
-      <Topbar title="Payroll" subtitle="Monthly payroll processing & payslips" />
+      <PageHeader
+        title="Payroll"
+        subtitle="Monthly payroll processing & payslips"
+        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["payroll-summary"] })}
+        isRefreshing={summaryQ.isFetching}
+      />
       <AccessGuard module="payroll">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           <div className="flex items-center gap-3">

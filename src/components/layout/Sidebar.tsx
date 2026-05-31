@@ -97,7 +97,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
 function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavClick?: () => void }) {
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
-  const { canAccess, isSuperAdmin } = useRBAC();
+  const { canAccess, isSuperAdmin, companyModulesLoaded } = useRBAC();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -107,6 +107,32 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
     if (to === "/admin") return pathname === "/admin";
     return pathname === to;
   };
+
+  if (!isSuperAdmin && !companyModulesLoaded) {
+    return (
+      <div className="flex flex-col h-full" style={{ backgroundColor: "#1e3a5f" }}>
+        <div className="flex-shrink-0 border-b border-blue-800/50">
+          <div className="px-4 py-5">
+            {collapsed ? (
+              <div className="size-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(59,130,246,0.2)" }}>
+                <span style={{ color: "#3b82f6", fontWeight: 700, fontSize: "1.125rem" }}>SF</span>
+              </div>
+            ) : (
+              <div className="text-left">
+                <div className="text-white font-bold text-lg tracking-tight">SpinFlow</div>
+                <div className="text-blue-400 text-[11px] mt-0.5">Your mill. In your hands.</div>
+              </div>
+            )}
+          </div>
+        </div>
+        <nav className="flex-1 overflow-y-auto py-2 space-y-1 px-4">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="h-9 bg-blue-900/20 rounded-lg animate-pulse mx-2" />
+          ))}
+        </nav>
+      </div>
+    );
+  }
 
   const filteredGroups = NAV_GROUPS
     .map(group => ({

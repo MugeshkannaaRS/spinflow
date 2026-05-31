@@ -15,7 +15,7 @@ import {
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
-import { Topbar } from "@/components/layout/Topbar";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -144,23 +144,25 @@ function PurchasePage() {
   if (purchasesQ.isLoading)
     return (
       <>
-        <Topbar title="Cotton Purchase" subtitle="Loading..." />
+        <PageHeader title="Cotton Purchase" subtitle="Loading..." />
         <div className="p-6 text-sm text-muted-foreground">Loading data…</div>
       </>
     );
   if (purchasesQ.isError)
     return (
       <>
-        <Topbar title="Cotton Purchase" subtitle="Error" />
+        <PageHeader title="Cotton Purchase" subtitle="Error" />
         <div className="p-6 text-sm text-destructive">Error loading data.</div>
       </>
     );
 
   return (
     <>
-      <Topbar
+      <PageHeader
         title="Cotton Purchase"
         subtitle="Supplier management, bale purchase, GRN & invoice tracking"
+        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["purchases"] })}
+        isRefreshing={purchasesQ.isFetching}
       />
       <AccessGuard module="purchase">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">

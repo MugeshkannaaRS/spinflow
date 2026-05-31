@@ -4,7 +4,7 @@ import { mastersApi, productionApi, inventoryApi, adminApi } from "@/lib/api-ser
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
-import { Topbar } from "@/components/layout/Topbar";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -184,7 +184,12 @@ function MastersPage() {
 
   return (
     <>
-      <Topbar title="Masters" subtitle="Manage companies, mills, departments & reference data" />
+      <PageHeader
+        title="Masters"
+        subtitle="Manage companies, mills, departments & reference data"
+        onRefresh={() => qcMasters.invalidateQueries({ queryKey: ["masters"] })}
+        isRefreshing={companiesQ.isFetching}
+      />
       <AccessGuard module="masters">
         <div className="p-6">
           <div className="relative mb-4">

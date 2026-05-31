@@ -3,14 +3,14 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
-import { Topbar } from "@/components/layout/Topbar";
 import { StatCard } from "@/components/ui/StatCard";
 import { useRBAC } from "@/hooks/useRBAC";
 import { SuperAdminDashboard } from "@/components/dashboard/SuperAdminDashboard";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  AlertTriangle, X,
+  AlertTriangle, X, RefreshCw,
   Factory, Trash2, Users, Cpu, IndianRupee, AlertCircle,
   CheckCircle2, Circle,
 } from "lucide-react";
@@ -72,10 +72,10 @@ function Dashboard() {
   const navigate = useNavigate();
   const [alertDismissed, setAlertDismissed] = useState(false);
 
-  const { data: summary, isLoading } = useQuery({
+  const { data: summary, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["dashboard-summary"],
     queryFn: () => api.get("/dashboard/summary").then(r => r.data),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
   });
 
@@ -83,6 +83,13 @@ function Dashboard() {
 
   const hasCriticalAlerts = !alertDismissed;
   const raw = summary ?? {};
+
+  function getGreeting() {
+    const h = new Date().getHours();
+    if (h < 12) return "morning";
+    if (h < 17) return "afternoon";
+    return "evening";
+  }
 
   const demoData = {
     productionToday: Number(raw.production_today ?? 4280),
@@ -105,9 +112,21 @@ function Dashboard() {
 
   return (
     <>
-      <Topbar title={`Good day, ${user?.name?.split(" ")[0] ?? "User"}`} subtitle="Live operations overview" />
-
       <div className="space-y-6 p-6 max-w-[1400px] mx-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Good {getGreeting()}, {user?.name?.split(" ")[0] ?? "User"}
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">Live operations overview</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={cn("w-3.5 h-3.5 mr-1.5", isFetching && "animate-spin")} />
+              Refresh
+            </Button>
+          </div>
+        </div>
         {hasCriticalAlerts && (
           <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-sm">
             <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
