@@ -1,7 +1,7 @@
 from datetime import datetime, timezone, timedelta, date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, case
+from sqlalchemy import select, func, case, text
 from typing import Optional
 
 from app.db.session import get_db
@@ -335,33 +335,20 @@ async def get_admin_summary(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        companies_result = await db.execute(
-            select(func.count(Company.id)).where(Company.deleted_at.is_(None))
-        )
-        total_companies = companies_result.scalar() or 0
+        companies = await db.execute(text("SELECT COUNT(*) FROM companies"))
+        total_companies = companies.scalar() or 0
 
-        mills_result = await db.execute(
-            select(func.count(Mill.id)).where(Mill.deleted_at.is_(None))
-        )
-        total_mills = mills_result.scalar() or 0
+        mills = await db.execute(text("SELECT COUNT(*) FROM mills"))
+        total_mills = mills.scalar() or 0
 
-        users_result = await db.execute(
-            select(func.count(User.id)).where(
-                User.is_active == True,
-                User.deleted_at.is_(None)
-            )
-        )
-        total_users = users_result.scalar() or 0
+        users = await db.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true"))
+        total_users = users.scalar() or 0
 
-        employees_result = await db.execute(
-            select(func.count(Employee.id)).where(Employee.deleted_at.is_(None))
-        )
-        total_employees = employees_result.scalar() or 0
+        employees = await db.execute(text("SELECT COUNT(*) FROM employees"))
+        total_employees = employees.scalar() or 0
 
-        companies_q = await db.execute(
-            select(Company).where(Company.deleted_at.is_(None)).limit(20)
-        )
-        companies = companies_q.scalars().all()
+        companies_list = await db.execute(text("SELECT id, name, code, created_at FROM companies ORDER BY created_at DESC LIMIT 20"))
+        rows = companies_list.fetchall()
 
         return {
             "total_companies": total_companies,
@@ -370,12 +357,12 @@ async def get_admin_summary(
             "total_employees": total_employees,
             "companies": [
                 {
-                    "id": str(c.id),
-                    "name": c.name,
-                    "code": c.code,
-                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                    "id": str(r.id),
+                    "name": r.name,
+                    "code": r.code,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
                 }
-                for c in companies
+                for r in rows
             ]
         }
     except Exception as e:
@@ -385,7 +372,8 @@ async def get_admin_summary(
             "total_mills": 0,
             "total_users": 0,
             "total_employees": 0,
-            "companies": []
+            "companies": [],
+            "error": str(e)
         }
 
 

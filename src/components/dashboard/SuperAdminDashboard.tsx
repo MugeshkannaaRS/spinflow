@@ -1,9 +1,34 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { mastersApi, adminApi } from "@/lib/api-service";
+import { validateForm, GSTIN_REGEX } from "@/lib/formValidation";
 import { Building2, Factory, Users, UserCheck, Plus, Settings } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+const MODULE_LABELS: Record<string, string> = {
+  dashboard: "Dashboard", production: "Production", quality: "Quality",
+  stock: "Stock", inventory: "Inventory", lotrac: "LoTrac", dispatch: "Dispatch",
+  purchase: "Purchase", stores: "Stores", hr: "HR", payroll: "Payroll",
+  accounts: "Accounts", maintenance: "Maintenance", reports: "Reports",
+  audit: "Audit", users: "Users", masters: "Masters",
+};
+const ALL_MODULES = Object.keys(MODULE_LABELS);
 
 export function SuperAdminDashboard() {
+  const qc = useQueryClient();
+  const [showAddCompany, setShowAddCompany] = useState(false);
+
   const { data, isLoading } = useQuery({
     queryKey: ["admin-summary"],
     queryFn: () => api.get("/dashboard/admin-summary").then(r => r.data),
@@ -41,13 +66,14 @@ export function SuperAdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Link to="/admin" className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-4 transition-colors">
+        <button onClick={() => setShowAddCompany(true)}
+          className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-4 transition-colors w-full text-left">
           <Plus className="w-5 h-5 shrink-0" />
           <div>
             <div className="font-semibold text-sm">Add New Company</div>
             <div className="text-xs text-blue-200">Onboard a new mill customer</div>
           </div>
-        </Link>
+        </button>
         <Link to="/admin" className="flex items-center gap-3 bg-white dark:bg-slate-800 hover:bg-gray-50 border border-gray-200 dark:border-slate-700 rounded-xl px-5 py-4 transition-colors">
           <Settings className="w-5 h-5 text-gray-500 shrink-0" />
           <div>
@@ -93,6 +119,88 @@ export function SuperAdminDashboard() {
           )}
         </div>
       </div>
+
+      <Dialog open={showAddCompany} onOpenChange={setShowAddCompany}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add New Company</DialogTitle>
+          </DialogHeader>
+          <AddCompanyForm onDone={() => { setShowAddCompany(false); qc.invalidateQueries({ queryKey: ["admin-summary"] }); }} />
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function AddCompanyForm({ onDone }: { onDone: () => void }) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState({
+    code: "", name: "", gstin: "", phone: "", email: "",
+    max_users: 50, max_mills: 5, subscription_plan: "Pro",
+  });
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleSubmit = async () => {
+    const errs = validateForm(form, {
+      code: { required: true, minLength: 2 },
+      name: { required: true, minLength: 2 },
+      gstin: { pattern: GSTIN_REGEX, patternMessage: "Invalid GSTIN format" },
+    });
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+    setLoading(true);
+    try {
+      const company = await mastersApi.createCompany({
+        code: form.code, name: form.name,
+        gstin: form.gstin || undefined,
+        phone: form.phone || undefined,
+        email: form.email || undefined,
+        max_users: form.max_users,
+        max_mills: form.max_mills,
+        subscription_plan: form.subscription_plan,
+      });
+      const companyId = company.id ?? company._id;
+      if (companyId) {
+        await adminApi.createCompanyModules(companyId, ALL_MODULES);
+      }
+      toast.success("Company created with all modules enabled");
+      qc.invalidateQueries({ queryKey: ["masters"] });
+      onDone();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Failed to create company");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3 mt-2">
+      <div className="space-y-1.5">
+        <Label>Code <span className="text-destructive">*</span></Label>
+        <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="e.g. SPIN001" />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Name <span className="text-destructive">*</span></Label>
+        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. SpinFlow Textiles Pvt Ltd" />
+      </div>
+      <div className="space-y-1.5">
+        <Label>GSTIN</Label>
+        <Input value={form.gstin} onChange={(e) => setForm({ ...form, gstin: e.target.value })} placeholder="15 alphanumeric chars" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label>Phone</Label>
+          <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Email</Label>
+          <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        </div>
+      </div>
+      <Button className="w-full" onClick={handleSubmit} disabled={loading || !form.code || !form.name}>
+        {loading ? "Creating…" : "Create Company"}
+      </Button>
     </div>
   );
 }

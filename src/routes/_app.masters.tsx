@@ -213,7 +213,7 @@ function MastersPage() {
                 ];
                 const isSuperAdmin = user?.role === "SUPER_ADMIN";
                 return allTabs.filter(t =>
-                  isSuperAdmin ? ["companies", "mills"].includes(t.key) : true
+                  isSuperAdmin ? ["companies", "mills"].includes(t.key) : t.key !== "companies"
                 ).map(t => (
                   <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
                 ));
