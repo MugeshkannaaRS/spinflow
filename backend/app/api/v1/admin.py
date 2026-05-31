@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Dict
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -13,21 +14,32 @@ from app.models.masters import Company, CompanyModule, MillSettings
 
 router = APIRouter()
 
+ALL_MODULE_KEYS = [
+    "dashboard", "production", "quality", "maintenance", "hr",
+    "payroll", "purchase", "stores", "inventory", "dispatch",
+    "lotrac", "accounts", "sales", "masters", "users", "reports",
+]
+
+
 @router.get("/admin/companies/{company_id}/modules")
 async def get_company_modules(
     company_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "SUPER_ADMIN":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage modules")
-    result = await db.execute(
-        select(CompanyModule).where(CompanyModule.company_id == company_id)
-    )
-    modules = result.scalars().all()
-    return {
-        "modules": {m.module_name: m.is_enabled for m in modules},
-    }
+    try:
+        if current_user.role != "SUPER_ADMIN":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage modules")
+        result = await db.execute(
+            select(CompanyModule).where(CompanyModule.company_id == company_id)
+        )
+        modules = result.scalars().all()
+        module_map = {m.module_name: m.is_enabled for m in modules}
+        return {mod: module_map.get(mod, False) for mod in ALL_MODULE_KEYS}
+    except HTTPException:
+        raise
+    except Exception as e:
+        return {mod: False for mod in ALL_MODULE_KEYS}
 
 
 @router.put("/admin/companies/{company_id}/modules")
@@ -50,22 +62,16 @@ async def update_company_modules(
             )
             record = existing.scalar_one_or_none()
             if record:
-                record.is_enabled = is_enabled
+                record.is_enabled = bool(is_enabled)
             else:
                 db.add(CompanyModule(
                     company_id=company_id,
                     module_name=module_name,
-                    is_enabled=is_enabled,
+                    is_enabled=bool(is_enabled),
                     enabled_by=current_user.id,
                 ))
         await db.commit()
-        result = await db.execute(
-            select(CompanyModule).where(CompanyModule.company_id == company_id)
-        )
-        modules = result.scalars().all()
-        return {
-            "modules": {m.module_name: m.is_enabled for m in modules},
-        }
+        return {"saved": True}
     except HTTPException:
         raise
     except Exception as e:
@@ -100,6 +106,30 @@ async def get_user_modules(
         "company_name": company.name if company else "Unknown",
         "modules": {m.module_name: m.is_enabled for m in modules},
     }
+
+
+@router.patch("/admin/companies/{company_id}/suspend")
+async def toggle_company_status(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        result = await db.execute(
+            select(Company).where(Company.id == company_id)
+        )
+        company = result.scalar_one_or_none()
+        if not company:
+            raise HTTPException(404, "Company not found")
+        company.is_active = not company.is_active
+        await db.commit()
+        status = "activated" if company.is_active else "suspended"
+        return {"status": status, "is_active": company.is_active}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(500, detail=str(e))
 
 
 @router.get("/admin/mills/{mill_id}/settings")
