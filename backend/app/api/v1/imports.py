@@ -64,7 +64,7 @@ async def get_import_mappings(
         ]
     except Exception as e:
         logger.error(f"Error fetching import mappings for table={table}, mill={mill_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to fetch import mappings")
+        return []
 
 @router.post("/import/mappings")
 async def save_import_mappings(

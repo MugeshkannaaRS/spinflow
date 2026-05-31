@@ -1,13 +1,31 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/stores/auth";
+import { useTheme } from "@/hooks/useTheme";
 import { ROLE_LABELS } from "@/lib/rbac";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Menu, BellOff } from "lucide-react";
+import {
+  Bell,
+  Menu,
+  BellOff,
+  Moon,
+  Sun,
+  LogOut,
+  User,
+  KeyRound,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useSidebar } from "@/components/layout/SidebarContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { formatRelativeTime } from "@/utils/time";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "@tanstack/react-router";
 
 const TYPE_COLORS: Record<string, string> = {
   success: "bg-success",
@@ -100,37 +118,61 @@ export function Topbar({
   subtitle?: string;
   children?: React.ReactNode;
 }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { toggle } = useSidebar();
+  const { theme, toggle: toggleTheme } = useTheme();
+  const navigate = useNavigate();
+
   return (
-    <header className="flex items-center justify-between border-b bg-card px-4 sm:px-6 py-4 gap-3">
+    <header className="flex items-center justify-between h-14 bg-[var(--bg-primary)] border-b border-[var(--border)] shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 lg:px-6 gap-3 sticky top-0 z-20">
       <div className="flex items-center gap-3 min-w-0">
-        <Button variant="ghost" size="icon" className="md:hidden shrink-0" onClick={toggle}>
+        <Button variant="ghost" size="icon" className="lg:hidden shrink-0" onClick={toggle}>
           <Menu className="size-5" />
         </Button>
-        <div className="min-w-0">
-          <h1 className="text-lg sm:text-xl font-semibold tracking-tight truncate">{title}</h1>
+        <div className="min-w-0 flex items-center gap-2">
+          <h1 className="text-base font-semibold text-[var(--text-primary)] truncate">{title}</h1>
           {subtitle && (
-            <p className="text-xs sm:text-sm text-muted-foreground truncate">{subtitle}</p>
+            <>
+              <span className="text-xs text-[var(--text-muted)] hidden sm:inline">·</span>
+              <span className="text-xs text-[var(--text-muted)] truncate hidden sm:inline">{subtitle}</span>
+            </>
           )}
         </div>
       </div>
       {children && <div className="flex items-center gap-2">{children}</div>}
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
+        <Button variant="ghost" size="icon" onClick={toggleTheme} className="text-muted-foreground">
+          {theme === "light" ? <Moon className="size-5" /> : <Sun className="size-5" />}
+        </Button>
+        <NotificationsDropdown />
+        <div className="h-6 w-px bg-border" />
         {user && (
-          <>
-            <NotificationsDropdown />
-            <Badge variant="secondary" className="font-normal hidden sm:inline-flex">
-              {ROLE_LABELS[user.role]}
-            </Badge>
-            <div className="size-8 sm:size-9 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-sm">
-              {user.name
-                .split(" ")
-                .map((n) => n[0])
-                .slice(0, 2)
-                .join("")}
-            </div>
-          </>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="size-8 rounded-full bg-brand-500 text-white flex items-center justify-center font-semibold text-sm shrink-0 hover:opacity-90 transition-opacity">
+                {user.name
+                  .split(" ")
+                  .map((n) => n[0])
+                  .slice(0, 2)
+                  .join("")}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => navigate({ to: "/profile" })}>
+                <User className="size-4 mr-2" /> Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate({ to: "/change-password" })}>
+                <KeyRound className="size-4 mr-2" /> Change Password
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => { logout(); navigate({ to: "/login" }); }}
+                className="text-red-500 focus:text-red-500"
+              >
+                <LogOut className="size-4 mr-2" /> Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
     </header>

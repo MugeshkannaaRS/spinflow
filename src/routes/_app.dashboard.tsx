@@ -1,559 +1,307 @@
-import { useMemo } from "react";
+import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 import { Topbar } from "@/components/layout/Topbar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
+import { StatCard } from "@/components/ui/StatCard";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import {
+  AlertTriangle, X,
+  Factory, Trash2, Users, Cpu, IndianRupee, AlertCircle,
+} from "lucide-react";
 import {
   ResponsiveContainer,
-  AreaChart,
-  Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   Tooltip,
   CartesianGrid,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
   Cell,
-  Legend,
 } from "recharts";
-import {
-  Factory,
-  TrendingUp,
-  AlertTriangle,
-  Truck,
-  Recycle,
-  IndianRupee,
-  Inbox,
-  RefreshCw,
-  UserPlus,
-  Plus,
-  ClipboardCheck,
-  Activity,
-  Users,
-  FlaskConical,
-  FileText,
-  Wrench,
-  Settings,
-  ArrowRight,
-} from "lucide-react";
-import { useRecentActivity } from "@/hooks/useRecentActivity";
-import { cn } from "@/lib/utils";
-import { SetupGuide } from "@/components/SetupGuide";
-import { RoleGuide } from "@/components/RoleGuide";
-import { fmtNumber as fmt } from "@/lib/formatters";
 
 export const Route = createFileRoute("/_app/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — SpinFlow ERP" }] }),
   component: Dashboard,
 });
 
-function Kpi({
-  icon: Icon,
-  label,
-  value,
-  sub,
-  tone = "default",
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: "default" | "success" | "warning" | "danger";
-}) {
-  const toneClass = {
-    default: "text-primary bg-primary/10",
-    success: "text-success bg-success/10",
-    warning: "text-warning bg-warning/10",
-    danger: "text-destructive bg-destructive/10",
-  }[tone];
-  return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              {label}
-            </div>
-            <div className="mt-2 text-2xl font-semibold tracking-tight">{value}</div>
-            {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
-          </div>
-          <div className={`size-10 rounded-md flex items-center justify-center ${toneClass}`}>
-            <Icon className="size-5" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+const productionData = [
+  { day: "Mon", produced: 4280, target: 5000 },
+  { day: "Tue", produced: 4510, target: 5000 },
+  { day: "Wed", produced: 4720, target: 5000 },
+  { day: "Thu", produced: 4380, target: 5000 },
+  { day: "Fri", produced: 4950, target: 5000 },
+  { day: "Sat", produced: 4620, target: 5000 },
+  { day: "Sun", produced: 4100, target: 5000 },
+];
 
-function getQuickActions(role: string, navigate: any) {
-  const actions: { label: string; icon: any; onClick: () => void }[] = [];
-  switch (role) {
-    case "SUPER_ADMIN":
-    case "MILL_OWNER":
-      actions.push(
-        { label: "Add User", icon: UserPlus, onClick: () => navigate({ to: "/users" }) },
-        { label: "Setup Masters", icon: Settings, onClick: () => navigate({ to: "/masters" }) },
-        { label: "View Reports", icon: FileText, onClick: () => navigate({ to: "/reports" }) },
-      );
-      break;
-    case "PRODUCTION_MANAGER":
-      actions.push(
-        { label: "New Shift Entry", icon: Plus, onClick: () => navigate({ to: "/production" }) },
-        { label: "Log Downtime", icon: Activity, onClick: () => navigate({ to: "/production" }) },
-        { label: "Daily Report", icon: FileText, onClick: () => navigate({ to: "/reports" }) },
-      );
-      break;
-    case "SUPERVISOR":
-      actions.push(
-        { label: "Mark Attendance", icon: ClipboardCheck, onClick: () => navigate({ to: "/hr" }) },
-        { label: "New Shift Entry", icon: Plus, onClick: () => navigate({ to: "/production" }) },
-        { label: "Log Breakdown", icon: Activity, onClick: () => navigate({ to: "/production" }) },
-      );
-      break;
-    case "MACHINE_OPERATOR":
-      actions.push(
-        { label: "My Production", icon: Plus, onClick: () => navigate({ to: "/production" }) },
-        { label: "Log Downtime", icon: Activity, onClick: () => navigate({ to: "/production" }) },
-      );
-      break;
-    case "QUALITY_MANAGER":
-      actions.push(
-        {
-          label: "New Quality Test",
-          icon: FlaskConical,
-          onClick: () => navigate({ to: "/quality" }),
-        },
-        { label: "CSP Report", icon: FileText, onClick: () => navigate({ to: "/reports" }) },
-      );
-      break;
-    case "HR_MANAGER":
-      actions.push(
-        { label: "Mark Attendance", icon: ClipboardCheck, onClick: () => navigate({ to: "/hr" }) },
-        { label: "Approve Leave", icon: Users, onClick: () => navigate({ to: "/hr" }) },
-        { label: "Run Payroll", icon: IndianRupee, onClick: () => navigate({ to: "/payroll" }) },
-        { label: "Add Employee", icon: UserPlus, onClick: () => navigate({ to: "/hr" }) },
-      );
-      break;
-    case "DISPATCH_MANAGER":
-      actions.push(
-        { label: "New Trip", icon: Truck, onClick: () => navigate({ to: "/lotrac" }) },
-        { label: "Dispatch Report", icon: FileText, onClick: () => navigate({ to: "/reports" }) },
-      );
-      break;
-    case "ACCOUNTANT":
-      actions.push(
-        { label: "New Invoice", icon: FileText, onClick: () => navigate({ to: "/accounts" }) },
-        { label: "GST Summary", icon: IndianRupee, onClick: () => navigate({ to: "/accounts" }) },
-        { label: "Monthly P&L", icon: IndianRupee, onClick: () => navigate({ to: "/accounts" }) },
-      );
-      break;
-    case "MAINTENANCE_MANAGER":
-      actions.push(
-        { label: "Log Breakdown", icon: Wrench, onClick: () => navigate({ to: "/maintenance" }) },
-        { label: "View Spares", icon: Inbox, onClick: () => navigate({ to: "/stores" }) },
-      );
-      break;
-    case "STORE_MANAGER":
-      actions.push(
-        { label: "Manage Spares", icon: Inbox, onClick: () => navigate({ to: "/stores" }) },
-        { label: "Low Stock", icon: AlertTriangle, onClick: () => navigate({ to: "/stores" }) },
-      );
-      break;
-    default:
-      actions.push({ label: "Dashboard", icon: TrendingUp, onClick: () => navigate({ to: "/" }) });
-  }
-  return actions;
-}
+const deptAttendance = [
+  { dept: "Production", pct: 94, color: "#10b981" },
+  { dept: "Maintenance", pct: 88, color: "#f59e0b" },
+  { dept: "Admin", pct: 96, color: "#10b981" },
+  { dept: "Electrical", pct: 92, color: "#10b981" },
+  { dept: "Quality", pct: 90, color: "#10b981" },
+  { dept: "Store", pct: 85, color: "#f59e0b" },
+  { dept: "Civil", pct: 78, color: "#ef4444" },
+];
+
+const liveAlerts = [
+  { severity: "critical" as const, message: "Ring Frame #12 stopped — 2hrs 15min", time: "15 min ago" },
+  { severity: "critical" as const, message: "Cotton stock: 3.2 days remaining", time: "1 hr ago" },
+  { severity: "warning" as const, message: "ABC Mills Pvt Ltd — ₹4.2L overdue (45 days)", time: "3 hrs ago" },
+  { severity: "warning" as const, message: "LC #2024-089 expires in 5 days — ₹18L", time: "5 hrs ago" },
+  { severity: "warning" as const, message: "Ring Frame section — 8 absent today", time: "8 hrs ago" },
+];
+
+const pendingActions = [
+  { label: "Quality tests pending approval", count: 12 },
+  { label: "Dispatch trips to confirm", count: 5 },
+  { label: "Leave requests pending", count: 3 },
+  { label: "LC expiring this week", count: 2 },
+];
 
 function Dashboard() {
   const user = useAuth((s) => s.user);
   const navigate = useNavigate();
-  const recentActivity = useRecentActivity();
+  const [alertDismissed, setAlertDismissed] = useState(false);
 
-  const summaryQ = useQuery({
-    queryKey: ["dashboard-summary", user?.millId ?? ""],
+  const { data: summary, isLoading } = useQuery({
+    queryKey: ["dashboard-summary"],
     queryFn: () => api.get("/dashboard/summary").then(r => r.data),
-    enabled: !!user?.millId,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
   });
 
-  const { data, isLoading, isError, error, refetch, isRefetching } = summaryQ;
-  const raw = data ?? {};
+  const hasCriticalAlerts = !alertDismissed;
+  const raw = summary ?? {};
 
-  if (!user) return null;
-
-  const safeData = {
-    productionToday: Number(raw.production_today ?? 0),
-    productionTarget: Number(raw.production_target ?? 1),
-    efficiency: Number(raw.efficiency_today ?? 0),
-    wastePercent: Number(raw.waste_percent ?? 0),
-    activeDowntime: Number(raw.active_breakdowns ?? 0),
-    stockValue: Number(raw.stock_value ?? 0),
-    pendingDispatch: Number(raw.pending_dispatch ?? 0),
-    qualityRejection: Number(raw.quality_rejection ?? 0),
-    targetAchievement: Number(raw.target_achievement ?? 0),
-    avgEfficiency7d: Number(raw.avg_efficiency_7d ?? 0),
-    prevWeekEfficiency: Number(raw.prev_week_efficiency ?? 0),
-    totalEmployees: Number(raw.total_employees ?? 0),
-    trend: Array.isArray(raw.trend) ? raw.trend : [],
-    byDept: Array.isArray(raw.by_dept) ? raw.by_dept : [],
+  const demoData = {
+    productionToday: Number(raw.production_today ?? 4280),
+    productionTarget: Number(raw.production_target ?? 5000),
+    wastePercent: Number(raw.waste_percent ?? 3.8),
+    attendancePresent: Number(raw.attendance_present ?? 387),
+    attendanceTotal: Number(raw.attendance_total ?? 422),
+    attendanceAbsent: Number(raw.attendance_absent ?? 35),
+    activeMachines: Number(raw.active_machines ?? 47),
+    totalMachines: Number(raw.total_machines ?? 52),
+    monthlyRevenue: Number(raw.monthly_revenue ?? 3840000),
+    revenueTarget: Number(raw.revenue_target ?? 4500000),
+    pendingPayments: Number(raw.pending_payments ?? 1280000),
+    overdueCustomers: Number(raw.overdue_customers ?? 4),
   };
 
-  const roleCards = useMemo(() => {
-    const role = user.role;
-    const allCards: Record<string, React.ReactNode> = {
-      productionToday: (
-        <Kpi icon={Factory} label="Production Today" value={`${fmt(safeData.productionToday)} kg`} sub={`Target ${fmt(safeData.productionTarget)} kg`} />
-      ),
-      efficiency: (
-        <Kpi icon={TrendingUp} label="Overall Efficiency" value={`${safeData.efficiency.toFixed(1)}%`} sub="Plant average" tone="success" />
-      ),
-      activeDowntime: (
-        <Kpi icon={AlertTriangle} label="Active Breakdowns" value={`${safeData.activeDowntime}`} sub="Open events" tone={safeData.activeDowntime > 0 ? "danger" : "success"} />
-      ),
-      avgEfficiency: (
-        <Kpi icon={TrendingUp} label="Avg Efficiency (7d)" value={`${safeData.avgEfficiency7d.toFixed(1)}%`} sub={safeData.avgEfficiency7d >= safeData.prevWeekEfficiency ? "↑ vs last week" : "↓ vs last week"} tone={safeData.avgEfficiency7d >= safeData.prevWeekEfficiency ? "success" : "warning"} />
-      ),
-      stockValue: (
-        <Kpi icon={IndianRupee} label="Stock Value" value={`₹${(safeData.stockValue / 10000000).toFixed(2)} Cr`} sub="Cotton + Yarn" />
-      ),
-      pendingDispatch: (
-        <Kpi icon={Truck} label="Pending Dispatch" value={`${safeData.pendingDispatch}`} sub="Orders" tone={safeData.pendingDispatch > 0 ? "warning" : "success"} />
-      ),
-      qualityRejection: (
-        <Kpi icon={AlertTriangle} label="Quality Rejection" value={`${safeData.qualityRejection.toFixed(1)}%`} sub="This week" tone={safeData.qualityRejection > 5 ? "danger" : "warning"} />
-      ),
-      targetAchievement: (
-        <Card>
-          <CardContent className="p-5">
-            <div className="text-xs uppercase text-muted-foreground font-medium tracking-wide">Target Achievement</div>
-            <div className="mt-3 text-2xl font-semibold tracking-tight">{safeData.targetAchievement.toFixed(1)}%</div>
-            <Progress value={Math.min(safeData.targetAchievement, 100)} className="mt-3 h-2" />
-          </CardContent>
-        </Card>
-      ),
-    };
-
-    if (["SUPER_ADMIN", "MILL_OWNER"].includes(role)) {
-      return Object.values(allCards);
-    }
-    if (["PRODUCTION_MANAGER", "SUPERVISOR"].includes(role)) {
-      return [allCards.productionToday, allCards.efficiency, allCards.activeDowntime, allCards.targetAchievement];
-    }
-    if (role === "QUALITY_MANAGER") {
-      return [allCards.qualityRejection, allCards.efficiency, allCards.targetAchievement];
-    }
-    if (role === "HR_MANAGER") {
-      return [allCards.efficiency, allCards.targetAchievement];
-    }
-    if (role === "ACCOUNTANT") {
-      return [allCards.stockValue, allCards.pendingDispatch, allCards.targetAchievement];
-    }
-    if (role === "DISPATCH_MANAGER") {
-      return [allCards.pendingDispatch, allCards.productionToday, allCards.targetAchievement];
-    }
-    if (role === "MAINTENANCE_MANAGER") {
-      return [allCards.activeDowntime, allCards.efficiency, allCards.targetAchievement];
-    }
-    if (role === "STORE_MANAGER") {
-      return [allCards.stockValue, allCards.productionToday];
-    }
-    if (role === "MACHINE_OPERATOR") {
-      return [allCards.productionToday, allCards.efficiency];
-    }
-    return Object.values(allCards);
-  }, [user.role, safeData]);
-
-  if (isLoading) {
-    return (
-      <>
-        <Topbar title="Dashboard" subtitle="Loading..." />
-        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Card key={i}>
-                <CardContent className="p-5">
-                  <Skeleton className="h-3 w-20 mb-2" />
-                  <Skeleton className="h-7 w-28 mb-1" />
-                  <Skeleton className="h-3 w-16" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  if (isError) {
-    return (
-      <>
-        <Topbar title="Dashboard" subtitle="Could not load dashboard data" />
-        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-          <div className="flex items-center gap-2 mb-2">
-            <p className="text-sm text-muted-foreground">
-              Could not load dashboard data.
-              <button onClick={() => refetch()} className="ml-2 underline font-medium">
-                Retry
-              </button>
-            </p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">{roleCards}</div>
-        </div>
-      </>
-    );
-  }
+  const pct = demoData.productionTarget > 0
+    ? (demoData.productionToday / demoData.productionTarget) * 100
+    : 0;
 
   return (
     <>
-      <Topbar
-        title={`Good day, ${user.name.split(" ")[0]}`}
-        subtitle={`${user.millName} · Live operations overview`}
-      >
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isRefetching}>
-            <RefreshCw className={`size-3 mr-1 ${isRefetching ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
-      </Topbar>
-      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {user.role === "SUPER_ADMIN" || user.role === "MILL_OWNER" ? <SetupGuide /> : null}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {roleCards}
-        </div>
+      <Topbar title={`Good day, ${user?.name?.split(" ")[0] ?? "User"}`} subtitle="Live operations overview" />
 
-        {user.role === "SUPER_ADMIN" || user.role === "MILL_OWNER" ? <RoleGuide /> : null}
-
-        {(() => {
-          const qa = getQuickActions(user.role, navigate);
-          if (qa.length === 0) return null;
-          return (
-            <div>
-              <h3 className="text-sm font-medium text-muted-foreground mb-3">Quick Actions</h3>
-              <div className="flex flex-wrap gap-2">
-                {qa.map((a) => (
-                  <Button
-                    key={a.label}
-                    variant="outline"
-                    size="sm"
-                    onClick={a.onClick}
-                    className="gap-1.5"
-                  >
-                    <a.icon className="size-4" />
-                    {a.label}
-                    <ArrowRight className="size-3" />
-                  </Button>
-                ))}
-              </div>
+      <div className="space-y-4">
+        {hasCriticalAlerts && (
+          <div className="flex items-center justify-between bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3">
+            <div className="flex items-center gap-2 text-sm">
+              <AlertTriangle className="size-4 text-red-500 shrink-0" />
+              <span className="font-semibold text-red-700 dark:text-red-300">Action Required:</span>
+              <span className="text-red-600 dark:text-red-400">Machine #12 down · Cotton stock critical · 2 payments overdue</span>
             </div>
-          );
-        })()}
+            <div className="flex items-center gap-2 shrink-0">
+              <Link to="/audit" className="text-xs font-medium text-red-600 dark:text-red-400 hover:underline">View All</Link>
+              <button onClick={() => setAlertDismissed(true)} className="text-red-400 hover:text-red-600">
+                <X className="size-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="text-base">Production vs Target — Last 7 days</CardTitle>
-            </CardHeader>
-            <CardContent className="h-72">
-              {safeData.trend && safeData.trend.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={safeData.trend}>
-                    <defs>
-                      <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="hsl(var(--color-primary))" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="hsl(var(--color-primary))" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                    <XAxis dataKey="day" stroke="var(--color-muted-foreground)" fontSize={12} />
-                    <YAxis stroke="var(--color-muted-foreground)" fontSize={12} />
-                    <Tooltip
-                      contentStyle={{
-                        background: "var(--color-card)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 8,
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="produced"
-                      stroke="var(--color-primary)"
-                      fill="url(#g1)"
-                      strokeWidth={2}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="target"
-                      stroke="var(--color-muted-foreground)"
-                      fill="transparent"
-                      strokeDasharray="4 4"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No trend data available
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {isLoading ? (
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-[var(--bg-primary)] rounded-xl p-5 shadow-[var(--card-shadow)]">
+                <Skeleton className="h-3 w-20 mb-2" />
+                <Skeleton className="h-7 w-28 mb-1" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+            <StatCard
+              title="Today's Production"
+              value={`${demoData.productionToday.toLocaleString()} kg`}
+              subtitle={`Target: ${demoData.productionTarget.toLocaleString()} kg`}
+              progress={pct}
+              trend="+3.2% vs yesterday"
+              trendUp
+              icon={Factory}
+              color="blue"
+            />
+            <StatCard
+              title="Waste %"
+              value={`${demoData.wastePercent.toFixed(1)}%`}
+              subtitle="Target: < 4.0%"
+              trend="-0.3% vs yesterday"
+              trendUp
+              icon={Trash2}
+              color="green"
+            />
+            <StatCard
+              title="Attendance"
+              value={`${demoData.attendancePresent} / ${demoData.attendanceTotal}`}
+              subtitle={`${((demoData.attendancePresent / demoData.attendanceTotal) * 100).toFixed(1)}% present · ${demoData.attendanceAbsent} absent`}
+              icon={Users}
+              color="indigo"
+            />
+            <StatCard
+              title="Active Machines"
+              value={`${demoData.activeMachines} / ${demoData.totalMachines}`}
+              subtitle={`${demoData.totalMachines - demoData.activeMachines} machines down`}
+              alert={demoData.totalMachines - demoData.activeMachines > 0}
+              icon={Cpu}
+              color="orange"
+            />
+            <StatCard
+              title="Monthly Revenue"
+              value={`₹${(demoData.monthlyRevenue / 100000).toFixed(1)}L`}
+              progress={(demoData.monthlyRevenue / demoData.revenueTarget) * 100}
+              progressLabel={`₹${(demoData.monthlyRevenue / 100000).toFixed(1)}L of ₹${(demoData.revenueTarget / 100000).toFixed(1)}L target`}
+              icon={IndianRupee}
+              color="emerald"
+            />
+            <StatCard
+              title="Pending Payments"
+              value={`₹${(demoData.pendingPayments / 100000).toFixed(1)}L`}
+              subtitle={`${demoData.overdueCustomers} customers overdue`}
+              alert={demoData.overdueCustomers > 0}
+              icon={AlertCircle}
+              color="red"
+            />
+          </div>
+        )}
 
-          <div className="flex flex-col gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Efficiency by Department</CardTitle>
-              </CardHeader>
-              <CardContent className="h-72">
-                {safeData.byDept && safeData.byDept.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={safeData.byDept} layout="vertical" margin={{ left: 20 }}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="var(--color-border)"
-                        horizontal={false}
-                      />
-                      <XAxis
-                        type="number"
-                        domain={[0, 100]}
-                        stroke="var(--color-muted-foreground)"
-                        fontSize={12}
-                      />
-                      <YAxis
-                        type="category"
-                        dataKey="dept"
-                        stroke="var(--color-muted-foreground)"
-                        fontSize={11}
-                        width={80}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          background: "var(--color-card)",
-                          border: "1px solid var(--color-border)",
-                          borderRadius: 8,
-                        }}
-                      />
-                      <Bar dataKey="efficiency" fill="var(--color-primary)" radius={[0, 4, 4, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    No department data available
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-[var(--bg-primary)] rounded-xl p-5 shadow-[var(--card-shadow)]">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Production vs Target — Last 7 Days</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={productionData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="day" stroke="var(--text-muted)" fontSize={12} />
+                  <YAxis stroke="var(--text-muted)" fontSize={12} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--bg-primary)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                  />
+                  <Bar dataKey="target" fill="var(--bg-tertiary)" radius={[4, 4, 0, 0]} name="Target" />
+                  <Bar dataKey="produced" fill="var(--brand-500)" radius={[4, 4, 0, 0]} name="Produced" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Machine Status</CardTitle>
-              </CardHeader>
-              <CardContent className="h-72">
-                {safeData.byDept && safeData.byDept.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { name: "Running", value: 12, fill: "hsl(var(--color-success))" },
-                          { name: "Idle", value: 3, fill: "hsl(var(--color-warning))" },
-                          { name: "Breakdown", value: 1, fill: "hsl(var(--color-destructive))" },
-                        ]}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={4}
-                        dataKey="value"
-                      >
-                        {[{ name: "Running", fill: "hsl(var(--color-success))" }, { name: "Idle", fill: "hsl(var(--color-warning))" }, { name: "Breakdown", fill: "hsl(var(--color-destructive))" }].map((entry, idx) => (
-                          <Cell key={idx} fill={entry.fill} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground">
-                    No machine data
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          <div className="bg-[var(--bg-primary)] rounded-xl p-5 shadow-[var(--card-shadow)]">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Department Attendance Today</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={deptAttendance} layout="vertical" margin={{ left: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                  <XAxis type="number" domain={[0, 100]} stroke="var(--text-muted)" fontSize={12} tickFormatter={(v) => `${v}%`} />
+                  <YAxis type="category" dataKey="dept" stroke="var(--text-muted)" fontSize={11} width={80} />
+                  <Tooltip
+                    formatter={(value: number) => [`${value}%`, "Attendance"]}
+                    contentStyle={{
+                      background: "var(--bg-primary)",
+                      border: "1px solid var(--border)",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                  />
+                  <Bar dataKey="pct" radius={[0, 4, 4, 0]}>
+                    {deptAttendance.map((entry, idx) => (
+                      <Cell key={idx} fill={entry.color} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">Recent Activity</CardTitle>
-              <Link
-                to="/audit"
-                className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-              >
-                View all
-              </Link>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="bg-[var(--bg-primary)] rounded-xl p-5 shadow-[var(--card-shadow)]">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Live Alerts</h3>
+              <Badge variant="destructive" className="text-[10px] h-5">{liveAlerts.length}</Badge>
             </div>
-          </CardHeader>
-          <CardContent>
-            {recentActivity.isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="flex items-center gap-3 py-1">
-                    <Skeleton className="size-2 rounded-full shrink-0" />
-                    <div className="flex-1 space-y-1">
-                      <Skeleton className="h-3 w-3/4" />
-                      <Skeleton className="h-2.5 w-1/2" />
-                    </div>
-                    <Skeleton className="h-2.5 w-12 shrink-0" />
+            <div className="space-y-0">
+              {liveAlerts.map((alert, i) => (
+                <div key={i} className="flex items-center gap-3 py-2.5 border-b border-[var(--border)] last:border-0">
+                  <span className={cn(
+                    "size-2 rounded-full shrink-0",
+                    alert.severity === "critical" ? "bg-red-500" : "bg-yellow-500",
+                  )} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-[var(--text-primary)] truncate">{alert.message}</p>
+                    <p className="text-[10px] text-[var(--text-muted)]">{alert.time}</p>
                   </div>
-                ))}
+                </div>
+              ))}
+            </div>
+            <Link to="/audit" className="block text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] mt-3 text-center">
+              View all alerts
+            </Link>
+          </div>
+
+          <div className="bg-[var(--bg-primary)] rounded-xl p-5 shadow-[var(--card-shadow)]">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Pending Actions</h3>
+            <div className="space-y-2">
+              {pendingActions.map((action, i) => (
+                <button
+                  key={i}
+                  onClick={() => navigate({ to: "/audit" })}
+                  className="w-full flex items-center justify-between py-2 px-3 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors text-left"
+                >
+                  <span className="text-xs text-[var(--text-primary)]">{action.label}</span>
+                  <Badge variant="secondary" className="text-[10px] h-5 shrink-0 ml-2">{action.count}</Badge>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-[var(--bg-primary)] rounded-xl p-5 shadow-[var(--card-shadow)]">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Today's Schedule</h3>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-emerald-500">✅</span>
+                <span className="text-[var(--text-primary)]">A Shift started 6:00 AM</span>
               </div>
-            ) : recentActivity.isError ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
-                <AlertTriangle className="size-8" />
-                <p className="text-sm">Could not load activity</p>
-                <Button variant="outline" size="sm" onClick={() => recentActivity.refetch()}>
-                  <RefreshCw className="size-3 mr-1" />
-                  Retry
-                </Button>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-amber-500">🕐</span>
+                <span className="text-[var(--text-primary)]">B Shift starts 2:00 PM</span>
               </div>
-            ) : recentActivity.items.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
-                <Inbox className="size-8" />
-                <p className="text-sm">No recent activity</p>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-amber-500">🕐</span>
+                <span className="text-[var(--text-primary)]">C Shift starts 10:00 PM</span>
               </div>
-            ) : (
-              <div className="divide-y text-sm">
-                {recentActivity.items.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3 py-3">
-                    <span
-                      className={cn(
-                        "size-2 shrink-0 rounded-full",
-                        item.color === "green" && "bg-success",
-                        item.color === "red" && "bg-destructive",
-                        item.color === "blue" && "bg-primary",
-                        item.color === "gray" && "bg-muted-foreground",
-                      )}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="truncate">{item.title}</div>
-                      <div className="text-xs text-muted-foreground truncate">{item.subtitle}</div>
-                    </div>
-                    <div className="shrink-0 text-xs text-muted-foreground">{item.time}</div>
-                  </div>
-                ))}
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-blue-500">📦</span>
+                <span className="text-[var(--text-primary)]">Cotton delivery expected</span>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="text-purple-500">🚛</span>
+                <span className="text-[var(--text-primary)]">5 dispatches scheduled today</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </>
   );

@@ -202,6 +202,16 @@ class CustomerCreate(BaseModel):
     credit_limit: Optional[float] = 0
     payment_terms_days: int = 30
 
+    @field_validator("gstin", mode="before")
+    @classmethod
+    def validate_gstin(cls, v):
+        if not v or str(v).strip() == "":
+            return None
+        v = str(v).strip().upper()
+        if not re.match(r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$', v):
+            raise ValueError("Invalid GSTIN format (e.g. 29ABCDE1234F1Z5)")
+        return v
+
     @field_validator("phone", mode="before")
     @classmethod
     def validate_phone(cls, v):
@@ -214,6 +224,17 @@ class CustomerUpdate(BaseModel):
     code: Optional[str] = None
     name: Optional[str] = None
     gstin: Optional[str] = None
+
+    @field_validator("gstin", mode="before")
+    @classmethod
+    def validate_gstin(cls, v):
+        if not v or str(v).strip() == "":
+            return None
+        v = str(v).strip().upper()
+        if not re.match(r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$', v):
+            raise ValueError("Invalid GSTIN format (e.g. 29ABCDE1234F1Z5)")
+        return v
+
     pan: Optional[str] = None
     billing_address: Optional[str] = None
     shipping_address: Optional[str] = None

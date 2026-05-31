@@ -198,18 +198,26 @@ function MastersPage() {
           </div>
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="flex-wrap h-auto">
-              {user.role === "SUPER_ADMIN" && (
-                <TabsTrigger value="companies">Companies</TabsTrigger>
-              )}
-              <TabsTrigger value="mills">Mills</TabsTrigger>
-              <TabsTrigger value="departments">Departments</TabsTrigger>
-              <TabsTrigger value="yarn-counts">Yarn Counts</TabsTrigger>
-              <TabsTrigger value="customers">Customers</TabsTrigger>
-              <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
-              <TabsTrigger value="routes">Routes</TabsTrigger>
-              <TabsTrigger value="machines">Machines</TabsTrigger>
-              <TabsTrigger value="shifts">Shifts</TabsTrigger>
-              <TabsTrigger value="warehouses">Warehouses</TabsTrigger>
+              {(() => {
+                const allTabs = [
+                  { key: "companies", label: "Companies" },
+                  { key: "mills", label: "Mills" },
+                  { key: "departments", label: "Departments" },
+                  { key: "yarn-counts", label: "Yarn Counts" },
+                  { key: "customers", label: "Customers" },
+                  { key: "vehicles", label: "Vehicles" },
+                  { key: "routes", label: "Routes" },
+                  { key: "machines", label: "Machines" },
+                  { key: "shifts", label: "Shifts" },
+                  { key: "warehouses", label: "Warehouses" },
+                ];
+                const isSuperAdmin = user?.role === "SUPER_ADMIN";
+                return allTabs.filter(t =>
+                  isSuperAdmin ? ["companies", "mills"].includes(t.key) : true
+                ).map(t => (
+                  <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
+                ));
+              })()}
             </TabsList>
 
             <TabsContent value="companies">

@@ -5,6 +5,7 @@ import { SidebarProvider, useSidebar } from "@/components/layout/SidebarContext"
 import { AlertBanner } from "@/components/common/AlertBanner";
 import { MobileNav } from "@/components/layout/MobileNav";
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: () => {
@@ -56,13 +57,32 @@ function RedirectOnMustChangePassword() {
 
 function AppShell() {
   const { open, close } = useSidebar();
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem("spinflow_sidebar_collapsed") === "true"
+  );
+
+  useEffect(() => {
+    const handler = () => {
+      setCollapsed(localStorage.getItem("spinflow_sidebar_collapsed") === "true");
+    };
+    window.addEventListener("sidebar-collapse-change", handler);
+    return () => window.removeEventListener("sidebar-collapse-change", handler);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex h-screen overflow-hidden bg-[var(--bg-secondary)]">
       <Sidebar open={open} onClose={close} />
-      <main className="ml-64 min-h-screen overflow-y-auto flex flex-col relative pb-16 lg:pb-0">
+      <div
+        className={cn(
+          "flex flex-col flex-1 overflow-hidden transition-all duration-200 ease-in-out",
+          collapsed ? "lg:ml-16" : "lg:ml-60",
+        )}
+      >
         <AlertBanner />
-        <Outlet />
-      </main>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 pb-16 lg:pb-6">
+          <Outlet />
+        </main>
+      </div>
       <MobileNav />
     </div>
   );

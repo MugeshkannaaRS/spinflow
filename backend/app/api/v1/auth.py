@@ -342,6 +342,17 @@ async def create_user(
     role = role_result.scalar_one_or_none()
     if not role:
         raise SpinFlowException.bad_request("Invalid role", ErrorCode.INVALID_VALUE)
+    user_count_result = await db.execute(
+        select(func.count(User.id)).where(
+            User.company_id == req.company_id,
+            User.is_active == True,
+        )
+    )
+    current_count = user_count_result.scalar() or 0
+    company = await db.get(Company, req.company_id)
+    max_users = getattr(company, "max_users", 10) or 10
+    if current_count >= max_users:
+        raise HTTPException(status_code=403, detail=f"User limit reached ({current_count}/{max_users}). Upgrade your plan to add more users.")
     user = User(
         name=req.name,
         email=req.email,
