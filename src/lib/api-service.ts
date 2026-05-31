@@ -487,7 +487,9 @@ export const adminApi = {
   updateCompanyModules: (companyId: string, modules: Record<string, boolean>) =>
     api.put(`/admin/companies/${companyId}/modules`, { modules }).then((r) => r.data),
   createCompanyModules: (companyId: string, modules: string[]) =>
-    api.put(`/admin/companies/${companyId}/modules`, { modules }).then((r) => r.data),
+    api.put(`/admin/companies/${companyId}/modules`, {
+      modules: Object.fromEntries(modules.map(m => [m, true]))
+    }).then((r) => r.data),
   getMillSettings: (millId: string) =>
     api.get(`/admin/mills/${millId}/settings`).then((r) => r.data),
   updateMillSettings: (millId: string, settings: Record<string, any>) =>

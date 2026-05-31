@@ -1,7 +1,7 @@
 import { useAuth } from "@/stores/auth";
 
 const ROLE_MODULES: Record<string, string[]> = {
-  SUPER_ADMIN: ["admin", "column_config"],
+  SUPER_ADMIN: ["dashboard", "admin", "column_config"],
   MILL_OWNER: ["dashboard", "production", "quality", "maintenance", "hr", "payroll",
                "purchase", "stores", "inventory", "dispatch", "lotrac", "accounts",
                "sales", "masters", "users", "column_config"],

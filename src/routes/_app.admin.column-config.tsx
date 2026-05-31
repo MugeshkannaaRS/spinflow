@@ -33,7 +33,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Save,
@@ -127,23 +127,16 @@ function ColumnConfigPage() {
     },
   });
 
-  const loadConfig = useCallback(() => {
-    if (configQuery.data?.columns) {
-      setColumns(configQuery.data.columns.map((c: any, i: number) => ({
-        ...c,
-        _originalIndex: i,
-      })));
-    } else {
-      setColumns([]);
+  useEffect(() => {
+    if (configQuery.data) {
+      const cols = configQuery.data?.columns;
+      if (cols && cols.length > 0) {
+        setColumns(cols.map((c: any, i: number) => ({ ...c, _originalIndex: i })));
+      } else {
+        setColumns([]);
+      }
     }
   }, [configQuery.data]);
-
-  useState(() => loadConfig());
-  // Also load when data changes
-  if (configQuery.data && columns.length === 0) {
-    // Trigger load
-    setTimeout(() => loadConfig(), 0);
-  }
 
   const updateColumn = (index: number, field: string, value: any) => {
     setColumns((prev) => {
@@ -278,7 +271,7 @@ function ColumnConfigPage() {
                     {!configQuery.isLoading && columns.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-8 text-sm text-muted-foreground">
-                          Select a table to configure columns
+                          No columns configured for this table yet. Default columns will be used.
                         </TableCell>
                       </TableRow>
                     )}

@@ -12,7 +12,7 @@ export function SuperAdminDashboard() {
 
   const stats = [
     { label: "Companies", value: data?.total_companies ?? 0, icon: Building2, bg: "bg-blue-50 dark:bg-blue-900/30", color: "text-blue-600" },
-    { label: "Mills", value: data?.total_mills ?? 0, icon: Factory, bg: "bg-indigo-50 dark:bg-indigo-900/30", color: "text-indigo-600" },
+    { label: "Mills", value: data?.total_mills ?? 0, icon: Factory, bg: "bg-blue-50 dark:bg-blue-900/30", color: "text-blue-600" },
     { label: "Total Users", value: data?.total_users ?? 0, icon: Users, bg: "bg-emerald-50 dark:bg-emerald-900/30", color: "text-emerald-600" },
     { label: "Employees", value: data?.total_employees ?? 0, icon: UserCheck, bg: "bg-orange-50 dark:bg-orange-900/30", color: "text-orange-600" },
   ];
@@ -41,11 +41,11 @@ export function SuperAdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Link to="/admin" className="flex items-center gap-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-5 py-4 transition-colors">
+        <Link to="/admin" className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-4 transition-colors">
           <Plus className="w-5 h-5 shrink-0" />
           <div>
             <div className="font-semibold text-sm">Add New Company</div>
-            <div className="text-xs text-indigo-200">Onboard a new mill customer</div>
+            <div className="text-xs text-blue-200">Onboard a new mill customer</div>
           </div>
         </Link>
         <Link to="/admin" className="flex items-center gap-3 bg-white dark:bg-slate-800 hover:bg-gray-50 border border-gray-200 dark:border-slate-700 rounded-xl px-5 py-4 transition-colors">
@@ -67,7 +67,7 @@ export function SuperAdminDashboard() {
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300">Active Companies</h3>
-          <Link to="/admin" className="text-xs text-indigo-600 hover:underline">View all →</Link>
+          <Link to="/admin" className="text-xs text-blue-600 hover:underline">View all →</Link>
         </div>
         <div className="divide-y divide-gray-50 dark:divide-slate-700/50">
           {isLoading ? (
@@ -87,7 +87,7 @@ export function SuperAdminDashboard() {
                   <div className="text-sm font-medium text-gray-900 dark:text-white">{company.name}</div>
                   <div className="text-xs text-gray-400 mt-0.5">Code: {company.code}</div>
                 </div>
-                <Link to="/admin" className="text-xs text-indigo-600 hover:underline">Manage →</Link>
+                <Link to="/admin" className="text-xs text-blue-600 hover:underline">Manage →</Link>
               </div>
             ))
           )}

@@ -1855,7 +1855,7 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
           </SelectContent>
         </Select>
         {canEdit && (
-          <Button size="sm" style={{ backgroundColor: "#6366f1", color: "#ffffff" }}>
+          <Button size="sm" style={{ backgroundColor: "#3b82f6", color: "#ffffff" }}>
             <ClipboardCheck className="size-4 mr-1" />
             <MarkAttendanceSheet employees={filteredEmployees} month={month} year={year} onSuccess={refetch} />
           </Button>

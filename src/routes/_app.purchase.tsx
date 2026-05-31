@@ -642,7 +642,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   D: "#f97316",
   E: "#ef4444",
   F: "#a855f7",
-  G: "#6366f1",
+  G: "#3b82f6",
   H: "#64748b",
   Reject: "#dc2626",
 };
@@ -1512,9 +1512,9 @@ function QualityDashTab() {
                 <XAxis type="number" domain={[3, 5]} tick={{ fontSize: 11 }} />
                 <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11 }} />
                 <Tooltip formatter={(v: any) => [`MIC ${v?.toFixed(3)}`]} />
-                <Bar dataKey="avg_mic" fill="#6366f1" radius={[0, 4, 4, 0]}>
+                <Bar dataKey="avg_mic" fill="#3b82f6" radius={[0, 4, 4, 0]}>
                   {supplierData.map((_: any, idx: number) => (
-                    <Cell key={idx} fill="#6366f1" />
+                    <Cell key={idx} fill="#3b82f6" />
                   ))}
                 </Bar>
               </BarChart>

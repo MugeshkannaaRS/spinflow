@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select
 from typing import Dict
 
 from app.db.session import get_db
@@ -34,26 +34,38 @@ async def update_company_modules(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "SUPER_ADMIN":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage modules")
-    modules_data: Dict[str, bool] = body.get("modules", {})
-    for module_name, is_enabled in modules_data.items():
-        await db.execute(
-            update(CompanyModule)
-            .where(
-                CompanyModule.company_id == company_id,
-                CompanyModule.module_name == module_name,
+    try:
+        if current_user.role != "SUPER_ADMIN":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage modules")
+        modules_data: Dict[str, bool] = body.get("modules", {})
+        for module_name, is_enabled in modules_data.items():
+            existing = await db.execute(
+                select(CompanyModule).where(
+                    CompanyModule.company_id == company_id,
+                    CompanyModule.module_name == module_name,
+                )
             )
-            .values(is_enabled=is_enabled, enabled_by=current_user.id)
+            record = existing.scalar_one_or_none()
+            if record:
+                record.is_enabled = is_enabled
+            else:
+                db.add(CompanyModule(
+                    company_id=company_id,
+                    module_name=module_name,
+                    is_enabled=is_enabled,
+                    enabled_by=current_user.id,
+                ))
+        await db.commit()
+        result = await db.execute(
+            select(CompanyModule).where(CompanyModule.company_id == company_id)
         )
-    await db.commit()
-    result = await db.execute(
-        select(CompanyModule).where(CompanyModule.company_id == company_id)
-    )
-    modules = result.scalars().all()
-    return {
-        "modules": {m.module_name: m.is_enabled for m in modules},
-    }
+        modules = result.scalars().all()
+        return {
+            "modules": {m.module_name: m.is_enabled for m in modules},
+        }
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/admin/users/{user_id}/modules")

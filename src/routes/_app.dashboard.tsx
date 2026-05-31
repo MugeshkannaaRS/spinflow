@@ -203,8 +203,8 @@ function Dashboard() {
                       boxShadow: "0 4px 6px rgba(0,0,0,0.07)",
                     }}
                   />
-                  <ReferenceLine y={5000} stroke="#6366f1" strokeDasharray="4 4" label={{ value: "Target", position: "right", fontSize: 11, fill: "#6366f1" }} />
-                  <Bar dataKey="produced" fill="#6366f1" radius={[4, 4, 0, 0]} name="Produced (kg)" />
+                  <ReferenceLine y={5000} stroke="#3b82f6" strokeDasharray="4 4" label={{ value: "Target", position: "right", fontSize: 11, fill: "#3b82f6" }} />
+                  <Bar dataKey="produced" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Produced (kg)" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -278,7 +278,7 @@ function Dashboard() {
                   className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors text-left"
                 >
                   <span className="text-sm text-gray-600 dark:text-slate-400">{action.label}</span>
-                  <span className="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-xs font-semibold px-2.5 py-0.5 rounded-full">{action.count}</span>
+                  <span className="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-xs font-semibold px-2.5 py-0.5 rounded-full">{action.count}</span>
                 </button>
               ))}
             </div>

@@ -19,7 +19,7 @@ interface StatCardProps {
 const colorMap: Record<string, { iconBg: string; iconColor: string; progressBar: string }> = {
   blue:    { iconBg: "bg-blue-50 dark:bg-blue-900/30",    iconColor: "text-blue-500",    progressBar: "bg-blue-500" },
   green:   { iconBg: "bg-emerald-50 dark:bg-emerald-900/30", iconColor: "text-emerald-500", progressBar: "bg-emerald-500" },
-  indigo:  { iconBg: "bg-indigo-50 dark:bg-indigo-900/30",  iconColor: "text-indigo-500",  progressBar: "bg-indigo-500" },
+  indigo:  { iconBg: "bg-blue-50 dark:bg-blue-900/30",     iconColor: "text-blue-500",    progressBar: "bg-blue-500" },
   orange:  { iconBg: "bg-orange-50 dark:bg-orange-900/30",  iconColor: "text-orange-500",  progressBar: "bg-orange-500" },
   emerald: { iconBg: "bg-teal-50 dark:bg-teal-900/30",      iconColor: "text-teal-500",    progressBar: "bg-teal-500" },
   red:     { iconBg: "bg-red-50 dark:bg-red-900/30",        iconColor: "text-red-500",     progressBar: "bg-red-500" },

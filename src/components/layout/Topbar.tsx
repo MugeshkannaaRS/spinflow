@@ -153,7 +153,7 @@ export function Topbar({
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="w-8 h-8 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center hover:bg-indigo-700 transition-colors"
+              className="w-8 h-8 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center hover:bg-blue-700 transition-colors"
             >
               {user.name?.charAt(0)?.toUpperCase() ?? "U"}
             </button>
@@ -163,7 +163,7 @@ export function Topbar({
                 <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700">
                   <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{user.name}</p>
                   <p className="text-xs text-gray-400 truncate mt-0.5">{user.email}</p>
-                  <span className="inline-block mt-1.5 text-[10px] font-semibold uppercase tracking-wide bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full">
+                  <span className="inline-block mt-1.5 text-[10px] font-semibold uppercase tracking-wide bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full">
                     {user.role.replace(/_/g, " ")}
                   </span>
                 </div>
