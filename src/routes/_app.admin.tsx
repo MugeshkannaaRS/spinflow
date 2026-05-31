@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, adminApi, usersApi, auditApi } from "@/lib/api-service";
+import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 
 import { Topbar } from "@/components/layout/Topbar";
@@ -204,9 +205,6 @@ function AdminPage() {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Companies ({companiesData.length})</CardTitle>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={handleExport}>
-                      <Download className="size-4 mr-1" /> Export
-                    </Button>
                     <Button size="sm" onClick={() => setAddCompanyOpen(true)}>
                       <Plus className="size-4 mr-1" /> Add Company
                     </Button>
@@ -402,41 +400,72 @@ function AdminPage() {
 function EditLimitDialog({ company }: { company: Company }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [maxUsers, setMaxUsers] = useState(company.max_users ?? 50);
-  const [loading, setLoading] = useState(false);
-
-  const handleSave = async () => {
-    setLoading(true);
-    try {
-      await mastersApi.updateCompany(company.id, { max_users: maxUsers });
-      toast.success("User limit updated");
-      qc.invalidateQueries({ queryKey: ["masters"] });
-      setOpen(false);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Failed to update limit");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [newLimit, setNewLimit] = useState(company.max_users ?? 50);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
-          <Pencil className="size-3.5 mr-1" /> Edit Limit
+          <Pencil className="w-3 h-3 mr-1" /> Edit Limit
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Edit User Limit — {company.name}</DialogTitle>
+          <DialogTitle>Edit User Limit</DialogTitle>
+          <DialogDescription>
+            Set maximum users for {company.name}
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
-          <Label>Max Users</Label>
-          <Input type="number" value={maxUsers} onChange={(e) => setMaxUsers(parseInt(e.target.value) || 0)} />
+        <div className="py-4 space-y-3">
+          <div className="flex items-center justify-between text-sm text-gray-500">
+            <span>Current limit:</span>
+            <span className="font-semibold text-gray-900">{company.max_users ?? 50} users</span>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1 block">
+              New Limit
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={500}
+              value={newLimit}
+              onChange={e => setNewLimit(parseInt(e.target.value) || 1)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Pricing: 1-10 users = Starter · 11-50 = Pro · 51+ = Enterprise
+            </p>
+          </div>
+          <div className={`p-3 rounded-lg text-xs font-medium ${
+            newLimit <= 10 ? "bg-gray-100 text-gray-600" :
+            newLimit <= 50 ? "bg-blue-50 text-blue-700" :
+            "bg-purple-50 text-purple-700"
+          }`}>
+            {newLimit <= 10 ? "📦 Starter Plan — up to 10 users" :
+             newLimit <= 50 ? "⭐ Pro Plan — up to 50 users" :
+             "🚀 Enterprise Plan — unlimited users"}
+          </div>
         </div>
-        <Button onClick={handleSave} disabled={loading}>
-          {loading ? "Saving…" : "Save"}
-        </Button>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={async () => {
+            try {
+              await api.patch(`/admin/companies/${company.id}/limits`, {
+                max_users: newLimit
+              });
+              toast.success(`User limit updated to ${newLimit} for ${company.name}`);
+              setOpen(false);
+              qc.invalidateQueries({ queryKey: ["admin-user-limits"] });
+            } catch {
+              toast.error("Failed to update limit");
+            }
+          }}>
+            Save Limit
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -103,7 +103,10 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
 
   if (!user) return null;
 
-  const isActive = (to: string) => pathname === to || pathname.startsWith(to + "/");
+  const isActive = (to: string) => {
+    if (to === "/admin") return pathname === "/admin";
+    return pathname === to;
+  };
 
   const filteredGroups = NAV_GROUPS
     .map(group => ({

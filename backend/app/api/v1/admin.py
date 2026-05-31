@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Dict
@@ -108,6 +108,38 @@ async def get_user_modules(
         "company_name": company.name if company else "Unknown",
         "modules": {m.module_name: m.is_enabled for m in modules},
     }
+
+
+@router.patch("/admin/companies/{company_id}/limits")
+async def update_company_limits(
+    company_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        body = await request.json()
+        max_users = body.get("max_users")
+
+        if max_users is None or int(max_users) < 1:
+            raise HTTPException(400, "max_users must be at least 1")
+
+        result = await db.execute(
+            select(Company).where(Company.id == company_id)
+        )
+        company = result.scalar_one_or_none()
+        if not company:
+            raise HTTPException(404, "Company not found")
+
+        company.max_users = int(max_users)
+        await db.commit()
+
+        return {"max_users": company.max_users, "updated": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(500, detail=str(e))
 
 
 @router.patch("/admin/companies/{company_id}/suspend")
