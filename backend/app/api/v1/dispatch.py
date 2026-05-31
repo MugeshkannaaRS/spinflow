@@ -12,7 +12,8 @@ from app.models.user import User
 from app.models.dispatch import Dispatch, DispatchItem
 from app.models.lotrac import Trip
 from app.models.inventory import Lot
-from app.models.masters import Mill, Customer, MasterVehicle, Warehouse
+from app.models.masters import Mill, Customer, MasterVehicle
+from app.models.inventory import Warehouse
 from app.schemas.dispatch import (
     DispatchResponse, DispatchCreate, DispatchStatusUpdate, QRScanRequest,
 )
