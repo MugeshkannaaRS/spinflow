@@ -12,7 +12,7 @@ from app.models.user import User
 from app.models.dispatch import Dispatch, DispatchItem
 from app.models.lotrac import Trip
 from app.models.inventory import Lot
-from app.models.masters import Mill, Customer, MasterVehicle
+from app.models.masters import Mill, Customer, MasterVehicle, Warehouse
 from app.schemas.dispatch import (
     DispatchResponse, DispatchCreate, DispatchStatusUpdate, QRScanRequest,
 )
@@ -79,6 +79,49 @@ async def get_trips(
     except Exception as e:
         logger.error(f"dispatch.trips list error: {e}")
         return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
+
+
+@router.post("/dispatch/trips")
+async def create_trip(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("dispatch", write=True)),
+):
+    try:
+        scope = await get_mill_scope(current_user)
+        mill_id = scope["mill_id"] or ""
+        if not mill_id:
+            raise HTTPException(status_code=400, detail="Mill ID required")
+        wh_result = await db.execute(
+            select(Warehouse.id).where(Warehouse.mill_id == mill_id).limit(1)
+        )
+        warehouse = wh_result.scalar_one_or_none()
+        if not warehouse:
+            raise HTTPException(status_code=400, detail="No warehouse found for this mill. Create a warehouse first.")
+        now = datetime.now(timezone.utc)
+        trip_no = f"DSP-{now.strftime('%y%m%d-%H%M%S')}"
+        trip = Trip(
+            mill_id=mill_id,
+            trip_no=trip_no,
+            from_warehouse_id=warehouse,
+            vehicle_no=body.get("vehicle_no"),
+            driver_name=body.get("driver_name"),
+            driver_mobile=body.get("driver_phone"),
+            customer_id=body.get("customer_id"),
+            notes=body.get("notes"),
+            planned_bags=0,
+            planned_weight_kg=0,
+            created_by=current_user.id,
+            departure_at=datetime.fromisoformat(body["dispatch_date"].replace("Z", "+00:00")) if body.get("dispatch_date") else None,
+        )
+        db.add(trip)
+        await db.flush()
+        return TripOut.model_validate(trip).model_dump()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"dispatch.create_trip error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/dispatch/orders")

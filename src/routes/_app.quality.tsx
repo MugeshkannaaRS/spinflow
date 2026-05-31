@@ -76,7 +76,7 @@ function QualityPage() {
 
   const testColConfig = useColumnConfig("quality_tests");
   const lotColConfig = useColumnConfig("quality_approvals");
-  const rejColConfig = useColumnConfig("quality_tests");
+  const rejColConfig = useColumnConfig("quality_rejections");
 
   const passRate = tests.length
     ? Math.round((tests.filter((t) => t.status === "pass").length / tests.length) * 100)
@@ -169,13 +169,13 @@ function QualityPage() {
                     columns={[
                       { key: "date", label: testColConfig.getLabel('date'), type: "date" },
                       { key: "type", label: testColConfig.getLabel('type'), type: "status", render: (t: any) => <Badge variant="outline">{t.type}</Badge> },
-                      { key: "lotId", label: testColConfig.getLabel('lotId'), className: "font-mono text-xs" },
-                      { key: "machineCode", label: testColConfig.getLabel('machineCode'), className: "font-mono text-xs" },
-                      { key: "sampleRef", label: testColConfig.getLabel('sampleRef') },
+                      { key: "lot_id", label: testColConfig.getLabel('lot_id'), className: "font-mono text-xs" },
+                      { key: "machine_code", label: testColConfig.getLabel('machine_code'), className: "font-mono text-xs" },
+                      { key: "sample_ref", label: testColConfig.getLabel('sample_ref') },
                       { key: "result", label: testColConfig.getLabel('result'), render: (t: any) => `${t.result} ${t.unit}` },
                       { key: "standard", label: testColConfig.getLabel('standard'), render: (t: any) => `${t.standard} ${t.unit}` },
                       { key: "status", label: testColConfig.getLabel('status'), type: "status", render: (t: any) => <Badge variant={t.status === "pass" ? "default" : t.status === "fail" ? "destructive" : "secondary"}>{t.status === "pass" && <CheckCircle2 className="size-3 mr-1 inline" />}{t.status}</Badge> },
-                      { key: "testedBy", label: testColConfig.getLabel('testedBy') },
+                      { key: "tested_by", label: testColConfig.getLabel('tested_by') },
                     ] satisfies ColDef[]}
                     data={tests}
                     loading={testsQ.isLoading}
@@ -196,13 +196,13 @@ function QualityPage() {
                   <DataTable
                     tableId="quality_lots"
                     columns={[
-                      { key: "lotNo", label: lotColConfig.getLabel('lotNo'), className: "font-mono text-xs" },
+                      { key: "lot_no", label: lotColConfig.getLabel('lot_no'), className: "font-mono text-xs" },
                       { key: "department", label: lotColConfig.getLabel('department'), type: "status" },
-                      { key: "producedKg", label: lotColConfig.getLabel('producedKg') },
-                      { key: "cspResult", label: lotColConfig.getLabel('cspResult') },
-                      { key: "countResult", label: lotColConfig.getLabel('countResult') },
-                      { key: "moistureResult", label: lotColConfig.getLabel('moistureResult'), render: (l: any) => l.moistureResult != null ? `${l.moistureResult}%` : "—" },
-                      { key: "strengthResult", label: lotColConfig.getLabel('strengthResult') },
+                      { key: "produced_kg", label: lotColConfig.getLabel('produced_kg') },
+                      { key: "csp_result", label: lotColConfig.getLabel('csp_result') },
+                      { key: "count_result", label: lotColConfig.getLabel('count_result') },
+                      { key: "moisture_result", label: lotColConfig.getLabel('moisture_result'), render: (l: any) => l.moisture_result != null ? `${l.moisture_result}%` : "—" },
+                      { key: "strength_result", label: lotColConfig.getLabel('strength_result') },
                       { key: "status", label: lotColConfig.getLabel('status'), type: "status", render: (l: any) => <Badge variant={l.status === "approved" ? "default" : l.status === "rejected" ? "destructive" : "secondary"}>{l.status}</Badge> },
                     ] satisfies ColDef[]}
                     data={lots}
@@ -225,12 +225,12 @@ function QualityPage() {
                     tableId="quality_rejections"
                     columns={[
                       { key: "date", label: rejColConfig.getLabel('date'), type: "date" },
-                      { key: "lotId", label: rejColConfig.getLabel('lotId'), className: "font-mono text-xs" },
+                      { key: "lot_id", label: rejColConfig.getLabel('lot_id'), className: "font-mono text-xs" },
                       { key: "category", label: rejColConfig.getLabel('category'), type: "status", render: (r: any) => <Badge variant="destructive">{r.category}</Badge> },
-                      { key: "quantityKg", label: rejColConfig.getLabel('quantityKg') },
+                      { key: "quantity_kg", label: rejColConfig.getLabel('quantity_kg') },
                       { key: "reason", label: rejColConfig.getLabel('reason'), className: "max-w-xs truncate" },
                       { key: "disposition", label: rejColConfig.getLabel('disposition'), type: "status", render: (r: any) => <Badge variant="outline">{r.disposition}</Badge> },
-                      { key: "notedBy", label: rejColConfig.getLabel('notedBy') },
+                      { key: "noted_by", label: rejColConfig.getLabel('noted_by') },
                     ] satisfies ColDef[]}
                     data={rejections}
                     loading={rejQ.isLoading}
@@ -271,21 +271,35 @@ function ImportTestsDialog() {
 function NewTestSlideOver() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const testTypes = ["HVI", "CSP", "Count", "Strength", "Moisture", "Uniformity", "Trash", "Nep"];
+  const typeUnits: Record<string, string> = {
+    HVI: "mic",
+    CSP: "",
+    Count: "Ne",
+    Strength: "g/tex",
+    Moisture: "%",
+    Uniformity: "%",
+    Trash: "%",
+    Nep: "cnt/g",
+  };
+  const typeStandards: Record<string, number> = {
+    HVI: 4.5,
+    CSP: 2400,
+    Count: 30,
+    Strength: 28,
+    Moisture: 8.5,
+    Uniformity: 82,
+    Trash: 2,
+    Nep: 80,
+  };
   const [form, setForm] = useState({
-    lotId: "",
+    lot_id: "",
     date: new Date().toISOString().slice(0, 10),
-    count: "",
-    mic: "",
-    stapleLength: "",
-    strength: "",
-    uniformity: "",
-    sfi: "",
-    trash: "",
-    nepCount: "",
-    shortFibre: "",
-    elongation: "",
-    testedBy: "",
-    notes: "",
+    type: "HVI",
+    result: "",
+    standard: "4.5",
+    unit: "mic",
+    tested_by: "",
   });
 
   const lotsQ = useQuery({
@@ -301,40 +315,51 @@ function NewTestSlideOver() {
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const reqFields = ["lotId", "date", "count"] as const;
+  const reqFields = ["lot_id", "date", "type", "result"] as const;
   const allFilled = reqFields.every((f) => {
     const v = form[f];
     return typeof v === "string" && v.trim().length > 0;
   });
 
+  const handleTypeChange = (type: string) => {
+    setForm({
+      ...form,
+      type,
+      unit: typeUnits[type] || "",
+      standard: String(typeStandards[type] || ""),
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
-    if (!form.lotId.trim()) errs.lotId = "Lot ID is required";
+    if (!form.lot_id.trim()) errs.lot_id = "Lot is required";
     if (!form.date.trim()) errs.date = "Date is required";
-    if (!form.count.trim()) errs.count = "Count/Yarn is required";
+    if (!form.type.trim()) errs.type = "Type is required";
     setFormErrors(errs);
     if (Object.keys(errs).length > 0) return;
-    m.mutate(form, {
+    const payload = {
+      date: form.date,
+      type: form.type,
+      lot_id: form.lot_id,
+      result: parseFloat(form.result) || 0,
+      standard: parseFloat(form.standard) || 0,
+      unit: form.unit || undefined,
+      tested_by: form.tested_by || undefined,
+    };
+    m.mutate(payload, {
       onSuccess: () => {
         toast.success("Test recorded");
         qc.invalidateQueries({ queryKey: ["quality-tests"] });
         setOpen(false);
         setForm({
-          lotId: "",
+          lot_id: "",
           date: new Date().toISOString().slice(0, 10),
-          count: "",
-          mic: "",
-          stapleLength: "",
-          strength: "",
-          uniformity: "",
-          sfi: "",
-          trash: "",
-          nepCount: "",
-          shortFibre: "",
-          elongation: "",
-          testedBy: "",
-          notes: "",
+          type: "HVI",
+          result: "",
+          standard: "4.5",
+          unit: "mic",
+          tested_by: "",
         });
         setFormErrors({});
       },
@@ -361,23 +386,23 @@ function NewTestSlideOver() {
         <form onSubmit={handleSubmit} className="space-y-4 mt-6">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Lot No <span className="text-destructive">*</span></Label>
+              <Label>Lot <span className="text-destructive">*</span></Label>
               <Select
-                value={form.lotId}
-                onValueChange={(v) => { setForm({ ...form, lotId: v }); setFormErrors((p) => ({ ...p, lotId: "" })); }}
+                value={form.lot_id}
+                onValueChange={(v) => { setForm({ ...form, lot_id: v }); setFormErrors((p) => ({ ...p, lot_id: "" })); }}
               >
-                <SelectTrigger className={formErrors.lotId ? "border-destructive" : ""}>
+                <SelectTrigger className={formErrors.lot_id ? "border-destructive" : ""}>
                   <SelectValue placeholder="Select lot" />
                 </SelectTrigger>
                 <SelectContent>
                   {lots.map((lot: any) => (
-                    <SelectItem key={lot.id} value={lot.lotNo || lot.id}>
+                    <SelectItem key={lot.id} value={lot.id}>
                       {lot.lotNo || lot.id}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {formErrors.lotId && <p className="text-xs text-destructive">{formErrors.lotId}</p>}
+              {formErrors.lot_id && <p className="text-xs text-destructive">{formErrors.lot_id}</p>}
             </div>
             <div className="space-y-1.5">
               <Label>Date <span className="text-destructive">*</span></Label>
@@ -390,111 +415,54 @@ function NewTestSlideOver() {
               {formErrors.date && <p className="text-xs text-destructive">{formErrors.date}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Count <span className="text-destructive">*</span></Label>
-              <Input
-                value={form.count}
-                onChange={(e) => { setForm({ ...form, count: e.target.value }); setFormErrors((p) => ({ ...p, count: "" })); }}
-                placeholder="e.g. 30s"
-                className={formErrors.count ? "border-destructive" : ""}
-              />
-              {formErrors.count && <p className="text-xs text-destructive">{formErrors.count}</p>}
+              <Label>Type <span className="text-destructive">*</span></Label>
+              <Select value={form.type} onValueChange={handleTypeChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Test type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {testTypes.map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>MIC</Label>
+              <Label>Result <span className="text-destructive">*</span></Label>
               <Input
                 type="number"
                 step="0.01"
-                value={form.mic}
-                onChange={(e) => setForm({ ...form, mic: e.target.value })}
+                value={form.result}
+                onChange={(e) => { setForm({ ...form, result: e.target.value }); setFormErrors((p) => ({ ...p, result: "" })); }}
+                placeholder="Measured value"
+                className={formErrors.result ? "border-destructive" : ""}
+              />
+              {formErrors.result && <p className="text-xs text-destructive">{formErrors.result}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Standard</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={form.standard}
+                onChange={(e) => setForm({ ...form, standard: e.target.value })}
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Staple Length</Label>
+              <Label>Unit</Label>
               <Input
-                type="number"
-                step="0.1"
-                value={form.stapleLength}
-                onChange={(e) => setForm({ ...form, stapleLength: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Strength</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={form.strength}
-                onChange={(e) => setForm({ ...form, strength: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Uniformity</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={form.uniformity}
-                onChange={(e) => setForm({ ...form, uniformity: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>SFI</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={form.sfi}
-                onChange={(e) => setForm({ ...form, sfi: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Trash</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={form.trash}
-                onChange={(e) => setForm({ ...form, trash: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Nep Count</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={form.nepCount}
-                onChange={(e) => setForm({ ...form, nepCount: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Short Fibre %</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={form.shortFibre}
-                onChange={(e) => setForm({ ...form, shortFibre: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Elongation</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={form.elongation}
-                onChange={(e) => setForm({ ...form, elongation: e.target.value })}
+                value={form.unit}
+                onChange={(e) => setForm({ ...form, unit: e.target.value })}
+                placeholder="e.g. mic"
               />
             </div>
             <div className="space-y-1.5">
               <Label>Tested By</Label>
               <Input
-                value={form.testedBy}
-                onChange={(e) => setForm({ ...form, testedBy: e.target.value })}
+                value={form.tested_by}
+                onChange={(e) => setForm({ ...form, tested_by: e.target.value })}
               />
             </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Notes</Label>
-            <textarea
-              className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            />
           </div>
           <SheetFooter>
             <Button type="submit" disabled={m.isPending || !allFilled}>

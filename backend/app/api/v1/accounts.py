@@ -109,6 +109,33 @@ async def update_invoice(
     return invoice
 
 
+@router.delete("/accounts/invoices/{invoice_id}")
+async def delete_invoice(
+    invoice_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("accounts", write=True)),
+):
+    try:
+        scope = await get_mill_scope(current_user)
+        stmt = select(Invoice).where(Invoice.id == invoice_id)
+        if scope["mill_id"]:
+            stmt = stmt.where(Invoice.mill_id == scope["mill_id"])
+        elif scope["company_id"]:
+            stmt = stmt.join(Mill, Invoice.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+        result = await db.execute(stmt)
+        invoice = result.scalar_one_or_none()
+        if not invoice:
+            raise HTTPException(status_code=404, detail="Invoice not found")
+        await db.delete(invoice)
+        await db.flush()
+        return {"message": "Invoice deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"accounts.delete_invoice error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/accounts/receivables")
 async def get_receivables(
     page: int = Query(1, ge=1),

@@ -282,7 +282,7 @@ function AdminPage() {
                         label: "Usage",
                         render: (c: any) => {
                           const current = companyUserCounts[c.id] ?? 0;
-                          const max = 50;
+                          const max = c.max_users ?? 50;
                           const pct = Math.round((current / max) * 100);
                           const color = pct < 70 ? "bg-green-500" : pct < 90 ? "bg-yellow-500" : "bg-red-500";
                           return (

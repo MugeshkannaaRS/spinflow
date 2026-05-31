@@ -383,6 +383,10 @@ function EditSpareSheet({ item }: { item: any }) {
       onSuccess: () => {
         toast.success("Spare updated"); qc.invalidateQueries({ queryKey: ["spare-items"] }); setOpen(false);
       },
+      onError: (err: any) => {
+        const msg = err?.response?.data?.detail || err?.message || "Failed to update spare";
+        toast.error(typeof msg === "string" ? msg : "Failed to update spare");
+      },
     });
   };
 

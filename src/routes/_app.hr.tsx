@@ -242,7 +242,7 @@ function HRPage() {
 
   const empQ = useQuery({
     queryKey: ["hr-employees"],
-    queryFn: () => hrApi.getEmployees(),
+    queryFn: () => hrApi.getEmployees({ page_size: 1000 }),
     staleTime: 60_000,
     retry: 1,
   });

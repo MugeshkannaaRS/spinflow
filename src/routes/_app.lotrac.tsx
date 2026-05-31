@@ -563,7 +563,7 @@ function NewTripSheet() {
             />
             <div className="max-h-40 overflow-y-auto space-y-1 border rounded p-1">
               {filteredBags.map((b: any) => {
-                const selected = form.bag_ids.includes(b.lot_id);
+                const selected = (form.bag_ids ?? []).includes(b.lot_id);
                 return (
                   <label
                     key={b.lot_id}
@@ -628,7 +628,7 @@ function LoaderScannerTab() {
 
   useEffect(() => {
     if (selectedTripId) {
-      loTracApi.getTrip(selectedTripId).then(setTripDetail);
+      loTracApi.getTrip(selectedTripId).then(setTripDetail).catch(() => null);
     }
   }, [selectedTripId]);
 
@@ -881,7 +881,7 @@ function ReceiverScannerTab() {
 
   useEffect(() => {
     if (selectedTripId) {
-      loTracApi.getTrip(selectedTripId).then(setTripDetail);
+      loTracApi.getTrip(selectedTripId).then(setTripDetail).catch(() => null);
     }
   }, [selectedTripId]);
 

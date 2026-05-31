@@ -1,12 +1,15 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Dict
 
+logger = logging.getLogger(__name__)
+
 from app.db.session import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, get_mill_scope
 from app.models.user import User
-from app.models.masters import Company, CompanyModule
+from app.models.masters import Company, CompanyModule, MillSettings
 
 router = APIRouter()
 
@@ -97,6 +100,83 @@ async def get_user_modules(
         "company_name": company.name if company else "Unknown",
         "modules": {m.module_name: m.is_enabled for m in modules},
     }
+
+
+@router.get("/admin/mills/{mill_id}/settings")
+async def get_mill_settings(
+    mill_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        result = await db.execute(
+            select(MillSettings).where(MillSettings.mill_id == mill_id)
+        )
+        settings = result.scalar_one_or_none()
+        if not settings:
+            return {
+                "working_hours_per_day": 8,
+                "shifts_per_day": 3,
+                "production_target_kg": 0,
+                "currency": "INR",
+                "timezone": "Asia/Kolkata",
+            }
+        return {
+            "working_hours_per_day": settings.working_hours_per_day,
+            "shifts_per_day": settings.shifts_per_day,
+            "production_target_kg": settings.production_target_kg,
+            "currency": settings.currency,
+            "timezone": settings.timezone,
+        }
+    except Exception as e:
+        logger.error(f"admin.mill_settings get error: {e}")
+        return {
+            "working_hours_per_day": 8,
+            "shifts_per_day": 3,
+            "production_target_kg": 0,
+            "currency": "INR",
+            "timezone": "Asia/Kolkata",
+        }
+
+
+@router.put("/admin/mills/{mill_id}/settings")
+async def update_mill_settings(
+    mill_id: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        result = await db.execute(
+            select(MillSettings).where(MillSettings.mill_id == mill_id)
+        )
+        settings = result.scalar_one_or_none()
+        if settings:
+            if "working_hours_per_day" in body:
+                settings.working_hours_per_day = body["working_hours_per_day"]
+            if "shifts_per_day" in body:
+                settings.shifts_per_day = body["shifts_per_day"]
+            if "production_target_kg" in body:
+                settings.production_target_kg = body["production_target_kg"]
+            if "currency" in body:
+                settings.currency = body["currency"]
+            if "timezone" in body:
+                settings.timezone = body["timezone"]
+        else:
+            settings = MillSettings(
+                mill_id=mill_id,
+                working_hours_per_day=body.get("working_hours_per_day", 8),
+                shifts_per_day=body.get("shifts_per_day", 3),
+                production_target_kg=body.get("production_target_kg", 0),
+                currency=body.get("currency", "INR"),
+                timezone=body.get("timezone", "Asia/Kolkata"),
+            )
+            db.add(settings)
+        await db.flush()
+        return {"message": "Mill settings updated"}
+    except Exception as e:
+        logger.error(f"admin.mill_settings update error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.put("/admin/users/{user_id}/modules")

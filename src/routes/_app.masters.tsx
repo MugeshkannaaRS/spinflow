@@ -29,7 +29,7 @@ import {
   SheetTrigger,
   SheetFooter,
 } from "@/components/ui/sheet";
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Plus, Search, Settings, Blocks, Upload, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -637,7 +637,7 @@ function CompanyModulesPanel({ companyId, onClose }: { companyId: string; onClos
   const [modules, setModules] = useState<Record<string, boolean>>({});
   const [initialized, setInitialized] = useState(false);
 
-  useMemo(() => {
+  useEffect(() => {
     if (modulesQ.data && !initialized) {
       setModules(modulesQ.data);
       setInitialized(true);
@@ -695,7 +695,7 @@ function MillSettingsPanel({ millId, onClose }: { millId: string; onClose: () =>
   });
   const [initialized, setInitialized] = useState(false);
 
-  useMemo(() => {
+  useEffect(() => {
     if (settingsQ.data && !initialized) {
       setForm((prev) => ({ ...prev, ...settingsQ.data }));
       setInitialized(true);
