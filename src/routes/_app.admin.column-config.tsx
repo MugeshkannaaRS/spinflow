@@ -263,19 +263,19 @@ function ColumnConfigPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {configQuery.isLoading && (
+                    {configQuery.isFetching && (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-8 text-sm text-muted-foreground">Loading…</TableCell>
                       </TableRow>
                     )}
-                    {!configQuery.isLoading && columns.length === 0 && (
+                    {!configQuery.isFetching && columns.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={8} className="text-center py-8 text-sm text-muted-foreground">
-                          No columns configured for this table yet. Default columns will be used.
+                          No columns found for this table.
                         </TableCell>
                       </TableRow>
                     )}
-                    {columns.map((col, i) => (
+                    {columns.length > 0 && columns.map((col, i) => (
                       <TableRow key={col.key ?? i} className="hover:bg-muted/30">
                         <TableCell className="text-muted-foreground cursor-grab">
                           <GripVertical className="size-3.5" />

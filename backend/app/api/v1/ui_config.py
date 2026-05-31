@@ -403,7 +403,7 @@ async def get_column_config(
 ):
     try:
         if not table or not table.strip():
-            return _empty_config(table)
+            return _default_config(table, "default")
 
         role_name = current_user.role_rel.code if current_user.role_rel else ""
         effective_mill_id = mill_id
@@ -461,11 +461,16 @@ async def get_column_config(
             "columns": columns,
         }
     except Exception:
-        return _empty_config(table)
+        logger.warning(f"ui-config/columns error for table={table}, returning defaults")
+        return _default_config(table, "default")
 
 
-def _empty_config(table: str) -> dict:
-    return {"table": table, "mill_id": "default", "columns": []}
+def _default_config(table: str, mill_id: str = "default") -> dict:
+    return {
+        "table": table,
+        "mill_id": mill_id,
+        "columns": [d.model_dump() for d in _get_default_columns(table)],
+    }
 
 
 @router.get("/ui-config/columns/all", response_model=dict)

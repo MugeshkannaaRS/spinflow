@@ -33,6 +33,7 @@ class CompanyUpdate(BaseModel):
     email: Optional[str] = None
     logo_url: Optional[str] = None
     is_active: Optional[bool] = None
+    max_users: Optional[int] = None
 
     @field_validator("gstin", mode="before")
     @classmethod
@@ -55,6 +56,7 @@ class CompanyOut(BaseModel):
     email: Optional[str] = None
     logo_url: Optional[str] = None
     is_active: bool = True
+    max_users: int = 50
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

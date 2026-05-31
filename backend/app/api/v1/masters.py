@@ -24,6 +24,7 @@ from app.models.masters import (
     Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route,
 )
 from app.models.production import Machine
+from app.core.error_handler import SpinFlowException
 
 router = APIRouter()
 
@@ -73,15 +74,23 @@ async def get_company(
     service = MastersService(db, current_user)
     return await service.get_company(id)
 
-@router.patch("/masters/companies/{id}", response_model=CompanyOut)
+@router.patch("/masters/companies/{id}")
 async def update_company(
     id: str,
     req: CompanyUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
-    service = MastersService(db, current_user)
-    return await service.update_company(id, req, updated_by=current_user.id)
+    try:
+        service = MastersService(db, current_user)
+        record = await service.update_company(id, req, updated_by=current_user.id)
+        await db.refresh(record)
+        return CompanyOut.model_validate(record).model_dump()
+    except SpinFlowException as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
+    except Exception as e:
+        logger.error(f"masters.companies update error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ── Mill ────────────────────────────────────────────────
 

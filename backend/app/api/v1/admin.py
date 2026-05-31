@@ -52,7 +52,9 @@ async def update_company_modules(
     try:
         if current_user.role != "SUPER_ADMIN":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage modules")
-        modules_data: Dict[str, bool] = body.get("modules", {})
+        modules_data: Dict[str, bool] = body.get("modules")
+        if modules_data is None:
+            modules_data = {k: bool(v) for k, v in body.items() if k in ALL_MODULE_KEYS}
         for module_name, is_enabled in modules_data.items():
             existing = await db.execute(
                 select(CompanyModule).where(
@@ -121,7 +123,8 @@ async def toggle_company_status(
         company = result.scalar_one_or_none()
         if not company:
             raise HTTPException(404, "Company not found")
-        company.is_active = not company.is_active
+        current = getattr(company, "is_active", True)
+        company.is_active = not current
         await db.commit()
         status = "activated" if company.is_active else "suspended"
         return {"status": status, "is_active": company.is_active}
@@ -129,6 +132,20 @@ async def toggle_company_status(
         raise
     except Exception as e:
         await db.rollback()
+        logger.error(f"admin.companies suspend error: {e}")
+        try:
+            from sqlalchemy import text
+            await db.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE"))
+            await db.commit()
+            result = await db.execute(select(Company).where(Company.id == company_id))
+            company = result.scalar_one_or_none()
+            if company:
+                company.is_active = not getattr(company, "is_active", True)
+                await db.commit()
+                return {"status": "activated" if company.is_active else "suspended", "is_active": company.is_active}
+        except Exception as e2:
+            logger.error(f"admin.companies suspend fallback also failed: {e2}")
+            await db.rollback()
         raise HTTPException(500, detail=str(e))
 
 
