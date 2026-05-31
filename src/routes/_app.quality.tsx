@@ -509,9 +509,10 @@ function NewTestSlideOver() {
 
 function LotApproveAction({ lotId }: { lotId: string }) {
   const qc = useQueryClient();
+  const user = useAuth((s) => s.user);
   const m = useMutation({
     mutationFn: () =>
-      qualityApi.approveOrReject({ lot_id: lotId, action: "approve" }),
+      qualityApi.approveOrReject({ lot_id: lotId, action: "approve", by: user?.name ?? "" }),
   });
   return (
     <Button
@@ -537,6 +538,7 @@ function LotApproveAction({ lotId }: { lotId: string }) {
 
 function LotRejectAction({ lotId }: { lotId: string }) {
   const qc = useQueryClient();
+  const user = useAuth((s) => s.user);
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const m = useMutation({
@@ -545,7 +547,7 @@ function LotRejectAction({ lotId }: { lotId: string }) {
 
   const handleReject = () => {
     m.mutate(
-      { lot_id: lotId, action: "reject", reason },
+      { lot_id: lotId, action: "reject", reason, by: user?.name ?? "" },
       {
         onSuccess: () => {
           toast.success("Lot rejected");

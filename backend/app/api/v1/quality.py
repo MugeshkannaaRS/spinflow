@@ -158,7 +158,7 @@ async def bulk_create_tests(
 @router.patch("/quality/tests/{test_id}/approve", response_model=QualityTestResponse)
 async def approve_test(
     test_id: str,
-    result: str = Query(..., regex="^(approved|rejected)$"),
+    result: str = Query(..., pattern="^(approved|rejected)$"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality", write=True)),
 ):

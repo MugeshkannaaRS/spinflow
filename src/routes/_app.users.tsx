@@ -654,7 +654,7 @@ function UsersPage() {
                   <Label>Email</Label>
                   <div className="flex items-center gap-2 mt-1">
                     <code className="flex-1 px-3 py-2 rounded bg-muted text-sm">
-                      {successDialog.user.email ?? successDialog.user.email}
+                      {successDialog.user.email ?? "—"}
                     </code>
                     <Button
                       variant="outline"

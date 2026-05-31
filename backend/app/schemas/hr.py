@@ -193,7 +193,11 @@ class AttendanceCreate(BaseModel):
             return "present"
         mapping = {"p": "present", "a": "absent", "l": "leave", "h": "holiday"}
         normalized = str(v).lower().strip()
-        return mapping.get(normalized, normalized)
+        result = mapping.get(normalized, normalized)
+        allowed = {"present", "absent", "leave", "holiday"}
+        if result not in allowed:
+            raise ValueError("status must be one of: present, absent, leave, holiday")
+        return result
 
 
 class AttendanceOut(BaseModel):

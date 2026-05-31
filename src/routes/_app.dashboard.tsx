@@ -72,14 +72,14 @@ function Dashboard() {
   const navigate = useNavigate();
   const [alertDismissed, setAlertDismissed] = useState(false);
 
-  if (isSuperAdmin) return <SuperAdminDashboard />;
-
   const { data: summary, isLoading } = useQuery({
     queryKey: ["dashboard-summary"],
     queryFn: () => api.get("/dashboard/summary").then(r => r.data),
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
   });
+
+  if (isSuperAdmin) return <SuperAdminDashboard />;
 
   const hasCriticalAlerts = !alertDismissed;
   const raw = summary ?? {};
@@ -156,7 +156,7 @@ function Dashboard() {
               value={`${demoData.attendancePresent} / ${demoData.attendanceTotal}`}
               subtitle={`${((demoData.attendancePresent / demoData.attendanceTotal) * 100).toFixed(1)}% present · ${demoData.attendanceAbsent} absent`}
               icon={Users}
-              color="indigo"
+              color="blue"
             />
             <StatCard
               title="Active Machines"

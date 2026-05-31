@@ -1027,19 +1027,18 @@ async def hr_page_init(
         result["departments"] = []
     try:
         today = date_type.today()
-        att_query = select(
-            func.count().label("total"),
-            func.sum(
-                func.cast(
-                    select([Attendance.status])
-                    .where(Attendance.date == today.isoformat())
-                    .correlate(None)
-                    .as_scalar() == "present",
-                    type_=type(None),
-                )
-            ),
-        ).select_from(Attendance)
-        result["attendance_summary"] = {"present_today": 0, "absent_today": 0}
+        att_rows = await db.execute(
+            select(Attendance.status, func.count().label("cnt"))
+            .where(Attendance.date == today.isoformat())
+            .group_by(Attendance.status)
+        )
+        att_data = att_rows.all()
+        present = next((r.cnt for r in att_data if r.status == "present"), 0)
+        total = sum(r.cnt for r in att_data)
+        result["attendance_summary"] = {
+            "present_today": present,
+            "absent_today": total - present,
+        }
     except Exception as e:
         logger.error(f"hr.page-init attendance error: {e}")
         result["attendance_summary"] = {"present_today": 0, "absent_today": 0}

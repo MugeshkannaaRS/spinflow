@@ -129,7 +129,7 @@ class TestAttendanceCreate:
             AttendanceCreate(
                 employee_id="e1",
                 attendance_date=date(2025, 1, 1),
-                status="holiday",
+                status="INVALID",
             )
 
 

@@ -63,6 +63,8 @@ async def update_company_modules(
         return {
             "modules": {m.module_name: m.is_enabled for m in modules},
         }
+    except HTTPException:
+        raise
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))

@@ -61,7 +61,6 @@ export const useAuth = create<AuthState>()(
             ...initialState,
             token: (p.token as string | null) ?? null,
             refreshToken: (p.refreshToken as string | null) ?? null,
-            isAuthenticated: !!(p.token || d.user_id),
           };
         }
         return p;

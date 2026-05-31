@@ -84,7 +84,7 @@ function LoginPage() {
               m.mutate(undefined, {
                 onSuccess: (r) => {
                   setFailedAttempts(0);
-                  setAuth(r.user, r.token);
+                  setAuth(r.user, r.token, r.refreshToken);
                   toast.success(`Welcome, ${r.user.name}`);
                   if (r.user.mustChangePassword) {
                     navigate({ to: "/change-password" });
@@ -142,7 +142,7 @@ function LoginPage() {
                       setTimeout(() => {
                         m.mutate(undefined, {
                           onSuccess: (r) => {
-                            setAuth(r.user, r.token);
+                            setAuth(r.user, r.token, r.refreshToken);
                             toast.success(`Welcome, ${r.user.name}`);
                             if (r.user.mustChangePassword) {
                               navigate({ to: "/change-password" });

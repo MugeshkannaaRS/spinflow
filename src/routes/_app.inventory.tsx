@@ -35,7 +35,7 @@ function InventoryPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "inventory");
   const lotColConfig = useColumnConfig("inventory_lots");
-  const transferColConfig = useColumnConfig("inventory_lots");
+  const transferColConfig = useColumnConfig("stock_transfers");
   const lotsQ = useQuery({ queryKey: ["inventory-lots"], queryFn: inventoryApi.getLots, staleTime: 60_000, retry: 1 });
   const transfersQ = useQuery({ queryKey: ["stock-transfers"], queryFn: inventoryApi.getTransfers, staleTime: 60_000, retry: 1 });
 

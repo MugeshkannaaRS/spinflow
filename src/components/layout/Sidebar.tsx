@@ -131,7 +131,7 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
 
       <nav className="flex-1 overflow-y-auto py-2 space-y-1 scrollbar-thin">
         {filteredGroups.map((group) => (
-          <div key={group.label + (group.superAdminOnly ? "-sa" : "")}>
+          <div key={group.label}>
             {!collapsed && (
               <div className="px-4 mb-1 mt-4 first:mt-0">
                 <div className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/70">

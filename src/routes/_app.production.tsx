@@ -555,7 +555,12 @@ function ProductionPage() {
     if (!dtForm.reason) errs.reason = "Reason is required";
     setDtErrors(errs);
     if (Object.keys(errs).length > 0) return;
-    createDowntimeMutation.mutate(dtForm);
+    createDowntimeMutation.mutate({
+      machine_code: dtForm.machine_id,
+      reason: dtForm.reason,
+      started_at: dtForm.start_time,
+      reported_by: user?.name ?? "",
+    });
   };
 
   // Machine edit

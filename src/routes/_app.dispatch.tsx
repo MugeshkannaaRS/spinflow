@@ -209,7 +209,7 @@ function DispatchPage() {
                 onSearchChange={(v) => { setSearch(v); setPage(1); }}
                 rowKey={(t) => t.id}
                 exportFilename="dispatch_trips"
-                onRowClick={(t: any) => t.id ? window.open(`/trips/${t.id}`, '_blank') : null}
+                onRowClick={undefined}
                 rowActions={(t: any) => (
                   <div className="flex gap-1">
                     {t.status === "draft" && (

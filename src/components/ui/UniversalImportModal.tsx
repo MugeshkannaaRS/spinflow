@@ -152,11 +152,13 @@ export function UniversalImportModal({
   }, [isOpen, tableName, millId]);
 
   async function validateExcelFile(file: File): Promise<boolean> {
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    if (ext === "csv") return true;
     const bytes = await file.slice(0, 4).arrayBuffer();
     const header = new Uint8Array(bytes);
     const isZip = header[0] === 0x50 && header[1] === 0x4B && header[2] === 0x03 && header[3] === 0x04;
     if (!isZip) {
-      toast.error("Invalid file. Please upload a real Excel (.xlsx) file.");
+      toast.error("Invalid file. Please upload a real Excel (.xlsx) or CSV file.");
       return false;
     }
     return true;
@@ -510,7 +512,7 @@ export function UniversalImportModal({
       setImportProgress({ current: 0, total: validRecords.length });
 
       const BATCH_SIZE = 20;
-      const MAX_RETRIES = 2;
+      const MAX_RETRIES = 3;
       let successCount = 0;
       const errors: ImportError[] = [];
 
@@ -601,13 +603,13 @@ export function UniversalImportModal({
         <input
           id="import-file-input"
           type="file"
-          accept=".xlsx,.xls"
+          accept=".xlsx,.xls,.csv"
           className="hidden"
           onChange={handleBrowse}
         />
         <Upload className="size-10 mx-auto mb-3 text-muted-foreground" />
         <p className="text-base font-medium">Drop your Excel file here or click to browse</p>
-        <p className="text-xs text-muted-foreground mt-1">Supports .xlsx and .xls files</p>
+        <p className="text-xs text-muted-foreground mt-1">Supports .xlsx, .xls, and .csv files</p>
         {file && (
           <div className="mt-4 flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <FileSpreadsheet className="size-4" />

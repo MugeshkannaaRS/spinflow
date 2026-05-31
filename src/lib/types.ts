@@ -403,6 +403,9 @@ export interface Company {
   email?: string;
   logo_url?: string;
   is_active: boolean;
+  max_users?: number;
+  max_mills?: number;
+  subscription_plan?: string;
   created_at?: string;
   updated_at?: string;
 }

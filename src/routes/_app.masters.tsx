@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/sheet";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { Plus, Search, Settings, Blocks, Upload } from "lucide-react";
+import { Plus, Search, Settings, Blocks, Upload, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
@@ -573,7 +573,7 @@ function MasterTable<T = any>({
                 {canEdit && (
                   <Sheet>
                     <SheetTrigger asChild>
-                      <Button size="sm" variant="outline">Edit</Button>
+                      <Button size="sm" variant="outline"><Pencil className="size-3.5 mr-1" /> Edit</Button>
                     </SheetTrigger>
                     <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
                       <SheetHeader><SheetTitle>Edit {singularize(title)}</SheetTitle></SheetHeader>
@@ -1847,7 +1847,7 @@ function MachineForm({ item, departments }: { item?: MasterMachine; departments:
   const createM = useMutation({
     mutationFn: () => productionApi.createMachine(form),
     onSuccess: () => {
-      toast.success("Machine created");
+      toast.success(item ? "Machine updated" : "Machine created");
       qc.invalidateQueries({ queryKey: ["masters", "machines"] });
     },
   });

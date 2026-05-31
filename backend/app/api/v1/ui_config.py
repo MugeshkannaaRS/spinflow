@@ -547,7 +547,7 @@ async def update_column_config(
             updated_by=current_user.name,
         )
         db.add(config)
-    await db.flush()
+    await db.commit()
 
     defaults = _get_default_columns(table)
     if config:
@@ -624,7 +624,7 @@ async def update_dropdown_options(
         )
         db.add(new_opt)
 
-    await db.flush()
+    await db.commit()
 
     return {"message": "Dropdown options updated", "count": len(req.options)}
 

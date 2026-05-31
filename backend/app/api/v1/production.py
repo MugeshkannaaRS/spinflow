@@ -261,12 +261,12 @@ async def resolve_downtime(
 @router.patch("/production/machines/{machine_id}/status", response_model=MachineResponse)
 async def update_machine_status(
     machine_id: str,
-    status: str,
+    body: dict,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production", write=True)),
 ):
     svc = ProductionService(db, current_user)
-    return await svc.update_machine_status(machine_id, status)
+    return await svc.update_machine_status(machine_id, body.get("status", ""))
 
 
 @router.get("/production/dashboard/summary")

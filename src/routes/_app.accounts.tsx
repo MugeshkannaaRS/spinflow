@@ -51,7 +51,7 @@ export const Route = createFileRoute("/_app/accounts")({
 function AccountsPage() {
   const user = useAuth((s) => s.user);
   const invColConfig = useColumnConfig("accounts_invoices");
-  const recvColConfig = useColumnConfig("accounts_invoices");
+  const recvColConfig = useColumnConfig("accounts_receivables");
   const invQ = useQuery({
     queryKey: ["invoices"],
     queryFn: accountsApi.getInvoices,
@@ -243,7 +243,7 @@ function AccountsPage() {
             </TabsContent>
 
             <TabsContent value="finance">
-              <FinanceTab millId={user.millId} />
+              <FinanceTab millId={user.millId ?? ""} />
             </TabsContent>
           </Tabs>
         </div>
@@ -502,23 +502,28 @@ function FinanceTab({ millId }: { millId: string }) {
   const [month, setMonth] = useState(String(now.getMonth() + 1));
   const [year, setYear] = useState(String(now.getFullYear()));
 
+  const enabled = !!millId;
+
   const plQ = useQuery({
     queryKey: ["pl", millId, month, year],
     queryFn: () => financeApi.getPL(millId, Number(month), Number(year)),
     staleTime: 60_000,
     retry: 1,
+    enabled,
   });
   const ageingQ = useQuery({
     queryKey: ["receivables-ageing", millId],
     queryFn: () => financeApi.getReceivables(millId),
     staleTime: 60_000,
     retry: 1,
+    enabled,
   });
   const gstQ = useQuery({
     queryKey: ["gst", millId, month, year],
     queryFn: () => financeApi.getGST(millId, Number(month), Number(year)),
     staleTime: 60_000,
     retry: 1,
+    enabled,
   });
 
   const pl = plQ.data;

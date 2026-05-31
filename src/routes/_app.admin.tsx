@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, adminApi, usersApi, auditApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
-import { AccessGuard } from "@/components/AccessGuard";
 import { validateForm, GSTIN_REGEX } from "@/lib/formValidation";
 import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +37,7 @@ import {
   SheetTrigger,
   SheetFooter,
 } from "@/components/ui/sheet";
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Plus,
@@ -82,7 +81,6 @@ function AdminPage() {
   const [tab, setTab] = useState("companies");
   const [search, setSearch] = useState("");
 
-  const [editCompany, setEditCompany] = useState<Company | null>(null);
   const [addCompanyOpen, setAddCompanyOpen] = useState(false);
 
   const companiesQ = useQuery({
@@ -152,8 +150,7 @@ function AdminPage() {
   return (
     <>
       <Topbar title="Admin Panel" subtitle="Super admin control panel" />
-      <AccessGuard module="audit">
-        <div className="p-6">
+      <div className="p-6">
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="flex-wrap h-auto">
               <TabsTrigger value="companies">Companies</TabsTrigger>
@@ -188,10 +185,10 @@ function AdminPage() {
                       { key: "name", label: "Company Name", render: (c: any) => <span className="font-medium">{c.name}</span> },
                       { key: "code", label: "Code" },
                       { key: "gstin", label: "GSTIN" },
-                      { key: "_max_users", label: "Max Users", render: () => "50" },
+                      { key: "max_users", label: "Max Users", render: (c: any) => c.max_users ?? 50 },
                       { key: "_active_users", label: "Active Users", render: (c: any) => companyUserCounts[c.id] ?? 0 },
                       { key: "_mills", label: "Mills", render: (c: any) => companyMillCounts[c.id] ?? 0 },
-                      { key: "_plan", label: "Plan", render: () => <Badge variant="outline">Pro</Badge> },
+                      { key: "subscription_plan", label: "Plan", render: (c: any) => <Badge variant="outline">{c.subscription_plan ?? "Pro"}</Badge> },
                       {
                         key: "is_active",
                         label: "Status",
@@ -210,7 +207,7 @@ function AdminPage() {
                       <div className="flex gap-1">
                         <Sheet>
                           <SheetTrigger asChild>
-                            <Button size="sm" variant="outline" onClick={() => setEditCompany(item)}>
+                            <Button size="sm" variant="outline">
                               <Pencil className="size-3.5 mr-1" /> Edit
                             </Button>
                           </SheetTrigger>
@@ -219,7 +216,7 @@ function AdminPage() {
                               <SheetTitle>Edit Company — {item.name}</SheetTitle>
                             </SheetHeader>
                             <div className="mt-4">
-                              <EditCompanyForm item={item} onDone={() => { setEditCompany(null); qc.invalidateQueries({ queryKey: ["masters"] }); }} />
+                              <EditCompanyForm item={item} onDone={() => { qc.invalidateQueries({ queryKey: ["masters"] }); }} />
                             </div>
                           </SheetContent>
                         </Sheet>
@@ -279,7 +276,7 @@ function AdminPage() {
                     columns={[
                       { key: "name", label: "Company", render: (c: any) => <span className="font-medium">{c.name}</span> },
                       { key: "_current", label: "Current Users", render: (c: any) => companyUserCounts[c.id] ?? 0 },
-                      { key: "_max", label: "Max Users", render: () => 50 },
+                      { key: "max_users", label: "Max Users", render: (c: any) => c.max_users ?? 50 },
                       {
                         key: "_usage",
                         label: "Usage",
@@ -300,10 +297,8 @@ function AdminPage() {
                     data={companiesData}
                     rowKey={(c: any) => c.id}
                     exportFilename="user_limits"
-                    actions={() => (
-                      <Button size="sm" variant="outline">
-                        <Pencil className="size-3.5 mr-1" /> Edit Limit
-                      </Button>
+                    actions={(item: any) => (
+                      <EditLimitDialog company={item} />
                     )}
                   />
                 </CardContent>
@@ -327,7 +322,7 @@ function AdminPage() {
                       { key: "created_at", label: "Date", type: "date", render: (r: any) => r.created_at ? new Date(r.created_at).toLocaleString() : "—" },
                     ] satisfies ColDef[]}
                     data={auditData}
-                    rowKey={(r: any) => r.id ?? Math.random()}
+                    rowKey={(r: any) => r.id}
                     loading={auditQ.isLoading}
                     exportFilename="audit_logs"
                     emptyMessage="No audit logs found."
@@ -337,8 +332,50 @@ function AdminPage() {
             </TabsContent>
           </Tabs>
         </div>
-      </AccessGuard>
     </>
+  );
+}
+
+function EditLimitDialog({ company }: { company: Company }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [maxUsers, setMaxUsers] = useState(company.max_users ?? 50);
+  const [loading, setLoading] = useState(false);
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      await mastersApi.updateCompany(company.id, { max_users: maxUsers });
+      toast.success("User limit updated");
+      qc.invalidateQueries({ queryKey: ["masters"] });
+      setOpen(false);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Failed to update limit");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline">
+          <Pencil className="size-3.5 mr-1" /> Edit Limit
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit User Limit — {company.name}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Label>Max Users</Label>
+          <Input type="number" value={maxUsers} onChange={(e) => setMaxUsers(parseInt(e.target.value) || 0)} />
+        </div>
+        <Button onClick={handleSave} disabled={loading}>
+          {loading ? "Saving…" : "Save"}
+        </Button>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -521,7 +558,7 @@ function CompanyModulesSheet({ company }: { company: Company }) {
   const [initialized, setInitialized] = useState(false);
   const [open, setOpen] = useState(false);
 
-  useMemo(() => {
+  useEffect(() => {
     if (modulesQ.data && !initialized) {
       setModules(modulesQ.data);
       setInitialized(true);
@@ -590,7 +627,7 @@ function ModuleManagerTab() {
   const [modules, setModules] = useState<Record<string, boolean>>({});
   const [initialized, setInitialized] = useState(false);
 
-  useMemo(() => {
+  useEffect(() => {
     if (modulesQ.data && !initialized) {
       setModules(modulesQ.data);
       setInitialized(true);

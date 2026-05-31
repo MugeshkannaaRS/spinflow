@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { useState } from "react";
 import { toast } from "sonner";
-import { IndianRupee, CheckCircle2, XCircle, Loader2, Download } from "lucide-react";
+import { CheckCircle2, Loader2, Download } from "lucide-react";
 import { exportApi } from "@/lib/api-service";
 import type { PayrollMonth, PayslipEntry } from "@/lib/types";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
