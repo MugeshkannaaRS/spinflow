@@ -39,6 +39,13 @@ import {
   Pencil,
   Download,
   CheckCircle,
+  Check,
+  ChevronRight,
+  CheckCircle2,
+  Copy,
+  UserPlus,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { fmtDate } from "@/lib/format";
@@ -92,6 +99,11 @@ function AdminPage() {
   const [editCompany, setEditCompany] = useState<Company | null>(null);
   const [modulesCompany, setModulesCompany] = useState<Company | null>(null);
   const [suspendCompany, setSuspendCompany] = useState<Company | null>(null);
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [filterCompanyId, setFilterCompanyId] = useState("");
+  const [resetPwUser, setResetPwUser] = useState<{ id: string; name: string } | null>(null);
+  const [newPw, setNewPw] = useState("");
+  const [showPw, setShowPw] = useState(false);
 
   const handleSuspend = async (company: Company) => {
     try {
@@ -151,6 +163,14 @@ function AdminPage() {
     enabled: tab === "audit",
   });
 
+  const adminUsersQ = useQuery({
+    queryKey: ["admin-users", filterCompanyId],
+    queryFn: () => api.get("/admin/users", { params: { company_id: filterCompanyId || undefined } }).then(r => r.data),
+    staleTime: 30_000,
+    retry: 1,
+    enabled: tab === "users",
+  });
+
   const companiesData = (companiesQ.data ?? []) as Company[];
   const usersData = (usersQ.data ?? []) as any[];
   const millsData = (millsQ.data ?? []) as any[];
@@ -197,6 +217,7 @@ function AdminPage() {
               <TabsTrigger value="companies">Companies</TabsTrigger>
               <TabsTrigger value="modules">Module Manager</TabsTrigger>
               <TabsTrigger value="limits">User Limits</TabsTrigger>
+              <TabsTrigger value="users">Users</TabsTrigger>
               <TabsTrigger value="audit">Audit</TabsTrigger>
             </TabsList>
 
@@ -366,6 +387,117 @@ function AdminPage() {
               </Card>
             </TabsContent>
 
+            <TabsContent value="users">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">All Users</CardTitle>
+                  <Button size="sm" onClick={() => setShowCreateUser(true)}>
+                    <UserPlus className="w-4 h-4 mr-2" /> Add User
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4 flex items-center gap-3">
+                    <select
+                      value={filterCompanyId}
+                      onChange={e => setFilterCompanyId(e.target.value)}
+                      className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white dark:bg-slate-800"
+                    >
+                      <option value="">All Companies</option>
+                      {companiesData.map((c: any) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-muted-foreground">
+                      {adminUsersQ.data?.items?.length ?? 0} users
+                    </span>
+                  </div>
+                  <DataTable
+                    tableId="admin_users"
+                    columns={[
+                      { key: "name", label: "Name", render: (u: any) => <span className="font-medium">{u.name}</span> },
+                      { key: "email", label: "Email" },
+                      { key: "role", label: "Role", render: (u: any) => <span className="text-xs uppercase">{u.role}</span> },
+                      { key: "company_id", label: "Company", render: (u: any) => companiesData.find((c: any) => c.id === u.company_id)?.name ?? u.company_id },
+                      { key: "mill_name", label: "Mill", render: (u: any) => u.mill_name ?? "—" },
+                      {
+                        key: "is_active",
+                        label: "Status",
+                        render: (u: any) => (
+                          <span className={u.is_active ? "text-green-600 text-xs font-medium" : "text-red-600 text-xs font-medium"}>
+                            {u.is_active ? "Active" : "Inactive"}
+                          </span>
+                        ),
+                      },
+                      {
+                        key: "must_change_password",
+                        label: "Password",
+                        render: (u: any) => u.must_change_password ? <span className="text-xs text-amber-600">Change required</span> : <span className="text-xs text-gray-400">—</span>,
+                      },
+                    ] satisfies ColDef[]}
+                    data={adminUsersQ.data?.items ?? []}
+                    rowKey={(u: any) => u.id}
+                    loading={adminUsersQ.isLoading}
+                    actions={(item: any) => (
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="outline" onClick={() => { setResetPwUser({ id: item.id, name: item.name }); setNewPw(""); }}>
+                          Reset Password
+                        </Button>
+                      </div>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Create User Dialog */}
+              <CreateUserDialog
+                open={showCreateUser}
+                onOpenChange={setShowCreateUser}
+                companies={companiesData}
+                onDone={() => { qc.invalidateQueries({ queryKey: ["admin-users"] }); qc.invalidateQueries({ queryKey: ["system-users"] }); }}
+              />
+
+              {/* Reset Password Dialog */}
+              <Dialog open={!!resetPwUser} onOpenChange={() => setResetPwUser(null)}>
+                <DialogContent className="max-w-sm">
+                  <DialogHeader>
+                    <DialogTitle>Reset Password</DialogTitle>
+                    <DialogDescription>Set a new password for {resetPwUser?.name}</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-3">
+                    <div className="relative">
+                      <Input
+                        type={showPw ? "text" : "password"}
+                        value={newPw}
+                        onChange={e => setNewPw(e.target.value)}
+                        placeholder="New password (min 6 chars)"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPw(!showPw)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setResetPwUser(null)}>Cancel</Button>
+                    <Button onClick={async () => {
+                      if (!newPw || newPw.length < 6) { toast.error("Password must be at least 6 characters"); return; }
+                      try {
+                        await api.patch(`/admin/users/${resetPwUser!.id}/reset-password`, { password: newPw });
+                        toast.success(`Password reset for ${resetPwUser!.name}`);
+                        setResetPwUser(null);
+                        qc.invalidateQueries({ queryKey: ["admin-users"] });
+                      } catch { toast.error("Failed to reset password"); }
+                    }} disabled={!newPw || newPw.length < 6}>
+                      Reset Password
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </TabsContent>
+
             <TabsContent value="audit">
               <Card>
                 <CardHeader>
@@ -471,111 +603,303 @@ function EditLimitDialog({ company }: { company: Company }) {
   );
 }
 
+function generateTempPassword() {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$";
+  return Array.from({length: 10}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
 function AddCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient();
-  const [form, setForm] = useState({
-    code: "", name: "", gstin: "", phone: "", email: "",
-    max_users: 50, max_mills: 5, subscription_plan: "Pro",
-  });
+  const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [createdUser, setCreatedUser] = useState<{ email: string } | null>(null);
+  const [tempPassword, setTempPassword] = useState("");
+
+  const [company, setCompany] = useState({ name: "", code: "", gstin: "", phone: "", email: "" });
+  const [mill, setMill] = useState({ name: "", code: "", city: "", state: "" });
+  const [plan, setPlan] = useState({ max_users: 15 });
+  const [modules, setModules] = useState<Record<string, boolean>>(
+    Object.fromEntries(ALL_MODULES.map(m => [m, true]))
+  );
+  const [owner, setOwner] = useState({ name: "", email: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const handleSubmit = async () => {
+  const planTier = plan.max_users <= 10 ? "Starter" : plan.max_users <= 50 ? "Pro" : "Enterprise";
+
+  const resetAll = () => {
+    setStep(0); setLoading(false); setCreatedUser(null);
+    setCompany({ name: "", code: "", gstin: "", phone: "", email: "" });
+    setMill({ name: "", code: "", city: "", state: "" });
+    setPlan({ max_users: 15 });
+    setModules(Object.fromEntries(ALL_MODULES.map(m => [m, true])));
+    setOwner({ name: "", email: "" });
+    setErrors({});
+  };
+
+  const handleNext = () => {
     const errs: Record<string, string> = {};
-    if (!form.code.trim()) errs.code = "Code is required";
-    if (!form.name.trim()) errs.name = "Name is required";
-    const gstin = form.gstin.trim();
-    if (gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin.toUpperCase())) {
-      errs.gstin = "Invalid GSTIN format. Example: 29ABCDE1234F1Z5";
+    if (step === 0) {
+      if (!company.name.trim()) errs.name = "Company name is required";
+      if (!company.code.trim()) errs.code = "Company code is required";
+      const g = company.gstin.trim();
+      if (g && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(g.toUpperCase())) {
+        errs.gstin = "Invalid GSTIN format";
+      }
+    } else if (step === 1) {
+      if (!mill.name.trim()) errs.millName = "Mill name is required";
+      if (!mill.code.trim()) errs.millCode = "Mill code is required";
     }
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
+    setStep(s => s + 1);
+  };
+
+  const handleSubmit = async () => {
+    if (!owner.name.trim() || !owner.email.trim()) {
+      setErrors({ owner: "Mill owner name and email are required" });
+      return;
+    }
     setLoading(true);
     try {
-      const company = await mastersApi.createCompany({
-        code: form.code.trim(), name: form.name.trim(),
-        gstin: form.gstin.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-        email: form.email.trim() || undefined,
-        max_users: form.max_users, max_mills: form.max_mills,
-        subscription_plan: form.subscription_plan,
+      const comp = await mastersApi.createCompany({
+        code: company.code.trim(), name: company.name.trim(),
+        gstin: company.gstin.trim() || undefined,
+        phone: company.phone.trim() || undefined,
+        email: company.email.trim() || undefined,
       });
-      const companyId = company.id ?? company._id;
-      if (companyId) {
-        await adminApi.createCompanyModules(companyId, ALL_MODULES);
+      const companyId = comp.id ?? comp._id;
+
+      await mastersApi.createMill({
+        company_id: companyId,
+        code: mill.code.trim(),
+        name: mill.name.trim(),
+        city: mill.city.trim() || undefined,
+        state: mill.state.trim() || undefined,
+      });
+
+      const enabledMods = Object.entries(modules).filter(([, v]) => v).map(([k]) => k);
+      if (enabledMods.length > 0) {
+        await adminApi.createCompanyModules(companyId, enabledMods);
       }
-      toast.success("Company created with all modules enabled");
+
+      await api.patch(`/admin/companies/${companyId}/limits`, { max_users: plan.max_users });
+
+      const pw = generateTempPassword();
+      setTempPassword(pw);
+      const user = await api.post("/admin/users", {
+        name: owner.name.trim(),
+        email: owner.email.trim(),
+        password: pw,
+        role_code: "MILL_OWNER",
+        company_id: companyId,
+        mill_id: null,
+      }).then(r => r.data);
+
+      setCreatedUser({ email: user.email });
+      setStep(3);
       qc.invalidateQueries({ queryKey: ["masters"] });
-      onOpenChange(false);
-      setForm({ code: "", name: "", gstin: "", phone: "", email: "", max_users: 50, max_mills: 5, subscription_plan: "Pro" });
+      qc.invalidateQueries({ queryKey: ["system-users"] });
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Failed to create company");
+      toast.error(err?.response?.data?.detail ?? "Onboarding failed");
     } finally {
       setLoading(false);
     }
   };
 
+  const copyCredentials = async () => {
+    const text = `Login: https://spinflow-f.onrender.com\nEmail: ${createdUser?.email}\nPassword: ${tempPassword}`;
+    try { await navigator.clipboard.writeText(text); toast.success("Credentials copied"); }
+    catch { toast.error("Failed to copy"); }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { resetAll(); onOpenChange(false); } }}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Company</DialogTitle>
-          <DialogDescription>Create a new company with all modules enabled.</DialogDescription>
+          <DialogTitle>Onboard New Company</DialogTitle>
+          <DialogDescription>3-step wizard to create company, mill, and first user.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-3 mt-2">
-          <div className="space-y-1.5">
-            <Label>Code <span className="text-destructive">*</span></Label>
-            <Input value={form.code} onChange={(e) => { setForm({ ...form, code: e.target.value }); setErrors({ ...errors, code: "" }); }} placeholder="e.g. SPIN001" />
-            {errors.code && <p className="text-xs text-destructive">{errors.code}</p>}
+
+        {/* Step indicator */}
+        {step < 3 && (
+          <div className="flex items-center gap-2 mb-4">
+            {["Company", "Mill", "Plan & Access"].map((s, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <div className={cn(
+                  "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors",
+                  step > i ? "bg-blue-600 text-white" :
+                  step === i ? "bg-blue-100 text-blue-700 ring-2 ring-blue-500" :
+                  "bg-gray-100 text-gray-400"
+                )}>
+                  {step > i ? <Check className="w-3 h-3" /> : i + 1}
+                </div>
+                <span className={cn(
+                  "text-sm font-medium",
+                  step === i ? "text-blue-700" : "text-gray-400"
+                )}>
+                  {s}
+                </span>
+                {i < 2 && <ChevronRight className="w-4 h-4 text-gray-300" />}
+              </div>
+            ))}
           </div>
-          <div className="space-y-1.5">
-            <Label>Name <span className="text-destructive">*</span></Label>
-            <Input value={form.name} onChange={(e) => { setForm({ ...form, name: e.target.value }); setErrors({ ...errors, name: "" }); }} placeholder="e.g. SpinFlow Textiles Pvt Ltd" />
-            {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
-          </div>
-          <div className="space-y-1.5">
-            <Label>GSTIN</Label>
-            <Input value={form.gstin} onChange={(e) => { setForm({ ...form, gstin: e.target.value }); setErrors({ ...errors, gstin: "" }); }} placeholder="15 alphanumeric chars" />
-            {errors.gstin && <p className="text-xs text-destructive">{errors.gstin}</p>}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+        )}
+
+        {/* Step 1: Company Details */}
+        {step === 0 && (
+          <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>Phone</Label>
-              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              <Label>Company Name <span className="text-destructive">*</span></Label>
+              <Input value={company.name} onChange={e => { setCompany({ ...company, name: e.target.value }); if (!company.code) setCompany(c => ({ ...c, code: e.target.value.slice(0, 3).toUpperCase() })); }} placeholder="e.g. AA Yarn Mills Pvt Ltd" />
+              {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Email</Label>
-              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Max Users</Label>
-              <Input type="number" value={form.max_users} onChange={(e) => setForm({ ...form, max_users: parseInt(e.target.value) || 0 })} />
+              <Label>Company Code <span className="text-destructive">*</span></Label>
+              <Input value={company.code} onChange={e => setCompany({ ...company, code: e.target.value.toUpperCase() })} placeholder="e.g. AAY" />
+              {errors.code && <p className="text-xs text-destructive">{errors.code}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Max Mills</Label>
-              <Input type="number" value={form.max_mills} onChange={(e) => setForm({ ...form, max_mills: parseInt(e.target.value) || 0 })} />
+              <Label>GSTIN</Label>
+              <Input value={company.gstin} onChange={e => setCompany({ ...company, gstin: e.target.value })} placeholder="15 alphanumeric chars" />
+              {errors.gstin && <p className="text-xs text-destructive">{errors.gstin}</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Phone</Label>
+                <Input value={company.phone} onChange={e => setCompany({ ...company, phone: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Email</Label>
+                <Input type="email" value={company.email} onChange={e => setCompany({ ...company, email: e.target.value })} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button onClick={handleNext}>Next: Mill Setup</Button>
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>Subscription Plan</Label>
-            <Select value={form.subscription_plan} onValueChange={(v) => setForm({ ...form, subscription_plan: v })}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Basic">Basic</SelectItem>
-                <SelectItem value="Pro">Pro</SelectItem>
-                <SelectItem value="Enterprise">Enterprise</SelectItem>
-              </SelectContent>
-            </Select>
+        )}
+
+        {/* Step 2: Mill Setup */}
+        {step === 1 && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label>Mill Name <span className="text-destructive">*</span></Label>
+              <Input value={mill.name} onChange={e => { setMill({ ...mill, name: e.target.value }); if (!mill.code) setMill(c => ({ ...c, code: e.target.value.slice(0, 3).toUpperCase() })); }} placeholder="e.g. AA Yarn Unit 1" />
+              {errors.millName && <p className="text-xs text-destructive">{errors.millName}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Mill Code <span className="text-destructive">*</span></Label>
+              <Input value={mill.code} onChange={e => setMill({ ...mill, code: e.target.value.toUpperCase() })} placeholder="e.g. AYU1" />
+              {errors.millCode && <p className="text-xs text-destructive">{errors.millCode}</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>City</Label>
+                <Input value={mill.city} onChange={e => setMill({ ...mill, city: e.target.value })} placeholder="e.g. Coimbatore" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>State</Label>
+                <Input value={mill.state} onChange={e => setMill({ ...mill, state: e.target.value })} placeholder="e.g. Tamil Nadu" />
+              </div>
+            </div>
+            <div className="flex justify-between gap-2 pt-2">
+              <Button variant="outline" onClick={() => setStep(0)}>Back</Button>
+              <Button onClick={handleNext}>Next: Plan & User</Button>
+            </div>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={handleSubmit} disabled={loading || !form.code || !form.name}>
-              {loading ? "Creating…" : "Create Company"}
-            </Button>
+        )}
+
+        {/* Step 3: Plan & First User */}
+        {step === 2 && (
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-semibold">Max Users</Label>
+              <input
+                type="number" min={1} max={500}
+                value={plan.max_users}
+                onChange={e => setPlan({ max_users: parseInt(e.target.value) || 1 })}
+                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <div className={`mt-2 p-2 rounded-lg text-xs font-medium ${
+                planTier === "Starter" ? "bg-gray-100 text-gray-600" :
+                planTier === "Pro" ? "bg-blue-50 text-blue-700" :
+                "bg-purple-50 text-purple-700"
+              }`}>
+                {planTier} Plan — {plan.max_users <= 10 ? "up to 10 users" : plan.max_users <= 50 ? "up to 50 users" : "unlimited users"}
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-sm font-semibold">Modules</Label>
+              <p className="text-xs text-gray-400 mb-2">Select modules to enable for this company</p>
+              <div className="grid grid-cols-2 gap-2">
+                {ALL_MODULES.map(mod => (
+                  <div key={mod} className="flex items-center justify-between p-2 rounded-md border border-gray-100">
+                    <span className="text-xs font-medium">{MODULE_LABELS[mod]}</span>
+                    <Switch checked={modules[mod]} onCheckedChange={v => setModules(p => ({ ...p, [mod]: v }))} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t pt-3">
+              <Label className="text-sm font-semibold">Mill Owner Account</Label>
+              <div className="space-y-2 mt-2">
+                <Input value={owner.name} onChange={e => setOwner({ ...owner, name: e.target.value })} placeholder="Owner name" />
+                <Input type="email" value={owner.email} onChange={e => setOwner({ ...owner, email: e.target.value })} placeholder="Owner email" />
+              </div>
+              {errors.owner && <p className="text-xs text-destructive mt-1">{errors.owner}</p>}
+            </div>
+
+            <div className="flex justify-between gap-2 pt-2">
+              <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
+              <Button onClick={handleSubmit} disabled={loading}>
+                {loading ? "Onboarding…" : "Complete Onboarding"}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Success Screen */}
+        {step === 3 && (
+          <div className="text-center space-y-4 py-4">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-8 h-8 text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold">Company onboarded successfully!</h3>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-left">
+              <p className="text-sm font-semibold text-blue-800 mb-3">
+                Share these credentials with the mill owner:
+              </p>
+              <div className="space-y-2 font-mono text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Login URL:</span>
+                  <span className="text-blue-700">https://spinflow-f.onrender.com</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Email:</span>
+                  <span className="font-semibold">{createdUser?.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Password:</span>
+                  <span className="font-semibold text-green-700">{tempPassword}</span>
+                </div>
+              </div>
+              <p className="text-xs text-blue-600 mt-3">
+                ⚠️ User will be asked to change password on first login
+              </p>
+            </div>
+
+            <div className="flex gap-3 justify-center">
+              <Button onClick={copyCredentials} variant="outline">
+                <Copy className="w-4 h-4 mr-2" /> Copy Credentials
+              </Button>
+              <Button onClick={() => { resetAll(); onOpenChange(false); }}>Done</Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -712,6 +1036,117 @@ function ModulesDialog({ company, onClose, onDone }: { company: Company | null; 
   );
 }
 
+
+
+const ROLES_FOR_CREATE = [
+  "MILL_OWNER", "GENERAL_MANAGER", "PRODUCTION_MANAGER", "QUALITY_MANAGER",
+  "DISPATCH_MANAGER", "STORE_MANAGER", "HR_MANAGER", "ACCOUNTANT",
+  "MAINTENANCE_MANAGER", "SUPERVISOR", "MACHINE_OPERATOR", "SECURITY_GATE", "AUDITOR",
+];
+
+function CreateUserDialog({ open, onOpenChange, companies, onDone }: {
+  open: boolean; onOpenChange: (o: boolean) => void;
+  companies: any[]; onDone: () => void;
+}) {
+  const [form, setForm] = useState({ company_id: "", mill_id: "", role_code: "MILL_OWNER", name: "", email: "", password: "" });
+  const [loading, setLoading] = useState(false);
+
+  const { data: mills } = useQuery({
+    queryKey: ["mills-for-company", form.company_id],
+    queryFn: () => api.get(`/masters/mills?company_id=${form.company_id}`).then(r => r.data?.data ?? r.data?.items ?? []),
+    enabled: !!form.company_id,
+  });
+
+  const handleSubmit = async () => {
+    if (!form.name.trim() || !form.email.trim() || !form.password.trim() || !form.company_id) {
+      toast.error("Name, email, password, and company are required");
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post("/admin/users", form);
+      toast.success(`User ${form.name} created`);
+      onDone();
+      onOpenChange(false);
+      setForm({ company_id: "", mill_id: "", role_code: "MILL_OWNER", name: "", email: "", password: "" });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Failed to create user");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create New User</DialogTitle>
+          <DialogDescription>Create a user under any company.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Company</Label>
+            <select
+              value={form.company_id}
+              onChange={e => setForm({ ...form, company_id: e.target.value, mill_id: "" })}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white dark:bg-slate-800"
+            >
+              <option value="">Select company...</option>
+              {companies.filter(c => c?.id).map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          {form.company_id && (
+            <div className="space-y-1.5">
+              <Label>Mill</Label>
+              <select
+                value={form.mill_id}
+                onChange={e => setForm({ ...form, mill_id: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white dark:bg-slate-800"
+              >
+                <option value="">No mill (company-level)</option>
+                {(Array.isArray(mills) ? mills : []).map((m: any) => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label>Role</Label>
+            <select
+              value={form.role_code}
+              onChange={e => setForm({ ...form, role_code: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white dark:bg-slate-800"
+            >
+              {ROLES_FOR_CREATE.map(r => (
+                <option key={r} value={r}>{r.replace(/_/g, " ")}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Name</Label>
+              <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Full name" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Email</Label>
+              <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="Email" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Password</Label>
+            <Input type="text" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Temporary password" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={loading}>{loading ? "Creating…" : "Create User"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 
 function ModuleManagerTab() {

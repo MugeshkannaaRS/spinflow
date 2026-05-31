@@ -1,4 +1,6 @@
 import { useAuth } from "@/stores/auth";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
 const ROLE_MODULES: Record<string, string[]> = {
   SUPER_ADMIN: ["dashboard", "admin", "column_config"],
@@ -25,10 +27,21 @@ export function useRBAC() {
   const user = useAuth(s => s.user);
   const role = user?.role ?? "MACHINE_OPERATOR";
   const isSuperAdmin = role === "SUPER_ADMIN";
+
+  const { data: companyModules } = useQuery({
+    queryKey: ["company-modules", user?.companyId],
+    queryFn: () => api.get(`/admin/companies/${user?.companyId}/modules`).then(r => r.data),
+    enabled: !!user?.companyId && !isSuperAdmin,
+    staleTime: 10 * 60 * 1000,
+  });
+
   const allowedModules = ROLE_MODULES[role] ?? ["dashboard"];
 
   function canAccess(module: string): boolean {
-    return allowedModules.includes(module);
+    if (isSuperAdmin) return ["dashboard", "admin", "column_config"].includes(module);
+    const roleAllows = allowedModules.includes(module);
+    const companyAllows = !companyModules || companyModules[module] === true;
+    return roleAllows && companyAllows;
   }
 
   return { role, isSuperAdmin, canAccess, allowedModules };
