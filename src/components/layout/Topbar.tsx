@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/stores/auth";
 import { useTheme } from "@/hooks/useTheme";
-import { ROLE_LABELS } from "@/lib/rbac";
-import { Badge } from "@/components/ui/badge";
 import {
   Bell,
   Menu,
@@ -14,13 +12,6 @@ import {
   KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useSidebar } from "@/components/layout/SidebarContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { formatRelativeTime } from "@/utils/time";
@@ -122,6 +113,18 @@ export function Topbar({
   const { toggle } = useSidebar();
   const { theme, toggle: toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <header className="flex items-center justify-between h-14 bg-[var(--bg-primary)] border-b border-[var(--border)] shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 lg:px-6 gap-3 sticky top-0 z-20">
@@ -147,32 +150,47 @@ export function Topbar({
         <NotificationsDropdown />
         <div className="h-6 w-px bg-border" />
         {user && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="size-8 rounded-full bg-brand-500 text-white flex items-center justify-center font-semibold text-sm shrink-0 hover:opacity-90 transition-opacity">
-                {user.name
-                  .split(" ")
-                  .map((n) => n[0])
-                  .slice(0, 2)
-                  .join("")}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => navigate({ to: "/profile" })}>
-                <User className="size-4 mr-2" /> Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate({ to: "/change-password" })}>
-                <KeyRound className="size-4 mr-2" /> Change Password
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => { logout(); navigate({ to: "/login" }); }}
-                className="text-red-500 focus:text-red-500"
-              >
-                <LogOut className="size-4 mr-2" /> Logout
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="w-8 h-8 rounded-full bg-indigo-600 text-white text-xs font-bold flex items-center justify-center hover:bg-indigo-700 transition-colors"
+            >
+              {user.name?.charAt(0)?.toUpperCase() ?? "U"}
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl shadow-lg z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{user.name}</p>
+                  <p className="text-xs text-gray-400 truncate mt-0.5">{user.email}</p>
+                  <span className="inline-block mt-1.5 text-[10px] font-semibold uppercase tracking-wide bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full">
+                    {user.role.replace(/_/g, " ")}
+                  </span>
+                </div>
+                <div className="py-1">
+                  <button
+                    onClick={() => { navigate({ to: "/profile" }); setDropdownOpen(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    <User className="w-4 h-4 text-gray-400" /> Profile
+                  </button>
+                  <button
+                    onClick={() => { navigate({ to: "/change-password" }); setDropdownOpen(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                  >
+                    <KeyRound className="w-4 h-4 text-gray-400" /> Change Password
+                  </button>
+                  <div className="h-px bg-gray-100 dark:bg-slate-700 mx-3 my-1" />
+                  <button
+                    onClick={() => { logout(); navigate({ to: "/login" }); }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" /> Logout
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </header>

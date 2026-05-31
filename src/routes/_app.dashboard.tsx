@@ -5,6 +5,8 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 import { Topbar } from "@/components/layout/Topbar";
 import { StatCard } from "@/components/ui/StatCard";
+import { useRBAC } from "@/hooks/useRBAC";
+import { SuperAdminDashboard } from "@/components/dashboard/SuperAdminDashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
@@ -65,9 +67,12 @@ const pendingActions = [
 ];
 
 function Dashboard() {
+  const { isSuperAdmin } = useRBAC();
   const user = useAuth((s) => s.user);
   const navigate = useNavigate();
   const [alertDismissed, setAlertDismissed] = useState(false);
+
+  if (isSuperAdmin) return <SuperAdminDashboard />;
 
   const { data: summary, isLoading } = useQuery({
     queryKey: ["dashboard-summary"],

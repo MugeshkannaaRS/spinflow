@@ -12,7 +12,7 @@ from app.models.maintenance import MaintenanceLog
 from app.models.quality import QualityTest
 from app.models.dispatch import Dispatch
 from app.models.hr import Employee, Attendance
-from app.models.masters import Department, Customer, Mill
+from app.models.masters import Department, Customer, Mill, Company
 from app.models.lotrac import Trip
 from app.models.inventory import Lot
 
@@ -327,6 +327,66 @@ async def get_setup_status(
         "users": await count(User),
         "customers": await count(Customer),
     }
+
+
+@router.get("/dashboard/admin-summary")
+async def get_admin_summary(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        companies_result = await db.execute(
+            select(func.count(Company.id)).where(Company.deleted_at.is_(None))
+        )
+        total_companies = companies_result.scalar() or 0
+
+        mills_result = await db.execute(
+            select(func.count(Mill.id)).where(Mill.deleted_at.is_(None))
+        )
+        total_mills = mills_result.scalar() or 0
+
+        users_result = await db.execute(
+            select(func.count(User.id)).where(
+                User.is_active == True,
+                User.deleted_at.is_(None)
+            )
+        )
+        total_users = users_result.scalar() or 0
+
+        employees_result = await db.execute(
+            select(func.count(Employee.id)).where(Employee.deleted_at.is_(None))
+        )
+        total_employees = employees_result.scalar() or 0
+
+        companies_q = await db.execute(
+            select(Company).where(Company.deleted_at.is_(None)).limit(20)
+        )
+        companies = companies_q.scalars().all()
+
+        return {
+            "total_companies": total_companies,
+            "total_mills": total_mills,
+            "total_users": total_users,
+            "total_employees": total_employees,
+            "companies": [
+                {
+                    "id": str(c.id),
+                    "name": c.name,
+                    "code": c.code,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                }
+                for c in companies
+            ]
+        }
+    except Exception as e:
+        print(f"admin-summary error: {e}")
+        return {
+            "total_companies": 0,
+            "total_mills": 0,
+            "total_users": 0,
+            "total_employees": 0,
+            "companies": []
+        }
 
 
 @router.get("/dashboard/summary")

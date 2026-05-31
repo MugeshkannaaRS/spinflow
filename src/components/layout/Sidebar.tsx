@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/stores/auth";
 import { useTheme } from "@/hooks/useTheme";
-import { MODULE_ACCESS, ROLE_LABELS, type Module } from "@/lib/rbac";
+import { useRBAC } from "@/hooks/useRBAC";
+import { ROLE_LABELS } from "@/lib/rbac";
 import {
   LayoutDashboard,
   Factory,
@@ -41,66 +42,62 @@ type NavItem = {
   to: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  module: string;
 };
 
-const NAV_GROUPS: Array<{ label: string; items: NavItem[]; superAdminOnly?: boolean }> = [
+const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Overview",
-    items: [{ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
+    items: [{ to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" }],
   },
   {
     label: "Operations",
     items: [
-      { to: "/production", label: "Production", icon: Factory },
-      { to: "/quality", label: "Quality", icon: BadgeCheck },
-      { to: "/maintenance", label: "Maintenance", icon: Wrench },
+      { to: "/production", label: "Production", icon: Factory, module: "production" },
+      { to: "/quality", label: "Quality", icon: BadgeCheck, module: "quality" },
+      { to: "/maintenance", label: "Maintenance", icon: Wrench, module: "maintenance" },
     ],
   },
   {
     label: "People",
     items: [
-      { to: "/hr", label: "Human Resources", icon: Users },
-      { to: "/payroll", label: "Payroll", icon: Banknote },
+      { to: "/hr", label: "Human Resources", icon: Users, module: "hr" },
+      { to: "/payroll", label: "Payroll", icon: Banknote, module: "payroll" },
     ],
   },
   {
     label: "Supply Chain",
     items: [
-      { to: "/purchase", label: "Cotton Purchase", icon: Package },
-      { to: "/stores", label: "Stores", icon: Warehouse },
-      { to: "/inventory", label: "Inventory", icon: Boxes },
-      { to: "/dispatch", label: "Dispatch", icon: Truck },
-      { to: "/lotrac", label: "LoTrac", icon: QrCode },
+      { to: "/purchase", label: "Cotton Purchase", icon: Package, module: "purchase" },
+      { to: "/stores", label: "Stores", icon: Warehouse, module: "stores" },
+      { to: "/inventory", label: "Inventory", icon: Boxes, module: "inventory" },
+      { to: "/dispatch", label: "Dispatch", icon: Truck, module: "dispatch" },
+      { to: "/lotrac", label: "LoTrac", icon: QrCode, module: "lotrac" },
     ],
   },
   {
     label: "Finance",
     items: [
-      { to: "/accounts", label: "Accounts", icon: Receipt },
-      { to: "/sales", label: "Sales", icon: TrendingUp },
+      { to: "/accounts", label: "Accounts", icon: Receipt, module: "accounts" },
+      { to: "/sales", label: "Sales", icon: TrendingUp, module: "sales" },
     ],
   },
   {
     label: "Settings",
     items: [
-      { to: "/masters", label: "Masters", icon: Settings2 },
-      { to: "/users", label: "Users & Roles", icon: UserCog },
-      { to: "/audit", label: "Audit Logs", icon: ClipboardList },
+      { to: "/masters", label: "Masters", icon: Settings2, module: "masters" },
+      { to: "/users", label: "Users & Roles", icon: UserCog, module: "users" },
+      { to: "/audit", label: "Audit Logs", icon: ClipboardList, module: "audit" },
+      { to: "/admin", label: "Admin Panel", icon: Shield, module: "admin" },
+      { to: "/admin/column-config", label: "Column Config", icon: SlidersHorizontal, module: "column_config" },
     ],
-  },
-  {
-    label: "Settings",
-    items: [
-      { to: "/admin", label: "Admin Panel", icon: Shield },
-      { to: "/admin/column-config", label: "Column Config", icon: SlidersHorizontal },
-    ],
-    superAdminOnly: true,
   },
 ];
 
 function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavClick?: () => void }) {
   const { user, logout } = useAuth();
   const { theme, toggle } = useTheme();
+  const { canAccess, isSuperAdmin } = useRBAC();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -108,15 +105,12 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
 
   const isActive = (to: string) => pathname === to || pathname.startsWith(to + "/");
 
-  const filteredGroups = NAV_GROUPS.filter((group) => {
-    if (group.superAdminOnly && user.role !== "SUPER_ADMIN") return false;
-    return group.items.some((item) => {
-      const module = item.to.replace("/", "") as Module;
-      const allowedByRole = MODULE_ACCESS[user?.role] ?? ["dashboard"];
-      const allowedByCompany = user?.allowedModules ?? allowedByRole;
-      return allowedByRole.includes(module) && allowedByCompany.includes(module);
-    });
-  });
+  const filteredGroups = NAV_GROUPS
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => canAccess(item.module))
+    }))
+    .filter(group => group.items.length > 0);
 
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#1e1b4b", color: "#c7d2fe" }}>
