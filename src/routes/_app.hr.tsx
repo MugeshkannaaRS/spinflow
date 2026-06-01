@@ -83,6 +83,7 @@ import {
   Settings2,
   Eye,
 } from "lucide-react";
+import { useActiveMill } from "@/hooks/useActiveMill";
 
 export const Route = createFileRoute("/_app/hr")({
   head: () => ({ meta: [{ title: "HR — SpinFlow ERP" }] }),
@@ -235,28 +236,31 @@ const MONTHS = [
 function HRPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "hr");
-  const millId = user?.millId;
+  const { millId } = useActiveMill();
   const qc = useQueryClient();
 
   const [tab, setTab] = useState("employees");
 
   const empQ = useQuery({
-    queryKey: ["hr-employees"],
-    queryFn: () => hrApi.getEmployees({ page_size: 1000 }),
+    queryKey: ["hr-employees", millId],
+    queryFn: () => hrApi.getEmployees({ page_size: 1000, mill_id: millId }),
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
   const attQ = useQuery({
-    queryKey: ["hr-attendance-all"],
-    queryFn: () => hrApi.getAttendance({}),
+    queryKey: ["hr-attendance-all", millId],
+    queryFn: () => hrApi.getAttendance({ mill_id: millId }),
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
   const leaveQ = useQuery({
-    queryKey: ["hr-leaves"],
-    queryFn: () => hrApi.getLeaves(),
+    queryKey: ["hr-leaves", millId],
+    queryFn: () => hrApi.getLeaves({ mill_id: millId }),
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
 
   const employees: EmployeeRow[] = Array.isArray(empQ.data) ? empQ.data : (empQ.data?.data ?? []);
@@ -593,6 +597,7 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
 // ─── Employee Detail Sheet ───────────────────────────────────────────────────────
 
 function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; onOpenChange: (v: boolean) => void; employee: EmployeeRow }) {
+  const { millId } = useActiveMill();
   const empColConfig = useColumnConfig("hr_employees");
   const [payrollTab, setPayrollTab] = useState("personal");
 
@@ -600,8 +605,8 @@ function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; 
   const curMonth = now.getMonth() + 1;
   const curYear = now.getFullYear();
   const { data: payrollData } = useQuery({
-    queryKey: ["hr-payroll-employee", employee.id, curMonth, curYear],
-    queryFn: () => hrApi.getPayroll({ employee_id: employee.id, month: curMonth, year: curYear }).then((r: any) => r.data?.[0]),
+    queryKey: ["hr-payroll-employee", employee.id, curMonth, curYear, millId],
+    queryFn: () => hrApi.getPayroll({ employee_id: employee.id, month: curMonth, year: curYear, mill_id: millId }).then((r: any) => r.data?.[0]),
     enabled: open,
     staleTime: 30_000,
   });
@@ -1705,6 +1710,7 @@ function ImportEmployeeDialog() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdit: boolean }) {
+  const { millId } = useActiveMill();
   const attColConfig = useColumnConfig("hr_attendance");
   const now = new Date();
   const today = new Date();
@@ -1716,8 +1722,8 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
   const [mobileCardOpen, setMobileCardOpen] = useState(false);
 
   const { data: attendanceData, isLoading, refetch } = useQuery({
-    queryKey: ["hr-attendance", month, year, deptFilter],
-    queryFn: () => hrApi.getAttendance({ month, year, department: deptFilter !== "all" ? deptFilter : undefined }),
+    queryKey: ["hr-attendance", month, year, deptFilter, millId],
+    queryFn: () => hrApi.getAttendance({ month, year, mill_id: millId, department: deptFilter !== "all" ? deptFilter : undefined }),
     staleTime: 60_000,
   });
 

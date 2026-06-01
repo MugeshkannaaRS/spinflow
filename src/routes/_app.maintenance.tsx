@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { maintenanceApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
+import { useActiveMill } from "@/hooks/useActiveMill";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -291,24 +292,28 @@ function MaintenancePage() {
   const taskColConfig = useColumnConfig("maintenance_tasks");
   const schedColConfig = useColumnConfig("maintenance_schedules");
   const qc = useQueryClient();
+  const { millId } = useActiveMill();
 
   const maintQ = useQuery({
-    queryKey: ["maintenance-tasks"],
+    queryKey: ["maintenance-tasks", millId],
     queryFn: maintenanceApi.getTasks,
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
   const schedulesQ = useQuery({
-    queryKey: ["maintenance-schedules"],
+    queryKey: ["maintenance-schedules", millId],
     queryFn: maintenanceApi.getSchedules,
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
   const paramsQ = useQuery({
-    queryKey: ["machine-parameters"],
+    queryKey: ["machine-parameters", millId],
     queryFn: maintenanceApi.getParameters,
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
 
   const tasks: any[] = maintQ.data ?? [];

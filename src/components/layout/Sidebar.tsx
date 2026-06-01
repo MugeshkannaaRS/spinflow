@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/stores/auth";
 import { useTheme } from "@/hooks/useTheme";
 import { useRBAC } from "@/hooks/useRBAC";
 import { ROLE_LABELS } from "@/lib/rbac";
+import { toast } from "sonner";
 import {
   LayoutDashboard,
   Factory,
@@ -95,11 +97,24 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
 ];
 
 function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavClick?: () => void }) {
-  const { user, logout } = useAuth();
+  const { user, logout, activeMill, setActiveMill } = useAuth();
+  const queryClient = useQueryClient();
   const { theme, toggle } = useTheme();
   const { canAccess, isSuperAdmin, companyModulesLoaded } = useRBAC();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+
+  const mills = user?.companyMills ?? [];
+  const hasMultipleMills = mills.length > 1;
+  const displayMillName = activeMill?.name ?? user?.millName ?? "Your Mill";
+
+  const handleMillSwitch = useCallback((newMillId: string) => {
+    const selected = mills.find(m => m.id === newMillId);
+    if (!selected || selected.id === activeMill?.id) return;
+    setActiveMill(selected);
+    toast.info(`Switching to ${selected.name}...`, { duration: 1500 });
+    queryClient.invalidateQueries();
+  }, [mills, activeMill, setActiveMill, queryClient]);
 
   if (!user) return null;
 
@@ -208,8 +223,20 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
       <div className="mt-auto flex-shrink-0 border-t border-blue-800/50">
         {!collapsed && (
           <div className="px-4 py-3">
-            <div className="text-xs font-medium truncate text-blue-300">{user.millName}</div>
-            <div className="text-blue-500 text-[11px]">{ROLE_LABELS[user.role]}</div>
+            {hasMultipleMills ? (
+              <select
+                value={activeMill?.id ?? user?.millId ?? ""}
+                onChange={(e) => handleMillSwitch(e.target.value)}
+                className="w-full bg-blue-900/30 text-blue-100 text-xs rounded-lg px-2 py-1.5 border border-blue-700/50 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 mb-1"
+              >
+                {mills.map(m => (
+                  <option key={m.id} value={m.id} className="bg-slate-800">{m.name}</option>
+                ))}
+              </select>
+            ) : (
+              <p className="text-xs font-medium text-blue-100 truncate mb-0.5">{displayMillName}</p>
+            )}
+            <p className="text-xs text-blue-400">{user.role.replace(/_/g, " ")}</p>
           </div>
         )}
 

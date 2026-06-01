@@ -23,7 +23,7 @@ from app.schemas.auth import (
     ResetPasswordRequest, VerifyOTPRequest, UserCreateRequest, UserUpdateRequest,
     MeResponse, MillSettingsOut, CompanyInfo,
 )
-from app.models.masters import Company, CompanyModule, MillSettings
+from app.models.masters import Company, CompanyModule, MillSettings, Mill
 from app.models.ui_config import ColumnConfig
 from pydantic import BaseModel, Field
 
@@ -161,81 +161,48 @@ async def logout(db: AsyncSession = Depends(get_db), current_user: User = Depend
     return {"message": "Logged out successfully"}
 
 
-@router.get("/auth/me", response_model=MeResponse)
-async def get_me(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+@router.get("/auth/me")
+async def get_me(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    try:
+        role_code = current_user.role_rel.code if current_user.role_rel else "MACHINE_OPERATOR"
 
-    allowed_modules = []
-    if current_user.company_id:
-        result = await db.execute(
-            select(CompanyModule.module_name).where(
-                CompanyModule.company_id == current_user.company_id,
-                CompanyModule.is_enabled == True,
+        # Get fresh mill name from mills table (not from users.mill_name)
+        mill_name = current_user.mill_name
+        if current_user.mill_id:
+            mill_result = await db.execute(select(Mill).where(Mill.id == current_user.mill_id))
+            mill = mill_result.scalar_one_or_none()
+            if mill:
+                mill_name = mill.name
+                # Auto-fix stale mill_name in users table
+                if current_user.mill_name != mill.name:
+                    current_user.mill_name = mill.name
+                    await db.commit()
+
+        # Get all mills in user's company (for mill switcher)
+        company_mills = []
+        if current_user.company_id:
+            mills_result = await db.execute(
+                select(Mill).where(Mill.company_id == current_user.company_id, Mill.deleted_at.is_(None)).order_by(Mill.name)
             )
-        )
-        allowed_modules = [row[0] for row in result.all()]
+            company_mills = [
+                {"id": str(m.id), "name": m.name, "code": m.code or ""}
+                for m in mills_result.scalars().all()
+            ]
 
-    mill_settings = None
-    if current_user.mill_id:
-        result = await db.execute(
-            select(MillSettings).where(MillSettings.mill_id == current_user.mill_id)
-        )
-        mill_settings_row = result.scalar_one_or_none()
-        if mill_settings_row:
-            mill_settings = MillSettingsOut.model_validate(mill_settings_row)
+        return {
+            "id": str(current_user.id),
+            "name": current_user.name,
+            "email": current_user.email,
+            "role": role_code,
+            "mill_id": str(current_user.mill_id) if current_user.mill_id else None,
+            "company_id": str(current_user.company_id) if current_user.company_id else None,
+            "mill_name": mill_name,
+            "company_mills": company_mills,
+            "must_change_password": current_user.must_change_password,
+        }
 
-    company_info = None
-    if current_user.company_id:
-        result = await db.execute(
-            select(Company).where(Company.id == current_user.company_id)
-        )
-        company = result.scalar_one_or_none()
-        if company:
-            count_result = await db.execute(
-                select(func.count(User.id)).where(
-                    User.company_id == current_user.company_id,
-                    User.deleted_at.is_(None),
-                )
-            )
-            user_count = count_result.scalar() or 0
-            company_info = CompanyInfo(
-                name=company.name,
-                max_users=company.max_users,
-                current_user_count=user_count,
-                subscription_plan=getattr(company, "subscription_plan", None),
-            )
-
-    column_configs_version = None
-    if current_user.mill_id:
-        cv_result = await db.execute(
-            select(func.max(ColumnConfig.updated_at)).where(
-                ColumnConfig.mill_id == current_user.mill_id,
-            )
-        )
-        max_updated = cv_result.scalar()
-        if max_updated:
-            column_configs_version = max_updated.isoformat()
-
-    return MeResponse(
-        user=UserResponse(
-            id=current_user.id,
-            name=current_user.name,
-            email=current_user.email,
-            role=role_code,
-            role_name=current_user.role_rel.name if current_user.role_rel else role_code,
-            department=current_user.department,
-            mill_id=current_user.mill_id,
-            mill_name=current_user.mill_name,
-            company_id=current_user.company_id,
-            is_active=current_user.is_active,
-            last_login=current_user.last_login,
-            must_change_password=current_user.must_change_password,
-        ),
-        allowed_modules=allowed_modules,
-        mill_settings=mill_settings,
-        company=company_info,
-        column_configs_version=column_configs_version,
-    )
+    except Exception as e:
+        raise HTTPException(500, detail=str(e))
 
 
 @router.post("/auth/change-password")

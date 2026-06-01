@@ -43,6 +43,7 @@ import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, Upload } from "lucide-react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { useActiveMill } from "@/hooks/useActiveMill";
 
 export const Route = createFileRoute("/_app/production")({
   head: () => ({ meta: [{ title: "Production — SpinFlow ERP" }] }),
@@ -95,6 +96,7 @@ function buildRows(machines: any[]): GridRow[] {
 
 function ShiftGrid() {
   const qc = useQueryClient();
+  const { millId } = useActiveMill();
   const today = new Date();
   const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
     .toISOString()
@@ -108,9 +110,10 @@ function ShiftGrid() {
   const config = useColumnConfig("production_entries");
 
   const machinesQ = useQuery({
-    queryKey: ["machines", department],
-    queryFn: () => productionApi.getMachines({ department }),
+    queryKey: ["machines", department, millId],
+    queryFn: () => productionApi.getMachines({ department, mill_id: millId }),
     staleTime: 60_000,
+    enabled: !!millId,
   });
 
   const machines = useMemo(
@@ -485,23 +488,27 @@ function ImportShiftEntriesDialog() {
 function ProductionPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "production");
+  const { millId } = useActiveMill();
   const machinesQ = useQuery({
-    queryKey: ["machines"],
-    queryFn: () => productionApi.getMachines(),
+    queryKey: ["machines", millId],
+    queryFn: () => productionApi.getMachines({ mill_id: millId }),
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
   const shiftsQ = useQuery({
-    queryKey: ["shifts"],
+    queryKey: ["shifts", millId],
     queryFn: productionApi.getEntries,
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
   const downQ = useQuery({
-    queryKey: ["downtime"],
+    queryKey: ["downtime", millId],
     queryFn: productionApi.getDowntime,
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
   const qc = useQueryClient();
 

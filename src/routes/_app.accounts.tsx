@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { accountsApi, financeApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
+import { useActiveMill } from "@/hooks/useActiveMill";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -50,19 +51,22 @@ export const Route = createFileRoute("/_app/accounts")({
 
 function AccountsPage() {
   const user = useAuth((s) => s.user);
+  const { millId } = useActiveMill();
   const invColConfig = useColumnConfig("accounts_invoices");
   const recvColConfig = useColumnConfig("accounts_receivables");
   const invQ = useQuery({
-    queryKey: ["invoices"],
+    queryKey: ["invoices", millId],
     queryFn: accountsApi.getInvoices,
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
   const recvQ = useQuery({
-    queryKey: ["receivables"],
+    queryKey: ["receivables", millId],
     queryFn: accountsApi.getReceivables,
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
 
   const invoices: any[] = invQ.data ?? [];

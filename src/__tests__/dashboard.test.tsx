@@ -10,6 +10,18 @@ vi.mock("@/stores/auth", () => ({
       millName: "Test Mill",
       millId: "mill-1",
     },
+    activeMill: { id: "mill-1", name: "Test Mill" },
+    setActiveMill: vi.fn(),
+  })),
+}));
+
+vi.mock("@/hooks/useActiveMill", () => ({
+  useActiveMill: vi.fn(() => ({
+    millId: "mill-1",
+    millName: "Test Mill",
+    mills: [{ id: "mill-1", name: "Test Mill" }],
+    hasMultipleMills: false,
+    activeMill: { id: "mill-1", name: "Test Mill" },
   })),
 }));
 
@@ -54,6 +66,7 @@ vi.mock("recharts", () => ({
   ResponsiveContainer: ({ children }: any) => <div>{children}</div>,
   BarChart: ({ children }: any) => <div>{children}</div>,
   Bar: () => <div />,
+  ReferenceLine: () => null,
   XAxis: () => null,
   YAxis: () => null,
   Tooltip: () => null,

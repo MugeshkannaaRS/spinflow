@@ -3,6 +3,12 @@ import { persist } from "zustand/middleware";
 import type { Role } from "@/lib/rbac";
 import { setAuthHeader } from "@/lib/api";
 
+export interface CompanyMill {
+  id: string;
+  name: string;
+  code: string;
+}
+
 export interface AuthUser {
   id: string;
   name: string;
@@ -13,6 +19,7 @@ export interface AuthUser {
   companyId?: string;
   allowedModules?: string[];
   mustChangePassword?: boolean;
+  companyMills?: CompanyMill[];
 }
 
 interface AuthState {
@@ -20,9 +27,11 @@ interface AuthState {
   token: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  activeMill: CompanyMill | null;
   login: (user: AuthUser, token: string, refreshToken?: string) => void;
   setUser: (updates: Partial<AuthUser>) => void;
   setTokens: (token: string, refreshToken: string) => void;
+  setActiveMill: (mill: CompanyMill | null) => void;
   logout: () => void;
 }
 
@@ -31,6 +40,7 @@ const initialState = {
   token: null,
   refreshToken: null,
   isAuthenticated: false,
+  activeMill: null,
 };
 
 export const useAuth = create<AuthState>()(
@@ -38,16 +48,24 @@ export const useAuth = create<AuthState>()(
     (set) => ({
       ...initialState,
       login: (user, token, refreshToken) => {
-        set({ user, token, refreshToken: refreshToken ?? null, isAuthenticated: true });
+        const activeMill = (user.millId && user.millName)
+          ? { id: user.millId, name: user.millName, code: "" }
+          : null;
+        set({ user, token, refreshToken: refreshToken ?? null, isAuthenticated: true, activeMill });
         setAuthHeader(token);
       },
-      setUser: (updates) => set((state) => ({
-        user: state.user ? { ...state.user, ...updates } : null,
-      })),
+      setUser: (updates) => set((state) => {
+        const merged = state.user ? { ...state.user, ...updates } : null;
+        if (merged && !state.activeMill && merged.millId && merged.millName) {
+          return { user: merged, activeMill: { id: merged.millId, name: merged.millName, code: "" } };
+        }
+        return { user: merged };
+      }),
       setTokens: (token, refreshToken) => {
         set({ token, refreshToken });
         setAuthHeader(token);
       },
+      setActiveMill: (mill) => set({ activeMill: mill }),
       logout: () => {
         set({ ...initialState });
         setAuthHeader(null);

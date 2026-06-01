@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/stores/auth";
+import { useActiveMill } from "@/hooks/useActiveMill";
 import { useTheme } from "@/hooks/useTheme";
 import {
   Bell,
@@ -10,6 +11,7 @@ import {
   LogOut,
   User,
   KeyRound,
+  Building2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/layout/SidebarContext";
@@ -110,6 +112,7 @@ export function Topbar({
   children?: React.ReactNode;
 }) {
   const { user, logout } = useAuth();
+  const { millName, hasMultipleMills } = useActiveMill();
   const { toggle } = useSidebar();
   const { theme, toggle: toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -147,6 +150,12 @@ export function Topbar({
         <Button variant="ghost" size="icon" onClick={toggleTheme} className="text-muted-foreground">
           {theme === "light" ? <Moon className="size-5" /> : <Sun className="size-5" />}
         </Button>
+        {hasMultipleMills && (
+          <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-full border border-blue-200 dark:border-blue-700 text-xs font-medium text-blue-700 dark:text-blue-300">
+            <Building2 className="w-3 h-3" />
+            {millName}
+          </div>
+        )}
         <NotificationsDropdown />
         <div className="h-6 w-px bg-border" />
         {user && (

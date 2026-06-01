@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { dispatchApi, mastersApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
+import { useActiveMill } from "@/hooks/useActiveMill";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -38,6 +39,7 @@ function DispatchPage() {
   const orderColConfig = useColumnConfig("dispatch_sales_orders");
   const tripColConfig = useColumnConfig("dispatch_trips");
   const queryClient = useQueryClient();
+  const { millId } = useActiveMill();
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -54,18 +56,20 @@ function DispatchPage() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  const ordersQ = useQuery({ queryKey: ["dispatch-orders"], queryFn: dispatchApi.getOrders, staleTime: 60_000, retry: 1 });
+  const ordersQ = useQuery({ queryKey: ["dispatch-orders", millId], queryFn: dispatchApi.getOrders, staleTime: 60_000, retry: 1, enabled: !!millId });
   const tripsQ = useQuery({
-    queryKey: ["dispatch-trips", page, pageSize, search],
-    queryFn: () => dispatchApi.getTrips({ page, page_size: pageSize, ...(search ? { search } : {}) }),
+    queryKey: ["dispatch-trips", page, pageSize, search, millId],
+    queryFn: () => dispatchApi.getTrips({ page, page_size: pageSize, mill_id: millId ?? "", ...(search ? { search } : {}) }),
     staleTime: 30_000,
     retry: 1,
+    enabled: !!millId,
   });
   const customersQ = useQuery({
-    queryKey: ["masters", "customers"],
-    queryFn: () => mastersApi.getCustomers(),
+    queryKey: ["masters", "customers", millId],
+    queryFn: () => mastersApi.getCustomers(millId ?? undefined),
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
 
   const orders: any[] = ordersQ.data ?? [];

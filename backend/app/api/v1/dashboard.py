@@ -415,22 +415,38 @@ async def get_admin_summary(
 
 @router.get("/dashboard/summary")
 async def get_dashboard_summary(
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     try:
-        # Strict mill resolution — always use user's own mill
-        mill_id = current_user.mill_id
-        if not mill_id and current_user.company_id:
+        role_code = current_user.role_rel.code if current_user.role_rel else ""
+        if role_code == "SUPER_ADMIN":
+            return _empty_dashboard()
+
+        # Determine effective mill_id from param or current user
+        effective_mill_id = mill_id or current_user.mill_id
+
+        # SECURITY: verify this mill belongs to user's company
+        if effective_mill_id and current_user.company_id:
+            mill_check = await db.execute(
+                select(Mill).where(Mill.id == effective_mill_id, Mill.company_id == current_user.company_id, Mill.deleted_at.is_(None))
+            )
+            if not mill_check.scalar_one_or_none():
+                effective_mill_id = current_user.mill_id
+
+        # Fallback: try first mill in user's company
+        if not effective_mill_id and current_user.company_id:
             mill_result = await db.execute(
                 select(Mill).where(Mill.company_id == current_user.company_id, Mill.deleted_at.is_(None)).limit(1)
             )
             mill = mill_result.scalar_one_or_none()
-            mill_id = mill.id if mill else None
+            effective_mill_id = mill.id if mill else None
 
-        role_code = current_user.role_rel.code if current_user.role_rel else ""
-        if role_code == "SUPER_ADMIN" or not mill_id:
+        if not effective_mill_id:
             return _empty_dashboard()
+
+        today = date.today()
 
         today = date.today()
         results = {}
@@ -438,7 +454,7 @@ async def get_dashboard_summary(
         # Production today
         try:
             q = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
-            q = q.where(ProductionEntry.mill_id == mill_id, func.date(ProductionEntry.date) == today)
+            q = q.where(ProductionEntry.mill_id == effective_mill_id, func.date(ProductionEntry.date) == today)
             results["production_today"] = float((await db.execute(q)).scalar() or 0)
         except Exception:
             results["production_today"] = 0
@@ -446,7 +462,7 @@ async def get_dashboard_summary(
         # Production target
         try:
             q = select(func.coalesce(func.sum(Machine.target_kg), 0))
-            q = q.where(Machine.mill_id == mill_id)
+            q = q.where(Machine.mill_id == effective_mill_id)
             results["production_target"] = float((await db.execute(q)).scalar() or 1)
         except Exception:
             results["production_target"] = 3000
@@ -454,7 +470,7 @@ async def get_dashboard_summary(
         # Waste %
         try:
             q = select(func.coalesce(func.sum(ProductionEntry.waste_kg), 0))
-            q = q.where(ProductionEntry.mill_id == mill_id, func.date(ProductionEntry.date) == today)
+            q = q.where(ProductionEntry.mill_id == effective_mill_id, func.date(ProductionEntry.date) == today)
             waste = float((await db.execute(q)).scalar() or 0)
             results["waste_percent"] = round(waste / results["production_today"] * 100, 1) if results["production_today"] > 0 else 0
         except Exception:
@@ -466,17 +482,17 @@ async def get_dashboard_summary(
                 ProductionEntry.produced_kg / func.nullif(Machine.target_kg, 0) * 100
             ), 0))
             q = q.join(Machine, ProductionEntry.machine_code == Machine.code)
-            q = q.where(Machine.mill_id == mill_id, func.date(ProductionEntry.date) == today)
+            q = q.where(Machine.mill_id == effective_mill_id, func.date(ProductionEntry.date) == today)
             results["efficiency_today"] = round(float((await db.execute(q)).scalar() or 0), 1)
         except Exception:
             results["efficiency_today"] = 0
 
         # Attendance
         try:
-            q = select(func.count(Employee.id)).where(Employee.mill_id == mill_id, Employee.is_active == True)
+            q = select(func.count(Employee.id)).where(Employee.mill_id == effective_mill_id, Employee.is_active == True)
             total_emp = int((await db.execute(q)).scalar() or 0)
             q = select(func.count(Attendance.id)).where(
-                Attendance.mill_id == mill_id, func.date(Attendance.date) == today
+                Attendance.mill_id == effective_mill_id, func.date(Attendance.date) == today
             )
             present = int((await db.execute(q)).scalar() or 0)
             results["attendance_total"] = total_emp
@@ -489,9 +505,9 @@ async def get_dashboard_summary(
 
         # Active machines
         try:
-            q = select(func.count(Machine.id)).where(Machine.mill_id == mill_id)
+            q = select(func.count(Machine.id)).where(Machine.mill_id == effective_mill_id)
             total = int((await db.execute(q)).scalar() or 0)
-            q = select(func.count(Machine.id)).where(Machine.mill_id == mill_id, Machine.current_status == "running")
+            q = select(func.count(Machine.id)).where(Machine.mill_id == effective_mill_id, Machine.current_status == "running")
             active = int((await db.execute(q)).scalar() or 0)
             results["total_machines"] = total
             results["active_machines"] = active
@@ -503,19 +519,18 @@ async def get_dashboard_summary(
         try:
             month_start = today.replace(day=1)
             q = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
-            q = q.where(ProductionEntry.mill_id == mill_id, ProductionEntry.date >= month_start)
+            q = q.where(ProductionEntry.mill_id == effective_mill_id, ProductionEntry.date >= month_start)
             month_kg = float((await db.execute(q)).scalar() or 0)
-            # Estimate revenue at ₹150/kg
             results["monthly_revenue"] = month_kg * 150
             q = select(func.coalesce(func.sum(Machine.target_kg), 0))
-            q = q.where(Machine.mill_id == mill_id)
+            q = q.where(Machine.mill_id == effective_mill_id)
             total_target = float((await db.execute(q)).scalar() or 1)
             results["revenue_target"] = total_target * 150 * (today - month_start).days * 150 if total_target > 0 else 4500000
         except Exception:
             results["monthly_revenue"] = 0
             results["revenue_target"] = 4500000
 
-        # Pending payments (from Dispatch or Customers)
+        # Pending payments
         try:
             results["pending_payments"] = 0
             results["overdue_customers"] = 0
@@ -526,10 +541,10 @@ async def get_dashboard_summary(
         # Quality rejection
         try:
             week_ago = today - timedelta(days=7)
-            q = select(func.count(QualityTest.id)).where(QualityTest.mill_id == mill_id, QualityTest.date >= week_ago)
+            q = select(func.count(QualityTest.id)).where(QualityTest.mill_id == effective_mill_id, QualityTest.date >= week_ago)
             total_tests = int((await db.execute(q)).scalar() or 1)
             q = select(func.count(QualityTest.id)).where(
-                QualityTest.mill_id == mill_id, QualityTest.date >= week_ago, QualityTest.status == "fail"
+                QualityTest.mill_id == effective_mill_id, QualityTest.date >= week_ago, QualityTest.status == "fail"
             )
             failed = int((await db.execute(q)).scalar() or 0)
             results["quality_rejection"] = round(failed / total_tests * 100, 1) if total_tests > 1 else 0
@@ -540,10 +555,10 @@ async def get_dashboard_summary(
         try:
             month_start = today.replace(day=1)
             q = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
-            q = q.where(ProductionEntry.mill_id == mill_id, ProductionEntry.date >= month_start)
+            q = q.where(ProductionEntry.mill_id == effective_mill_id, ProductionEntry.date >= month_start)
             month_prod = float((await db.execute(q)).scalar() or 0)
             q = select(func.coalesce(func.sum(Machine.target_kg), 0))
-            q = q.where(Machine.mill_id == mill_id)
+            q = q.where(Machine.mill_id == effective_mill_id)
             month_target = float((await db.execute(q)).scalar() or 1)
             results["target_achievement"] = round(month_prod / month_target * 100, 1) if month_target > 0 else 0
         except Exception:
@@ -552,7 +567,7 @@ async def get_dashboard_summary(
         # Active breakdowns
         try:
             q = select(func.count(MaintenanceLog.id)).where(
-                MaintenanceLog.mill_id == mill_id, MaintenanceLog.status == "open"
+                MaintenanceLog.mill_id == effective_mill_id, MaintenanceLog.status == "open"
             )
             results["active_breakdowns"] = int((await db.execute(q)).scalar() or 0)
         except Exception:
@@ -560,19 +575,19 @@ async def get_dashboard_summary(
 
         # Pending dispatch
         try:
-            q = select(func.count(Trip.id)).where(Trip.mill_id == mill_id, Trip.status == "pending")
+            q = select(func.count(Trip.id)).where(Trip.mill_id == effective_mill_id, Trip.status == "pending")
             results["pending_dispatch"] = int((await db.execute(q)).scalar() or 0)
         except Exception:
             results["pending_dispatch"] = 0
 
         # Total employees / stock lots
         try:
-            q = select(func.count(Employee.id)).where(Employee.mill_id == mill_id, Employee.is_active == True)
+            q = select(func.count(Employee.id)).where(Employee.mill_id == effective_mill_id, Employee.is_active == True)
             results["total_employees"] = int((await db.execute(q)).scalar() or 0)
         except Exception:
             results["total_employees"] = 0
         try:
-            q = select(func.count(Lot.id)).where(Lot.mill_id == mill_id, Lot.status == "in-stock")
+            q = select(func.count(Lot.id)).where(Lot.mill_id == effective_mill_id, Lot.status == "in-stock")
             results["stock_lots"] = int((await db.execute(q)).scalar() or 0)
         except Exception:
             results["stock_lots"] = 0

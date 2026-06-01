@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { payrollApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
+import { useActiveMill } from "@/hooks/useActiveMill";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { fmtNumber } from "@/lib/formatters";
@@ -61,11 +62,12 @@ function PayrollPage() {
   const [year, setYear] = useState(currentYear);
   const [tab, setTab] = useState("months");
   const qc = useQueryClient();
+  const { millId } = useActiveMill();
 
   const summaryQ = useQuery({
-    queryKey: ["payroll-summary", user?.millId ?? "", year],
-    queryFn: () => payrollApi.getSummary(user!.millId, year),
-    enabled: !!user,
+    queryKey: ["payroll-summary", millId ?? "", year],
+    queryFn: () => payrollApi.getSummary(millId ?? "", year),
+    enabled: !!millId,
     staleTime: 60_000,
     retry: 1,
   });
@@ -142,7 +144,7 @@ function PayrollPage() {
                         )}
                         <div className="mt-3">
                           <MonthSheet
-                            millId={user.millId}
+                            millId={millId ?? ""}
                             month={m}
                             year={year}
                             pm={pm}
@@ -157,7 +159,7 @@ function PayrollPage() {
             </TabsContent>
 
             <TabsContent value="payslips">
-              <PayslipsTab millId={user.millId} year={year} />
+              <PayslipsTab millId={millId ?? ""} year={year} />
             </TabsContent>
           </Tabs>
         </div>

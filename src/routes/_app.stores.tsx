@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { storesApi, uploadApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
+import { useActiveMill } from "@/hooks/useActiveMill";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -48,8 +49,9 @@ function StoresPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "stores");
   const qc = useQueryClient();
-  const itemsQ = useQuery({ queryKey: ["spare-items"], queryFn: storesApi.getSpares, staleTime: 60_000, retry: 1 });
-  const issuesQ = useQuery({ queryKey: ["issue-notes"], queryFn: storesApi.getIssues, staleTime: 60_000, retry: 1 });
+  const { millId } = useActiveMill();
+  const itemsQ = useQuery({ queryKey: ["spare-items", millId], queryFn: storesApi.getSpares, staleTime: 60_000, retry: 1, enabled: !!millId });
+  const issuesQ = useQuery({ queryKey: ["issue-notes", millId], queryFn: storesApi.getIssues, staleTime: 60_000, retry: 1, enabled: !!millId });
 
   const items: any[] = itemsQ.data ?? [];
   const issues: any[] = issuesQ.data ?? [];

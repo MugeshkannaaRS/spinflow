@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { inventoryApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
+import { useActiveMill } from "@/hooks/useActiveMill";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -35,10 +36,11 @@ function InventoryPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "inventory");
   const qc = useQueryClient();
+  const { millId } = useActiveMill();
   const lotColConfig = useColumnConfig("inventory_lots");
   const transferColConfig = useColumnConfig("stock_transfers");
-  const lotsQ = useQuery({ queryKey: ["inventory-lots"], queryFn: inventoryApi.getLots, staleTime: 60_000, retry: 1 });
-  const transfersQ = useQuery({ queryKey: ["stock-transfers"], queryFn: inventoryApi.getTransfers, staleTime: 60_000, retry: 1 });
+  const lotsQ = useQuery({ queryKey: ["inventory-lots", millId], queryFn: inventoryApi.getLots, staleTime: 60_000, retry: 1, enabled: !!millId });
+  const transfersQ = useQuery({ queryKey: ["stock-transfers", millId], queryFn: inventoryApi.getTransfers, staleTime: 60_000, retry: 1, enabled: !!millId });
 
   const lots: any[] = lotsQ.data ?? [];
   const transfers: any[] = transfersQ.data ?? [];

@@ -13,6 +13,7 @@ import {
   Cell,
 } from "recharts";
 import { useAuth } from "@/stores/auth";
+import { useActiveMill } from "@/hooks/useActiveMill";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -76,23 +77,27 @@ function PurchasePage() {
   const canEdit = canWrite(user?.role ?? "OPERATOR", "purchase");
   const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "MILL_OWNER";
   const qc = useQueryClient();
+  const { millId } = useActiveMill();
   const suppliersQ = useQuery({
-    queryKey: ["suppliers"],
+    queryKey: ["suppliers", millId],
     queryFn: purchaseApi.getSuppliers,
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
   const purchasesQ = useQuery({
-    queryKey: ["purchases"],
+    queryKey: ["purchases", millId],
     queryFn: purchaseApi.getPurchases,
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
   const grnsQ = useQuery({
-    queryKey: ["grns"],
+    queryKey: ["grns", millId],
     queryFn: purchaseApi.getGRNs,
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
 
   const suppliers: any[] = suppliersQ.data ?? [];
@@ -694,16 +699,19 @@ function BaleManagementTab({ canEdit }: { canEdit: boolean }) {
 }
 
 function BaleStockTab({ canEdit }: { canEdit: boolean }) {
+  const { millId } = useActiveMill();
   const [catFilter, setCatFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("in-stock");
   const balesQ = useQuery({
-    queryKey: ["bales", catFilter, statusFilter],
+    queryKey: ["bales", catFilter, statusFilter, millId],
     queryFn: () =>
       baleApi.getBales({
+        mill_id: millId ?? "",
         ...(catFilter !== "all" ? { category: catFilter } : {}),
         ...(statusFilter !== "all" ? { status: statusFilter } : {}),
       }),
     staleTime: 30_000,
+    enabled: !!millId,
   });
   const bales: any[] = balesQ.data ?? [];
   const total: number = balesQ.data?.total ?? 0;
@@ -1420,10 +1428,12 @@ function MixingPlanTab() {
 }
 
 function QualityDashTab() {
+  const { millId } = useActiveMill();
   const statsQ = useQuery({
-    queryKey: ["bale-stats"],
+    queryKey: ["bale-stats", millId],
     queryFn: baleApi.getStats,
     staleTime: 60_000,
+    enabled: !!millId,
   });
   const s = statsQ.data;
 

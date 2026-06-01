@@ -3,6 +3,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
+import { useActiveMill } from "@/hooks/useActiveMill";
 import { StatCard } from "@/components/ui/StatCard";
 import { useRBAC } from "@/hooks/useRBAC";
 import { SuperAdminDashboard } from "@/components/dashboard/SuperAdminDashboard";
@@ -69,14 +70,16 @@ const pendingActions = [
 function Dashboard() {
   const { isSuperAdmin } = useRBAC();
   const user = useAuth((s) => s.user);
+  const { millId, millName } = useActiveMill();
   const navigate = useNavigate();
   const [alertDismissed, setAlertDismissed] = useState(false);
 
   const { data: summary, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["dashboard-summary"],
-    queryFn: () => api.get("/dashboard/summary").then(r => r.data),
+    queryKey: ["dashboard-summary", millId],
+    queryFn: () => api.get("/dashboard/summary", { params: { mill_id: millId } }).then(r => r.data),
     staleTime: 2 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
+    enabled: !!millId,
   });
 
   if (isSuperAdmin) return <SuperAdminDashboard />;
@@ -118,7 +121,7 @@ function Dashboard() {
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
               Good {getGreeting()}, {user?.name?.split(" ")[0] ?? "User"}
             </h1>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">{user?.millName ?? "Your mill"} · Live operations overview</p>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">{millName} · Live operations overview</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { qualityApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
+import { useActiveMill } from "@/hooks/useActiveMill";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -52,23 +53,27 @@ function QualityPage() {
   const canEdit = canWrite(user?.role ?? "OPERATOR", "quality");
   const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "MILL_OWNER";
   const qc = useQueryClient();
+  const { millId } = useActiveMill();
   const testsQ = useQuery({
-    queryKey: ["quality-tests"],
+    queryKey: ["quality-tests", millId],
     queryFn: qualityApi.getTests,
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
   const lotsQ = useQuery({
-    queryKey: ["lot-approvals"],
+    queryKey: ["lot-approvals", millId],
     queryFn: qualityApi.getApprovals,
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
   const rejQ = useQuery({
-    queryKey: ["rejections"],
+    queryKey: ["rejections", millId],
     queryFn: qualityApi.getRejections,
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
 
   const tests: any[] = testsQ.data ?? [];
@@ -273,6 +278,7 @@ function ImportTestsDialog() {
 
 function NewTestSlideOver() {
   const qc = useQueryClient();
+  const { millId } = useActiveMill();
   const [open, setOpen] = useState(false);
   const testTypes = ["HVI", "CSP", "Count", "Strength", "Moisture", "Uniformity", "Trash", "Nep"];
   const typeUnits: Record<string, string> = {
@@ -306,10 +312,11 @@ function NewTestSlideOver() {
   });
 
   const lotsQ = useQuery({
-    queryKey: ["quality-lots-list"],
+    queryKey: ["quality-lots-list", millId],
     queryFn: qualityApi.getLots,
     staleTime: 60_000,
     retry: 1,
+    enabled: !!millId,
   });
   const lots: any[] = lotsQ.data ?? [];
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { useAuth } from "@/stores/auth";
 import { MODULE_ACCESS } from "@/lib/rbac";
@@ -14,7 +15,34 @@ vi.mock("@/stores/auth", () => ({
       millId: "mill-1",
     },
     logout: vi.fn(),
+    activeMill: { id: "mill-1", name: "Test Mill" },
+    setActiveMill: vi.fn(),
   })),
+}));
+
+vi.mock("@/hooks/useActiveMill", () => ({
+  useActiveMill: vi.fn(() => ({
+    millId: "mill-1",
+    millName: "Test Mill",
+    mills: [{ id: "mill-1", name: "Test Mill" }],
+    hasMultipleMills: false,
+    activeMill: { id: "mill-1", name: "Test Mill" },
+  })),
+}));
+
+vi.mock("@/hooks/useRBAC", () => ({
+  useRBAC: vi.fn(() => {
+    const role = vi.mocked(useAuth)().user?.role ?? "";
+    const isSuperAdmin = role === "SUPER_ADMIN";
+    return {
+      canAccess: (module: string) => {
+        if (isSuperAdmin) return ["admin", "dashboard", "column_config"].includes(module);
+        return !["admin", "column_config"].includes(module);
+      },
+      isSuperAdmin,
+      companyModulesLoaded: true,
+    };
+  }),
 }));
 
 vi.mock("@/hooks/useTheme", () => ({
@@ -58,30 +86,35 @@ vi.mock("@/components/ui/tooltip", () => ({
   TooltipTrigger: ({ children, asChild }: any) => <div data-testid="tooltip-trigger">{children}</div>,
 }));
 
+function renderWithQuery(ui: React.ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
+
 describe("Sidebar", () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
   it("renders SpinFlow logo when expanded", () => {
-    render(<Sidebar />);
+    renderWithQuery(<Sidebar />);
     expect(screen.getByText("SpinFlow")).toBeTruthy();
   });
 
   it("renders SF monogram when collapsed", () => {
     localStorage.setItem("spinflow_sidebar_collapsed", "true");
-    render(<Sidebar />);
+    renderWithQuery(<Sidebar />);
     expect(screen.getByText("SF")).toBeTruthy();
   });
 
   it("collapsed state persists in localStorage", () => {
     localStorage.setItem("spinflow_sidebar_collapsed", "true");
-    render(<Sidebar />);
+    renderWithQuery(<Sidebar />);
     expect(screen.getByText("SF")).toBeTruthy();
   });
 
   it("shows Dashboard navigation link", () => {
-    render(<Sidebar />);
+    renderWithQuery(<Sidebar />);
     expect(screen.getByText("Dashboard")).toBeTruthy();
   });
 });
@@ -99,16 +132,18 @@ describe("Sidebar - SUPER_ADMIN visibility", () => {
           "sales", "masters", "users", "audit", "admin"],
       },
       logout: vi.fn(),
+      activeMill: { id: "mill-1", name: "Test Mill" },
+      setActiveMill: vi.fn(),
     }));
   });
 
   it("SUPER_ADMIN sees Admin Panel link", () => {
-    render(<Sidebar />);
+    renderWithQuery(<Sidebar />);
     expect(screen.getByText("Admin Panel")).toBeTruthy();
   });
 
   it("SUPER_ADMIN sees Column Config link", () => {
-    render(<Sidebar />);
+    renderWithQuery(<Sidebar />);
     expect(screen.getByText("Column Config")).toBeTruthy();
   });
 });
@@ -126,16 +161,18 @@ describe("Sidebar - MILL_OWNER visibility", () => {
           "sales", "masters", "users", "audit"],
       },
       logout: vi.fn(),
+      activeMill: { id: "mill-1", name: "Test Mill" },
+      setActiveMill: vi.fn(),
     }));
   });
 
   it("MILL_OWNER does not see Admin Panel", () => {
-    render(<Sidebar />);
+    renderWithQuery(<Sidebar />);
     expect(screen.queryByText("Admin Panel")).toBeNull();
   });
 
   it("MILL_OWNER does not see Column Config", () => {
-    render(<Sidebar />);
+    renderWithQuery(<Sidebar />);
     expect(screen.queryByText("Column Config")).toBeNull();
   });
 });
