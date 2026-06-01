@@ -81,7 +81,7 @@ async def create_user(
 
     # Resolve mill_id and company_id
     mill_id = req.mill_id or scope.get("mill_id")
-    company_id = current_user.company_id
+    company_id = req.company_id or current_user.company_id
 
     if mill_id:
         mill_result = await db.execute(select(Mill).where(Mill.id == mill_id))

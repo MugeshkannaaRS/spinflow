@@ -1061,7 +1061,7 @@ function CreateUserDialog({ open, onOpenChange, companies, onDone }: {
   companies: any[]; onDone: () => void;
 }) {
   const qc = useQueryClient();
-  const [form, setForm] = useState({ company_id: "", mill_id: "", role_code: "MILL_OWNER", name: "", email: "", password: "" });
+  const [form, setForm] = useState({ company_id: "", mill_id: "", role_code: "MILL_OWNER", full_name: "", email: "", password: "", phone: "" });
   const [loading, setLoading] = useState(false);
   const [showCredentials, setShowCredentials] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string; role: string; mill?: string } | null>(null);
@@ -1072,20 +1072,32 @@ function CreateUserDialog({ open, onOpenChange, companies, onDone }: {
     enabled: !!form.company_id,
   });
 
+  const pwChecks = [
+    { label: "6+ chars", test: (p: string) => p.length >= 6 },
+    { label: "Uppercase", test: (p: string) => /[A-Z]/.test(p) },
+    { label: "Number", test: (p: string) => /\d/.test(p) },
+    { label: "Special (!@#$)", test: (p: string) => /[!@#$%^&*]/.test(p) },
+  ];
+
   const handleSubmit = async () => {
-    if (!form.name.trim()) { toast.error("Name is required"); return; }
+    if (!form.full_name.trim()) { toast.error("Name is required"); return; }
     if (!form.email.trim() || !form.email.includes("@")) { toast.error("Valid email is required"); return; }
     if (!form.password || form.password.length < 6) { toast.error("Password must be at least 6 characters"); return; }
+    if (form.password.length >= 8) {
+      if (!/[A-Z]/.test(form.password)) { toast.error("Password must contain at least one uppercase letter"); return; }
+      if (!/\d/.test(form.password)) { toast.error("Password must contain at least one number"); return; }
+    }
     if (!form.company_id) { toast.error("Please select a company"); return; }
     setLoading(true);
     try {
-      const res = await api.post("/admin/users", {
-        name: form.name.trim(),
+      const res = await api.post("/users", {
+        full_name: form.full_name.trim(),
         email: form.email.trim().toLowerCase(),
         password: form.password,
-        role_code: form.role_code || "MILL_OWNER",
+        role: form.role_code || "MILL_OWNER",
         company_id: form.company_id,
         mill_id: form.mill_id || null,
+        mobile: form.phone.trim() || null,
       });
       setCreatedCredentials({
         email: res.data.email,
@@ -1095,12 +1107,17 @@ function CreateUserDialog({ open, onOpenChange, companies, onDone }: {
       });
       onOpenChange(false);
       setShowCredentials(true);
-      setForm({ company_id: "", mill_id: "", role_code: "MILL_OWNER", name: "", email: "", password: "" });
+      setForm({ company_id: "", mill_id: "", role_code: "MILL_OWNER", full_name: "", email: "", password: "", phone: "" });
       qc.invalidateQueries({ queryKey: ["admin-users"] });
       qc.invalidateQueries({ queryKey: ["admin-summary"] });
       onDone();
     } catch (err: any) {
-      const msg = err?.response?.data?.detail ?? err?.message ?? "Failed to create user";
+      const detail = err?.response?.data?.detail;
+      const msg = typeof detail === "string"
+        ? detail
+        : Array.isArray(detail)
+          ? detail.map((d: any) => d.msg || d.message || d).join(", ")
+          : err?.message ?? "Failed to create user";
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -1159,7 +1176,7 @@ function CreateUserDialog({ open, onOpenChange, companies, onDone }: {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Name <span className="text-destructive">*</span></Label>
-                <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Full name" />
+                <Input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} placeholder="Full name" />
               </div>
               <div className="space-y-1.5">
                 <Label>Email <span className="text-destructive">*</span></Label>
@@ -1168,10 +1185,22 @@ function CreateUserDialog({ open, onOpenChange, companies, onDone }: {
             </div>
             <div className="space-y-1.5">
               <Label>Password <span className="text-destructive">*</span></Label>
-              <Input type="text" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Min 6 characters" />
-              {form.password.length > 0 && form.password.length < 6 && (
-                <p className="text-xs text-destructive mt-1">Password must be at least 6 characters</p>
-              )}
+              <Input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Min 6 characters" />
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {pwChecks.map(req => (
+                  <span key={req.label} className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    req.test(form.password || "")
+                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                      : "bg-gray-100 text-gray-400 dark:bg-slate-700 dark:text-slate-500"
+                  }`}>
+                    {req.test(form.password || "") ? "✓ " : ""}{req.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Phone</Label>
+              <Input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="Optional" />
             </div>
           </div>
           <DialogFooter>
