@@ -25,6 +25,14 @@ class QualityTestBulkRequest(BaseModel):
     items: List[Dict[str, Any]]
 
 
+# Performance indexes (run on database):
+#   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_quality_tests_lot_date_status
+#     ON quality_tests (lot_id, date, status);
+#   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_quality_tests_status
+#     ON quality_tests (status);
+#   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_lots_mill_id
+#     ON lots (mill_id);
+
 router = APIRouter()
 
 

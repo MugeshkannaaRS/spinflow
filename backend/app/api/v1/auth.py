@@ -41,13 +41,17 @@ class ForceChangePasswordRequest(BaseModel):
 @router.post("/auth/login", response_model=LoginResponse)
 @limiter.limit("100/minute")
 async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], request: Request, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(User).options(selectinload(User.role_rel)).where(
-            or_(User.email == form_data.username, User.name == form_data.username),
-            User.deleted_at.is_(None),
+    try:
+        result = await db.execute(
+            select(User).options(selectinload(User.role_rel)).where(
+                or_(User.email == form_data.username, User.name == form_data.username),
+                User.deleted_at.is_(None),
+            )
         )
-    )
-    user = result.scalar_one_or_none()
+        user = result.scalar_one_or_none()
+    except Exception as e:
+        print(f"Login DB error: {e}")
+        raise HTTPException(status_code=500, detail="Login failed. Please try again.")
 
     if not user or not verify_password(form_data.password, user.password_hash):
         if user:
@@ -68,57 +72,63 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
             message="Invalid username or password",
         )
 
-    if user.locked_until and user.locked_until > datetime.now(timezone.utc):
-        raise SpinFlowException(
-            status_code=423,
-            code=ErrorCode.ACCOUNT_LOCKED,
-            message=f"Account locked. Try again after {user.locked_until.strftime('%H:%M UTC')}",
+    try:
+        if user.locked_until and user.locked_until > datetime.now(timezone.utc):
+            raise SpinFlowException(
+                status_code=423,
+                code=ErrorCode.ACCOUNT_LOCKED,
+                message=f"Account locked. Try again after {user.locked_until.strftime('%H:%M UTC')}",
+            )
+
+        if not user.is_active:
+            raise SpinFlowException(
+                status_code=423,
+                code=ErrorCode.ACCOUNT_LOCKED,
+                message="Account is inactive",
+            )
+
+        user.failed_login_attempts = 0
+        user.locked_until = None
+        user.last_login = datetime.now(timezone.utc)
+        await db.flush()
+
+        role_code = user.role_rel.code if user.role_rel else "UNKNOWN"
+        access_token = create_access_token(user.id, role_code)
+        refresh_token = create_refresh_token(user.id, role_code)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        session = UserSession(
+            user_id=user.id,
+            refresh_token=refresh_token,
+            is_active=True,
+            expires_at=expires_at,
         )
-
-    if not user.is_active:
-        raise SpinFlowException(
-            status_code=423,
-            code=ErrorCode.ACCOUNT_LOCKED,
-            message="Account is inactive",
+        db.add(session)
+        await db.flush()
+        client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "0.0.0.0").split(",")[0].strip()
+        await log_audit(db, user.id, role_code, "login", "auth", user.id, "User logged in", ip_address=client_ip)
+        return LoginResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            user=UserResponse(
+                id=user.id,
+                name=user.name,
+                email=user.email,
+                role=role_code,
+                role_name=user.role_rel.name if user.role_rel else role_code,
+                department=user.department,
+                mill_id=user.mill_id,
+                mill_name=user.mill_name,
+                company_id=user.company_id,
+                is_active=user.is_active,
+                last_login=user.last_login,
+                must_change_password=user.must_change_password,
+            ),
         )
-
-    user.failed_login_attempts = 0
-    user.locked_until = None
-    user.last_login = datetime.now(timezone.utc)
-    await db.flush()
-
-    role_code = user.role_rel.code if user.role_rel else "UNKNOWN"
-    access_token = create_access_token(user.id, role_code)
-    refresh_token = create_refresh_token(user.id, role_code)
-    expires_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    session = UserSession(
-        user_id=user.id,
-        refresh_token=refresh_token,
-        is_active=True,
-        expires_at=expires_at,
-    )
-    db.add(session)
-    await db.flush()
-    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "0.0.0.0").split(",")[0].strip()
-    await log_audit(db, user.id, role_code, "login", "auth", user.id, "User logged in", ip_address=client_ip)
-    return LoginResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        user=UserResponse(
-            id=user.id,
-            name=user.name,
-            email=user.email,
-            role=role_code,
-            role_name=user.role_rel.name if user.role_rel else role_code,
-            department=user.department,
-            mill_id=user.mill_id,
-            mill_name=user.mill_name,
-            company_id=user.company_id,
-            is_active=user.is_active,
-            last_login=user.last_login,
-            must_change_password=user.must_change_password,
-        ),
-    )
+    except SpinFlowException:
+        raise
+    except Exception as e:
+        print(f"Login post-auth error: {e}")
+        raise HTTPException(status_code=500, detail="Login failed. Please try again.")
 
 
 @router.post("/auth/refresh", response_model=TokenResponse)

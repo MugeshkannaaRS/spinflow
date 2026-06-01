@@ -39,6 +39,7 @@ export function SuperAdminDashboard() {
     },
     staleTime: 0,
     refetchInterval: 30_000,
+    refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
 

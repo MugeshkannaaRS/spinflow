@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { authApi } from "@/lib/api-service";
+import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,7 +36,17 @@ function LoginPage() {
   const isLockedOut = failedAttempts >= 5;
 
   const m = useMutation({
-    mutationFn: () => authApi.login(email, password),
+    mutationFn: async () => {
+      const res = await api.post(
+        "/auth/login",
+        new URLSearchParams({ username: email, password }),
+        {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          timeout: 15000,
+        },
+      );
+      return res.data;
+    },
   });
 
   const demos = [{ id: "u1", email: "admin@mill.spinflow", role: "SUPER_ADMIN" }];

@@ -9,16 +9,18 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppUsersRouteImport } from './routes/_app.users'
 import { Route as AppStoresRouteImport } from './routes/_app.stores'
 import { Route as AppStockRouteImport } from './routes/_app.stock'
+import { Route as AppSalesRouteImport } from './routes/_app.sales'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
 import { Route as AppQualityRouteImport } from './routes/_app.quality'
 import { Route as AppPurchaseRouteImport } from './routes/_app.purchase'
+import { Route as AppProfileRouteImport } from './routes/_app.profile'
 import { Route as AppProductionRouteImport } from './routes/_app.production'
 import { Route as AppPayrollRouteImport } from './routes/_app.payroll'
 import { Route as AppMastersRouteImport } from './routes/_app.masters'
@@ -29,18 +31,18 @@ import { Route as AppHrRouteImport } from './routes/_app.hr'
 import { Route as AppDispatchRouteImport } from './routes/_app.dispatch'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppAuditRouteImport } from './routes/_app.audit'
+import { Route as AppAdminRouteImport } from './routes/_app.admin'
 import { Route as AppAccountsRouteImport } from './routes/_app.accounts'
 import { Route as AppAdminColumnConfigRouteImport } from './routes/_app.admin.column-config'
-import { Route as AppAdminRouteImport } from './routes/_app.admin'
 
-const ChangePasswordRoute = ChangePasswordRouteImport.update({
-  id: '/change-password',
-  path: '/change-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChangePasswordRoute = ChangePasswordRouteImport.update({
+  id: '/change-password',
+  path: '/change-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -67,6 +69,11 @@ const AppStockRoute = AppStockRouteImport.update({
   path: '/stock',
   getParentRoute: () => AppRoute,
 } as any)
+const AppSalesRoute = AppSalesRouteImport.update({
+  id: '/sales',
+  path: '/sales',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppReportsRoute = AppReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -80,6 +87,11 @@ const AppQualityRoute = AppQualityRouteImport.update({
 const AppPurchaseRoute = AppPurchaseRouteImport.update({
   id: '/purchase',
   path: '/purchase',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProfileRoute = AppProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => AppRoute,
 } as any)
 const AppProductionRoute = AppProductionRouteImport.update({
@@ -132,20 +144,20 @@ const AppAuditRoute = AppAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminRoute = AppAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAccountsRoute = AppAccountsRouteImport.update({
   id: '/accounts',
   path: '/accounts',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAdminColumnConfigRoute = AppAdminColumnConfigRouteImport.update({
-  id: '/admin/column-config',
-  path: '/admin/column-config',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppAdminRoute = AppAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => AppRoute,
+  id: '/column-config',
+  path: '/column-config',
+  getParentRoute: () => AppAdminRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -153,8 +165,7 @@ export interface FileRoutesByFullPath {
   '/change-password': typeof ChangePasswordRoute
   '/login': typeof LoginRoute
   '/accounts': typeof AppAccountsRoute
-  '/admin': typeof AppAdminRoute
-  '/admin/column-config': typeof AppAdminColumnConfigRoute
+  '/admin': typeof AppAdminRouteWithChildren
   '/audit': typeof AppAuditRoute
   '/dashboard': typeof AppDashboardRoute
   '/dispatch': typeof AppDispatchRoute
@@ -165,20 +176,22 @@ export interface FileRoutesByFullPath {
   '/masters': typeof AppMastersRoute
   '/payroll': typeof AppPayrollRoute
   '/production': typeof AppProductionRoute
+  '/profile': typeof AppProfileRoute
   '/purchase': typeof AppPurchaseRoute
   '/quality': typeof AppQualityRoute
   '/reports': typeof AppReportsRoute
+  '/sales': typeof AppSalesRoute
   '/stock': typeof AppStockRoute
   '/stores': typeof AppStoresRoute
   '/users': typeof AppUsersRoute
+  '/admin/column-config': typeof AppAdminColumnConfigRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/change-password': typeof ChangePasswordRoute
   '/login': typeof LoginRoute
   '/accounts': typeof AppAccountsRoute
-  '/admin': typeof AppAdminRoute
-  '/admin/column-config': typeof AppAdminColumnConfigRoute
+  '/admin': typeof AppAdminRouteWithChildren
   '/audit': typeof AppAuditRoute
   '/dashboard': typeof AppDashboardRoute
   '/dispatch': typeof AppDispatchRoute
@@ -189,12 +202,15 @@ export interface FileRoutesByTo {
   '/masters': typeof AppMastersRoute
   '/payroll': typeof AppPayrollRoute
   '/production': typeof AppProductionRoute
+  '/profile': typeof AppProfileRoute
   '/purchase': typeof AppPurchaseRoute
   '/quality': typeof AppQualityRoute
   '/reports': typeof AppReportsRoute
+  '/sales': typeof AppSalesRoute
   '/stock': typeof AppStockRoute
   '/stores': typeof AppStoresRoute
   '/users': typeof AppUsersRoute
+  '/admin/column-config': typeof AppAdminColumnConfigRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -203,8 +219,7 @@ export interface FileRoutesById {
   '/change-password': typeof ChangePasswordRoute
   '/login': typeof LoginRoute
   '/_app/accounts': typeof AppAccountsRoute
-  '/_app/admin': typeof AppAdminRoute
-  '/_app/admin/column-config': typeof AppAdminColumnConfigRoute
+  '/_app/admin': typeof AppAdminRouteWithChildren
   '/_app/audit': typeof AppAuditRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/dispatch': typeof AppDispatchRoute
@@ -215,12 +230,15 @@ export interface FileRoutesById {
   '/_app/masters': typeof AppMastersRoute
   '/_app/payroll': typeof AppPayrollRoute
   '/_app/production': typeof AppProductionRoute
+  '/_app/profile': typeof AppProfileRoute
   '/_app/purchase': typeof AppPurchaseRoute
   '/_app/quality': typeof AppQualityRoute
   '/_app/reports': typeof AppReportsRoute
+  '/_app/sales': typeof AppSalesRoute
   '/_app/stock': typeof AppStockRoute
   '/_app/stores': typeof AppStoresRoute
   '/_app/users': typeof AppUsersRoute
+  '/_app/admin/column-config': typeof AppAdminColumnConfigRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -230,7 +248,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/accounts'
     | '/admin'
-    | '/admin/column-config'
     | '/audit'
     | '/dashboard'
     | '/dispatch'
@@ -241,12 +258,15 @@ export interface FileRouteTypes {
     | '/masters'
     | '/payroll'
     | '/production'
+    | '/profile'
     | '/purchase'
     | '/quality'
     | '/reports'
+    | '/sales'
     | '/stock'
     | '/stores'
     | '/users'
+    | '/admin/column-config'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -254,7 +274,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/accounts'
     | '/admin'
-    | '/admin/column-config'
     | '/audit'
     | '/dashboard'
     | '/dispatch'
@@ -265,12 +284,15 @@ export interface FileRouteTypes {
     | '/masters'
     | '/payroll'
     | '/production'
+    | '/profile'
     | '/purchase'
     | '/quality'
     | '/reports'
+    | '/sales'
     | '/stock'
     | '/stores'
     | '/users'
+    | '/admin/column-config'
   id:
     | '__root__'
     | '/'
@@ -279,7 +301,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/_app/accounts'
     | '/_app/admin'
-    | '/_app/admin/column-config'
     | '/_app/audit'
     | '/_app/dashboard'
     | '/_app/dispatch'
@@ -290,12 +311,15 @@ export interface FileRouteTypes {
     | '/_app/masters'
     | '/_app/payroll'
     | '/_app/production'
+    | '/_app/profile'
     | '/_app/purchase'
     | '/_app/quality'
     | '/_app/reports'
+    | '/_app/sales'
     | '/_app/stock'
     | '/_app/stores'
     | '/_app/users'
+    | '/_app/admin/column-config'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -314,18 +338,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app': {
-      id: '/_app'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof AppRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/change-password': {
       id: '/change-password'
       path: '/change-password'
       fullPath: '/change-password'
       preLoaderRoute: typeof ChangePasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -356,6 +380,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppStockRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/sales': {
+      id: '/_app/sales'
+      path: '/sales'
+      fullPath: '/sales'
+      preLoaderRoute: typeof AppSalesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/reports': {
       id: '/_app/reports'
       path: '/reports'
@@ -375,6 +406,13 @@ declare module '@tanstack/react-router' {
       path: '/purchase'
       fullPath: '/purchase'
       preLoaderRoute: typeof AppPurchaseRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/profile': {
+      id: '/_app/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AppProfileRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/production': {
@@ -447,13 +485,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAuditRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/accounts': {
-      id: '/_app/accounts'
-      path: '/accounts'
-      fullPath: '/accounts'
-      preLoaderRoute: typeof AppAccountsRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/admin': {
       id: '/_app/admin'
       path: '/admin'
@@ -461,20 +492,38 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/accounts': {
+      id: '/_app/accounts'
+      path: '/accounts'
+      fullPath: '/accounts'
+      preLoaderRoute: typeof AppAccountsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/column-config': {
       id: '/_app/admin/column-config'
-      path: '/admin/column-config'
+      path: '/column-config'
       fullPath: '/admin/column-config'
       preLoaderRoute: typeof AppAdminColumnConfigRouteImport
-      parentRoute: typeof AppRoute
+      parentRoute: typeof AppAdminRoute
     }
   }
 }
 
+interface AppAdminRouteChildren {
+  AppAdminColumnConfigRoute: typeof AppAdminColumnConfigRoute
+}
+
+const AppAdminRouteChildren: AppAdminRouteChildren = {
+  AppAdminColumnConfigRoute: AppAdminColumnConfigRoute,
+}
+
+const AppAdminRouteWithChildren = AppAdminRoute._addFileChildren(
+  AppAdminRouteChildren,
+)
+
 interface AppRouteChildren {
   AppAccountsRoute: typeof AppAccountsRoute
-  AppAdminRoute: typeof AppAdminRoute
-  AppAdminColumnConfigRoute: typeof AppAdminColumnConfigRoute
+  AppAdminRoute: typeof AppAdminRouteWithChildren
   AppAuditRoute: typeof AppAuditRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDispatchRoute: typeof AppDispatchRoute
@@ -485,9 +534,11 @@ interface AppRouteChildren {
   AppMastersRoute: typeof AppMastersRoute
   AppPayrollRoute: typeof AppPayrollRoute
   AppProductionRoute: typeof AppProductionRoute
+  AppProfileRoute: typeof AppProfileRoute
   AppPurchaseRoute: typeof AppPurchaseRoute
   AppQualityRoute: typeof AppQualityRoute
   AppReportsRoute: typeof AppReportsRoute
+  AppSalesRoute: typeof AppSalesRoute
   AppStockRoute: typeof AppStockRoute
   AppStoresRoute: typeof AppStoresRoute
   AppUsersRoute: typeof AppUsersRoute
@@ -495,8 +546,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAccountsRoute: AppAccountsRoute,
-  AppAdminRoute: AppAdminRoute,
-  AppAdminColumnConfigRoute: AppAdminColumnConfigRoute,
+  AppAdminRoute: AppAdminRouteWithChildren,
   AppAuditRoute: AppAuditRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDispatchRoute: AppDispatchRoute,
@@ -507,9 +557,11 @@ const AppRouteChildren: AppRouteChildren = {
   AppMastersRoute: AppMastersRoute,
   AppPayrollRoute: AppPayrollRoute,
   AppProductionRoute: AppProductionRoute,
+  AppProfileRoute: AppProfileRoute,
   AppPurchaseRoute: AppPurchaseRoute,
   AppQualityRoute: AppQualityRoute,
   AppReportsRoute: AppReportsRoute,
+  AppSalesRoute: AppSalesRoute,
   AppStockRoute: AppStockRoute,
   AppStoresRoute: AppStoresRoute,
   AppUsersRoute: AppUsersRoute,

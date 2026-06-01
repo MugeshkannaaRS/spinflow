@@ -375,40 +375,60 @@ async def get_admin_summary(
         try:
             c = await db.execute(text("SELECT COUNT(*) FROM companies WHERE deleted_at IS NULL"))
             total_companies = c.scalar() or 0
+            print(f"DEBUG companies count: {total_companies}")
         except Exception as e:
-            print(f"admin-summary companies count error: {e}")
-            total_companies = 0
+            print(f"DEBUG companies error: {e}")
+            try:
+                c2 = await db.execute(text("SELECT COUNT(*) FROM companies"))
+                total_companies = c2.scalar() or 0
+                print(f"DEBUG companies fallback: {total_companies}")
+            except Exception as e2:
+                print(f"DEBUG companies total fail: {e2}")
+                total_companies = 0
 
         # Mills count
         try:
             m = await db.execute(text("SELECT COUNT(*) FROM mills WHERE deleted_at IS NULL"))
             total_mills = m.scalar() or 0
+            print(f"DEBUG mills count: {total_mills}")
         except Exception as e:
-            print(f"admin-summary mills count error: {e}")
-            total_mills = 0
+            print(f"DEBUG mills error: {e}")
+            try:
+                m2 = await db.execute(text("SELECT COUNT(*) FROM mills"))
+                total_mills = m2.scalar() or 0
+                print(f"DEBUG mills fallback: {total_mills}")
+            except Exception as e2:
+                print(f"DEBUG mills total fail: {e2}")
+                total_mills = 0
 
         # Users count
         try:
             u = await db.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true AND deleted_at IS NULL"))
             total_users = u.scalar() or 0
+            print(f"DEBUG users count: {total_users}")
         except Exception as e:
-            print(f"admin-summary users count error: {e}")
+            print(f"DEBUG users error: {e}")
             try:
                 u2 = await db.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true"))
                 total_users = u2.scalar() or 0
-            except:
+                print(f"DEBUG users fallback: {total_users}")
+            except Exception as e2:
+                print(f"DEBUG users total fail: {e2}")
                 total_users = 0
 
         # Employees count
         try:
             e = await db.execute(text("SELECT COUNT(*) FROM employees WHERE deleted_at IS NULL"))
             total_employees = e.scalar() or 0
+            print(f"DEBUG employees count: {total_employees}")
         except Exception as ex:
-            print(f"admin-summary employees count error: {ex}")
+            print(f"DEBUG employees error: {ex}")
             try:
                 e2 = await db.execute(text("SELECT COUNT(*) FROM employees"))
                 total_employees = e2.scalar() or 0
-            except:
+                print(f"DEBUG employees fallback: {total_employees}")
+            except Exception as e2:
+                print(f"DEBUG employees total fail: {e2}")
                 total_employees = 0
 
         # Companies list
@@ -425,7 +445,7 @@ async def get_admin_summary(
                 for row in rows
             ]
         except Exception as e:
-            print(f"admin-summary companies list error: {e}")
+            print(f"DEBUG companies list error: {e}")
             companies_list = []
 
         result = {
