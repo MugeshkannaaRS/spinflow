@@ -335,19 +335,19 @@ async def get_admin_summary(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        companies = await db.execute(text("SELECT COUNT(*) FROM companies"))
+        companies = await db.execute(text("SELECT COUNT(*) FROM companies WHERE deleted_at IS NULL"))
         total_companies = companies.scalar() or 0
 
-        mills = await db.execute(text("SELECT COUNT(*) FROM mills"))
+        mills = await db.execute(text("SELECT COUNT(*) FROM mills WHERE deleted_at IS NULL"))
         total_mills = mills.scalar() or 0
 
-        users = await db.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true"))
+        users = await db.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true AND deleted_at IS NULL"))
         total_users = users.scalar() or 0
 
-        employees = await db.execute(text("SELECT COUNT(*) FROM employees"))
+        employees = await db.execute(text("SELECT COUNT(*) FROM employees WHERE deleted_at IS NULL"))
         total_employees = employees.scalar() or 0
 
-        companies_list = await db.execute(text("SELECT id, name, code, created_at FROM companies ORDER BY created_at DESC LIMIT 20"))
+        companies_list = await db.execute(text("SELECT id, name, code, created_at FROM companies WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 20"))
         rows = companies_list.fetchall()
 
         return {

@@ -304,7 +304,7 @@ function AdminPage() {
                   />
                 </CardContent>
                 <EditCompanyDialog company={editCompany} onClose={() => setEditCompany(null)} onDone={() => { qc.invalidateQueries({ queryKey: ["masters"] }); qc.invalidateQueries({ queryKey: ["admin-summary"] }); setEditCompany(null); }} />
-                <ModulesDialog company={modulesCompany} onClose={() => setModulesCompany(null)} onDone={() => { qc.invalidateQueries({ queryKey: ["masters"] }); qc.invalidateQueries({ queryKey: ["admin-summary"] }); setModulesCompany(null); }} />
+                <ModulesDialog company={modulesCompany} onClose={() => setModulesCompany(null)} onDone={() => { qc.invalidateQueries({ queryKey: ["masters"] }); qc.invalidateQueries({ queryKey: ["admin-summary"] }); if (modulesCompany?.id) qc.invalidateQueries({ queryKey: ["company-modules", modulesCompany.id] }); setModulesCompany(null); }} />
                 <AlertDialog open={!!suspendCompany} onOpenChange={() => setSuspendCompany(null)}>
                   <AlertDialogContent>
                     <AlertDialogHeader>
@@ -1060,8 +1060,11 @@ function CreateUserDialog({ open, onOpenChange, companies, onDone }: {
   open: boolean; onOpenChange: (o: boolean) => void;
   companies: any[]; onDone: () => void;
 }) {
+  const qc = useQueryClient();
   const [form, setForm] = useState({ company_id: "", mill_id: "", role_code: "MILL_OWNER", name: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
+  const [showCredentials, setShowCredentials] = useState(false);
+  const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string; role: string; mill?: string } | null>(null);
 
   const { data: mills } = useQuery({
     queryKey: ["mills-for-company", form.company_id],
@@ -1070,93 +1073,163 @@ function CreateUserDialog({ open, onOpenChange, companies, onDone }: {
   });
 
   const handleSubmit = async () => {
-    if (!form.name.trim() || !form.email.trim() || !form.password.trim() || !form.company_id) {
-      toast.error("Name, email, password, and company are required");
-      return;
-    }
+    if (!form.name.trim()) { toast.error("Name is required"); return; }
+    if (!form.email.trim() || !form.email.includes("@")) { toast.error("Valid email is required"); return; }
+    if (!form.password || form.password.length < 6) { toast.error("Password must be at least 6 characters"); return; }
+    if (!form.company_id) { toast.error("Please select a company"); return; }
     setLoading(true);
     try {
-      await api.post("/admin/users", form);
-      toast.success(`User ${form.name} created`);
-      onDone();
+      const res = await api.post("/admin/users", {
+        name: form.name.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        role_code: form.role_code || "MILL_OWNER",
+        company_id: form.company_id,
+        mill_id: form.mill_id || null,
+      });
+      setCreatedCredentials({
+        email: res.data.email,
+        password: form.password,
+        role: res.data.role,
+        mill: res.data.mill_name,
+      });
       onOpenChange(false);
+      setShowCredentials(true);
       setForm({ company_id: "", mill_id: "", role_code: "MILL_OWNER", name: "", email: "", password: "" });
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+      qc.invalidateQueries({ queryKey: ["admin-summary"] });
+      onDone();
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Failed to create user");
+      const msg = err?.response?.data?.detail ?? err?.message ?? "Failed to create user";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Create New User</DialogTitle>
-          <DialogDescription>Create a user under any company.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label>Company</Label>
-            <select
-              value={form.company_id}
-              onChange={e => setForm({ ...form, company_id: e.target.value, mill_id: "" })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white dark:bg-slate-800"
-            >
-              <option value="">Select company...</option>
-              {companies.filter(c => c?.id).map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-          {form.company_id && (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New User</DialogTitle>
+            <DialogDescription>Create a user under any company.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>Mill</Label>
+              <Label>Company <span className="text-destructive">*</span></Label>
               <select
-                value={form.mill_id}
-                onChange={e => setForm({ ...form, mill_id: e.target.value })}
+                value={form.company_id}
+                onChange={e => setForm({ ...form, company_id: e.target.value, mill_id: "" })}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white dark:bg-slate-800"
               >
-                <option value="">No mill (company-level)</option>
-                {(Array.isArray(mills) ? mills : []).map((m: any) => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
+                <option value="">Select company...</option>
+                {companies.filter(c => c?.id).map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
             </div>
-          )}
-          <div className="space-y-1.5">
-            <Label>Role</Label>
-            <select
-              value={form.role_code}
-              onChange={e => setForm({ ...form, role_code: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white dark:bg-slate-800"
-            >
-              {ROLES_FOR_CREATE.map(r => (
-                <option key={r} value={r}>{r.replace(/_/g, " ")}</option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+            {form.company_id && (
+              <div className="space-y-1.5">
+                <Label>Mill</Label>
+                <select
+                  value={form.mill_id}
+                  onChange={e => setForm({ ...form, mill_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white dark:bg-slate-800"
+                >
+                  <option value="">No mill (company-level)</option>
+                  {(Array.isArray(mills) ? mills : []).map((m: any) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="space-y-1.5">
-              <Label>Name</Label>
-              <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Full name" />
+              <Label>Role</Label>
+              <select
+                value={form.role_code}
+                onChange={e => setForm({ ...form, role_code: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white dark:bg-slate-800"
+              >
+                {ROLES_FOR_CREATE.map(r => (
+                  <option key={r} value={r}>{r.replace(/_/g, " ")}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Name <span className="text-destructive">*</span></Label>
+                <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Full name" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Email <span className="text-destructive">*</span></Label>
+                <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="Email" />
+              </div>
             </div>
             <div className="space-y-1.5">
-              <Label>Email</Label>
-              <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="Email" />
+              <Label>Password <span className="text-destructive">*</span></Label>
+              <Input type="text" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Min 6 characters" />
+              {form.password.length > 0 && form.password.length < 6 && (
+                <p className="text-xs text-destructive mt-1">Password must be at least 6 characters</p>
+              )}
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label>Password</Label>
-            <Input type="text" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Temporary password" />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={loading}>{loading ? "Creating…" : "Create User"}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button onClick={handleSubmit} disabled={loading}>{loading ? "Creating…" : "Create User"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {showCredentials && createdCredentials && (
+        <Dialog open onOpenChange={() => setShowCredentials(false)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>User Created ✓</DialogTitle>
+              <DialogDescription>Share these login credentials with the user</DialogDescription>
+            </DialogHeader>
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 rounded-xl p-4 space-y-2 font-mono text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">URL:</span>
+                <span className="text-blue-700 text-xs">spinflow-f.onrender.com</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Email:</span>
+                <span className="font-semibold">{createdCredentials.email}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Password:</span>
+                <span className="font-semibold text-green-700">{createdCredentials.password}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Role:</span>
+                <span>{createdCredentials.role}</span>
+              </div>
+              {createdCredentials.mill && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Mill:</span>
+                  <span>{createdCredentials.mill}</span>
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-orange-600 bg-orange-50 p-2 rounded-lg">
+              ⚠️ User will be forced to change password on first login
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                navigator.clipboard.writeText(
+                  `Login: spinflow-f.onrender.com\nEmail: ${createdCredentials.email}\nPassword: ${createdCredentials.password}`
+                );
+                toast.success("Credentials copied!");
+              }}>
+                Copy Credentials
+              </Button>
+              <Button onClick={() => setShowCredentials(false)}>Done</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }
 

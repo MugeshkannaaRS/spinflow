@@ -127,16 +127,22 @@ async def create_user(
         password = body.get("password")
         role_code = body.get("role_code", "MILL_OWNER")
         company_id = body.get("company_id")
-        mill_id = body.get("mill_id")
+        mill_id = body.get("mill_id") or None
 
-        if not all([name, email, password, company_id]):
-            raise HTTPException(400, "name, email, password, company_id are required")
+        if not password or len(str(password)) < 6:
+            raise HTTPException(400, "Password must be at least 6 characters")
+        if not name or not name.strip():
+            raise HTTPException(400, "Name is required")
+        if not email or "@" not in email:
+            raise HTTPException(400, "Valid email is required")
+        if not company_id:
+            raise HTTPException(400, "Company is required")
 
         existing = await db.execute(
             select(User).where(User.email == email, User.deleted_at.is_(None))
         )
         if existing.scalar_one_or_none():
-            raise HTTPException(400, f"Email {email} already exists")
+            raise HTTPException(400, f"Email {email} is already in use")
 
         user_count = await db.execute(
             select(func.count(User.id)).where(
@@ -165,9 +171,9 @@ async def create_user(
 
         new_user = User(
             id=str(uuid.uuid4()),
-            name=name,
-            email=email,
-            password_hash=pwd_context.hash(password),
+            name=name.strip(),
+            email=email.strip().lower(),
+            password_hash=pwd_context.hash(str(password)),
             role_id=role.id,
             company_id=company_id,
             mill_id=mill_id,
@@ -185,7 +191,9 @@ async def create_user(
             "email": new_user.email,
             "role": role_code,
             "mill_id": mill_id,
+            "mill_name": mill_name,
             "must_change_password": True,
+            "created": True,
         }
 
     except HTTPException:
@@ -193,7 +201,7 @@ async def create_user(
     except Exception as e:
         await db.rollback()
         logger.error(f"admin create user error: {e}")
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(500, detail=f"Server error: {str(e)}")
 
 
 @router.get("/admin/users")

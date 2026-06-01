@@ -41,7 +41,8 @@ export function useRBAC() {
     queryKey: ["company-modules", user?.companyId],
     queryFn: () => api.get(`/admin/companies/${user?.companyId}/modules`).then(r => r.data as Record<string, boolean>),
     enabled: !!user?.companyId && !isSuperAdmin,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
     retry: false,
   });
 

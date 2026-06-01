@@ -32,7 +32,11 @@ export function SuperAdminDashboard() {
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["admin-summary"],
-    queryFn: () => api.get("/dashboard/admin-summary").then(r => r.data),
+    queryFn: async () => {
+      const res = await api.get("/dashboard/admin-summary");
+      qc.invalidateQueries({ queryKey: ["masters"] });
+      return res.data;
+    },
     staleTime: 0,
     refetchInterval: 30_000,
     refetchOnWindowFocus: true,
