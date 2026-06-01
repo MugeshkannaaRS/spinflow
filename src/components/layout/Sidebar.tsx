@@ -1,12 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { User } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/stores/auth";
-import { useTheme } from "@/hooks/useTheme";
 import { useRBAC } from "@/hooks/useRBAC";
-import { ROLE_LABELS } from "@/lib/rbac";
-import { toast } from "sonner";
 import {
   LayoutDashboard,
   Factory,
@@ -26,9 +21,6 @@ import {
   ClipboardList,
   Shield,
   SlidersHorizontal,
-  LogOut,
-  Moon,
-  Sun,
   ChevronLeft,
   ChevronRight,
   X,
@@ -98,24 +90,9 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
 ];
 
 function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavClick?: () => void }) {
-  const { user, logout, activeMill, setActiveMill } = useAuth();
-  const queryClient = useQueryClient();
-  const { theme, toggle } = useTheme();
+  const { user } = useAuth();
   const { canAccess, isSuperAdmin, companyModulesLoaded } = useRBAC();
-  const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-
-  const mills = user?.companyMills ?? [];
-  const hasMultipleMills = mills.length > 1;
-  const displayMillName = activeMill?.name ?? user?.millName ?? "Your Mill";
-
-  const handleMillSwitch = useCallback((newMillId: string) => {
-    const selected = mills.find(m => m.id === newMillId);
-    if (!selected || selected.id === activeMill?.id) return;
-    setActiveMill(selected);
-    toast.info(`Switching to ${selected.name}...`, { duration: 1500 });
-    queryClient.invalidateQueries();
-  }, [mills, activeMill, setActiveMill, queryClient]);
 
   if (!user) return null;
 
@@ -126,24 +103,22 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
 
   if (!isSuperAdmin && !companyModulesLoaded) {
     return (
-      <div className="flex flex-col h-full" style={{ backgroundColor: "#1e3a5f" }}>
-        <div className="flex-shrink-0 border-b border-blue-800/50">
-          <div className="px-4 py-5">
-            {collapsed ? (
-              <div className="size-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(59,130,246,0.2)" }}>
-                <span style={{ color: "#3b82f6", fontWeight: 700, fontSize: "1.125rem" }}>SF</span>
-              </div>
-            ) : (
-              <div className="text-left">
-                <div className="text-white font-bold text-lg tracking-tight">SpinFlow</div>
-                <div className="text-blue-400 text-[11px] mt-0.5">Your mill. In your hands.</div>
-              </div>
-            )}
-          </div>
+      <div className="flex flex-col h-full" style={{ backgroundColor: "#0f1923" }}>
+        <div className="flex-shrink-0 px-5 py-5 border-b border-[rgba(255,255,255,0.06)]">
+          {collapsed ? (
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+              <span className="text-white font-bold text-sm">S</span>
+            </div>
+          ) : (
+            <div>
+              <div className="text-white font-semibold text-[15px]">SpinFlow ERP</div>
+              <div className="text-[#6b7280] text-[11px] mt-0.5">Loading...</div>
+            </div>
+          )}
         </div>
-        <nav className="flex-1 overflow-y-auto py-2 space-y-1 px-4">
-          {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="h-9 bg-blue-900/20 rounded-lg animate-pulse mx-2" />
+        <nav className="flex-1 overflow-y-auto py-3 px-2">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-9 bg-[#1e2d3d] rounded-lg animate-pulse mx-2 mb-1" />
           ))}
         </nav>
       </div>
@@ -151,37 +126,42 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
   }
 
   const filteredGroups = NAV_GROUPS
-    .map(group => ({
+    .map((group) => ({
       ...group,
-      items: group.items.filter(item => canAccess(item.module))
+      items: group.items.filter((item) => canAccess(item.module)),
     }))
-    .filter(group => group.items.length > 0);
+    .filter((group) => group.items.length > 0);
 
   return (
-    <div className="flex flex-col h-full" style={{ backgroundColor: "#1e3a5f", color: "#dbeafe" }}>
-      <div className="flex-shrink-0 border-b border-blue-800/50">
-        <div className="px-4 py-5">
-          {collapsed ? (
-            <div className="size-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "rgba(59,130,246,0.2)" }}>
-              <span style={{ color: "#3b82f6", fontWeight: 700, fontSize: "1.125rem" }}>SF</span>
+    <div className="flex flex-col h-full" style={{ backgroundColor: "#0f1923" }}>
+      {/* Logo */}
+      <div className="flex-shrink-0 px-5 py-5 border-b border-[rgba(255,255,255,0.06)]">
+        {collapsed ? (
+          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+            <span className="text-white font-bold text-sm">S</span>
+          </div>
+        ) : (
+          <Link to="/dashboard" className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+              S
             </div>
-          ) : (
-            <div className="text-left">
-              <div className="text-white font-bold text-lg tracking-tight">SpinFlow</div>
-              <div className="text-blue-400 text-[11px] mt-0.5">Your mill. In your hands.</div>
+            <div>
+              <div className="text-white font-semibold text-[15px] leading-tight">SpinFlow ERP</div>
+              <div className="text-[#6b7280] text-[11px] mt-0.5">
+                {user?.millName ?? "Your mill"}
+              </div>
             </div>
-          )}
-        </div>
+          </Link>
+        )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-2 space-y-1 scrollbar-thin">
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto py-3 px-2">
         {filteredGroups.map((group) => (
-          <div key={group.label}>
+          <div key={group.label} className="mb-1">
             {!collapsed && (
-              <div className="px-4 mb-1 mt-4 first:mt-0">
-                <div className="text-[10px] font-semibold uppercase tracking-widest text-blue-400/70">
-                  {group.label}
-                </div>
+              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#374151]">
+                {group.label}
               </div>
             )}
             {group.items.map((item) => {
@@ -189,18 +169,24 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
               const active = isActive(item.to);
               const link = (
                 <Link
+                  key={item.to}
                   to={item.to}
                   onClick={onNavClick}
                   className={cn(
-                    "flex items-center gap-3 mx-2 px-3 py-2.5 rounded-lg text-sm transition-colors duration-150 cursor-pointer",
-                    collapsed && "justify-center mx-1 px-0 border-l-0",
+                    "flex items-center rounded-lg transition-all duration-150 mb-0.5 cursor-pointer",
+                    collapsed ? "justify-center py-2.5" : "px-3 py-2",
                     active
-                      ? "text-white bg-blue-500/25 border-l-[3px] border-blue-400 font-medium"
-                      : "text-blue-200 hover:text-white hover:bg-blue-500/20",
+                      ? "bg-[#1e2d3d] text-white"
+                      : "text-[#6b7280] hover:bg-[#162030] hover:text-[#d1d5db]",
                   )}
                 >
-                  <Icon className={cn("size-[18px] shrink-0", active ? "text-blue-300" : "text-blue-400/70")} />
-                  {!collapsed && <span>{item.label}</span>}
+                  <Icon
+                    className={cn(
+                      "shrink-0",
+                      collapsed ? "w-5 h-5" : "w-4 h-4 mr-3",
+                    )}
+                  />
+                  {!collapsed && <span className="text-sm font-medium truncate">{item.label}</span>}
                 </Link>
               );
               if (collapsed) {
@@ -208,112 +194,62 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                   <TooltipProvider key={item.to}>
                     <Tooltip>
                       <TooltipTrigger asChild>{link}</TooltipTrigger>
-                      <TooltipContent side="right" style={{ backgroundColor: "#1e3a5f", color: "#ffffff", border: "1px solid #1d4ed8" }}>
+                      <TooltipContent side="right" className="bg-[#0f1923] text-white border border-[rgba(255,255,255,0.1)] text-xs">
                         {item.label}
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 );
               }
-              return <div key={item.to}>{link}</div>;
+              return link;
             })}
           </div>
         ))}
       </nav>
 
-      <div className="mt-auto flex-shrink-0 border-t border-blue-800/50">
-        {!collapsed && (
-          <div className="px-4 py-3">
-            {hasMultipleMills ? (
-              <select
-                value={activeMill?.id ?? user?.millId ?? ""}
-                onChange={(e) => handleMillSwitch(e.target.value)}
-                className="w-full bg-blue-900/30 text-blue-100 text-xs rounded-lg px-2 py-1.5 border border-blue-700/50 cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 mb-1"
-              >
-                {mills.map(m => (
-                  <option key={m.id} value={m.id} className="bg-slate-800">{m.name}</option>
-                ))}
-              </select>
-            ) : (
-              <Link to={"/profile" as any} className="block rounded-lg transition-colors hover:bg-blue-800/20 -mx-1 px-2 py-1">
-                <p className="text-xs font-medium text-blue-100 truncate">{displayMillName}</p>
-              </Link>
-            )}
-            <Link to={"/profile" as any} className="text-xs text-blue-400 hover:text-blue-300 transition-colors block">{user.role.replace(/_/g, " ")}</Link>
-          </div>
+      {/* Bottom */}
+      <div className="flex-shrink-0 px-3 py-3 border-t border-[rgba(255,255,255,0.06)]">
+        {!collapsed ? (
+          <Link
+            to="/profile"
+            onClick={onNavClick}
+            className="flex items-center gap-3 px-2 py-2 rounded-lg text-[#9ca3af] hover:bg-[#162030] transition-colors"
+          >
+            <div className="w-7 h-7 rounded-full bg-[#0d9488] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+              {user?.name?.charAt(0)?.toUpperCase() ?? "U"}
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-white truncate">{user?.name}</div>
+              <div className="text-[10px] text-[#6b7280] truncate">{user?.role?.replace(/_/g, " ")}</div>
+            </div>
+          </Link>
+        ) : (
+          <Link to="/profile" onClick={onNavClick} className="flex justify-center py-2">
+            <div className="w-7 h-7 rounded-full bg-[#0d9488] flex items-center justify-center text-white text-xs font-bold">
+              {user?.name?.charAt(0)?.toUpperCase() ?? "U"}
+            </div>
+          </Link>
         )}
 
-        <div className="flex items-center px-3 py-2 gap-1">
-          <button
-            onClick={toggle}
-            className={cn(
-              "flex items-center justify-center h-9 rounded-lg transition-colors",
-              collapsed ? "w-full" : "w-9",
-            )}
-            style={{ color: "#93c5fd" }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.1)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-            title={theme === "light" ? "Dark mode" : "Light mode"}
-          >
-            {theme === "light" ? <Moon className="size-[18px]" /> : <Sun className="size-[18px]" />}
-          </button>
-
-          <button
-            onClick={() => { logout(); navigate({ to: "/login" }); }}
-            className={cn(
-              "flex items-center justify-center h-9 rounded-lg transition-colors",
-              collapsed ? "w-full" : "w-9",
-            )}
-            style={{ color: "#93c5fd" }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.2)"; e.currentTarget.style.color = "#f87171"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = "#93c5fd"; }}
-            title="Logout"
-          >
-            <LogOut className="size-[18px]" />
-          </button>
-
-          {!collapsed && (
-            <button
-              onClick={() => {
-                const isCollapsed = localStorage.getItem("spinflow_sidebar_collapsed") === "true";
-                localStorage.setItem("spinflow_sidebar_collapsed", String(!isCollapsed));
-                window.dispatchEvent(new Event("sidebar-collapse-change"));
-              }}
-              className="flex items-center justify-center h-9 w-9 rounded-lg transition-colors ml-auto"
-              style={{ color: "#93c5fd" }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.1)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-              title="Collapse sidebar"
-            >
-              <ChevronLeft className="size-[18px]" />
-            </button>
-          )}
-        </div>
-
-        {collapsed && (
-          <div className="px-2 pb-2">
-            <button
-              onClick={() => {
-                localStorage.setItem("spinflow_sidebar_collapsed", "false");
-                window.dispatchEvent(new Event("sidebar-collapse-change"));
-              }}
-              className="flex items-center justify-center h-9 w-full rounded-lg transition-colors"
-              style={{ color: "#93c5fd" }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.1)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-              title="Expand sidebar"
-            >
-              <ChevronRight className="size-[18px]" />
-            </button>
-          </div>
-        )}
+        <button
+          onClick={() => {
+            const isCollapsed = localStorage.getItem("spinflow_sidebar_collapsed") === "true";
+            localStorage.setItem("spinflow_sidebar_collapsed", String(!isCollapsed));
+            window.dispatchEvent(new Event("sidebar-collapse-change"));
+          }}
+          className="hidden lg:flex w-full items-center justify-center mt-2 py-1.5 rounded-lg text-[#4b5563] hover:bg-[#162030] transition-colors"
+        >
+          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
       </div>
     </div>
   );
 }
 
 export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => void }) {
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("spinflow_sidebar_collapsed") === "true");
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem("spinflow_sidebar_collapsed") === "true",
+  );
 
   useEffect(() => {
     const handler = () => {
@@ -325,16 +261,18 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
 
   return (
     <>
+      {/* Desktop */}
       <aside
         className={cn(
-          "fixed top-0 left-0 h-screen flex flex-col overflow-hidden z-30 transition-all duration-200 ease-in-out hidden lg:flex border-r border-[#1e3a5f]",
+          "fixed top-0 left-0 h-screen flex flex-col overflow-hidden z-30 transition-all duration-200 ease-in-out hidden lg:flex",
           collapsed ? "w-16" : "w-60",
         )}
-        style={{ backgroundColor: "#1e3a5f" }}
+        style={{ backgroundColor: "#0f1923" }}
       >
         <SidebarContent collapsed={collapsed} />
       </aside>
 
+      {/* Mobile overlay */}
       {open !== undefined && (
         <div
           className={cn(
@@ -349,14 +287,14 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
           />
           <div
             className="absolute left-0 top-0 h-full w-72 transition-transform duration-200"
-            style={{ transform: open ? "translateX(0)" : "translateX(-100%)", backgroundColor: "#1e3a5f", color: "#dbeafe" }}
+            style={{
+              transform: open ? "translateX(0)" : "translateX(-100%)",
+              backgroundColor: "#0f1923",
+            }}
           >
             <button
               onClick={onClose}
-              className="absolute right-3 top-4 p-1 rounded-md"
-              style={{ color: "rgba(199,210,254,0.7)" }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(59,130,246,0.1)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+              className="absolute right-3 top-4 p-1 rounded-md text-[#6b7280] hover:bg-[#162030]"
             >
               <X className="size-5" />
             </button>

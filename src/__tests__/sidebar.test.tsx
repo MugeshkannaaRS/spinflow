@@ -98,19 +98,19 @@ describe("Sidebar", () => {
 
   it("renders SpinFlow logo when expanded", () => {
     renderWithQuery(<Sidebar />);
-    expect(screen.getByText("SpinFlow")).toBeTruthy();
+    expect(screen.getByText("SpinFlow ERP")).toBeTruthy();
   });
 
   it("renders SF monogram when collapsed", () => {
     localStorage.setItem("spinflow_sidebar_collapsed", "true");
     renderWithQuery(<Sidebar />);
-    expect(screen.getByText("SF")).toBeTruthy();
+    expect(screen.getByText("S")).toBeTruthy();
   });
 
   it("collapsed state persists in localStorage", () => {
     localStorage.setItem("spinflow_sidebar_collapsed", "true");
     renderWithQuery(<Sidebar />);
-    expect(screen.getByText("SF")).toBeTruthy();
+    expect(screen.getByText("S")).toBeTruthy();
   });
 
   it("shows Dashboard navigation link", () => {

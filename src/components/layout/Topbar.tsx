@@ -1,30 +1,26 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/stores/auth";
-import { useActiveMill } from "@/hooks/useActiveMill";
 import { useTheme } from "@/hooks/useTheme";
+import { useSidebar } from "@/components/layout/SidebarContext";
+import { useWebSocket } from "@/hooks/useWebSocket";
+import { useNavigate, Link } from "@tanstack/react-router";
 import {
   Bell,
-  Menu,
   BellOff,
+  Menu,
   Moon,
   Sun,
   LogOut,
   User,
-  KeyRound,
-  Building2,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useSidebar } from "@/components/layout/SidebarContext";
-import { useWebSocket } from "@/hooks/useWebSocket";
-import { formatRelativeTime } from "@/utils/time";
 import { cn } from "@/lib/utils";
-import { useNavigate } from "@tanstack/react-router";
+import { formatRelativeTime } from "@/utils/time";
 
 const TYPE_COLORS: Record<string, string> = {
-  success: "bg-success",
-  info: "bg-primary",
-  warning: "bg-warning",
-  error: "bg-destructive",
+  success: "bg-emerald-500",
+  info: "bg-blue-500",
+  warning: "bg-amber-500",
+  error: "bg-red-500",
 };
 
 function NotificationsDropdown() {
@@ -52,22 +48,25 @@ function NotificationsDropdown() {
 
   return (
     <div ref={ref} className="relative">
-      <Button variant="ghost" size="icon" className="relative" onClick={handleToggle}>
-        <Bell className="size-5" />
+      <button
+        onClick={handleToggle}
+        className="relative w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500"
+      >
+        <Bell className="w-4 h-4" />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
-      </Button>
+      </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-80 rounded-md border bg-popover shadow-md z-50">
-          <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b">
+        <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-100 rounded-xl shadow-lg z-50 overflow-hidden">
+          <div className="px-4 py-2 text-xs font-medium text-gray-500 border-b border-gray-100">
             Notifications
           </div>
           {notifications.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
-              <BellOff className="size-8" />
+            <div className="flex flex-col items-center gap-2 py-8 text-gray-400">
+              <BellOff className="w-8 h-8" />
               <span className="text-sm">No new alerts</span>
             </div>
           ) : (
@@ -75,21 +74,21 @@ function NotificationsDropdown() {
               {notifications.slice(0, 10).map((n) => (
                 <div
                   key={n.id}
-                  className="flex items-start gap-3 px-3 py-2.5 text-sm border-b last:border-0 hover:bg-accent/50 transition-colors"
+                  className="flex items-start gap-3 px-4 py-2.5 text-sm border-b last:border-0 border-gray-50 hover:bg-gray-50 transition-colors"
                 >
                   <span
                     className={cn(
-                      "mt-1 size-2 shrink-0 rounded-full",
-                      TYPE_COLORS[n.type] || "bg-muted-foreground",
+                      "mt-1.5 w-2 h-2 shrink-0 rounded-full",
+                      TYPE_COLORS[n.type] || "bg-gray-300",
                     )}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{n.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="font-medium text-gray-900 truncate">{n.title}</p>
+                    <p className="text-xs text-gray-500 truncate">
                       {n.message.length > 60 ? n.message.slice(0, 60) + "…" : n.message}
                     </p>
                   </div>
-                  <span className="shrink-0 text-xs text-muted-foreground whitespace-nowrap">
+                  <span className="shrink-0 text-xs text-gray-400 whitespace-nowrap">
                     {formatRelativeTime(n.created_at)}
                   </span>
                 </div>
@@ -112,7 +111,6 @@ export function Topbar({
   children?: React.ReactNode;
 }) {
   const { user, logout } = useAuth();
-  const { millName, hasMultipleMills } = useActiveMill();
   const { toggle } = useSidebar();
   const { theme, toggle: toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -129,75 +127,95 @@ export function Topbar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const initials =
+    user?.name
+      ?.split(" ")
+      .map((n) => n[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() ?? "U";
+
+  const handleLogout = () => {
+    logout();
+    navigate({ to: "/login" });
+  };
+
   return (
-    <header className="flex items-center justify-between h-14 bg-[var(--bg-primary)] border-b border-[var(--border)] shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 lg:px-6 gap-3 sticky top-0 z-20">
-      <div className="flex items-center gap-3 min-w-0">
-        <Button variant="ghost" size="icon" className="lg:hidden shrink-0" onClick={toggle}>
-          <Menu className="size-5" />
-        </Button>
-        <div className="min-w-0 flex items-center gap-2">
-          <h1 className="text-base font-semibold text-[var(--text-primary)] truncate">{title}</h1>
+    <header className="sticky top-0 z-30 h-14 bg-white border-b border-gray-100 flex items-center px-4 lg:px-6 gap-3">
+      {/* Left */}
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <button
+          onClick={toggle}
+          className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <div className="min-w-0">
+          <h1 className="text-[17px] font-semibold text-gray-900 truncate">{title}</h1>
           {subtitle && (
-            <>
-              <span className="text-xs text-[var(--text-muted)] hidden sm:inline">·</span>
-              <span className="text-xs text-[var(--text-muted)] truncate hidden sm:inline">{subtitle}</span>
-            </>
+            <p className="text-xs text-gray-400 truncate hidden sm:block">{subtitle}</p>
           )}
         </div>
       </div>
+
       {children && <div className="flex items-center gap-2">{children}</div>}
-      <div className="flex items-center gap-2 shrink-0">
-        <Button variant="ghost" size="icon" onClick={toggleTheme} className="text-muted-foreground">
-          {theme === "light" ? <Moon className="size-5" /> : <Sun className="size-5" />}
-        </Button>
-        {hasMultipleMills && (
-          <div className="hidden md:flex items-center gap-1.5 px-3 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-full border border-blue-200 dark:border-blue-700 text-xs font-medium text-blue-700 dark:text-blue-300">
-            <Building2 className="w-3 h-3" />
-            {millName}
+
+      {/* Right */}
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <NotificationsDropdown />
+
+        {user && (
+          <div className="hidden sm:flex items-center px-3 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
+            {user.role.replace(/_/g, " ")}
           </div>
         )}
-        <NotificationsDropdown />
-        <div className="h-6 w-px bg-border" />
+
         {user && (
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="w-8 h-8 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center hover:bg-blue-700 transition-colors"
+              className="w-8 h-8 rounded-full text-white text-xs font-bold flex items-center justify-center hover:opacity-90 transition-opacity"
+              style={{ backgroundColor: "#0d9488" }}
             >
-              {user.name?.charAt(0)?.toUpperCase() ?? "U"}
+              {initials}
             </button>
 
             {dropdownOpen && (
-              <div className="absolute right-0 top-full mt-2 w-52 bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 rounded-xl shadow-lg z-50 overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{user.name}</p>
-                  <p className="text-xs text-gray-400 truncate mt-0.5">{user.email}</p>
-                  <span className="inline-block mt-1.5 text-[10px] font-semibold uppercase tracking-wide bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full">
-                    {user.role.replace(/_/g, " ")}
-                  </span>
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
+                <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-gray-100 rounded-xl shadow-lg z-50 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
+                    <p className="text-xs text-gray-400 truncate mt-0.5">{user.email}</p>
+                  </div>
+                  <div className="py-1">
+                    <Link
+                      to="/profile"
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <User className="w-4 h-4 text-gray-400" /> Profile
+                    </Link>
+                    <button
+                      onClick={() => { toggleTheme(); setDropdownOpen(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      {theme === "dark"
+                        ? <Sun className="w-4 h-4 text-gray-400" />
+                        : <Moon className="w-4 h-4 text-gray-400" />
+                      }
+                      {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                    </button>
+                    <div className="h-px bg-gray-100 mx-3 my-1" />
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+                    >
+                      <LogOut className="w-4 h-4" /> Logout
+                    </button>
+                  </div>
                 </div>
-                <div className="py-1">
-                  <button
-                    onClick={() => { navigate({ to: "/profile" as never }); setDropdownOpen(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    <User className="w-4 h-4 text-gray-400" /> Profile
-                  </button>
-                  <button
-                    onClick={() => { navigate({ to: "/change-password" }); setDropdownOpen(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    <KeyRound className="w-4 h-4 text-gray-400" /> Change Password
-                  </button>
-                  <div className="h-px bg-gray-100 dark:bg-slate-700 mx-3 my-1" />
-                  <button
-                    onClick={() => { logout(); navigate({ to: "/login" }); }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                  >
-                    <LogOut className="w-4 h-4" /> Logout
-                  </button>
-                </div>
-              </div>
+              </>
             )}
           </div>
         )}
