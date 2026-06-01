@@ -33,9 +33,13 @@ vi.mock("@/hooks/useWebSocket", () => ({
   useWebSocket: vi.fn(() => ({ unreadCount: 0, notifications: [], markAllRead: vi.fn() })),
 }));
 
+const { mockApiGet } = vi.hoisted(() => ({
+  mockApiGet: vi.fn(() => Promise.resolve({ data: {} })),
+}));
+
 vi.mock("@/lib/api", () => ({
   api: {
-    get: vi.fn(() => Promise.resolve({ data: {} })),
+    get: mockApiGet,
   },
 }));
 
@@ -97,9 +101,17 @@ describe("Dashboard", () => {
     expect(await screen.findByText("Pending Payments")).toBeTruthy();
   });
 
-  it("shows alert banner", () => {
+  it("shows alert banner when critical alerts exist", async () => {
+    mockApiGet.mockResolvedValueOnce({
+      data: {
+        alerts: [
+          { type: "critical", message: "Machine 4 down", time: "2m ago" },
+          { type: "warning", message: "Stock low", time: "10m ago" },
+        ],
+      },
+    });
     renderWithQuery(<Dashboard />);
-    expect(screen.getByText(/Action Required/)).toBeTruthy();
+    expect(await screen.findByText(/Action Required/)).toBeTruthy();
   });
 
   it("renders production chart", () => {
@@ -127,8 +139,16 @@ describe("Dashboard", () => {
     expect(screen.getByText("Today's Schedule")).toBeTruthy();
   });
 
-  it("renders dismissal button on alert banner", () => {
+  it("renders dismissal button on alert banner", async () => {
+    mockApiGet.mockResolvedValueOnce({
+      data: {
+        alerts: [
+          { type: "critical", message: "Machine 4 down", time: "2m ago" },
+        ],
+      },
+    });
     renderWithQuery(<Dashboard />);
+    await screen.findByText(/Action Required/);
     const allButtons = screen.getAllByRole("button");
     expect(allButtons.length).toBeGreaterThanOrEqual(1);
   });

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, productionApi, inventoryApi, adminApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
+import { useActiveMill } from "@/hooks/useActiveMill";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -283,7 +284,6 @@ function MastersPage() {
                   { key: "code", label: deptColConfig.getLabel("code") },
                   { key: "name", label: deptColConfig.getLabel("name") },
                   { key: "department_type", label: deptColConfig.getLabel("department_type") },
-                  { key: "mill_id", label: "Mill ID" },
                 ]}
                 activeKey="is_active"
                 canEdit={canEdit}
@@ -1018,11 +1018,14 @@ function MillForm({ item, companies }: { item?: Mill; companies: Company[] }) {
   );
 }
 
-function DepartmentForm({ item, mills }: { item?: Department; mills: Mill[] }) {
+function DepartmentForm({ item }: { item?: Department; mills: Mill[] }) {
   const qc = useQueryClient();
-  const requiredFields = ["mill_id", "code", "name", "department_type"];
+  const { activeMill } = useActiveMill();
+  const { user } = useAuth();
+  const currentMillId = activeMill?.id ?? user?.millId ?? "";
+  const requiredFields = ["code", "name", "department_type"];
   const [form, setForm] = useState({
-    mill_id: item?.mill_id ?? "",
+    mill_id: item?.mill_id ?? currentMillId,
     code: item?.code ?? "",
     name: item?.name ?? "",
     department_type: item?.department_type ?? "ring_frame",
@@ -1057,24 +1060,6 @@ function DepartmentForm({ item, mills }: { item?: Department; mills: Mill[] }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="space-y-1.5">
-        <Label className={cn(err("mill_id") && "text-destructive")}>
-          Mill <span className="text-destructive">*</span>
-        </Label>
-        <Select value={form.mill_id} onValueChange={(v) => setForm({ ...form, mill_id: v })}>
-          <SelectTrigger className={cn(err("mill_id") && "border-destructive")}>
-            <SelectValue placeholder="Select mill" />
-          </SelectTrigger>
-          <SelectContent>
-            {mills.filter((m) => m?.id).map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {m.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {err("mill_id") && <p className="text-xs text-destructive">{err("mill_id")}</p>}
-      </div>
       <div className="space-y-1.5">
         <Label className={cn(err("code") && "text-destructive")}>
           Code <span className="text-destructive">*</span>
@@ -1129,11 +1114,14 @@ function DepartmentForm({ item, mills }: { item?: Department; mills: Mill[] }) {
   );
 }
 
-function YarnCountForm({ item, mills }: { item?: YarnCount; mills: Mill[] }) {
+function YarnCountForm({ item }: { item?: YarnCount; mills: Mill[] }) {
   const qc = useQueryClient();
-  const requiredFields = ["mill_id", "count", "count_value"];
+  const { activeMill } = useActiveMill();
+  const { user } = useAuth();
+  const currentMillId = activeMill?.id ?? user?.millId ?? "";
+  const requiredFields = ["count", "count_value"];
   const [form, setForm] = useState({
-    mill_id: item?.mill_id ?? "",
+    mill_id: item?.mill_id ?? currentMillId,
     count: item?.count ?? "",
     count_value: item?.count_value ?? 0,
     blend: item?.blend ?? "",
@@ -1178,24 +1166,6 @@ function YarnCountForm({ item, mills }: { item?: YarnCount; mills: Mill[] }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="space-y-1.5">
-        <Label className={cn(err("mill_id") && "text-destructive")}>
-          Mill <span className="text-destructive">*</span>
-        </Label>
-        <Select value={form.mill_id} onValueChange={(v) => setForm({ ...form, mill_id: v })}>
-          <SelectTrigger className={cn(err("mill_id") && "border-destructive")}>
-            <SelectValue placeholder="Select mill" />
-          </SelectTrigger>
-          <SelectContent>
-            {mills.filter((m) => m?.id).map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {m.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {err("mill_id") && <p className="text-xs text-destructive">{err("mill_id")}</p>}
-      </div>
       <div className="space-y-1.5">
         <Label className={cn(err("count") && "text-destructive")}>
           Count <span className="text-destructive">*</span>
@@ -1282,11 +1252,14 @@ function YarnCountForm({ item, mills }: { item?: YarnCount; mills: Mill[] }) {
   );
 }
 
-function CustomerForm({ item, mills }: { item?: Customer; mills: Mill[] }) {
+function CustomerForm({ item }: { item?: Customer; mills: Mill[] }) {
   const qc = useQueryClient();
-  const requiredFields = ["mill_id", "code", "name"];
+  const { activeMill } = useActiveMill();
+  const { user } = useAuth();
+  const currentMillId = activeMill?.id ?? user?.millId ?? "";
+  const requiredFields = ["code", "name"];
   const [form, setForm] = useState({
-    mill_id: item?.mill_id ?? "",
+    mill_id: item?.mill_id ?? currentMillId,
     code: item?.code ?? "",
     name: item?.name ?? "",
     gstin: item?.gstin ?? "",
@@ -1339,24 +1312,6 @@ function CustomerForm({ item, mills }: { item?: Customer; mills: Mill[] }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="space-y-1.5">
-        <Label className={cn(err("mill_id") && "text-destructive")}>
-          Mill <span className="text-destructive">*</span>
-        </Label>
-        <Select value={form.mill_id} onValueChange={(v) => setForm({ ...form, mill_id: v })}>
-          <SelectTrigger className={cn(err("mill_id") && "border-destructive")}>
-            <SelectValue placeholder="Select mill" />
-          </SelectTrigger>
-          <SelectContent>
-            {mills.filter((m) => m?.id).map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {m.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {err("mill_id") && <p className="text-xs text-destructive">{err("mill_id")}</p>}
-      </div>
       <div className="space-y-1.5">
         <Label className={cn(err("code") && "text-destructive")}>
           Code <span className="text-destructive">*</span>
@@ -1469,11 +1424,14 @@ function CustomerForm({ item, mills }: { item?: Customer; mills: Mill[] }) {
   );
 }
 
-function VehicleForm({ item, mills }: { item?: MasterVehicle; mills: Mill[] }) {
+function VehicleForm({ item }: { item?: MasterVehicle; mills: Mill[] }) {
   const qc = useQueryClient();
-  const requiredFields = ["mill_id", "vehicle_no", "vehicle_type"];
+  const { activeMill } = useActiveMill();
+  const { user } = useAuth();
+  const currentMillId = activeMill?.id ?? user?.millId ?? "";
+  const requiredFields = ["vehicle_no", "vehicle_type"];
   const [form, setForm] = useState({
-    mill_id: item?.mill_id ?? "",
+    mill_id: item?.mill_id ?? currentMillId,
     vehicle_no: item?.vehicle_no ?? "",
     vehicle_type: item?.vehicle_type ?? "truck",
     make: item?.make ?? "",
@@ -1520,24 +1478,6 @@ function VehicleForm({ item, mills }: { item?: MasterVehicle; mills: Mill[] }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="space-y-1.5">
-        <Label className={cn(err("mill_id") && "text-destructive")}>
-          Mill <span className="text-destructive">*</span>
-        </Label>
-        <Select value={form.mill_id} onValueChange={(v) => setForm({ ...form, mill_id: v })}>
-          <SelectTrigger className={cn(err("mill_id") && "border-destructive")}>
-            <SelectValue placeholder="Select mill" />
-          </SelectTrigger>
-          <SelectContent>
-            {mills.filter((m) => m?.id).map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {m.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {err("mill_id") && <p className="text-xs text-destructive">{err("mill_id")}</p>}
-      </div>
       <div className="space-y-1.5">
         <Label className={cn(err("vehicle_no") && "text-destructive")}>
           Vehicle No <span className="text-destructive">*</span>
@@ -1627,11 +1567,14 @@ function VehicleForm({ item, mills }: { item?: MasterVehicle; mills: Mill[] }) {
   );
 }
 
-function RouteForm({ item, mills }: { item?: MasterRoute; mills: Mill[] }) {
+function RouteForm({ item }: { item?: MasterRoute; mills: Mill[] }) {
   const qc = useQueryClient();
-  const requiredFields = ["mill_id", "code", "name", "origin", "destination"];
+  const { activeMill } = useActiveMill();
+  const { user } = useAuth();
+  const currentMillId = activeMill?.id ?? user?.millId ?? "";
+  const requiredFields = ["code", "name", "origin", "destination"];
   const [form, setForm] = useState({
-    mill_id: item?.mill_id ?? "",
+    mill_id: item?.mill_id ?? currentMillId,
     code: item?.code ?? "",
     name: item?.name ?? "",
     origin: item?.origin ?? "",
@@ -1676,24 +1619,6 @@ function RouteForm({ item, mills }: { item?: MasterRoute; mills: Mill[] }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="space-y-1.5">
-        <Label className={cn(err("mill_id") && "text-destructive")}>
-          Mill <span className="text-destructive">*</span>
-        </Label>
-        <Select value={form.mill_id} onValueChange={(v) => setForm({ ...form, mill_id: v })}>
-          <SelectTrigger className={cn(err("mill_id") && "border-destructive")}>
-            <SelectValue placeholder="Select mill" />
-          </SelectTrigger>
-          <SelectContent>
-            {mills.filter((m) => m?.id).map((m) => (
-              <SelectItem key={m.id} value={m.id}>
-                {m.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {err("mill_id") && <p className="text-xs text-destructive">{err("mill_id")}</p>}
-      </div>
       <div className="space-y-1.5">
         <Label className={cn(err("code") && "text-destructive")}>
           Code <span className="text-destructive">*</span>

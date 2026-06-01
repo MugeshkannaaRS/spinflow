@@ -196,6 +196,10 @@ async def create_department(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
+    mill_id = scope.get("mill_id") or current_user.mill_id
+    if mill_id:
+        req.mill_id = mill_id
     service = MastersService(db, current_user)
     return await service.create_department(req, created_by=current_user.id)
 
@@ -259,6 +263,10 @@ async def create_yarn_count(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
+    mill_id = scope.get("mill_id") or current_user.mill_id
+    if mill_id:
+        req.mill_id = mill_id
     service = MastersService(db, current_user)
     return await service.create_yarn_count(req, created_by=current_user.id)
 
@@ -322,6 +330,10 @@ async def create_customer(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
+    mill_id = scope.get("mill_id") or current_user.mill_id
+    if mill_id:
+        req.mill_id = mill_id
     service = MastersService(db, current_user)
     return await service.create_customer(req, created_by=current_user.id)
 
@@ -394,6 +406,10 @@ async def create_vehicle(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
+    mill_id = scope.get("mill_id") or current_user.mill_id
+    if mill_id:
+        req.mill_id = mill_id
     service = MastersService(db, current_user)
     return await service.create_vehicle(req, created_by=current_user.id)
 
@@ -457,6 +473,10 @@ async def create_route(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
+    scope = await get_mill_scope(current_user)
+    mill_id = scope.get("mill_id") or current_user.mill_id
+    if mill_id:
+        req.mill_id = mill_id
     service = MastersService(db, current_user)
     return await service.create_route(req, created_by=current_user.id)
 

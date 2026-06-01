@@ -61,7 +61,7 @@ SORTABLE_EMPLOYEE_COLUMNS = {
 @router.get("/hr/employees")
 async def get_employees(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     department: Optional[str] = Query(None),
     grade: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
@@ -719,7 +719,7 @@ async def finalize_payroll(
 @router.get("/hr/attendance")
 async def get_attendance(
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=100),
+    page_size: int = Query(50, ge=1, le=1000),
     date: Optional[str] = Query(None),
     employee_id: Optional[str] = Query(None),
     department: Optional[str] = Query(None),
@@ -973,7 +973,7 @@ async def update_attendance(
 @router.get("/hr/leaves")
 async def get_leaves(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     employee_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     mill_id: Optional[str] = Query(None),
