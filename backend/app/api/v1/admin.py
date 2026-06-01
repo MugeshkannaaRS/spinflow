@@ -32,8 +32,13 @@ async def get_company_modules(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        if current_user.role != "SUPER_ADMIN":
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage modules")
+        role_code = current_user.role_rel.code if current_user.role_rel else ""
+
+        # Non-SUPER_ADMIN can only read their own company's modules
+        if role_code != "SUPER_ADMIN":
+            if str(current_user.company_id) != str(company_id):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only view your own company's modules")
+
         result = await db.execute(
             select(CompanyModule).where(CompanyModule.company_id == company_id)
         )

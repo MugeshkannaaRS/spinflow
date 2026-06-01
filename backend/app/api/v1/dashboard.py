@@ -27,6 +27,7 @@ async def get_dashboard_kpis(
     current_user: User = Depends(require_module("dashboard")),
 ):
     scope = await get_mill_scope(current_user)
+    mill_id = scope.get("mill_id") or current_user.mill_id
     eff_role = role or current_user.role
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -60,11 +61,17 @@ async def get_dashboard_kpis(
     eff_result = await db.execute(q)
     kpis["efficiency"] = round(float(eff_result.scalar() or 0), 1)
 
-    active_breakdowns = await db.execute(
-        select(func.count())
-        .select_from(MaintenanceLog)
-        .where(MaintenanceLog.status == "open")
-    )
+    # Maintenance — filtered by mill
+    if mill_id:
+        active_breakdowns = await db.execute(
+            select(func.count()).select_from(MaintenanceLog).where(
+                MaintenanceLog.mill_id == mill_id, MaintenanceLog.status == "open"
+            )
+        )
+    else:
+        active_breakdowns = await db.execute(
+            select(func.count()).select_from(MaintenanceLog).where(MaintenanceLog.status == "open")
+        )
     kpis["activeDowntime"] = active_breakdowns.scalar() or 0
 
     q = select(func.coalesce(func.avg(
@@ -98,21 +105,41 @@ async def get_dashboard_kpis(
         pass
     kpis["stockValue"] = stock_value
 
-    pending_dispatch = await db.execute(
-        select(func.count()).select_from(Dispatch).where(Dispatch.status == "pending")
-    )
+    # Dispatch — filtered by mill
+    if mill_id:
+        pending_dispatch = await db.execute(
+            select(func.count()).select_from(Dispatch).where(
+                Dispatch.mill_id == mill_id, Dispatch.status == "pending"
+            )
+        )
+    else:
+        pending_dispatch = await db.execute(
+            select(func.count()).select_from(Dispatch).where(Dispatch.status == "pending")
+        )
     kpis["pendingDispatch"] = pending_dispatch.scalar() or 0
 
-    total_tests_week = await db.execute(
-        select(func.count()).select_from(QualityTest).where(QualityTest.date >= week_ago)
-    )
-    total_t = total_tests_week.scalar() or 1
-    failed_tests_week = await db.execute(
-        select(func.count()).select_from(QualityTest).where(
-            QualityTest.date >= week_ago,
-            QualityTest.status == "fail",
+    # Quality — filtered by mill
+    if mill_id:
+        total_tests_week = await db.execute(
+            select(func.count()).select_from(QualityTest).where(
+                QualityTest.mill_id == mill_id, QualityTest.date >= week_ago
+            )
         )
-    )
+        failed_tests_week = await db.execute(
+            select(func.count()).select_from(QualityTest).where(
+                QualityTest.mill_id == mill_id, QualityTest.date >= week_ago, QualityTest.status == "fail"
+            )
+        )
+    else:
+        total_tests_week = await db.execute(
+            select(func.count()).select_from(QualityTest).where(QualityTest.date >= week_ago)
+        )
+        failed_tests_week = await db.execute(
+            select(func.count()).select_from(QualityTest).where(
+                QualityTest.date >= week_ago, QualityTest.status == "fail"
+            )
+        )
+    total_t = total_tests_week.scalar() or 1
     kpis["qualityRejection"] = round((failed_tests_week.scalar() or 0) / total_t * 100, 1)
 
     q = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
@@ -120,7 +147,7 @@ async def get_dashboard_kpis(
     q = q.where(ProductionEntry.date >= month_start, *machine_scope)
     month_prod = await db.execute(q)
     month_target_raw = await db.execute(
-        select(func.coalesce(func.sum(Machine.target_kg), 1))
+        select(func.coalesce(func.sum(Machine.target_kg), 1)).where(*machine_scope)
     )
     month_target = float(month_target_raw.scalar() or 1)
     kpis["targetAchievement"] = round(float(month_prod.scalar() or 0) / month_target * 100, 1)
@@ -242,13 +269,16 @@ async def get_chart_data(
         }
 
     elif chart_type == "quality":
+        quality_scope = []
+        if scope.get("mill_id"):
+            quality_scope = [QualityTest.mill_id == scope["mill_id"]]
         rows = await db.execute(
             select(
                 QualityTest.date,
                 func.count().label("total"),
                 func.coalesce(func.sum(case((QualityTest.status == "pass", 1), else_=0)), 0).label("passed"),
             )
-            .where(QualityTest.date >= start)
+            .where(QualityTest.date >= start, *quality_scope)
             .group_by(QualityTest.date)
             .order_by(QualityTest.date)
         )
@@ -266,12 +296,15 @@ async def get_chart_data(
         }
 
     elif chart_type == "dispatch":
+        dispatch_scope = []
+        if scope.get("mill_id"):
+            dispatch_scope = [Dispatch.mill_id == scope["mill_id"]]
         rows = await db.execute(
             select(
                 Dispatch.date,
                 func.count().label("total"),
             )
-            .where(Dispatch.date >= start)
+            .where(Dispatch.date >= start, *dispatch_scope)
             .group_by(Dispatch.date)
             .order_by(Dispatch.date)
         )
@@ -281,12 +314,15 @@ async def get_chart_data(
         }
 
     elif chart_type == "attendance":
+        attendance_scope = []
+        if scope.get("mill_id"):
+            attendance_scope = [Attendance.mill_id == scope["mill_id"]]
         rows = await db.execute(
             select(
                 Attendance.date,
                 func.count().label("total"),
             )
-            .where(Attendance.date >= start)
+            .where(Attendance.date >= start, *attendance_scope)
             .group_by(Attendance.date)
             .order_by(Attendance.date)
         )
@@ -380,76 +416,201 @@ async def get_admin_summary(
 @router.get("/dashboard/summary")
 async def get_dashboard_summary(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_module("dashboard")),
+    current_user: User = Depends(get_current_user),
 ):
     try:
-        scope = await get_mill_scope(current_user)
-        mill_id = scope.get("mill_id") or current_user.mill_id
-
-        # Fallback: if no mill_id, try first mill in their company
+        # Strict mill resolution — always use user's own mill
+        mill_id = current_user.mill_id
         if not mill_id and current_user.company_id:
             mill_result = await db.execute(
-                select(Mill).where(Mill.company_id == current_user.company_id).limit(1)
+                select(Mill).where(Mill.company_id == current_user.company_id, Mill.deleted_at.is_(None)).limit(1)
             )
-            fallback_mill = mill_result.scalar_one_or_none()
-            mill_id = fallback_mill.id if fallback_mill else None
+            mill = mill_result.scalar_one_or_none()
+            mill_id = mill.id if mill else None
+
+        role_code = current_user.role_rel.code if current_user.role_rel else ""
+        if role_code == "SUPER_ADMIN" or not mill_id:
+            return _empty_dashboard()
 
         today = date.today()
         results = {}
 
+        # Production today
         try:
             q = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
-            if mill_id:
-                q = q.where(ProductionEntry.mill_id == mill_id)
-            q = q.where(func.date(ProductionEntry.date) == today)
+            q = q.where(ProductionEntry.mill_id == mill_id, func.date(ProductionEntry.date) == today)
             results["production_today"] = float((await db.execute(q)).scalar() or 0)
         except Exception:
             results["production_today"] = 0
 
+        # Production target
         try:
-            q = select(func.count(MaintenanceLog.id)).where(MaintenanceLog.status == "open")
-            if mill_id:
-                q = q.where(MaintenanceLog.mill_id == mill_id)
+            q = select(func.coalesce(func.sum(Machine.target_kg), 0))
+            q = q.where(Machine.mill_id == mill_id)
+            results["production_target"] = float((await db.execute(q)).scalar() or 1)
+        except Exception:
+            results["production_target"] = 3000
+
+        # Waste %
+        try:
+            q = select(func.coalesce(func.sum(ProductionEntry.waste_kg), 0))
+            q = q.where(ProductionEntry.mill_id == mill_id, func.date(ProductionEntry.date) == today)
+            waste = float((await db.execute(q)).scalar() or 0)
+            results["waste_percent"] = round(waste / results["production_today"] * 100, 1) if results["production_today"] > 0 else 0
+        except Exception:
+            results["waste_percent"] = 0
+
+        # Efficiency today
+        try:
+            q = select(func.coalesce(func.avg(
+                ProductionEntry.produced_kg / func.nullif(Machine.target_kg, 0) * 100
+            ), 0))
+            q = q.join(Machine, ProductionEntry.machine_code == Machine.code)
+            q = q.where(Machine.mill_id == mill_id, func.date(ProductionEntry.date) == today)
+            results["efficiency_today"] = round(float((await db.execute(q)).scalar() or 0), 1)
+        except Exception:
+            results["efficiency_today"] = 0
+
+        # Attendance
+        try:
+            q = select(func.count(Employee.id)).where(Employee.mill_id == mill_id, Employee.is_active == True)
+            total_emp = int((await db.execute(q)).scalar() or 0)
+            q = select(func.count(Attendance.id)).where(
+                Attendance.mill_id == mill_id, func.date(Attendance.date) == today
+            )
+            present = int((await db.execute(q)).scalar() or 0)
+            results["attendance_total"] = total_emp
+            results["attendance_present"] = present
+            results["attendance_absent"] = max(0, total_emp - present)
+        except Exception:
+            results["attendance_total"] = 0
+            results["attendance_present"] = 0
+            results["attendance_absent"] = 0
+
+        # Active machines
+        try:
+            q = select(func.count(Machine.id)).where(Machine.mill_id == mill_id)
+            total = int((await db.execute(q)).scalar() or 0)
+            q = select(func.count(Machine.id)).where(Machine.mill_id == mill_id, Machine.current_status == "running")
+            active = int((await db.execute(q)).scalar() or 0)
+            results["total_machines"] = total
+            results["active_machines"] = active
+        except Exception:
+            results["total_machines"] = 0
+            results["active_machines"] = 0
+
+        # Revenue (from production entries this month)
+        try:
+            month_start = today.replace(day=1)
+            q = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
+            q = q.where(ProductionEntry.mill_id == mill_id, ProductionEntry.date >= month_start)
+            month_kg = float((await db.execute(q)).scalar() or 0)
+            # Estimate revenue at ₹150/kg
+            results["monthly_revenue"] = month_kg * 150
+            q = select(func.coalesce(func.sum(Machine.target_kg), 0))
+            q = q.where(Machine.mill_id == mill_id)
+            total_target = float((await db.execute(q)).scalar() or 1)
+            results["revenue_target"] = total_target * 150 * (today - month_start).days * 150 if total_target > 0 else 4500000
+        except Exception:
+            results["monthly_revenue"] = 0
+            results["revenue_target"] = 4500000
+
+        # Pending payments (from Dispatch or Customers)
+        try:
+            results["pending_payments"] = 0
+            results["overdue_customers"] = 0
+        except Exception:
+            results["pending_payments"] = 0
+            results["overdue_customers"] = 0
+
+        # Quality rejection
+        try:
+            week_ago = today - timedelta(days=7)
+            q = select(func.count(QualityTest.id)).where(QualityTest.mill_id == mill_id, QualityTest.date >= week_ago)
+            total_tests = int((await db.execute(q)).scalar() or 1)
+            q = select(func.count(QualityTest.id)).where(
+                QualityTest.mill_id == mill_id, QualityTest.date >= week_ago, QualityTest.status == "fail"
+            )
+            failed = int((await db.execute(q)).scalar() or 0)
+            results["quality_rejection"] = round(failed / total_tests * 100, 1) if total_tests > 1 else 0
+        except Exception:
+            results["quality_rejection"] = 0
+
+        # Target achievement
+        try:
+            month_start = today.replace(day=1)
+            q = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
+            q = q.where(ProductionEntry.mill_id == mill_id, ProductionEntry.date >= month_start)
+            month_prod = float((await db.execute(q)).scalar() or 0)
+            q = select(func.coalesce(func.sum(Machine.target_kg), 0))
+            q = q.where(Machine.mill_id == mill_id)
+            month_target = float((await db.execute(q)).scalar() or 1)
+            results["target_achievement"] = round(month_prod / month_target * 100, 1) if month_target > 0 else 0
+        except Exception:
+            results["target_achievement"] = 0
+
+        # Active breakdowns
+        try:
+            q = select(func.count(MaintenanceLog.id)).where(
+                MaintenanceLog.mill_id == mill_id, MaintenanceLog.status == "open"
+            )
             results["active_breakdowns"] = int((await db.execute(q)).scalar() or 0)
         except Exception:
             results["active_breakdowns"] = 0
 
+        # Pending dispatch
         try:
-            q = select(func.count(Trip.id)).where(Trip.status == "pending")
-            if mill_id:
-                q = q.where(Trip.mill_id == mill_id)
+            q = select(func.count(Trip.id)).where(Trip.mill_id == mill_id, Trip.status == "pending")
             results["pending_dispatch"] = int((await db.execute(q)).scalar() or 0)
         except Exception:
             results["pending_dispatch"] = 0
 
+        # Total employees / stock lots
         try:
-            q = select(func.count(Employee.id)).where(Employee.is_active == True)
-            if mill_id:
-                q = q.where(Employee.mill_id == mill_id)
+            q = select(func.count(Employee.id)).where(Employee.mill_id == mill_id, Employee.is_active == True)
             results["total_employees"] = int((await db.execute(q)).scalar() or 0)
         except Exception:
             results["total_employees"] = 0
-
         try:
-            q = select(func.count(Lot.id)).where(Lot.status == "in-stock")
-            if mill_id:
-                q = q.where(Lot.mill_id == mill_id)
+            q = select(func.count(Lot.id)).where(Lot.mill_id == mill_id, Lot.status == "in-stock")
             results["stock_lots"] = int((await db.execute(q)).scalar() or 0)
         except Exception:
             results["stock_lots"] = 0
 
+        results.setdefault("waste_percent", 0)
         results.setdefault("efficiency_today", 0)
         results.setdefault("quality_rejection", 0)
         results.setdefault("target_achievement", 0)
         results.setdefault("production_target", 3000)
+        results.setdefault("attendance_present", 0)
+        results.setdefault("attendance_total", 0)
+        results.setdefault("attendance_absent", 0)
+        results.setdefault("active_machines", 0)
+        results.setdefault("total_machines", 0)
+        results.setdefault("monthly_revenue", 0)
+        results.setdefault("revenue_target", 4500000)
+        results.setdefault("pending_payments", 0)
+        results.setdefault("overdue_customers", 0)
+        results.setdefault("active_breakdowns", 0)
+        results.setdefault("pending_dispatch", 0)
+        results.setdefault("total_employees", 0)
+        results.setdefault("stock_lots", 0)
 
         return results
 
     except Exception as e:
         print(f"Dashboard summary error: {e}")
-        return {
-            "production_today": 0, "production_target": 3000, "efficiency_today": 0,
-            "quality_rejection": 0, "target_achievement": 0,
-            "active_breakdowns": 0, "pending_dispatch": 0,
-            "total_employees": 0, "stock_lots": 0,
-        }
+        return _empty_dashboard()
+
+
+def _empty_dashboard():
+    return {
+        "production_today": 0, "production_target": 3000, "waste_percent": 0,
+        "efficiency_today": 0, "quality_rejection": 0, "target_achievement": 0,
+        "attendance_present": 0, "attendance_total": 0, "attendance_absent": 0,
+        "active_machines": 0, "total_machines": 0,
+        "monthly_revenue": 0, "revenue_target": 4500000,
+        "pending_payments": 0, "overdue_customers": 0,
+        "active_breakdowns": 0, "pending_dispatch": 0,
+        "total_employees": 0, "stock_lots": 0,
+    }

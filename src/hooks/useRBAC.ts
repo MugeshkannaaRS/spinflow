@@ -61,14 +61,22 @@ export function useRBAC() {
     queryKey: ["company-modules", user?.companyId],
     queryFn: async () => {
       if (!user?.companyId || isSuperAdmin) return null;
-      const res = await api.get(`/admin/companies/${user.companyId}/modules`);
-      console.log("Company modules loaded:", res.data);
-      return res.data as Record<string, boolean>;
+      try {
+        const res = await api.get(`/admin/companies/${user.companyId}/modules`);
+        console.log("Company modules loaded:", res.data);
+        return res.data as Record<string, boolean>;
+      } catch (err: any) {
+        if (err?.response?.status === 403) {
+          console.warn("Cannot fetch company modules — using role-based access only");
+          return null;
+        }
+        return null;
+      }
     },
     enabled: !!user?.companyId && !isSuperAdmin,
     staleTime: 0,
     refetchOnWindowFocus: true,
-    retry: 2,
+    retry: false,
   });
 
   const allowedModules = ROLE_MODULES[role] ?? ["dashboard"];
