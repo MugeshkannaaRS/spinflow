@@ -68,22 +68,32 @@ async def get_employees(
     status: Optional[str] = Query(None),
     sort_by: Optional[str] = Query(None),
     sort_dir: Optional[str] = Query("asc"),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
-    # SQL to fix existing employees with null mill_id (run in Supabase SQL editor):
-    #   SELECT COUNT(*) FROM employees WHERE mill_id IS NULL;
-    #   SELECT id, name FROM mills LIMIT 5;
-    #   UPDATE employees
-    #   SET mill_id = (SELECT id FROM mills WHERE name ILIKE '%spinflow%' OR name ILIKE '%arafath%' LIMIT 1)
-    #   WHERE mill_id IS NULL;
     scope = await get_mill_scope(current_user)
-    mill_id = scope.get("mill_id")
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    # SUPER_ADMIN can query any mill; MILL_OWNER can switch between company mills
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
 
     stmt = select(Employee)
 
-    if mill_id:
-        stmt = stmt.where(Employee.mill_id == mill_id)
+    if effective_mill_id:
+        stmt = stmt.where(Employee.mill_id == effective_mill_id)
     elif scope.get("company_id"):
         stmt = stmt.join(Mill, Employee.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
 
@@ -713,13 +723,30 @@ async def get_attendance(
     date: Optional[str] = Query(None),
     employee_id: Optional[str] = Query(None),
     department: Optional[str] = Query(None),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(Attendance).join(Employee, Attendance.employee_id == Employee.id).order_by(Attendance.date.desc())
-    if scope["mill_id"]:
-        stmt = stmt.where(Employee.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        stmt = stmt.where(Employee.mill_id == effective_mill_id)
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Employee.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     if date:
@@ -751,13 +778,30 @@ async def get_attendance_summary(
     date: Optional[str] = Query(None),
     month: Optional[int] = Query(None),
     year: Optional[int] = Query(None),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     emp_stmt = select(Employee)
-    if scope["mill_id"]:
-        emp_stmt = emp_stmt.where(Employee.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        emp_stmt = emp_stmt.where(Employee.mill_id == effective_mill_id)
     elif scope["company_id"]:
         emp_stmt = emp_stmt.join(Mill, Employee.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     emp_result = await db.execute(emp_stmt)
@@ -932,13 +976,30 @@ async def get_leaves(
     page_size: int = Query(20, ge=1, le=100),
     employee_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(Leave).join(Employee, Leave.employee_id == Employee.id).order_by(Leave.created_at.desc())
-    if scope["mill_id"]:
-        stmt = stmt.where(Employee.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        stmt = stmt.where(Employee.mill_id == effective_mill_id)
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Employee.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     if employee_id:

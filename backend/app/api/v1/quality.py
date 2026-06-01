@@ -33,15 +33,32 @@ async def get_tests(
     date: Optional[str] = Query(None),
     lot_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    mill_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     query = select(QualityTest).join(Lot, QualityTest.lot_id == Lot.id)
-    if scope["mill_id"]:
-        query = query.where(Lot.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        query = query.where(Lot.mill_id == effective_mill_id)
     elif scope["company_id"]:
         query = query.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     if date:
@@ -168,15 +185,32 @@ async def approve_test(
 
 @router.get("/quality/lots")
 async def list_lots(
+    mill_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     query = select(Lot)
-    if scope["mill_id"]:
-        query = query.where(Lot.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        query = query.where(Lot.mill_id == effective_mill_id)
     elif scope["company_id"]:
         query = query.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     query = query.order_by(Lot.created_at.desc())
@@ -235,13 +269,30 @@ async def csp_trend(
 
 @router.get("/quality/approvals")
 async def list_approvals(
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(QualityApproval).join(Lot, QualityApproval.lot_id == Lot.id).order_by(QualityApproval.created_at.desc())
-    if scope["mill_id"]:
-        stmt = stmt.where(Lot.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        stmt = stmt.where(Lot.mill_id == effective_mill_id)
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     try:
@@ -323,6 +374,7 @@ async def approve_or_reject_approval(
 
 @router.get("/quality/rejections")
 async def list_rejections(
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):
@@ -330,9 +382,25 @@ async def list_rejections(
     from sqlalchemy import select
 
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(QualityTest).join(Lot, QualityTest.lot_id == Lot.id).where(QualityTest.status == "fail").order_by(QualityTest.created_at.desc())
-    if scope["mill_id"]:
-        stmt = stmt.where(Lot.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        stmt = stmt.where(Lot.mill_id == effective_mill_id)
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     try:

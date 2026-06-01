@@ -25,13 +25,30 @@ router = APIRouter()
 async def get_invoices(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(Invoice)
-    if scope["mill_id"]:
-        stmt = stmt.where(Invoice.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        stmt = stmt.where(Invoice.mill_id == effective_mill_id)
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Invoice.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     stmt = stmt.order_by(Invoice.date.desc())
@@ -140,13 +157,30 @@ async def delete_invoice(
 async def get_receivables(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(Invoice).where(Invoice.status.in_(["posted", "overdue"]))
-    if scope["mill_id"]:
-        stmt = stmt.where(Invoice.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        stmt = stmt.where(Invoice.mill_id == effective_mill_id)
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Invoice.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     stmt = stmt.order_by(Invoice.date.desc())
@@ -298,15 +332,32 @@ async def get_cogs(
 
 @router.get("/accounts/page-init")
 async def accounts_page_init(
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     result: Dict[str, Any] = {}
     try:
         cust_query = select(Customer.id, Customer.name, Customer.code).where(Customer.is_active == True)
-        if scope["mill_id"]:
-            cust_query = cust_query.where(Customer.mill_id == scope["mill_id"])
+        if effective_mill_id:
+            cust_query = cust_query.where(Customer.mill_id == effective_mill_id)
         cust_rows = await db.execute(cust_query.order_by(Customer.name))
         result["customers"] = [{"id": r.id, "name": r.name, "code": r.code} for r in cust_rows]
     except Exception as e:

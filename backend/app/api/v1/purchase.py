@@ -10,9 +10,10 @@ import statistics as stats_lib
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
-from app.core.deps import get_current_user, require_module, log_audit
+from app.core.deps import get_current_user, require_module, log_audit, get_mill_scope
 from app.models.user import User
 from app.models.purchase import Supplier, CottonPurchase, GRNEntry, CottonBale
+from app.models.masters import Mill
 from app.schemas.purchase import (
     SupplierCreate, SupplierOut,
     CottonPurchaseCreate, CottonPurchaseOut,
@@ -62,10 +63,32 @@ router = APIRouter()
 async def get_purchases(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase")),
 ):
+    scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(CottonPurchase).order_by(CottonPurchase.created_at.desc())
+    if effective_mill_id:
+        stmt = stmt.where(CottonPurchase.mill_id == effective_mill_id)
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, CottonPurchase.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     try:
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = (await db.execute(count_stmt)).scalar() or 0
@@ -113,9 +136,27 @@ async def create_purchase(
 async def get_suppliers(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase")),
 ):
+    scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     try:
         stmt = select(Supplier)
         count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -162,9 +203,27 @@ async def create_supplier(
 
 @router.get("/purchase/bales/stats", response_model=BaleStatsOut)
 async def get_bale_stats(
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase")),
 ):
+    scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     result = await db.execute(select(CottonBale))
     bales = result.scalars().all()
     total = len(bales)
@@ -236,9 +295,27 @@ async def get_bales(
     status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase")),
 ):
+    scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(CottonBale).order_by(CottonBale.created_at.desc())
     if supplier:
         stmt = stmt.where(CottonBale.supplier == supplier)
@@ -352,11 +429,33 @@ async def get_bale_group(
 async def get_grns(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase")),
 ):
+    scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     try:
         stmt = select(GRNEntry).order_by(GRNEntry.created_at.desc())
+        if effective_mill_id:
+            stmt = stmt.join(CottonPurchase, GRNEntry.purchase_id == CottonPurchase.id).where(CottonPurchase.mill_id == effective_mill_id)
+        elif scope["company_id"]:
+            stmt = stmt.join(CottonPurchase, GRNEntry.purchase_id == CottonPurchase.id).join(Mill, CottonPurchase.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = (await db.execute(count_stmt)).scalar() or 0
         stmt = stmt.offset((page - 1) * page_size).limit(page_size)

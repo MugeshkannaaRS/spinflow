@@ -24,15 +24,32 @@ router = APIRouter()
 @router.get("/production/machines")
 async def get_machines(
     department: Optional[str] = Query(None),
+    mill_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     query = select(Machine).where(Machine.status == True)
-    if scope["mill_id"]:
-        query = query.where(Machine.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        query = query.where(Machine.mill_id == effective_mill_id)
     elif scope["company_id"]:
         query = query.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     if department:
@@ -75,13 +92,30 @@ async def create_machine(
 
 @router.get("/production/shifts")
 async def get_shifts(
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     query = select(Shift)
-    if scope["mill_id"]:
-        query = query.where(Shift.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        query = query.where(Shift.mill_id == effective_mill_id)
     elif scope["company_id"]:
         query = query.join(Mill, Shift.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     try:
@@ -116,15 +150,32 @@ async def get_entries(
     department: Optional[str] = Query(None),
     machine: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    mill_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     query = select(ProductionEntry).join(Machine, ProductionEntry.machine_code == Machine.code)
-    if scope["mill_id"]:
-        query = query.where(Machine.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        query = query.where(Machine.mill_id == effective_mill_id)
     elif scope["company_id"]:
         query = query.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     role_code = current_user.role_rel.code if current_user.role_rel else ""
@@ -202,15 +253,32 @@ async def reject_entry(
 
 @router.get("/production/downtime")
 async def get_downtime(
+    mill_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     query = select(DowntimeLog).join(Machine, DowntimeLog.machine_code == Machine.code)
-    if scope["mill_id"]:
-        query = query.where(Machine.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        query = query.where(Machine.mill_id == effective_mill_id)
     elif scope["company_id"]:
         query = query.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     query = query.order_by(DowntimeLog.started_at.desc())
@@ -290,17 +358,34 @@ async def efficiency_trend(
 
 @router.get("/production/page-init")
 async def production_page_init(
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     result: Dict[str, Any] = {}
     try:
         dept_query = select(Department.id, Department.name, Department.code).where(
             Department.is_active == True
         )
-        if scope["mill_id"]:
-            dept_query = dept_query.where(Department.mill_id == scope["mill_id"])
+        if effective_mill_id:
+            dept_query = dept_query.where(Department.mill_id == effective_mill_id)
         dept_rows = await db.execute(dept_query.order_by(Department.name))
         result["departments"] = [{"id": r.id, "name": r.name, "code": r.code} for r in dept_rows]
     except Exception as e:
@@ -314,8 +399,8 @@ async def production_page_init(
         result["shifts"] = []
     try:
         yc_query = select(YarnCount.id, YarnCount.count, YarnCount.blend).where(YarnCount.is_active == True)
-        if scope["mill_id"]:
-            yc_query = yc_query.where(YarnCount.mill_id == scope["mill_id"])
+        if effective_mill_id:
+            yc_query = yc_query.where(YarnCount.mill_id == effective_mill_id)
         yc_rows = await db.execute(yc_query.order_by(YarnCount.count))
         result["yarn_counts"] = [{"id": r.id, "count": r.count, "blend": r.blend} for r in yc_rows]
     except Exception as e:

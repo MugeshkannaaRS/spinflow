@@ -92,7 +92,9 @@ export function useRBAC() {
 
     const dbKey = normaliseKey(module);
 
-    if (["dashboard", "masters", "users"].includes(dbKey)) return true;
+    // System features — always allow if role permits, never check company_modules
+    const SYSTEM_FEATURES = ["dashboard", "masters", "users", "column_config", "admin", "audit"];
+    if (SYSTEM_FEATURES.includes(dbKey)) return true;
 
     if (modulesLoaded && companyModules !== null && companyModules !== undefined) {
       const enabled = companyModules[dbKey];

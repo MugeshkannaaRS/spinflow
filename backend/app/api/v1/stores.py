@@ -29,13 +29,30 @@ router = APIRouter()
 async def get_spares(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(Spare)
-    if scope["mill_id"]:
-        stmt = stmt.where(Spare.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        stmt = stmt.where(Spare.mill_id == effective_mill_id)
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Spare.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     try:
@@ -126,13 +143,30 @@ async def bulk_create_spares(
 async def get_issues(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(SpareIssue).order_by(SpareIssue.created_at.desc())
-    if scope["mill_id"]:
-        stmt = stmt.where(SpareIssue.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        stmt = stmt.where(SpareIssue.mill_id == effective_mill_id)
     elif scope["company_id"]:
         stmt = stmt.join(Mill, SpareIssue.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     try:
@@ -249,17 +283,36 @@ async def receive_spare_stock(
 
 @router.get("/stores/page-init")
 async def stores_page_init(
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores")),
 ):
+    scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     result: Dict[str, Any] = {}
     try:
-        rows = await db.execute(
-            select(Spare.category, func.count().label("count"))
-            .where(Spare.category != None, Spare.category != "")
-            .group_by(Spare.category)
-            .order_by(Spare.category)
-        )
+        q = select(Spare.category, func.count().label("count"))
+        if effective_mill_id:
+            q = q.where(Spare.mill_id == effective_mill_id)
+        elif scope["company_id"]:
+            q = q.join(Mill, Spare.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+        q = q.where(Spare.category != None, Spare.category != "").group_by(Spare.category).order_by(Spare.category)
+        rows = await db.execute(q)
         result["categories"] = [{"name": r.category, "count": r.count} for r in rows]
     except Exception as e:
         logger.error(f"stores.page-init error: {e}")

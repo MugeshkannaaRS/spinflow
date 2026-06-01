@@ -25,13 +25,30 @@ router = APIRouter()
 async def get_lots(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(Lot)
-    if scope["mill_id"]:
-        stmt = stmt.where(Lot.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        stmt = stmt.where(Lot.mill_id == effective_mill_id)
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     stmt = stmt.order_by(Lot.created_at.desc())
@@ -57,13 +74,30 @@ async def get_lots(
 async def get_transfers(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(StockMovement).outerjoin(Lot, StockMovement.lot_id == Lot.id)
-    if scope["mill_id"]:
-        stmt = stmt.where(Lot.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        stmt = stmt.where(Lot.mill_id == effective_mill_id)
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     stmt = stmt.order_by(StockMovement.created_at.desc())
@@ -160,13 +194,30 @@ async def create_lot(
 
 @router.get("/inventory/warehouses")
 async def get_warehouses(
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     query = select(Warehouse).order_by(Warehouse.name)
-    if scope["mill_id"]:
-        query = query.where(Warehouse.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        query = query.where(Warehouse.mill_id == effective_mill_id)
     elif scope["company_id"]:
         query = query.join(Mill, Warehouse.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     try:

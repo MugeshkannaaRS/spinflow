@@ -26,13 +26,30 @@ router = APIRouter()
 async def get_tasks(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(MaintenanceLog).join(Machine, MaintenanceLog.machine_code == Machine.code)
-    if scope["mill_id"]:
-        stmt = stmt.where(Machine.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        stmt = stmt.where(Machine.mill_id == effective_mill_id)
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     stmt = stmt.order_by(MaintenanceLog.date.desc())
@@ -119,13 +136,30 @@ async def update_task_status(
 async def get_schedules(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(MaintenanceSchedule).join(Machine, MaintenanceSchedule.machine_code == Machine.code)
-    if scope["mill_id"]:
-        stmt = stmt.where(Machine.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        stmt = stmt.where(Machine.mill_id == effective_mill_id)
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     try:
@@ -251,13 +285,30 @@ async def get_parameters(
     machine_code: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(MachineParameter).join(Machine, MachineParameter.machine_code == Machine.code)
-    if scope["mill_id"]:
-        stmt = stmt.where(Machine.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        stmt = stmt.where(Machine.mill_id == effective_mill_id)
     elif scope["company_id"]:
         stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     if machine_code:
@@ -316,15 +367,32 @@ async def bulk_create_parameters(
 
 @router.get("/maintenance/page-init")
 async def maintenance_page_init(
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     result: Dict[str, Any] = {}
     try:
         mach_query = select(Machine.id, Machine.code, Machine.name, Machine.department).where(Machine.status == True)
-        if scope["mill_id"]:
-            mach_query = mach_query.where(Machine.mill_id == scope["mill_id"])
+        if effective_mill_id:
+            mach_query = mach_query.where(Machine.mill_id == effective_mill_id)
         mach_rows = await db.execute(mach_query.order_by(Machine.code))
         result["machines"] = [{"id": r.id, "code": r.code, "name": r.name} for r in mach_rows]
     except Exception as e:

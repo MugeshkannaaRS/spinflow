@@ -25,6 +25,7 @@ router = APIRouter()
 
 @router.get("/dispatch/trips")
 async def get_trips(
+    mill_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
@@ -35,9 +36,25 @@ async def get_trips(
     current_user: User = Depends(require_module("dispatch")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     stmt = select(Trip)
-    if scope["mill_id"]:
-        stmt = stmt.where(Trip.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        stmt = stmt.where(Trip.mill_id == effective_mill_id)
     elif scope["company_id"]:
         from app.models.masters import Mill as MillModel
         stmt = stmt.join(MillModel, Trip.mill_id == MillModel.id).where(MillModel.company_id == scope["company_id"])
@@ -127,6 +144,7 @@ async def create_trip(
 
 @router.get("/dispatch/orders")
 async def get_dispatches(
+    mill_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     date: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
@@ -135,9 +153,25 @@ async def get_dispatches(
     current_user: User = Depends(require_module("dispatch")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     query = select(Dispatch).outerjoin(Lot, Dispatch.lot_id == Lot.id)
-    if scope["mill_id"]:
-        query = query.where(Lot.mill_id == scope["mill_id"])
+    if effective_mill_id:
+        query = query.where(Lot.mill_id == effective_mill_id)
     elif scope["company_id"]:
         query = query.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     if status:
@@ -335,15 +369,32 @@ async def dispatch_summary(
 
 @router.get("/dispatch/page-init")
 async def dispatch_page_init(
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dispatch")),
 ):
     scope = await get_mill_scope(current_user)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
     result: Dict[str, Any] = {}
     try:
         cust_query = select(Customer.id, Customer.name, Customer.code).where(Customer.is_active == True)
-        if scope["mill_id"]:
-            cust_query = cust_query.where(Customer.mill_id == scope["mill_id"])
+        if effective_mill_id:
+            cust_query = cust_query.where(Customer.mill_id == effective_mill_id)
         cust_rows = await db.execute(cust_query.order_by(Customer.name))
         result["customers"] = [{"id": r.id, "name": r.name, "code": r.code} for r in cust_rows]
     except Exception as e:
@@ -353,8 +404,8 @@ async def dispatch_page_init(
         veh_query = select(MasterVehicle.id, MasterVehicle.vehicle_no, MasterVehicle.vehicle_type, MasterVehicle.driver_name).where(
             MasterVehicle.is_active == True
         )
-        if scope["mill_id"]:
-            veh_query = veh_query.where(MasterVehicle.mill_id == scope["mill_id"])
+        if effective_mill_id:
+            veh_query = veh_query.where(MasterVehicle.mill_id == effective_mill_id)
         veh_rows = await db.execute(veh_query.order_by(MasterVehicle.vehicle_no))
         result["vehicles"] = [{"id": r.id, "vehicle_no": r.vehicle_no, "vehicle_type": r.vehicle_type, "driver_name": r.driver_name} for r in veh_rows]
     except Exception as e:
