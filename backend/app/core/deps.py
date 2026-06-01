@@ -38,7 +38,8 @@ async def get_current_user(
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
 
-    if user.must_change_password and request.url.path not in ("/auth/change-password", "/auth/me"):
+    allowed_paths = ("/auth/change-password", "/auth/me", "/auth/logout")
+    if user.must_change_password and not any(request.url.path.endswith(p) for p in allowed_paths):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"code": "MUST_CHANGE_PASSWORD", "message": "Please change your password to continue"},

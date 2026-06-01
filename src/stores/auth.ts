@@ -21,6 +21,7 @@ interface AuthState {
   refreshToken: string | null;
   isAuthenticated: boolean;
   login: (user: AuthUser, token: string, refreshToken?: string) => void;
+  setUser: (updates: Partial<AuthUser>) => void;
   setTokens: (token: string, refreshToken: string) => void;
   logout: () => void;
 }
@@ -40,6 +41,9 @@ export const useAuth = create<AuthState>()(
         set({ user, token, refreshToken: refreshToken ?? null, isAuthenticated: true });
         setAuthHeader(token);
       },
+      setUser: (updates) => set((state) => ({
+        user: state.user ? { ...state.user, ...updates } : null,
+      })),
       setTokens: (token, refreshToken) => {
         set({ token, refreshToken });
         setAuthHeader(token);

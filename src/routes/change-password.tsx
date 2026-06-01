@@ -15,7 +15,7 @@ export const Route = createFileRoute("/change-password")({
 
 function getStrength(password: string): { label: string; color: string; score: number } {
   let score = 0;
-  if (password.length >= 8) score++;
+  if (password.length >= 6) score++;
   if (/[A-Z]/.test(password)) score++;
   if (/[0-9]/.test(password)) score++;
   if (/[^A-Za-z0-9]/.test(password)) score++;
@@ -25,7 +25,7 @@ function getStrength(password: string): { label: string; color: string; score: n
 }
 
 const requirements = [
-  { label: "Min 8 characters", test: (p: string) => p.length >= 8 },
+  { label: "Min 6 characters", test: (p: string) => p.length >= 6 },
   { label: "1 uppercase letter", test: (p: string) => /[A-Z]/.test(p) },
   { label: "1 number", test: (p: string) => /[0-9]/.test(p) },
   { label: "1 special character", test: (p: string) => /[^A-Za-z0-9]/.test(p) },
@@ -39,18 +39,24 @@ function ChangePasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const strength = useMemo(() => getStrength(newPassword), [newPassword]);
 
   const m = useMutation({
     mutationFn: () => authApi.changePassword(currentPassword, newPassword),
     onSuccess: () => {
-      useAuth.setState({ user: user ? { ...user, mustChangePassword: false } : null });
+      useAuth.getState().setUser({ mustChangePassword: false });
       toast.success("Password changed successfully");
       navigate({ to: "/dashboard" as any });
     },
-    onError: (e: Error) => {
-      toast.error(e.message);
+    onError: (e: any) => {
+      const msg = e?.response?.data?.detail ?? e?.response?.data?.message ?? e?.message ?? "Failed to change password";
+      if (typeof msg === "object" && msg?.message) {
+        setErrorMsg(msg.message);
+      } else {
+        setErrorMsg(typeof msg === "string" ? msg : "Failed to change password");
+      }
     },
   });
 
@@ -91,7 +97,11 @@ function ChangePasswordPage() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              if (!canSubmit || m.isPending) return;
+              setErrorMsg("");
+              if (!currentPassword) { setErrorMsg("Current password is required"); return; }
+              if (!newPassword || newPassword.length < 6) { setErrorMsg("New password must be at least 6 characters"); return; }
+              if (newPassword !== confirmPassword) { setErrorMsg("Passwords do not match"); return; }
+              if (m.isPending) return;
               m.mutate();
             }}
             className="space-y-4"
@@ -176,6 +186,12 @@ function ChangePasswordPage() {
                 <p className="text-xs text-red-500">Passwords do not match</p>
               )}
             </div>
+
+            {errorMsg && (
+              <div className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 text-sm text-red-700 dark:text-red-400">
+                {errorMsg}
+              </div>
+            )}
 
             <Button type="submit" className="w-full" disabled={!canSubmit || m.isPending}>
               {m.isPending ? "Updating Password…" : "Update Password"}

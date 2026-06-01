@@ -244,12 +244,26 @@ async def change_password(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not verify_password(req.current_password, current_user.password_hash):
-        raise SpinFlowException.bad_request("Current password is incorrect", ErrorCode.INVALID_VALUE)
-    current_user.password_hash = hash_password(req.new_password)
-    current_user.must_change_password = False
-    await db.flush()
-    return {"message": "Password changed successfully"}
+    try:
+        if not verify_password(req.current_password, current_user.password_hash):
+            raise SpinFlowException.bad_request("Current password is incorrect", ErrorCode.INVALID_VALUE)
+
+        if len(req.new_password) < 6:
+            raise SpinFlowException.bad_request("New password must be at least 6 characters", ErrorCode.INVALID_VALUE)
+
+        current_user.password_hash = hash_password(req.new_password)
+        current_user.must_change_password = False
+        current_user.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+
+        return {"success": True, "message": "Password changed successfully"}
+
+    except SpinFlowException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/auth/forgot-password")
