@@ -28,6 +28,19 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
+function mapUser(u: Record<string, unknown>): AuthUser {
+  return {
+    id: u.id as string,
+    name: u.name as string,
+    email: u.email as string,
+    role: u.role as Role,
+    millId: (u.mill_id as string) ?? "",
+    millName: (u.mill_name as string) ?? "",
+    companyId: u.company_id as string | undefined,
+    mustChangePassword: u.must_change_password as boolean,
+  };
+}
+
 function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuth((s) => s.login);
@@ -102,9 +115,9 @@ function LoginPage() {
               m.mutate(undefined, {
                 onSuccess: (r) => {
                   setFailedAttempts(0);
-                  setAuth(r.user, r.token, r.refreshToken);
+                  setAuth(mapUser(r.user), r.access_token, r.refresh_token);
                   toast.success(`Welcome, ${r.user?.name ?? "User"}`);
-                  if (r.user?.mustChangePassword) {
+                  if (r.user?.must_change_password) {
                     navigate({ to: "/change-password" });
                   } else {
                     navigate({ to: "/dashboard" });
@@ -160,9 +173,9 @@ function LoginPage() {
                       setTimeout(() => {
                         m.mutate(undefined, {
                           onSuccess: (r) => {
-                            setAuth(r.user, r.token, r.refreshToken);
+                            setAuth(mapUser(r.user), r.access_token, r.refresh_token);
                             toast.success(`Welcome, ${r.user?.name ?? "User"}`);
-                            if (r.user?.mustChangePassword) {
+                            if (r.user?.must_change_password) {
                               navigate({ to: "/change-password" });
                             } else {
                               navigate({ to: "/dashboard" });
