@@ -1,18 +1,19 @@
-const PING_INTERVAL = 2 * 60 * 1000
+const PING_INTERVAL = 90 * 1000
+const PING_URL = "https://spinflow.onrender.com/api/health"
+
+function ping() {
+  fetch(PING_URL, { method: "GET", cache: "no-store" }).catch(() => {})
+}
 
 export function startKeepAlive() {
-  const base = import.meta.env.VITE_API_BASE_URL || "https://spinflow.onrender.com"
-
-  const ping = async () => {
-    try {
-      await fetch(`${base}/api/health`, { method: "GET", cache: "no-store" })
-    } catch {
-      // silent — don't surface keep-alive errors to user
-    }
-  }
-
   ping()
-  return setInterval(ping, PING_INTERVAL)
+  const intervalId = setInterval(ping, PING_INTERVAL)
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) ping()
+  })
+
+  return intervalId
 }
 
 export function stopKeepAlive(intervalId: ReturnType<typeof setInterval>) {
