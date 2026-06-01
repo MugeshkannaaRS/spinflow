@@ -4,8 +4,8 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/layout/SidebarContext";
 import { AlertBanner } from "@/components/common/AlertBanner";
 import { useEffect, useState } from "react";
+import { Topbar } from "@/components/layout/Topbar";
 import { cn } from "@/lib/utils";
-import { Menu, X } from "lucide-react";
 
 export const Route = createFileRoute("/_app")({
   beforeLoad: () => {
@@ -56,7 +56,7 @@ function RedirectOnMustChangePassword() {
 }
 
 function AppShell() {
-  const { open, close, toggle } = useSidebar();
+  const { open, close } = useSidebar();
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem("spinflow_sidebar_collapsed") === "true"
   );
@@ -71,17 +71,6 @@ function AppShell() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--bg-secondary)]">
-      {/* Floating hamburger — mobile only */}
-      <button
-        onClick={toggle}
-        className="lg:hidden fixed top-3 left-3 z-30 p-2 rounded-lg bg-white dark:bg-slate-800 shadow-md border border-gray-200 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
-        aria-label="Open menu"
-      >
-        <Menu className="w-5 h-5 text-gray-600 dark:text-slate-400" />
-      </button>
-
-      {/* Close button inside sidebar when open on mobile — handled by Sidebar itself */}
-
       <Sidebar open={open} onClose={close} />
       <div
         className={cn(
@@ -89,6 +78,7 @@ function AppShell() {
           collapsed ? "lg:ml-16" : "lg:ml-60",
         )}
       >
+        <Topbar />
         <AlertBanner />
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-slate-900 p-4 lg:p-6">
           <Outlet />

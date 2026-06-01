@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { auditApi } from "@/lib/api-service";
-import { Topbar } from "@/components/layout/Topbar";
 import { AccessGuard } from "@/components/AccessGuard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -103,14 +102,12 @@ function AuditPage() {
   if (logsQ.isLoading)
     return (
       <>
-        <Topbar title="Audit Logs" subtitle="Loading..." />
         <div className="p-6 text-sm text-muted-foreground">Loading data…</div>
       </>
     );
   if (logsQ.isError)
     return (
       <>
-        <Topbar title="Audit Logs" subtitle="Error" />
         <div className="p-6 text-sm text-destructive">Error loading data.</div>
       </>
     );
@@ -122,10 +119,6 @@ function AuditPage() {
 
   return (
     <>
-      <Topbar
-        title="Audit Logs"
-        subtitle="Complete trail of user actions, system changes & security events"
-      />
       <AccessGuard module="audit">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           <div className="grid gap-4 grid-cols-2 md:grid-cols-4">

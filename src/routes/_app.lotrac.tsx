@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { loTracApi, mastersApi, salesApi, stockApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
-import { Topbar } from "@/components/layout/Topbar";
 import { AccessGuard } from "@/components/AccessGuard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -137,7 +136,6 @@ function LotracPage() {
 
   return (
     <>
-      <Topbar title="LoTrac" subtitle="Trip Logistics — QR-based bag tracking" />
       <AccessGuard module="lotrac">
         <div className="p-4 md:p-6">
           <Tabs value={tab} onValueChange={handleTabChange}>

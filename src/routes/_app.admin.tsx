@@ -5,7 +5,6 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 import { z } from "zod";
 
-import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DataTable } from "@/components/ui/DataTable";
@@ -210,7 +209,6 @@ function AdminPage() {
   if (!user || user.role !== "SUPER_ADMIN") {
     return (
       <>
-        <Topbar title="Admin Panel" subtitle="Access denied" />
         <div className="p-6 text-destructive text-lg font-medium">
           Only Super Admin can access this page.
         </div>
@@ -220,7 +218,6 @@ function AdminPage() {
 
   return (
     <>
-      <Topbar title="Admin Panel" subtitle="Super admin control panel" />
       <div className="p-6">
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="flex-wrap h-auto">

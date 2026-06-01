@@ -103,11 +103,11 @@ function NotificationsDropdown() {
 }
 
 export function Topbar({
-  title,
+  title = "SpinFlow",
   subtitle,
   children,
 }: {
-  title: string;
+  title?: string;
   subtitle?: string;
   children?: React.ReactNode;
 }) {

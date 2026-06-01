@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { reportsApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { AccessGuard } from "@/components/AccessGuard";
-import { Topbar } from "@/components/layout/Topbar";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -104,54 +104,55 @@ function ReportsPage() {
 
   return (
     <>
-      <Topbar
-        title="Reports & Analytics"
-        subtitle="Cross-module performance reports, KPIs & exportable summaries"
-      >
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleExport("Production PDF", () => exportApi.productionPdf())}
-            disabled={exporting !== null}
-          >
-            {exporting === "Production PDF" ? (
-              <Loader2 className="size-3 animate-spin mr-1" />
-            ) : (
-              <Download className="size-3 mr-1" />
-            )}
-            Prod PDF
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleExport("Production XLSX", () => exportApi.productionXlsx())}
-            disabled={exporting !== null}
-          >
-            {exporting === "Production XLSX" ? (
-              <Loader2 className="size-3 animate-spin mr-1" />
-            ) : (
-              <Download className="size-3 mr-1" />
-            )}
-            Prod XLSX
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleExport("Dispatch PDF", () => exportApi.dispatchPdf())}
-            disabled={exporting !== null}
-          >
-            {exporting === "Dispatch PDF" ? (
-              <Loader2 className="size-3 animate-spin mr-1" />
-            ) : (
-              <Download className="size-3 mr-1" />
-            )}
-            Dispatch PDF
-          </Button>
-        </div>
-      </Topbar>
       <AccessGuard module="reports">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-semibold">Reports & Analytics</h1>
+              <p className="text-sm text-muted-foreground">Cross-module performance reports, KPIs & exportable summaries</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleExport("Production PDF", () => exportApi.productionPdf())}
+                disabled={exporting !== null}
+              >
+                {exporting === "Production PDF" ? (
+                  <Loader2 className="size-3 animate-spin mr-1" />
+                ) : (
+                  <Download className="size-3 mr-1" />
+                )}
+                Prod PDF
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleExport("Production XLSX", () => exportApi.productionXlsx())}
+                disabled={exporting !== null}
+              >
+                {exporting === "Production XLSX" ? (
+                  <Loader2 className="size-3 animate-spin mr-1" />
+                ) : (
+                  <Download className="size-3 mr-1" />
+                )}
+                Prod XLSX
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleExport("Dispatch PDF", () => exportApi.dispatchPdf())}
+                disabled={exporting !== null}
+              >
+                {exporting === "Dispatch PDF" ? (
+                  <Loader2 className="size-3 animate-spin mr-1" />
+                ) : (
+                  <Download className="size-3 mr-1" />
+                )}
+                Dispatch PDF
+              </Button>
+            </div>
+          </div>
           <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
             <Card>
               <CardContent className="p-5">

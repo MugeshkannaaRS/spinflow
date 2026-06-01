@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 import { AccessGuard } from "@/components/AccessGuard";
-import { Topbar } from "@/components/layout/Topbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -217,7 +216,6 @@ function ColumnConfigPage() {
   if (!user || user.role !== "SUPER_ADMIN") {
     return (
       <>
-        <Topbar title="Column Configurator" subtitle="Access denied" />
         <div className="p-6 text-destructive">Only Super Admin can access this page.</div>
       </>
     );
@@ -225,7 +223,6 @@ function ColumnConfigPage() {
 
   return (
     <>
-      <Topbar title="Column Configurator" subtitle="Customize field labels, visibility & order per table" />
       <AccessGuard module="masters">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           <div className="flex items-center gap-4 mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">

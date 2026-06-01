@@ -5,7 +5,7 @@ import { ROLES, ROLE_LABELS, type Module } from "@/lib/rbac";
 import type { Role } from "@/lib/rbac";
 import { useAuth } from "@/stores/auth";
 import { AccessGuard } from "@/components/AccessGuard";
-import { Topbar } from "@/components/layout/Topbar";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -271,197 +271,198 @@ function UsersPage() {
 
   return (
     <>
-      <Topbar
-        title="Users & Roles"
-        subtitle="User management, role assignment, permissions & activity tracking"
-      >
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetTrigger asChild>
-            <Button onClick={openNewUser}>
-              <Plus className="size-4 mr-2" />
-              New User
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>{editingUser ? "Edit User" : "Create New User"}</SheetTitle>
-              <SheetDescription>
-                {editingUser
-                  ? "Update user details and role."
-                  : "Fill in the details to create a new user."}
-              </SheetDescription>
-            </SheetHeader>
-            <div className="space-y-4 mt-6">
-              <div className="space-y-2">
-                <Label htmlFor="full_name">Full Name</Label>
-                <Input
-                  id="full_name"
-                  value={form.full_name}
-                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                  placeholder="John Doe"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  placeholder="john@mill.com"
-                />
-              </div>
-              {!editingUser && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="password"
-                        type={showPwd ? "text" : "password"}
-                        value={form.password}
-                        onChange={(e) => setForm({ ...form, password: e.target.value })}
-                        placeholder="Min 8 chars"
-                      />
-                      <button
-                        type="button"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground cursor-pointer"
-                        onClick={() => setShowPwd(!showPwd)}
-                      >
-                        {showPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="confirmPassword"
-                        type={showConfirmPwd ? "text" : "password"}
-                        value={form.confirmPassword}
-                        onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                        placeholder="Re-enter password"
-                      />
-                      <button
-                        type="button"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground cursor-pointer"
-                        onClick={() => setShowConfirmPwd(!showConfirmPwd)}
-                      >
-                        {showConfirmPwd ? (
-                          <EyeOff className="size-4" />
-                        ) : (
-                          <Eye className="size-4" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
-                  <SelectTrigger id="role">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ROLES.map((role) => (
-                      <SelectItem key={role} value={role}>
-                        {ROLE_LABELS[role]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {editingUser && ROLE_DESCRIPTIONS[form.role] && (
-                <Card className="bg-muted/50">
-                  <CardContent className="pt-4 text-sm text-muted-foreground">
-                    <ShieldCheck className="size-4 inline mr-1.5 text-primary" />
-                    {ROLE_DESCRIPTIONS[form.role]}
-                  </CardContent>
-                </Card>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="company_id">Company</Label>
-                <Select
-                  value={form.company_id}
-                  onValueChange={(v) => setForm({ ...form, company_id: v, mill_id: "" })}
-                  disabled={!isSuperAdmin && !!currentUser?.companyId}
-                >
-                  <SelectTrigger id="company_id">
-                    <SelectValue placeholder="Select company" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies.filter((c: any) => c?.id).map((c: any) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="mill_id">
-                  Mill{" "}
-                  {form.role !== "MILL_OWNER" ? (
-                    <span className="text-destructive">*</span>
-                  ) : (
-                    "(optional)"
-                  )}
-                </Label>
-                <Select
-                  value={form.mill_id}
-                  onValueChange={(v) => setForm({ ...form, mill_id: v })}
-                  disabled={!form.company_id}
-                >
-                  <SelectTrigger id="mill_id">
-                    <SelectValue
-                      placeholder={form.company_id ? "Select mill" : "Select company first"}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredMills.filter((m: any) => m?.id).map((m: any) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="department">Department (optional)</Label>
-                <Input
-                  id="department"
-                  value={form.department ?? ""}
-                  onChange={(e) => setForm({ ...form, department: e.target.value })}
-                  placeholder="e.g. Spinning"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="mobile">Mobile (optional)</Label>
-                <Input
-                  id="mobile"
-                  value={form.mobile ?? ""}
-                  onChange={(e) => setForm({ ...form, mobile: e.target.value })}
-                  placeholder="+91 9876543210"
-                />
-              </div>
-              <Button
-                className="w-full cursor-pointer"
-                onClick={handleSubmit}
-                disabled={
-                  createMutation.isPending ||
-                  updateMutation.isPending ||
-                  !!(!editingUser && form.password !== form.confirmPassword)
-                }
-              >
-                {editingUser ? "Update User" : "Create User"}
-              </Button>
-            </div>
-          </SheetContent>
-        </Sheet>
-      </Topbar>
       <AccessGuard module="users">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-lg font-semibold">Users & Roles</h1>
+              <p className="text-sm text-muted-foreground">User management, role assignment, permissions & activity tracking</p>
+            </div>
+            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+              <SheetTrigger asChild>
+                <Button onClick={openNewUser}>
+                  <Plus className="size-4 mr-2" />
+                  New User
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>{editingUser ? "Edit User" : "Create New User"}</SheetTitle>
+                  <SheetDescription>
+                    {editingUser
+                      ? "Update user details and role."
+                      : "Fill in the details to create a new user."}
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="space-y-4 mt-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="full_name">Full Name</Label>
+                    <Input
+                      id="full_name"
+                      value={form.full_name}
+                      onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                      placeholder="John Doe"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      placeholder="john@mill.com"
+                    />
+                  </div>
+                  {!editingUser && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="password">Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="password"
+                            type={showPwd ? "text" : "password"}
+                            value={form.password}
+                            onChange={(e) => setForm({ ...form, password: e.target.value })}
+                            placeholder="Min 8 chars"
+                          />
+                          <button
+                            type="button"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground cursor-pointer"
+                            onClick={() => setShowPwd(!showPwd)}
+                          >
+                            {showPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="confirmPassword">Confirm Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="confirmPassword"
+                            type={showConfirmPwd ? "text" : "password"}
+                            value={form.confirmPassword}
+                            onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                            placeholder="Re-enter password"
+                          />
+                          <button
+                            type="button"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground cursor-pointer"
+                            onClick={() => setShowConfirmPwd(!showConfirmPwd)}
+                          >
+                            {showConfirmPwd ? (
+                              <EyeOff className="size-4" />
+                            ) : (
+                              <Eye className="size-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="role">Role</Label>
+                    <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v })}>
+                      <SelectTrigger id="role">
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROLES.map((role) => (
+                          <SelectItem key={role} value={role}>
+                            {ROLE_LABELS[role]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {editingUser && ROLE_DESCRIPTIONS[form.role] && (
+                    <Card className="bg-muted/50">
+                      <CardContent className="pt-4 text-sm text-muted-foreground">
+                        <ShieldCheck className="size-4 inline mr-1.5 text-primary" />
+                        {ROLE_DESCRIPTIONS[form.role]}
+                      </CardContent>
+                    </Card>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="company_id">Company</Label>
+                    <Select
+                      value={form.company_id}
+                      onValueChange={(v) => setForm({ ...form, company_id: v, mill_id: "" })}
+                      disabled={!isSuperAdmin && !!currentUser?.companyId}
+                    >
+                      <SelectTrigger id="company_id">
+                        <SelectValue placeholder="Select company" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.filter((c: any) => c?.id).map((c: any) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="mill_id">
+                      Mill{" "}
+                      {form.role !== "MILL_OWNER" ? (
+                        <span className="text-destructive">*</span>
+                      ) : (
+                        "(optional)"
+                      )}
+                    </Label>
+                    <Select
+                      value={form.mill_id}
+                      onValueChange={(v) => setForm({ ...form, mill_id: v })}
+                      disabled={!form.company_id}
+                    >
+                      <SelectTrigger id="mill_id">
+                        <SelectValue
+                          placeholder={form.company_id ? "Select mill" : "Select company first"}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredMills.filter((m: any) => m?.id).map((m: any) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="department">Department (optional)</Label>
+                    <Input
+                      id="department"
+                      value={form.department ?? ""}
+                      onChange={(e) => setForm({ ...form, department: e.target.value })}
+                      placeholder="e.g. Spinning"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="mobile">Mobile (optional)</Label>
+                    <Input
+                      id="mobile"
+                      value={form.mobile ?? ""}
+                      onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+                      placeholder="+91 9876543210"
+                    />
+                  </div>
+                  <Button
+                    className="w-full cursor-pointer"
+                    onClick={handleSubmit}
+                    disabled={
+                      createMutation.isPending ||
+                      updateMutation.isPending ||
+                      !!(!editingUser && form.password !== form.confirmPassword)
+                    }
+                  >
+                    {editingUser ? "Update User" : "Create User"}
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
           <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
