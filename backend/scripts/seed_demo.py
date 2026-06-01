@@ -112,9 +112,9 @@ async def seed():
         if admin_role:
             from app.core.security import hash_password
             admin = User(
-                name="Demo Admin",
-                email="demo@araffath.in",
-                password_hash=hash_password("Demo@1234"),
+                name="Super Admin",
+                email="admin@mill.spinflow",
+                password_hash=hash_password("Admin@1234"),
                 role_id=admin_role.id,
                 mill_id=mill.id,
                 mill_name=mill.name,
@@ -124,7 +124,7 @@ async def seed():
             )
             db.add(admin)
             await db.flush()
-            print(f"Created admin user: {admin.email} / Demo@1234")
+            print(f"Created admin user: {admin.email} / Admin@1234")
 
         # Create customers
         for c in CUSTOMERS:
@@ -208,7 +208,7 @@ async def seed():
         print(f"   Mill: {DEMO_DATA['mill']}")
         print(f"   Employees: {DEMO_DATA['total_employees']}")
         print(f"   Production entries: {len(production_entries)}")
-        print(f"   Login: demo@araffath.in / Demo@1234")
+        print(f"   Login: admin@mill.spinflow / Admin@1234")
 
 
 if __name__ == "__main__":

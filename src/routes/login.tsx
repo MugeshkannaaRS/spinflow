@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { ROLE_LABELS, type Role } from "@/lib/rbac";
+import { AxiosError } from "axios";
 import { Factory } from "lucide-react";
 import { toast } from "sonner";
 
@@ -34,6 +35,13 @@ function LoginPage() {
   const [password, setPassword] = useState("Admin@1234");
   const [failedAttempts, setFailedAttempts] = useState(0);
   const isLockedOut = failedAttempts >= 5;
+
+  function getApiError(e: unknown): string {
+    if (e instanceof AxiosError && e.response?.data?.detail) return e.response.data.detail;
+    if (e instanceof AxiosError && e.response?.data?.message) return e.response.data.message;
+    if (e instanceof Error) return e.message;
+    return "Login failed. Please try again.";
+  }
 
   const m = useMutation({
     mutationFn: async () => {
@@ -102,9 +110,9 @@ function LoginPage() {
                     navigate({ to: "/dashboard" });
                   }
                 },
-                onError: (e: Error) => {
+                onError: (e) => {
                   setFailedAttempts((n) => n + 1);
-                  toast.error(e.message);
+                  toast.error(getApiError(e));
                 },
               });
             }}
@@ -160,7 +168,7 @@ function LoginPage() {
                               navigate({ to: "/dashboard" });
                             }
                           },
-                          onError: (e: Error) => toast.error(e.message),
+                          onError: (e) => toast.error(getApiError(e)),
                         });
                       }, 0);
                     }}

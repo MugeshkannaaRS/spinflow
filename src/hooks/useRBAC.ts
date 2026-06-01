@@ -60,7 +60,8 @@ export function useRBAC() {
   const { data: companyModules, isSuccess: modulesLoaded } = useQuery({
     queryKey: ["company-modules", user?.companyId],
     queryFn: async () => {
-      if (!user?.companyId || isSuperAdmin) return null;
+      if (isSuperAdmin) return null;
+      if (!user?.companyId) return null;
       try {
         const res = await api.get(`/admin/companies/${user.companyId}/modules`);
         console.log("Company modules loaded:", res.data);
@@ -73,7 +74,7 @@ export function useRBAC() {
         return null;
       }
     },
-    enabled: !!user?.companyId && !isSuperAdmin,
+    enabled: !isSuperAdmin,
     staleTime: 0,
     refetchOnWindowFocus: true,
     retry: false,
