@@ -42,38 +42,38 @@ export function StatCard({
     <div
       onClick={onClick}
       className={cn(
-        "relative bg-white dark:bg-slate-800 rounded-2xl p-5",
+        "relative bg-white dark:bg-slate-800 rounded-xl lg:rounded-2xl p-3 lg:p-5",
         "border border-gray-100 dark:border-slate-700",
         "shadow-sm hover:shadow-md transition-all duration-200",
-        alert && "border-l-4 border-l-red-500",
+        alert && "border-l-4 lg:border-l-4 border-l-red-500",
         onClick && "cursor-pointer hover:-translate-y-0.5"
       )}
     >
-      <div className="flex items-start justify-between mb-3">
-        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">
+      <div className="flex items-start justify-between mb-2 lg:mb-3">
+        <p className="text-[10px] lg:text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">
           {title}
         </p>
         <div className={cn(
-          "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
+          "w-8 h-8 lg:w-10 lg:h-10 rounded-lg lg:rounded-xl flex items-center justify-center flex-shrink-0",
           c.iconBg
         )}>
-          <Icon className={cn("w-5 h-5", c.iconColor)} />
+          <Icon className={cn("w-4 h-4 lg:w-5 lg:h-5", c.iconColor)} />
         </div>
       </div>
 
-      <div className="mb-1">
-        <span className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
+      <div className="mb-0.5 lg:mb-1">
+        <span className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
           {value}
         </span>
       </div>
 
       {subtitle && (
-        <p className="text-sm text-gray-500 dark:text-slate-400 mb-2">{subtitle}</p>
+        <p className="text-[11px] lg:text-sm text-gray-500 dark:text-slate-400 mb-1 lg:mb-2">{subtitle}</p>
       )}
 
       {trend && (
         <div className={cn(
-          "flex items-center gap-1 text-xs font-medium mt-1",
+          "flex items-center gap-1 text-[10px] lg:text-xs font-medium mt-0.5 lg:mt-1",
           trendUp ? "text-emerald-600" : "text-red-500"
         )}>
           {trendUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
@@ -82,12 +82,12 @@ export function StatCard({
       )}
 
       {progress !== undefined && (
-        <div className="mt-3">
-          <div className="flex justify-between text-xs text-gray-400 mb-1">
+        <div className="mt-2 lg:mt-3">
+          <div className="flex justify-between text-[10px] lg:text-xs text-gray-400 mb-0.5 lg:mb-1">
             <span>{progressLabel}</span>
             <span className="font-medium">{progress.toFixed(1)}%</span>
           </div>
-          <div className="h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
+          <div className="h-1 lg:h-1.5 bg-gray-100 dark:bg-slate-700 rounded-full overflow-hidden">
             <div
               className={cn("h-full rounded-full transition-all duration-700", c.progressBar)}
               style={{ width: `${Math.min(progress, 100)}%` }}

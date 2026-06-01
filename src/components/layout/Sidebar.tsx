@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { User } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/stores/auth";
 import { useTheme } from "@/hooks/useTheme";
@@ -234,9 +235,11 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                 ))}
               </select>
             ) : (
-              <p className="text-xs font-medium text-blue-100 truncate mb-0.5">{displayMillName}</p>
+              <Link to={"/profile" as any} className="block rounded-lg transition-colors hover:bg-blue-800/20 -mx-1 px-2 py-1">
+                <p className="text-xs font-medium text-blue-100 truncate">{displayMillName}</p>
+              </Link>
             )}
-            <p className="text-xs text-blue-400">{user.role.replace(/_/g, " ")}</p>
+            <Link to={"/profile" as any} className="text-xs text-blue-400 hover:text-blue-300 transition-colors block">{user.role.replace(/_/g, " ")}</Link>
           </div>
         )}
 

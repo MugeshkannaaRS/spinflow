@@ -113,7 +113,7 @@ function Dashboard() {
         )}
 
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-gray-100 dark:border-slate-700 shadow-sm">
                 <Skeleton className="h-3 w-20 mb-2" />
@@ -123,7 +123,7 @@ function Dashboard() {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
             <StatCard
               title="Today's Production"
               value={`${prodToday.toLocaleString()} kg`}

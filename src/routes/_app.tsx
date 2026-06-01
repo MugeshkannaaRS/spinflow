@@ -3,7 +3,8 @@ import { useAuth } from "@/stores/auth";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/layout/SidebarContext";
 import { AlertBanner } from "@/components/common/AlertBanner";
-import { MobileNav } from "@/components/layout/MobileNav";
+
+
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -79,11 +80,10 @@ function AppShell() {
         )}
       >
         <AlertBanner />
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-slate-900 p-4 lg:p-6 pb-16 lg:pb-6">
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-slate-900 p-4 lg:p-6">
           <Outlet />
         </main>
       </div>
-      <MobileNav />
     </div>
   );
 }

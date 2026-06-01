@@ -70,7 +70,7 @@ export function MobileNav() {
 
   const middleTabs = CANDIDATE_TABS.filter(t => canAccess(t.module)).slice(0, 3);
 
-  const bottomTabs = [
+  const bottomTabs: Array<{ to: string | null; label: string; icon: any; isAlert?: boolean }> = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     ...middleTabs,
     { to: null, label: "Alerts", icon: Bell, isAlert: true },
