@@ -91,12 +91,12 @@
   --sidebar-bg: #0f1923;
   --sidebar-active-bg: #1e2d3d;
   --sidebar-hover-bg: #162030;
-  --sidebar-text: #6b7280;
+  --sidebar-text: #94a3b8;
   --sidebar-text-active: #ffffff;
-  --sidebar-icon: #4b5563;
+  --sidebar-icon: #94a3b8;
   --sidebar-icon-active: #ffffff;
   --sidebar-border-color: rgba(255,255,255,0.06);
-  --sidebar-group-label: #374151;
+  --sidebar-group-label: #64748b;
   --card-shadow: 0 1px 3px rgba(0,0,0,0.1);
   --card-shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
 }

@@ -160,7 +160,7 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
         {filteredGroups.map((group) => (
           <div key={group.label} className="mb-1">
             {!collapsed && (
-              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#374151]">
+              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#64748b]">
                 {group.label}
               </div>
             )}
@@ -177,7 +177,7 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                     collapsed ? "justify-center py-2.5" : "px-3 py-2",
                     active
                       ? "bg-[#1e2d3d] text-white"
-                      : "text-[#6b7280] hover:bg-[#162030] hover:text-[#d1d5db]",
+                      : "text-[#94a3b8] hover:bg-[#1a2d42] hover:text-[#d1d5db]",
                   )}
                 >
                   <Icon
@@ -213,14 +213,14 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
           <Link
             to="/profile"
             onClick={onNavClick}
-            className="flex items-center gap-3 px-2 py-2 rounded-lg text-[#9ca3af] hover:bg-[#162030] transition-colors"
+            className="flex items-center gap-3 px-2 py-2 rounded-lg text-[#9ca3af] hover:bg-[#1a2d42] transition-colors"
           >
             <div className="w-7 h-7 rounded-full bg-[#0d9488] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
               {user?.name?.charAt(0)?.toUpperCase() ?? "U"}
             </div>
             <div className="min-w-0">
               <div className="text-xs font-medium text-white truncate">{user?.name}</div>
-              <div className="text-[10px] text-[#6b7280] truncate">{user?.role?.replace(/_/g, " ")}</div>
+              <div className="text-[10px] text-[#94a3b8] truncate">{user?.role?.replace(/_/g, " ")}</div>
             </div>
           </Link>
         ) : (
@@ -237,7 +237,7 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
             localStorage.setItem("spinflow_sidebar_collapsed", String(!isCollapsed));
             window.dispatchEvent(new Event("sidebar-collapse-change"));
           }}
-          className="hidden lg:flex w-full items-center justify-center mt-2 py-1.5 rounded-lg text-[#4b5563] hover:bg-[#162030] transition-colors"
+          className="hidden lg:flex w-full items-center justify-center mt-2 py-1.5 rounded-lg text-[#94a3b8] hover:bg-[#1a2d42] transition-colors"
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
@@ -294,7 +294,7 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
           >
             <button
               onClick={onClose}
-              className="absolute right-3 top-4 p-1 rounded-md text-[#6b7280] hover:bg-[#162030]"
+              className="absolute right-3 top-4 p-1 rounded-md text-[#6b7280] hover:bg-[#1a2d42]"
             >
               <X className="size-5" />
             </button>
