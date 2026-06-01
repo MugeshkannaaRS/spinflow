@@ -69,10 +69,10 @@ def require_module(module: str, write: bool = False):
 async def get_mill_scope(current_user: User = Depends(get_current_user)):
     role_name = current_user.role
     if role_name == "SUPER_ADMIN":
-        return {"mill_id": None, "company_id": None, "role": role_name}
+        return {"mill_id": None, "company_id": None, "role": role_name, "see_all_company_mills": False}
     if role_name == "MILL_OWNER":
-        return {"mill_id": None, "company_id": current_user.company_id, "role": role_name}
-    return {"mill_id": current_user.mill_id, "company_id": current_user.company_id, "role": role_name}
+        return {"mill_id": current_user.mill_id, "company_id": current_user.company_id, "role": role_name, "see_all_company_mills": True}
+    return {"mill_id": current_user.mill_id, "company_id": current_user.company_id, "role": role_name, "see_all_company_mills": False}
 
 
 async def log_audit(

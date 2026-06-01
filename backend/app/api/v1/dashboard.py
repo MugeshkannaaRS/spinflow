@@ -382,59 +382,74 @@ async def get_dashboard_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dashboard")),
 ):
-    scope = await get_mill_scope(current_user)
-    mill_id = scope.get("mill_id")
-    company_id = scope.get("company_id")
-    today = date.today()
-
-    results = {}
-
     try:
-        q = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
-        if mill_id:
-            q = q.where(ProductionEntry.mill_id == mill_id)
-        if company_id and not mill_id:
-            q = q.join(Mill).where(Mill.company_id == company_id)
-        q = q.where(func.date(ProductionEntry.date) == today)
-        results["production_today"] = float((await db.execute(q)).scalar() or 0)
-    except Exception:
-        results["production_today"] = 0
+        scope = await get_mill_scope(current_user)
+        mill_id = scope.get("mill_id") or current_user.mill_id
 
-    try:
-        q = select(func.count(MaintenanceLog.id)).where(MaintenanceLog.status == "open")
-        if mill_id:
-            q = q.where(MaintenanceLog.mill_id == mill_id)
-        results["active_breakdowns"] = int((await db.execute(q)).scalar() or 0)
-    except Exception:
-        results["active_breakdowns"] = 0
+        # Fallback: if no mill_id, try first mill in their company
+        if not mill_id and current_user.company_id:
+            mill_result = await db.execute(
+                select(Mill).where(Mill.company_id == current_user.company_id).limit(1)
+            )
+            fallback_mill = mill_result.scalar_one_or_none()
+            mill_id = fallback_mill.id if fallback_mill else None
 
-    try:
-        q = select(func.count(Trip.id)).where(Trip.status == "pending")
-        if mill_id:
-            q = q.where(Trip.mill_id == mill_id)
-        results["pending_dispatch"] = int((await db.execute(q)).scalar() or 0)
-    except Exception:
-        results["pending_dispatch"] = 0
+        today = date.today()
+        results = {}
 
-    try:
-        q = select(func.count(Employee.id)).where(Employee.is_active == True)
-        if mill_id:
-            q = q.where(Employee.mill_id == mill_id)
-        results["total_employees"] = int((await db.execute(q)).scalar() or 0)
-    except Exception:
-        results["total_employees"] = 0
+        try:
+            q = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
+            if mill_id:
+                q = q.where(ProductionEntry.mill_id == mill_id)
+            q = q.where(func.date(ProductionEntry.date) == today)
+            results["production_today"] = float((await db.execute(q)).scalar() or 0)
+        except Exception:
+            results["production_today"] = 0
 
-    try:
-        q = select(func.count(Lot.id)).where(Lot.status == "in-stock")
-        if mill_id:
-            q = q.where(Lot.mill_id == mill_id)
-        results["stock_lots"] = int((await db.execute(q)).scalar() or 0)
-    except Exception:
-        results["stock_lots"] = 0
+        try:
+            q = select(func.count(MaintenanceLog.id)).where(MaintenanceLog.status == "open")
+            if mill_id:
+                q = q.where(MaintenanceLog.mill_id == mill_id)
+            results["active_breakdowns"] = int((await db.execute(q)).scalar() or 0)
+        except Exception:
+            results["active_breakdowns"] = 0
 
-    results.setdefault("efficiency_today", 0)
-    results.setdefault("quality_rejection", 0)
-    results.setdefault("target_achievement", 0)
-    results.setdefault("production_target", 3000)
+        try:
+            q = select(func.count(Trip.id)).where(Trip.status == "pending")
+            if mill_id:
+                q = q.where(Trip.mill_id == mill_id)
+            results["pending_dispatch"] = int((await db.execute(q)).scalar() or 0)
+        except Exception:
+            results["pending_dispatch"] = 0
 
-    return results
+        try:
+            q = select(func.count(Employee.id)).where(Employee.is_active == True)
+            if mill_id:
+                q = q.where(Employee.mill_id == mill_id)
+            results["total_employees"] = int((await db.execute(q)).scalar() or 0)
+        except Exception:
+            results["total_employees"] = 0
+
+        try:
+            q = select(func.count(Lot.id)).where(Lot.status == "in-stock")
+            if mill_id:
+                q = q.where(Lot.mill_id == mill_id)
+            results["stock_lots"] = int((await db.execute(q)).scalar() or 0)
+        except Exception:
+            results["stock_lots"] = 0
+
+        results.setdefault("efficiency_today", 0)
+        results.setdefault("quality_rejection", 0)
+        results.setdefault("target_achievement", 0)
+        results.setdefault("production_target", 3000)
+
+        return results
+
+    except Exception as e:
+        print(f"Dashboard summary error: {e}")
+        return {
+            "production_today": 0, "production_target": 3000, "efficiency_today": 0,
+            "quality_rejection": 0, "target_achievement": 0,
+            "active_breakdowns": 0, "pending_dispatch": 0,
+            "total_employees": 0, "stock_lots": 0,
+        }

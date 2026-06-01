@@ -118,7 +118,7 @@ function Dashboard() {
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
               Good {getGreeting()}, {user?.name?.split(" ")[0] ?? "User"}
             </h1>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">Live operations overview</p>
+            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">{user?.millName ?? "Your mill"} · Live operations overview</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>

@@ -89,10 +89,13 @@ async def create_user(
         if not mill:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mill not found")
         company_id = mill.company_id
+        mill_name = mill.name
 
         # Validate mill belongs to creator's company scope
         if scope.get("company_id") and mill.company_id != scope["company_id"]:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Mill does not belong to your company")
+    else:
+        mill_name = None
 
     # Check user limit for company
     if company_id:
@@ -121,6 +124,7 @@ async def create_user(
         department=req.department,
         phone=req.mobile,
         mill_id=mill_id,
+        mill_name=mill_name,
         company_id=company_id,
         is_active=True,
         must_change_password=True,

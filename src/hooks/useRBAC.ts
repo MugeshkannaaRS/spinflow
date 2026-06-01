@@ -23,13 +23,33 @@ const ROLE_MODULES: Record<string, string[]> = {
   AUDITOR: ["dashboard", "production", "quality", "hr", "accounts"],
 };
 
-const KEY_MAP: Record<string, string> = {
+const DB_MODULE_KEY_MAP: Record<string, string> = {
+  "dashboard": "dashboard",
+  "production": "production",
+  "quality": "quality",
+  "maintenance": "maintenance",
+  "hr": "hr",
+  "payroll": "payroll",
+  "purchase": "purchase",
+  "cotton-purchase": "purchase",
+  "stores": "stores",
+  "inventory": "inventory",
+  "dispatch": "dispatch",
+  "lotrac": "lotrac",
+  "accounts": "accounts",
+  "sales": "sales",
+  "reports": "reports",
+  "masters": "masters",
+  "users": "users",
+  "audit": "audit",
+  "stock": "stock",
   "column_config": "column_config",
   "column-config": "column_config",
+  "admin": "admin",
 };
 
 function normaliseKey(key: string): string {
-  return KEY_MAP[key] ?? key.replace(/-/g, "_");
+  return DB_MODULE_KEY_MAP[key] ?? key.replace(/-/g, "_");
 }
 
 export function useRBAC() {
@@ -37,29 +57,39 @@ export function useRBAC() {
   const role = user?.role ?? "MACHINE_OPERATOR";
   const isSuperAdmin = role === "SUPER_ADMIN";
 
-  const { data: companyModules, isFetched } = useQuery({
+  const { data: companyModules, isSuccess: modulesLoaded } = useQuery({
     queryKey: ["company-modules", user?.companyId],
-    queryFn: () => api.get(`/admin/companies/${user?.companyId}/modules`).then(r => r.data as Record<string, boolean>),
+    queryFn: async () => {
+      if (!user?.companyId || isSuperAdmin) return null;
+      const res = await api.get(`/admin/companies/${user.companyId}/modules`);
+      console.log("Company modules loaded:", res.data);
+      return res.data as Record<string, boolean>;
+    },
     enabled: !!user?.companyId && !isSuperAdmin,
     staleTime: 0,
     refetchOnWindowFocus: true,
-    retry: false,
+    retry: 2,
   });
 
   const allowedModules = ROLE_MODULES[role] ?? ["dashboard"];
-  const companyModulesLoaded = isFetched || isSuperAdmin || !user?.companyId;
+  const companyModulesLoaded = isSuperAdmin ? true : modulesLoaded;
 
   function canAccess(module: string): boolean {
     if (isSuperAdmin) {
       return ["dashboard", "admin", "column_config"].includes(normaliseKey(module));
     }
+
     const roleAllows = allowedModules.includes(module);
     if (!roleAllows) return false;
 
-    if (companyModules !== null && companyModules !== undefined) {
-      const key = normaliseKey(module);
-      if (["dashboard", "users", "masters"].includes(key)) return true;
-      return companyModules[key] === true;
+    const dbKey = normaliseKey(module);
+
+    if (["dashboard", "masters", "users"].includes(dbKey)) return true;
+
+    if (modulesLoaded && companyModules !== null && companyModules !== undefined) {
+      const enabled = companyModules[dbKey];
+      console.log(`Module check: ${module} (${dbKey}) = ${enabled}`);
+      return enabled === true;
     }
 
     return roleAllows;
