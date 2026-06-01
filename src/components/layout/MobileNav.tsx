@@ -25,47 +25,56 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/stores/auth";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { MODULE_ACCESS, type Module } from "@/lib/rbac";
+import { useRBAC } from "@/hooks/useRBAC";
 
-const MAIN_TABS = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/production", label: "Production", icon: Factory },
-  { to: "/hr", label: "HR", icon: Users },
-  { to: null, label: "Alerts", icon: Bell, isAlert: true },
+const ALL_MODULE_ITEMS = [
+  { to: "/production", label: "Production", icon: Factory, module: "production" },
+  { to: "/quality", label: "Quality", icon: BadgeCheck, module: "quality" },
+  { to: "/maintenance", label: "Maintenance", icon: Wrench, module: "maintenance" },
+  { to: "/hr", label: "HR", icon: Users, module: "hr" },
+  { to: "/payroll", label: "Payroll", icon: Banknote, module: "payroll" },
+  { to: "/purchase", label: "Purchase", icon: Package, module: "purchase" },
+  { to: "/stores", label: "Stores", icon: Warehouse, module: "stores" },
+  { to: "/inventory", label: "Inventory", icon: Boxes, module: "inventory" },
+  { to: "/dispatch", label: "Dispatch", icon: Truck, module: "dispatch" },
+  { to: "/lotrac", label: "LoTrac", icon: QrCode, module: "lotrac" },
+  { to: "/accounts", label: "Accounts", icon: Receipt, module: "accounts" },
+  { to: "/sales", label: "Sales & Stock", icon: TrendingUp, module: "sales" },
+  { to: "/masters", label: "Masters", icon: Settings2, module: "masters" },
+  { to: "/users", label: "Users", icon: UserCog, module: "users" },
+  { to: "/audit", label: "Audit", icon: ClipboardList, module: "audit" },
+  { to: "/admin", label: "Admin", icon: Shield, module: "admin" },
 ];
 
-const MORE_ITEMS = [
-  { to: "/quality", label: "Quality", icon: BadgeCheck },
-  { to: "/maintenance", label: "Maintenance", icon: Wrench },
-  { to: "/payroll", label: "Payroll", icon: Banknote },
-  { to: "/purchase", label: "Purchase", icon: Package },
-  { to: "/stores", label: "Stores", icon: Warehouse },
-  { to: "/inventory", label: "Inventory", icon: Boxes },
-  { to: "/dispatch", label: "Dispatch", icon: Truck },
-  { to: "/lotrac", label: "LoTrac", icon: QrCode },
-  { to: "/accounts", label: "Accounts", icon: Receipt },
-  { to: "/sales", label: "Sales", icon: TrendingUp },
-  { to: "/masters", label: "Masters", icon: Settings2 },
-  { to: "/users", label: "Users", icon: UserCog },
-  { to: "/audit", label: "Audit", icon: ClipboardList },
-  { to: "/admin", label: "Admin", icon: Shield },
+const CANDIDATE_TABS = [
+  { to: "/production", label: "Production", icon: Factory, module: "production" },
+  { to: "/hr", label: "HR", icon: Users, module: "hr" },
+  { to: "/quality", label: "Quality", icon: BadgeCheck, module: "quality" },
+  { to: "/stores", label: "Stores", icon: Warehouse, module: "stores" },
+  { to: "/accounts", label: "Accounts", icon: Receipt, module: "accounts" },
 ];
 
 export function MobileNav() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { unreadCount } = useWebSocket();
   const { user } = useAuth();
+  const { canAccess } = useRBAC();
   const [moreOpen, setMoreOpen] = useState(false);
 
   const isActive = (to: string) => pathname === to || pathname.startsWith(to + "/");
 
-  const visibleMore = MORE_ITEMS.filter((item) => {
-    const module = item.to.replace("/", "") as Module;
-    const allowedByRole = MODULE_ACCESS[user?.role ?? "OPERATOR"] ?? ["dashboard"];
-    const allowedByCompany = user?.allowedModules ?? allowedByRole;
+  const visibleModules = ALL_MODULE_ITEMS.filter(item => {
     if (item.to === "/admin" && user?.role !== "SUPER_ADMIN") return false;
-    return allowedByRole.includes(module) && allowedByCompany.includes(module);
+    return canAccess(item.module);
   });
+
+  const middleTabs = CANDIDATE_TABS.filter(t => canAccess(t.module)).slice(0, 3);
+
+  const bottomTabs = [
+    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+    ...middleTabs,
+    { to: null, label: "Alerts", icon: Bell, isAlert: true },
+  ];
 
   return (
     <>
@@ -73,7 +82,7 @@ export function MobileNav() {
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="flex items-center justify-around h-14">
-          {MAIN_TABS.map((item) => {
+          {bottomTabs.map((item) => {
             const Icon = item.icon;
             const active = item.to ? isActive(item.to) : false;
             const content = (
@@ -117,41 +126,44 @@ export function MobileNav() {
       </nav>
 
       {moreOpen && (
-        <div
-          className="fixed inset-0 z-50 lg:hidden"
-          onClick={() => setMoreOpen(false)}
-        >
-          <div className="absolute inset-0 bg-black/60" />
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMoreOpen(false)} />
           <div
-            className="absolute bottom-0 left-0 right-0 bg-[var(--bg-primary)] rounded-t-2xl p-4 pb-8"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}
+            className="absolute bottom-0 left-0 right-0 bg-[var(--bg-primary)] rounded-t-2xl flex flex-col max-h-[75vh]"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-4 px-1">
-              <span className="text-sm font-semibold text-[var(--text-primary)]">All Modules</span>
-              <button onClick={() => setMoreOpen(false)} className="text-[var(--text-muted)]">
-                <X className="size-5" />
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">All Modules</h3>
+              <button onClick={() => setMoreOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-slate-700">
+                <X className="size-5 text-gray-500" />
               </button>
             </div>
-            <div className="grid grid-cols-4 gap-3">
-              {visibleMore.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.to);
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    onClick={() => setMoreOpen(false)}
-                    className={cn(
-                      "flex flex-col items-center gap-1 py-3 rounded-xl transition-colors",
-                      active ? "text-brand-500 bg-brand-500/10" : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]",
-                    )}
-                  >
-                    <Icon className="size-6" />
-                    <span className="text-[10px] text-center leading-tight">{item.label}</span>
-                  </Link>
-                );
-              })}
+            <div className="overflow-y-auto flex-1 px-4 py-4">
+              <div className="grid grid-cols-4 gap-3">
+                {visibleModules.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.to);
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setMoreOpen(false)}
+                      className={cn(
+                        "flex flex-col items-center gap-1.5 p-3 rounded-xl transition-colors",
+                        active
+                          ? "text-brand-500 bg-brand-500/10"
+                          : "text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]",
+                      )}
+                    >
+                      <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center">
+                        <Icon className="size-6 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <span className="text-xs text-center leading-tight">{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
