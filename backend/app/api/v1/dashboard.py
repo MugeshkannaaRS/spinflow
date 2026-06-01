@@ -371,45 +371,82 @@ async def get_admin_summary(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        companies = await db.execute(text("SELECT COUNT(*) FROM companies WHERE deleted_at IS NULL"))
-        total_companies = companies.scalar() or 0
+        # Companies count
+        try:
+            c = await db.execute(text("SELECT COUNT(*) FROM companies WHERE deleted_at IS NULL"))
+            total_companies = c.scalar() or 0
+        except Exception as e:
+            print(f"admin-summary companies count error: {e}")
+            total_companies = 0
 
-        mills = await db.execute(text("SELECT COUNT(*) FROM mills WHERE deleted_at IS NULL"))
-        total_mills = mills.scalar() or 0
+        # Mills count
+        try:
+            m = await db.execute(text("SELECT COUNT(*) FROM mills WHERE deleted_at IS NULL"))
+            total_mills = m.scalar() or 0
+        except Exception as e:
+            print(f"admin-summary mills count error: {e}")
+            total_mills = 0
 
-        users = await db.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true AND deleted_at IS NULL"))
-        total_users = users.scalar() or 0
+        # Users count
+        try:
+            u = await db.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true AND deleted_at IS NULL"))
+            total_users = u.scalar() or 0
+        except Exception as e:
+            print(f"admin-summary users count error: {e}")
+            try:
+                u2 = await db.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true"))
+                total_users = u2.scalar() or 0
+            except:
+                total_users = 0
 
-        employees = await db.execute(text("SELECT COUNT(*) FROM employees WHERE deleted_at IS NULL"))
-        total_employees = employees.scalar() or 0
+        # Employees count
+        try:
+            e = await db.execute(text("SELECT COUNT(*) FROM employees WHERE deleted_at IS NULL"))
+            total_employees = e.scalar() or 0
+        except Exception as ex:
+            print(f"admin-summary employees count error: {ex}")
+            try:
+                e2 = await db.execute(text("SELECT COUNT(*) FROM employees"))
+                total_employees = e2.scalar() or 0
+            except:
+                total_employees = 0
 
-        companies_list = await db.execute(text("SELECT id, name, code, created_at FROM companies WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 20"))
-        rows = companies_list.fetchall()
+        # Companies list
+        try:
+            cl = await db.execute(text("SELECT id, name, code, created_at FROM companies WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 20"))
+            rows = cl.fetchall()
+            companies_list = [
+                {
+                    "id": str(row[0]),
+                    "name": row[1],
+                    "code": row[2],
+                    "created_at": row[3].isoformat() if row[3] else None,
+                }
+                for row in rows
+            ]
+        except Exception as e:
+            print(f"admin-summary companies list error: {e}")
+            companies_list = []
 
-        return {
+        result = {
             "total_companies": total_companies,
             "total_mills": total_mills,
             "total_users": total_users,
             "total_employees": total_employees,
-            "companies": [
-                {
-                    "id": str(r.id),
-                    "name": r.name,
-                    "code": r.code,
-                    "created_at": r.created_at.isoformat() if r.created_at else None,
-                }
-                for r in rows
-            ]
+            "companies": companies_list,
         }
+        print(f"Admin summary: {result}")
+        return result
+
     except Exception as e:
-        print(f"admin-summary error: {e}")
+        print(f"admin-summary fatal error: {e}")
         return {
             "total_companies": 0,
             "total_mills": 0,
             "total_users": 0,
             "total_employees": 0,
             "companies": [],
-            "error": str(e)
+            "error": str(e),
         }
 
 
