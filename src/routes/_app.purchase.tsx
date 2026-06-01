@@ -75,6 +75,7 @@ function PurchasePage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "purchase");
   const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "MILL_OWNER";
+  const qc = useQueryClient();
   const suppliersQ = useQuery({
     queryKey: ["suppliers"],
     queryFn: purchaseApi.getSuppliers,
@@ -161,7 +162,7 @@ function PurchasePage() {
       <PageHeader
         title="Cotton Purchase"
         subtitle="Supplier management, bale purchase, GRN & invoice tracking"
-        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["purchases"] })}
+        onRefresh={() => qc.invalidateQueries({ queryKey: ["purchases"] })}
         isRefreshing={purchasesQ.isFetching}
       />
       <AccessGuard module="purchase">

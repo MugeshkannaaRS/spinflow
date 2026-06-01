@@ -34,6 +34,7 @@ export const Route = createFileRoute("/_app/inventory")({
 function InventoryPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "inventory");
+  const qc = useQueryClient();
   const lotColConfig = useColumnConfig("inventory_lots");
   const transferColConfig = useColumnConfig("stock_transfers");
   const lotsQ = useQuery({ queryKey: ["inventory-lots"], queryFn: inventoryApi.getLots, staleTime: 60_000, retry: 1 });
@@ -88,7 +89,7 @@ function InventoryPage() {
       <PageHeader
         title="Inventory"
         subtitle="Lot tracking, godown stock, transfers & ageing analysis"
-        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["inventory-lots"] })}
+        onRefresh={() => qc.invalidateQueries({ queryKey: ["inventory-lots"] })}
         isRefreshing={lotsQ.isFetching}
       />
       <AccessGuard module="inventory">

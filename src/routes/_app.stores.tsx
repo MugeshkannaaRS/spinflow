@@ -47,6 +47,7 @@ export const Route = createFileRoute("/_app/stores")({
 function StoresPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "stores");
+  const qc = useQueryClient();
   const itemsQ = useQuery({ queryKey: ["spare-items"], queryFn: storesApi.getSpares, staleTime: 60_000, retry: 1 });
   const issuesQ = useQuery({ queryKey: ["issue-notes"], queryFn: storesApi.getIssues, staleTime: 60_000, retry: 1 });
 
@@ -101,7 +102,7 @@ function StoresPage() {
       <PageHeader
         title="Stores & Spares"
         subtitle="Spare inventory, reorder alerts, issue notes & vendor management"
-        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["spare-items"] })}
+        onRefresh={() => qc.invalidateQueries({ queryKey: ["spare-items"] })}
         isRefreshing={itemsQ.isFetching}
       />
       <AccessGuard module="stores">

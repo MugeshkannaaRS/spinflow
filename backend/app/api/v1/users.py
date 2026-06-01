@@ -123,10 +123,11 @@ async def create_user(
         mill_id=mill_id,
         company_id=company_id,
         is_active=True,
+        must_change_password=True,
     )
     db.add(user)
     await db.flush()
-    role_code = user.role_rel.code if user.role_rel else role.code
+    role_code = role.code
     return UserOut(
         id=user.id,
         full_name=user.name,

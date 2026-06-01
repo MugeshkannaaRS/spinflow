@@ -60,6 +60,7 @@ function PayrollPage() {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
   const [tab, setTab] = useState("months");
+  const qc = useQueryClient();
 
   const summaryQ = useQuery({
     queryKey: ["payroll-summary", user?.millId ?? "", year],
@@ -78,7 +79,7 @@ function PayrollPage() {
       <PageHeader
         title="Payroll"
         subtitle="Monthly payroll processing & payslips"
-        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["payroll-summary"] })}
+        onRefresh={() => qc.invalidateQueries({ queryKey: ["payroll-summary"] })}
         isRefreshing={summaryQ.isFetching}
       />
       <AccessGuard module="payroll">

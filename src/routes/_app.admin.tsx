@@ -137,7 +137,7 @@ function AdminPage() {
       "Max Users": c.max_users || 50,
       "Active Users": companyUserCounts[c.id] ?? 0,
       Mills: companyMillCounts[c.id] ?? 0,
-      Plan: c.subscription_plan || c.plan || "Pro",
+      Plan: (c as any).subscription_plan || (c as any).plan || "Pro",
       Status: c.is_active ? "Active" : "Suspended",
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
@@ -615,8 +615,18 @@ function EditLimitDialog({ company }: { company: Company }) {
 }
 
 function generateTempPassword() {
-  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$";
-  return Array.from({length: 10}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  const upper = "ABCDEFGHJKMNPQRSTUVWXYZ";
+  const lower = "abcdefghjkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const special = "@#$!";
+  const base = [
+    upper[Math.floor(Math.random() * upper.length)],
+    digits[Math.floor(Math.random() * digits.length)],
+    special[Math.floor(Math.random() * special.length)],
+  ];
+  const all = upper + lower + digits + special;
+  for (let i = 0; i < 7; i++) base.push(all[Math.floor(Math.random() * all.length)]);
+  return base.sort(() => Math.random() - 0.5).join('');
 }
 
 function AddCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
@@ -697,11 +707,11 @@ function AddCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
 
       const pw = generateTempPassword();
       setTempPassword(pw);
-      const user = await api.post("/admin/users", {
-        name: owner.name.trim(),
+      const user = await api.post("/users", {
+        full_name: owner.name.trim(),
         email: owner.email.trim(),
         password: pw,
-        role_code: "MILL_OWNER",
+        role: "MILL_OWNER",
         company_id: companyId,
         mill_id: null,
       }).then(r => r.data);

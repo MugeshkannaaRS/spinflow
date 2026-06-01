@@ -236,6 +236,7 @@ function HRPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "hr");
   const millId = user?.millId;
+  const qc = useQueryClient();
 
   const [tab, setTab] = useState("employees");
 
@@ -290,7 +291,7 @@ function HRPage() {
       <PageHeader
         title="Human Resources"
         subtitle="Employees, Attendance, Payroll & Leave Management"
-        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["hr-employees"] })}
+        onRefresh={() => qc.invalidateQueries({ queryKey: ["hr-employees"] })}
         isRefreshing={empQ.isFetching}
       />
       <AccessGuard module="hr">

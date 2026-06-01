@@ -641,7 +641,7 @@ function ProductionPage() {
       <PageHeader
         title="Production"
         subtitle="Shift entries, machine efficiency, downtime & waste tracking"
-        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["machines"] })}
+        onRefresh={() => qc.invalidateQueries({ queryKey: ["machines"] })}
         isRefreshing={machinesQ.isFetching}
       />
       <AccessGuard module="production">

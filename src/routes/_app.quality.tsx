@@ -51,6 +51,7 @@ function QualityPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "quality");
   const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "MILL_OWNER";
+  const qc = useQueryClient();
   const testsQ = useQuery({
     queryKey: ["quality-tests"],
     queryFn: qualityApi.getTests,
@@ -106,7 +107,7 @@ function QualityPage() {
       <PageHeader
         title="Quality Control"
         subtitle="CSP testing, lot approvals, rejection analysis & lab register"
-        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["quality-tests"] })}
+        onRefresh={() => qc.invalidateQueries({ queryKey: ["quality-tests"] })}
         isRefreshing={testsQ.isFetching}
       />
       <AccessGuard module="quality">

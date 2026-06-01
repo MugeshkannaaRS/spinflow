@@ -119,7 +119,7 @@ function AccountsPage() {
       <PageHeader
         title="Accounts"
         subtitle="GST invoices, sales/purchase register, outstanding tracking & Tally export"
-        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["invoices"] })}
+        onRefresh={() => qc.invalidateQueries({ queryKey: ["invoices"] })}
         isRefreshing={invQ.isFetching}
       />
       <AccessGuard module="accounts">
