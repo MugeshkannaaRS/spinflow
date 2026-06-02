@@ -417,32 +417,6 @@ async def get_admin_summary(
 
     print(f"Admin summary result: {result}")
     return result
-                for row in rows
-            ]
-        except Exception as e:
-            print(f"DEBUG companies list error: {e}")
-            companies_list = []
-
-        result = {
-            "total_companies": total_companies,
-            "total_mills": total_mills,
-            "total_users": total_users,
-            "total_employees": total_employees,
-            "companies": companies_list,
-        }
-        print(f"Admin summary: {result}")
-        return result
-
-    except Exception as e:
-        print(f"admin-summary fatal error: {e}")
-        return {
-            "total_companies": 0,
-            "total_mills": 0,
-            "total_users": 0,
-            "total_employees": 0,
-            "companies": [],
-            "error": str(e),
-        }
 
 
 @router.get("/dashboard/summary")
