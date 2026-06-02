@@ -119,7 +119,6 @@ export function UniversalImportModal({
   const [importError, setImportError] = useState<string | null>(null);
   const [showStep5Errors, setShowStep5Errors] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [customFieldHeaders, setCustomFieldHeaders] = useState<Set<string>>(new Set());
 
   const colMap = useMemo(() => {
     const map: Record<string, ColumnConfig> = {};
@@ -142,7 +141,6 @@ export function UniversalImportModal({
       setIsImporting(false);
       setImportProgress({ current: 0, total: 0 });
       setImportResult(null);
-      setCustomFieldHeaders(new Set());
     }
   }, [isOpen]);
 
@@ -316,14 +314,18 @@ export function UniversalImportModal({
       for (let i = 0; i < headers.length; i++) {
         const header = headers[i];
         const fieldKey = mapping[header];
+        const isCustom = !fieldKey && !colConfigs.some(
+          c => c.key === fieldKey || c.label.toLowerCase() === header.toLowerCase()
+        );
+
+        if (isCustom) {
+          record.custom_fields[normalizeCustomFieldKey(header)] = row[i] ?? null;
+          continue;
+        }
+
         if (!fieldKey) continue;
         const colCfg = keyToConfig[fieldKey];
         let value = row[i];
-
-        if (customFieldHeaders.has(header)) {
-          record.custom_fields[normalizeCustomFieldKey(header)] = value ?? null;
-          continue;
-        }
 
         if (colCfg) {
           if (colCfg.type === "date") {
@@ -362,7 +364,7 @@ export function UniversalImportModal({
     setPreviewRecords(records);
 
       const mappingsToSave: ImportMapping[] = Object.entries(mapping)
-        .filter(([header, v]) => v !== null && !customFieldHeaders.has(header))
+        .filter(([header, v]) => v !== null)
         .map(([header, field]) => ({
           excel_header: header,
           spinflow_field: field,
@@ -695,12 +697,14 @@ export function UniversalImportModal({
           </TableHeader>
               <TableBody>
                 {headers.map((header) => {
-                  const isCustom = customFieldHeaders.has(header);
+                  const autoCustom = !mapping[header] && !colConfigs.some(
+                    c => c.key === mapping[header] || c.label.toLowerCase() === header.toLowerCase()
+                  );
                   return (
                     <TableRow key={header}>
                       <TableCell className="font-medium">{header}</TableCell>
                       <TableCell>
-                        {isCustom ? (
+                        {autoCustom ? (
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300">
                               Custom: {normalizeCustomFieldKey(header)}
@@ -726,7 +730,7 @@ export function UniversalImportModal({
                         )}
                       </TableCell>
                       <TableCell>
-                        {isCustom ? (
+                        {autoCustom ? (
                           <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300">
                             New
                           </Badge>
@@ -737,50 +741,18 @@ export function UniversalImportModal({
                         )}
                       </TableCell>
                       <TableCell className="text-center">
-                        {isCustom ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 text-xs text-muted-foreground"
-                            onClick={() => {
-                              const next = new Set(customFieldHeaders);
-                              next.delete(header);
-                              setCustomFieldHeaders(next);
-                            }}
-                          >
-                            Undo
-                          </Button>
-                        ) : (
-                          <div className="flex items-center justify-center gap-1">
-                            <Checkbox
-                              checked={mapping[header] === null}
-                              onCheckedChange={(chk) => {
-                                if (chk) {
-                                  handleMappingChange(header, null);
-                                } else if (headers.length > 0) {
-                                  const fuzzyResult = fuzzyMatchColumns([header], colConfigs, savedMappings);
-                                  const matched = fuzzyResult.get(header);
-                                  handleMappingChange(header, matched?.key ?? null);
-                                }
-                              }}
-                            />
-                            {!mapping[header] && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 text-xs text-blue-600 hover:text-blue-700 px-1"
-                                onClick={() => {
-                                  const next = new Set(customFieldHeaders);
-                                  next.add(header);
-                                  setCustomFieldHeaders(next);
-                                }}
-                                title="Create as custom field"
-                              >
-                                + Custom
-                              </Button>
-                            )}
-                          </div>
-                        )}
+                        <Checkbox
+                          checked={mapping[header] === null && !autoCustom}
+                          onCheckedChange={(chk) => {
+                            if (chk) {
+                              handleMappingChange(header, null);
+                            } else if (headers.length > 0) {
+                              const fuzzyResult = fuzzyMatchColumns([header], colConfigs, savedMappings);
+                              const matched = fuzzyResult.get(header);
+                              handleMappingChange(header, matched?.key ?? null);
+                            }
+                          }}
+                        />
                       </TableCell>
                     </TableRow>
                   );
@@ -811,7 +783,9 @@ export function UniversalImportModal({
   const renderStep3 = () => {
     const displayRecords = previewRecords.slice(0, 20);
     const standardFields = Object.values(mapping).filter(Boolean) as string[];
-    const customKeys = [...customFieldHeaders].map(h => `__custom__:${normalizeCustomFieldKey(h)}`);
+    const customKeys = [...new Set(displayRecords.flatMap(r =>
+      Object.keys(r.data.custom_fields || {}).map(k => `__custom__:${k}`)
+    ))];
     const mappedFields = [...standardFields, ...customKeys];
     const isCustomKey = (k: string) => k.startsWith("__custom__:");
     const customKeyToHeader = (k: string) => k.replace("__custom__:", "");
