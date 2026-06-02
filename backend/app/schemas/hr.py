@@ -401,6 +401,7 @@ class PayrollBulkResponse(BaseModel):
 
 class EmployeeBulkCreate(BaseModel):
     items: List[EmployeeBulkItem]
+    mill_id: Optional[str] = None
 
 
 class ImportErrorDetail(BaseModel):

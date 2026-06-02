@@ -306,7 +306,11 @@ async def bulk_create_employees(
         raise HTTPException(status_code=400, detail="Maximum 100 employees per batch")
 
     scope = await get_mill_scope(current_user)
-    mill_id = scope["mill_id"]
+    mill_id = req.mill_id or scope["mill_id"]
+
+    # SUPER_ADMIN / MILL_OWNER can import into any mill in their company
+    if mill_id != scope.get("mill_id") and scope.get("role") not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(403, "Cannot import employees into a different mill")
 
     # Resolve company_id for custom fields
     resolved_company_id = scope.get("company_id")
@@ -463,35 +467,38 @@ async def bulk_create_employees(
                 emp_id_map[emp.code] = emp.id
 
         # Store custom field values for this batch
-        if resolved_company_id:
-            for emp in batch:
-                cf_fields = custom_fields_map.get(emp.code)
-                if cf_fields:
-                    actual_emp_id = emp_id_map.get(emp.code)
-                    if not actual_emp_id:
-                        continue
-                    for fname, fval in cf_fields.items():
-                        field_result = await db.execute(
-                            select(EmployeeCustomField).where(
-                                EmployeeCustomField.company_id == resolved_company_id,
-                                EmployeeCustomField.field_name == fname,
+        try:
+            if resolved_company_id:
+                for emp in batch:
+                    cf_fields = custom_fields_map.get(emp.code)
+                    if cf_fields:
+                        actual_emp_id = emp_id_map.get(emp.code)
+                        if not actual_emp_id:
+                            continue
+                        for fname, fval in cf_fields.items():
+                            field_result = await db.execute(
+                                select(EmployeeCustomField).where(
+                                    EmployeeCustomField.company_id == resolved_company_id,
+                                    EmployeeCustomField.field_name == fname,
+                                )
                             )
-                        )
-                        field = field_result.scalar_one_or_none()
-                        if not field:
-                            field = EmployeeCustomField(
-                                company_id=resolved_company_id,
-                                field_name=fname,
-                                field_type="text",
+                            field = field_result.scalar_one_or_none()
+                            if not field:
+                                field = EmployeeCustomField(
+                                    company_id=resolved_company_id,
+                                    field_name=fname,
+                                    field_type="text",
+                                )
+                                db.add(field)
+                                await db.flush()
+                            cv = EmployeeCustomValue(
+                                employee_id=actual_emp_id,
+                                field_id=field.id,
+                                value=str(fval) if fval is not None else None,
                             )
-                            db.add(field)
-                            await db.flush()
-                        cv = EmployeeCustomValue(
-                            employee_id=actual_emp_id,
-                            field_id=field.id,
-                            value=str(fval) if fval is not None else None,
-                        )
-                        db.add(cv)
+                            db.add(cv)
+        except Exception as exc:
+            logger.warning(f"Failed to store custom field values: {exc}")
 
         imported += len(batch)
 
