@@ -38,6 +38,7 @@ interface UniversalImportModalProps {
   endpoint: string;
   onSuccess?: (count: number) => void;
   title?: string;
+  importMillId?: string;
 }
 
 interface PreviewRecord {
@@ -94,10 +95,11 @@ export function UniversalImportModal({
   endpoint,
   onSuccess,
   title,
+  importMillId,
 }: UniversalImportModalProps) {
   const { columns: colConfigs } = useColumnConfig(tableName);
   const user = useAuth((s) => s.user);
-  const millId = user?.millId ?? "";
+  const millId = importMillId ?? user?.millId ?? "";
 
   const [step, setStep] = useState(1);
   const [file, setFile] = useState<File | null>(null);

@@ -1714,6 +1714,7 @@ async function downloadEmployeeTemplate(columns: ColumnConfig[]) {
 function ImportEmployeeDialog() {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
+  const { millId } = useActiveMill();
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
@@ -1725,6 +1726,7 @@ function ImportEmployeeDialog() {
         onClose={() => setOpen(false)}
         tableName="hr_employees"
         endpoint="/hr/employees/bulk"
+        importMillId={millId ?? undefined}
         onSuccess={() => {
           qc.invalidateQueries({ queryKey: ["hr-employees"] });
         }}

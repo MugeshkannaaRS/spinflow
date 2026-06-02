@@ -427,33 +427,53 @@ async def bulk_create_employees(
 
     # Don't abort — skip only the bad rows, import the rest
 
+    # Pre-fetch existing employee codes for this mill (speed optimization)
+    existing_codes: set = set()
+    if mill_id:
+        ec_result = await db.execute(
+            select(Employee.code).where(Employee.mill_id == mill_id)
+        )
+        existing_codes = {r[0] for r in ec_result.all()}
+
+    # Pre-fetch existing custom field names for the company
+    existing_field_names: Dict[str, EmployeeCustomField] = {}
+    if resolved_company_id:
+        ef_result = await db.execute(
+            select(EmployeeCustomField).where(
+                EmployeeCustomField.company_id == resolved_company_id
+            )
+        )
+        for f in ef_result.scalars().all():
+            existing_field_names[f.field_name] = f
+
     BATCH_SIZE = 50
     imported = 0
     emp_id_map: Dict[str, str] = {}
     for batch_start in range(0, len(employees_to_add), BATCH_SIZE):
         batch = employees_to_add[batch_start:batch_start + BATCH_SIZE]
         for emp in batch:
-            existing_result = await db.execute(
-                select(Employee).where(
-                    Employee.code == emp.code,
-                    Employee.mill_id == mill_id
+            if emp.code in existing_codes:
+                existing_result = await db.execute(
+                    select(Employee).where(
+                        Employee.code == emp.code,
+                        Employee.mill_id == mill_id
+                    )
                 )
-            )
-            existing = existing_result.scalar_one_or_none()
-            if existing:
-                for field in ["name", "department", "designation", "section", "shift",
-                              "joining_date", "dob", "gen", "age", "gender", "grade",
-                              "phone", "bank_account_no", "basic", "house_rent", "medical",
-                              "conveyance", "food_allowance", "wages", "increment",
-                              "total_salary", "mobile_bill", "shift_benefit", "wages_of_month",
-                              "days_of_month", "sl_no"]:
-                    val = getattr(emp, field, None)
-                    if val is not None:
-                        setattr(existing, field, val)
-                db.add(existing)
-                emp_id_map[emp.code] = existing.id
-            else:
-                db.add(emp)
+                existing = existing_result.scalar_one_or_none()
+                if existing:
+                    for field in ["name", "department", "designation", "section", "shift",
+                                  "joining_date", "dob", "gen", "age", "gender", "grade",
+                                  "phone", "bank_account_no", "basic", "house_rent", "medical",
+                                  "conveyance", "food_allowance", "wages", "increment",
+                                  "total_salary", "mobile_bill", "shift_benefit", "wages_of_month",
+                                  "days_of_month", "sl_no"]:
+                        val = getattr(emp, field, None)
+                        if val is not None:
+                            setattr(existing, field, val)
+                    db.add(existing)
+                    emp_id_map[emp.code] = existing.id
+                    continue
+            db.add(emp)
         try:
             await db.flush()
         except Exception as exc:
@@ -461,12 +481,13 @@ async def bulk_create_employees(
             errors.append(_err(batch_start + 1, str(exc)))
             continue
 
-        # After flush, new employees now have IDs; populate map for them
+        # After flush, populate IDs for new employees
         for emp in batch:
             if emp.code not in emp_id_map:
                 emp_id_map[emp.code] = emp.id
+                existing_codes.add(emp.code)
 
-        # Store custom field values for this batch
+        # Store custom field values for this batch (batch create)
         try:
             if resolved_company_id:
                 for emp in batch:
@@ -476,13 +497,7 @@ async def bulk_create_employees(
                         if not actual_emp_id:
                             continue
                         for fname, fval in cf_fields.items():
-                            field_result = await db.execute(
-                                select(EmployeeCustomField).where(
-                                    EmployeeCustomField.company_id == resolved_company_id,
-                                    EmployeeCustomField.field_name == fname,
-                                )
-                            )
-                            field = field_result.scalar_one_or_none()
+                            field = existing_field_names.get(fname)
                             if not field:
                                 field = EmployeeCustomField(
                                     company_id=resolved_company_id,
@@ -491,6 +506,7 @@ async def bulk_create_employees(
                                 )
                                 db.add(field)
                                 await db.flush()
+                                existing_field_names[fname] = field
                             cv = EmployeeCustomValue(
                                 employee_id=actual_emp_id,
                                 field_id=field.id,
