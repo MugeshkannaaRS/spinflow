@@ -314,12 +314,14 @@ export function UniversalImportModal({
       for (let i = 0; i < headers.length; i++) {
         const header = headers[i];
         const fieldKey = mapping[header];
+        const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const nh = norm(header);
         const isCustom = !fieldKey && !colConfigs.some(
-          c => c.key === fieldKey || c.label.toLowerCase() === header.toLowerCase()
+          c => norm(c.key) === nh || norm(c.label) === nh
         );
 
         if (isCustom) {
-          record.custom_fields[normalizeCustomFieldKey(header)] = row[i] ?? null;
+          record.custom_fields[normalizeCustomFieldKey(header)] = row[i] != null ? String(row[i]) : null;
           continue;
         }
 
@@ -697,8 +699,10 @@ export function UniversalImportModal({
           </TableHeader>
               <TableBody>
                 {headers.map((header) => {
+                  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+                  const nh = norm(header);
                   const autoCustom = !mapping[header] && !colConfigs.some(
-                    c => c.key === mapping[header] || c.label.toLowerCase() === header.toLowerCase()
+                    c => norm(c.key) === nh || norm(c.label) === nh
                   );
                   return (
                     <TableRow key={header}>
