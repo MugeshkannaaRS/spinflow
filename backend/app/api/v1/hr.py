@@ -437,35 +437,38 @@ async def bulk_create_employees(
 
     # Pre-fetch existing custom field names for the company
     existing_field_names: Dict[str, EmployeeCustomField] = {}
-    if resolved_company_id:
-        ef_result = await db.execute(
-            select(EmployeeCustomField).where(
-                EmployeeCustomField.company_id == resolved_company_id
-            )
-        )
-        for f in ef_result.scalars().all():
-            existing_field_names[f.field_name] = f
-
-        # Pre-create all custom field definitions BEFORE the batch loop (one flush)
-        all_custom_names = set()
-        for emp in employees_to_add:
-            cf = custom_fields_map.get(emp.code)
-            if cf:
-                all_custom_names.update(cf.keys())
-        new_fields = []
-        for fname in all_custom_names:
-            if fname not in existing_field_names:
-                field = EmployeeCustomField(
-                    company_id=resolved_company_id,
-                    field_name=fname,
-                    field_type="text",
+    try:
+        if resolved_company_id:
+            ef_result = await db.execute(
+                select(EmployeeCustomField).where(
+                    EmployeeCustomField.company_id == resolved_company_id
                 )
-                db.add(field)
-                new_fields.append(field)
-        if new_fields:
-            await db.flush()
-            for f in new_fields:
+            )
+            for f in ef_result.scalars().all():
                 existing_field_names[f.field_name] = f
+
+            # Pre-create all custom field definitions BEFORE the batch loop (one flush)
+            all_custom_names = set()
+            for emp in employees_to_add:
+                cf = custom_fields_map.get(emp.code)
+                if cf:
+                    all_custom_names.update(cf.keys())
+            new_fields = []
+            for fname in all_custom_names:
+                if fname not in existing_field_names:
+                    field = EmployeeCustomField(
+                        company_id=resolved_company_id,
+                        field_name=fname,
+                        field_type="text",
+                    )
+                    db.add(field)
+                    new_fields.append(field)
+            if new_fields:
+                await db.flush()
+                for f in new_fields:
+                    existing_field_names[f.field_name] = f
+    except Exception as exc:
+        logger.warning(f"Failed to pre-fetch/pre-create custom fields: {exc}")
 
     BATCH_SIZE = 200
     imported = 0
