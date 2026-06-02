@@ -813,7 +813,11 @@ export function UniversalImportModal({
               <TableRow>
                 <TableHead className="w-12">#</TableHead>
                 {mappedFields.map((fk) => (
-                  <TableHead key={fk}>{colMap[fk]?.label ?? fk}</TableHead>
+                  <TableHead key={fk}>
+                    {isCustomKey(fk)
+                      ? customKeyToHeader(fk).replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())
+                      : (colMap[fk]?.label ?? fk)}
+                  </TableHead>
                 ))}
                 <TableHead className="w-32">Status</TableHead>
               </TableRow>
