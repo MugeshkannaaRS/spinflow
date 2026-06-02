@@ -249,13 +249,24 @@ function AdminPage() {
                       { key: "_active_users", label: "Active Users", render: (c: any) => companyUserCounts[c.id] ?? 0 },
                       { key: "_mills", label: "Mills", render: (c: any) => companyMillCounts[c.id] ?? 0 },
                       {
-                        key: "subscription_plan",
+                        key: "plan",
                         label: "Plan",
-                        render: (c: any) => (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-                            {c.subscription_plan || c.plan || "Pro"}
-                          </span>
-                        ),
+                        render: (c: any) => {
+                          const PLAN_COLORS: Record<string, string> = {
+                            starter: "bg-gray-100 text-gray-600",
+                            growth: "bg-blue-100 text-blue-700",
+                            business: "bg-indigo-100 text-indigo-700",
+                            enterprise: "bg-purple-100 text-purple-700",
+                            unlimited: "bg-amber-100 text-amber-700",
+                          };
+                          const plan = c.plan ?? c.subscription_plan ?? "starter";
+                          const color = PLAN_COLORS[plan] ?? PLAN_COLORS.starter;
+                          return (
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${color}`}>
+                              {plan}
+                            </span>
+                          );
+                        },
                       },
                       {
                         key: "is_active",
@@ -924,14 +935,29 @@ function AddCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
   );
 }
 
+const PLAN_OPTIONS = [
+  { value: "starter", label: "Starter — up to 100 employees (₹3,50,000)" },
+  { value: "growth", label: "Growth — up to 300 employees (₹7,50,000)" },
+  { value: "business", label: "Business — up to 600 employees (₹15,00,000)" },
+  { value: "enterprise", label: "Enterprise — up to 1500 employees (₹28,00,000)" },
+  { value: "unlimited", label: "Unlimited — 1500+ employees (₹45,00,000)" },
+];
+
 function EditCompanyDialog({ company, onClose, onDone }: { company: Company | null; onClose: () => void; onDone: () => void }) {
-  const [form, setForm] = useState({ name: "", gstin: "", phone: "", email: "" });
+  const [form, setForm] = useState({ name: "", gstin: "", phone: "", email: "", plan: "starter", max_employees: 100 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (company) {
-      setForm({ name: company.name ?? "", gstin: company.gstin ?? "", phone: company.phone ?? "", email: company.email ?? "" });
+      setForm({
+        name: company.name ?? "",
+        gstin: company.gstin ?? "",
+        phone: company.phone ?? "",
+        email: company.email ?? "",
+        plan: (company as any).plan ?? "starter",
+        max_employees: (company as any).max_employees ?? 100,
+      });
       setError("");
     }
   }, [company]);
@@ -952,6 +978,10 @@ function EditCompanyDialog({ company, onClose, onDone }: { company: Company | nu
         phone: form.phone.trim() || undefined,
         email: form.email.trim() || undefined,
       });
+      await api.patch(`/admin/companies/${company.id}`, {
+        plan: form.plan,
+        max_employees: form.max_employees,
+      });
       toast.success("Company updated");
       onDone();
     } catch (err: any) {
@@ -967,26 +997,47 @@ function EditCompanyDialog({ company, onClose, onDone }: { company: Company | nu
         <DialogHeader>
           <DialogTitle>Edit Company — {company?.name}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label>Name <span className="text-destructive">*</span></Label>
-            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>GSTIN</Label>
-            <Input value={form.gstin} onChange={(e) => setForm({ ...form, gstin: e.target.value })} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>Phone</Label>
-              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              <Label>Name <span className="text-destructive">*</span></Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>Email</Label>
-              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              <Label>GSTIN</Label>
+              <Input value={form.gstin} onChange={(e) => setForm({ ...form, gstin: e.target.value })} />
             </div>
-          </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Phone</Label>
+                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Email</Label>
+                <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Plan</Label>
+              <select
+                value={form.plan}
+                onChange={(e) => setForm({ ...form, plan: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white dark:bg-slate-800"
+              >
+                {PLAN_OPTIONS.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Max Employees</Label>
+              <input
+                type="number"
+                value={form.max_employees}
+                onChange={(e) => setForm({ ...form, max_employees: parseInt(e.target.value) || 100 })}
+                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white dark:bg-slate-800"
+              />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button variant="outline" onClick={onClose}>Cancel</Button>
             <Button onClick={handleSave} disabled={loading}>
@@ -998,6 +1049,31 @@ function EditCompanyDialog({ company, onClose, onDone }: { company: Company | nu
     </Dialog>
   );
 }
+
+const CORE_MODULES = [
+  { key: "dashboard", label: "Dashboard" },
+  { key: "production", label: "Production" },
+  { key: "quality", label: "Quality" },
+  { key: "maintenance", label: "Maintenance" },
+  { key: "hr", label: "Human Resources" },
+  { key: "payroll", label: "Payroll" },
+  { key: "purchase", label: "Cotton Purchase" },
+  { key: "stores", label: "Stores" },
+  { key: "inventory", label: "Inventory" },
+  { key: "dispatch", label: "Dispatch" },
+  { key: "accounts", label: "Accounts" },
+  { key: "sales", label: "Sales" },
+  { key: "masters", label: "Masters" },
+  { key: "users", label: "Users & Roles" },
+  { key: "reports", label: "Reports" },
+];
+
+const ADDON_MODULES = [
+  { key: "lotrac", label: "LoTrac — QR Dispatch Tracking", price: "₹1,999/month" },
+  { key: "whatsapp", label: "WhatsApp Alerts & Daily MIS", price: "₹2,999/month" },
+  { key: "lc_tracking", label: "LC (Letter of Credit) Tracking", price: "₹999/month" },
+  { key: "analytics", label: "Advanced Analytics & Lot Traceability", price: "₹1,499/month" },
+];
 
 function ModulesDialog({ company, onClose, onDone }: { company: Company | null; onClose: () => void; onDone: () => void }) {
   const [modules, setModules] = useState<Record<string, boolean>>({});
@@ -1031,18 +1107,41 @@ function ModulesDialog({ company, onClose, onDone }: { company: Company | null; 
 
   return (
     <Dialog open={!!company} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Module Access — {company?.name}</DialogTitle>
           <DialogDescription>Toggle which modules this company can access.</DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-3 py-4">
-          {ALL_MODULES.map((mod) => (
-            <div key={mod} className="flex items-center justify-between p-3 rounded-lg border border-gray-100 dark:border-slate-700">
-              <span className="text-sm font-medium text-gray-700 dark:text-slate-300">{MODULE_LABELS[mod]}</span>
-              <Switch checked={modules[mod] ?? false} onCheckedChange={(val) => setModules((prev) => ({ ...prev, [mod]: val }))} />
+        <div className="py-4 space-y-6">
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+              Core Modules (included in licence)
+            </h4>
+            <div className="grid grid-cols-2 gap-2">
+              {CORE_MODULES.map((mod) => (
+                <div key={mod.key} className="flex items-center justify-between p-2.5 rounded-lg border border-gray-100 dark:border-slate-700">
+                  <span className="text-sm text-gray-700 dark:text-slate-300">{mod.label}</span>
+                  <Switch checked={modules[mod.key] ?? false} onCheckedChange={(val) => setModules((prev) => ({ ...prev, [mod.key]: val }))} />
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+          <div className="border-t border-gray-100 pt-4">
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+              Add-On Modules (monthly billing)
+            </h4>
+            <div className="space-y-2">
+              {ADDON_MODULES.map((mod) => (
+                <div key={mod.key} className="flex items-center justify-between p-3 rounded-lg border border-dashed border-blue-200 bg-blue-50/50 dark:bg-blue-900/10 dark:border-blue-800">
+                  <div>
+                    <span className="text-sm font-medium text-gray-700 dark:text-slate-300">{mod.label}</span>
+                    <span className="ml-2 text-xs text-blue-600 font-semibold">{mod.price}</span>
+                  </div>
+                  <Switch checked={modules[mod.key] ?? false} onCheckedChange={(val) => setModules((prev) => ({ ...prev, [mod.key]: val }))} />
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>

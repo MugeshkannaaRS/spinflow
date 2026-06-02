@@ -103,12 +103,16 @@ async def list_mills(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    scope = await get_mill_scope(current_user)
+    role_code = current_user.role or ""
     query = select(Mill)
-    if scope["company_id"]:
-        query = query.where(Mill.company_id == scope["company_id"])
-    elif scope["mill_id"]:
-        query = query.where(Mill.id == scope["mill_id"])
+    if role_code == "SUPER_ADMIN":
+        if company_id:
+            query = query.where(Mill.company_id == company_id)
+    else:
+        if current_user.company_id:
+            query = query.where(Mill.company_id == current_user.company_id)
+        else:
+            return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
     if not include_inactive:
         query = query.where(Mill.is_active == True)
     query = query.order_by(Mill.created_at.desc())
@@ -166,12 +170,15 @@ async def list_departments(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    scope = await get_mill_scope(current_user)
+    role_code = current_user.role or ""
     query = select(Department)
-    if scope["mill_id"]:
-        query = query.where(Department.mill_id == scope["mill_id"])
-    elif scope["company_id"]:
-        query = query.join(Mill, Department.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if role_code == "SUPER_ADMIN":
+        if mill_id:
+            query = query.where(Department.mill_id == mill_id)
+    elif current_user.company_id:
+        query = query.join(Mill, Department.mill_id == Mill.id).where(Mill.company_id == current_user.company_id)
+    else:
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
     if not include_inactive:
         query = query.where(Department.is_active == True)
     query = query.order_by(Department.created_at.desc())
@@ -233,12 +240,15 @@ async def list_yarn_counts(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    scope = await get_mill_scope(current_user)
+    role_code = current_user.role or ""
     query = select(YarnCount)
-    if scope["mill_id"]:
-        query = query.where(YarnCount.mill_id == scope["mill_id"])
-    elif scope["company_id"]:
-        query = query.join(Mill, YarnCount.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if role_code == "SUPER_ADMIN":
+        if mill_id:
+            query = query.where(YarnCount.mill_id == mill_id)
+    elif current_user.company_id:
+        query = query.join(Mill, YarnCount.mill_id == Mill.id).where(Mill.company_id == current_user.company_id)
+    else:
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
     if not include_inactive:
         query = query.where(YarnCount.is_active == True)
     query = query.order_by(YarnCount.created_at.desc())
@@ -300,12 +310,15 @@ async def list_customers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    scope = await get_mill_scope(current_user)
+    role_code = current_user.role or ""
     query = select(Customer)
-    if scope["mill_id"]:
-        query = query.where(Customer.mill_id == scope["mill_id"])
-    elif scope["company_id"]:
-        query = query.join(Mill, Customer.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if role_code == "SUPER_ADMIN":
+        if mill_id:
+            query = query.where(Customer.mill_id == mill_id)
+    elif current_user.company_id:
+        query = query.join(Mill, Customer.mill_id == Mill.id).where(Mill.company_id == current_user.company_id)
+    else:
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
     if not include_inactive:
         query = query.where(Customer.is_active == True)
     query = query.order_by(Customer.created_at.desc())
@@ -376,12 +389,15 @@ async def list_vehicles(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    scope = await get_mill_scope(current_user)
+    role_code = current_user.role or ""
     query = select(MasterVehicle)
-    if scope["mill_id"]:
-        query = query.where(MasterVehicle.mill_id == scope["mill_id"])
-    elif scope["company_id"]:
-        query = query.join(Mill, MasterVehicle.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if role_code == "SUPER_ADMIN":
+        if mill_id:
+            query = query.where(MasterVehicle.mill_id == mill_id)
+    elif current_user.company_id:
+        query = query.join(Mill, MasterVehicle.mill_id == Mill.id).where(Mill.company_id == current_user.company_id)
+    else:
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
     if not include_inactive:
         query = query.where(MasterVehicle.is_active == True)
     query = query.order_by(MasterVehicle.created_at.desc())
@@ -443,12 +459,15 @@ async def list_routes(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    scope = await get_mill_scope(current_user)
+    role_code = current_user.role or ""
     query = select(Route)
-    if scope["mill_id"]:
-        query = query.where(Route.mill_id == scope["mill_id"])
-    elif scope["company_id"]:
-        query = query.join(Mill, Route.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if role_code == "SUPER_ADMIN":
+        if mill_id:
+            query = query.where(Route.mill_id == mill_id)
+    elif current_user.company_id:
+        query = query.join(Mill, Route.mill_id == Mill.id).where(Mill.company_id == current_user.company_id)
+    else:
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
     if not include_inactive:
         query = query.where(Route.is_active == True)
     query = query.order_by(Route.created_at.desc())

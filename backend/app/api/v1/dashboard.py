@@ -370,78 +370,53 @@ async def get_admin_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    result = {
+        "total_companies": 0,
+        "total_mills": 0,
+        "total_users": 0,
+        "total_employees": 0,
+        "companies": [],
+    }
     try:
-        # Companies count
-        try:
-            c = await db.execute(text("SELECT COUNT(*) FROM companies WHERE deleted_at IS NULL"))
-            total_companies = c.scalar() or 0
-            print(f"DEBUG companies count: {total_companies}")
-        except Exception as e:
-            print(f"DEBUG companies error: {e}")
-            try:
-                c2 = await db.execute(text("SELECT COUNT(*) FROM companies"))
-                total_companies = c2.scalar() or 0
-                print(f"DEBUG companies fallback: {total_companies}")
-            except Exception as e2:
-                print(f"DEBUG companies total fail: {e2}")
-                total_companies = 0
+        r1 = await db.execute(text("SELECT COUNT(*) FROM companies"))
+        result["total_companies"] = r1.scalar() or 0
+    except Exception as e:
+        print(f"companies count failed: {e}")
 
-        # Mills count
-        try:
-            m = await db.execute(text("SELECT COUNT(*) FROM mills WHERE deleted_at IS NULL"))
-            total_mills = m.scalar() or 0
-            print(f"DEBUG mills count: {total_mills}")
-        except Exception as e:
-            print(f"DEBUG mills error: {e}")
-            try:
-                m2 = await db.execute(text("SELECT COUNT(*) FROM mills"))
-                total_mills = m2.scalar() or 0
-                print(f"DEBUG mills fallback: {total_mills}")
-            except Exception as e2:
-                print(f"DEBUG mills total fail: {e2}")
-                total_mills = 0
+    try:
+        r2 = await db.execute(text("SELECT COUNT(*) FROM mills"))
+        result["total_mills"] = r2.scalar() or 0
+    except Exception as e:
+        print(f"mills count failed: {e}")
 
-        # Users count
-        try:
-            u = await db.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true AND deleted_at IS NULL"))
-            total_users = u.scalar() or 0
-            print(f"DEBUG users count: {total_users}")
-        except Exception as e:
-            print(f"DEBUG users error: {e}")
-            try:
-                u2 = await db.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true"))
-                total_users = u2.scalar() or 0
-                print(f"DEBUG users fallback: {total_users}")
-            except Exception as e2:
-                print(f"DEBUG users total fail: {e2}")
-                total_users = 0
+    try:
+        r3 = await db.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true"))
+        result["total_users"] = r3.scalar() or 0
+    except Exception as e:
+        print(f"users count failed: {e}")
 
-        # Employees count
-        try:
-            e = await db.execute(text("SELECT COUNT(*) FROM employees WHERE deleted_at IS NULL"))
-            total_employees = e.scalar() or 0
-            print(f"DEBUG employees count: {total_employees}")
-        except Exception as ex:
-            print(f"DEBUG employees error: {ex}")
-            try:
-                e2 = await db.execute(text("SELECT COUNT(*) FROM employees"))
-                total_employees = e2.scalar() or 0
-                print(f"DEBUG employees fallback: {total_employees}")
-            except Exception as e2:
-                print(f"DEBUG employees total fail: {e2}")
-                total_employees = 0
+    try:
+        r4 = await db.execute(text("SELECT COUNT(*) FROM employees"))
+        result["total_employees"] = r4.scalar() or 0
+    except Exception as e:
+        print(f"employees count failed: {e}")
 
-        # Companies list
-        try:
-            cl = await db.execute(text("SELECT id, name, code, created_at FROM companies WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 20"))
-            rows = cl.fetchall()
-            companies_list = [
-                {
-                    "id": str(row[0]),
-                    "name": row[1],
-                    "code": row[2],
-                    "created_at": row[3].isoformat() if row[3] else None,
-                }
+    try:
+        r5 = await db.execute(text(
+            "SELECT id::text, name, code, created_at "
+            "FROM companies ORDER BY created_at DESC LIMIT 20"
+        ))
+        rows = r5.fetchall()
+        result["companies"] = [
+            {"id": row[0], "name": row[1], "code": row[2],
+             "created_at": row[3].isoformat() if row[3] else None}
+            for row in rows
+        ]
+    except Exception as e:
+        print(f"companies list failed: {e}")
+
+    print(f"Admin summary result: {result}")
+    return result
                 for row in rows
             ]
         except Exception as e:
