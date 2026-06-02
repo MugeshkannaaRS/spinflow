@@ -308,6 +308,22 @@ async def bulk_create_employees(
     scope = await get_mill_scope(current_user)
     mill_id = req.mill_id or scope["mill_id"]
 
+    # If still no mill_id, try first available company mill
+    if not mill_id:
+        company_id = scope.get("company_id")
+        if company_id:
+            first_mill = await db.execute(
+                select(Mill).where(
+                    Mill.company_id == company_id,
+                    Mill.is_active == True,
+                ).limit(1)
+            )
+            first = first_mill.scalar_one_or_none()
+            if first:
+                mill_id = first.id
+        if not mill_id:
+            raise HTTPException(400, detail="No mill specified for import. Select a mill first.")
+
     # SUPER_ADMIN / MILL_OWNER can import into any mill in their company
     if mill_id != scope.get("mill_id") and scope.get("role") not in ("SUPER_ADMIN", "MILL_OWNER"):
         raise HTTPException(403, "Cannot import employees into a different mill")
@@ -485,7 +501,7 @@ async def bulk_create_employees(
         await db.rollback()
         logger.exception("Failed to pre-fetch/pre-create custom fields (will skip custom values for this import)")
 
-    imported = 0
+    created_count = 0
     updated = 0
     emp_id_map: Dict[str, str] = {}
     for idx, emp in enumerate(employees_to_add):
@@ -517,7 +533,7 @@ async def bulk_create_employees(
                     await db.flush()
                     emp_id_map[emp.code] = emp.id
                     existing_codes.add(emp.code)
-                    imported += 1
+                    created_count += 1
 
                 if resolved_company_id:
                     cf_fields = custom_fields_map.get(emp.code)
@@ -534,7 +550,6 @@ async def bulk_create_employees(
                                     value=str(fval) if fval is not None else None,
                                 )
                                 db.add(cv)
-            imported += 1
         except Exception as exc:
             try:
                 db.expunge(emp)
@@ -545,7 +560,7 @@ async def bulk_create_employees(
             continue
 
     for emp, item in payroll_records:
-        if emp.id not in [e.id for e in employees_to_add[:imported]]:
+        if emp.code not in emp_id_map:
             continue
         mp = MonthlyPayroll(
             employee_id=emp.id,
@@ -588,8 +603,8 @@ async def bulk_create_employees(
         await db.commit()
     except Exception as exc:
         await db.rollback()
-        return EmployeeBulkResponse(created=imported, updated=updated, errors=errors + [_err(0, str(exc))])
-    return EmployeeBulkResponse(created=imported, updated=updated, errors=errors)
+        return EmployeeBulkResponse(created=created_count, updated=updated, errors=errors + [_err(0, str(exc))])
+    return EmployeeBulkResponse(created=created_count, updated=updated, errors=errors)
 
 
 @router.post("/hr/payroll/bulk", response_model=PayrollBulkResponse)
