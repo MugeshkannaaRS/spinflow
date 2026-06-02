@@ -443,6 +443,9 @@ async def bulk_create_employees(
             is_active=True,
             mill_id=mill_id,
         )
+        if not emp.mill_id:
+            errors.append(_err(row, "Employee must have a mill_id — select a mill before import", "mill_id"))
+            continue
         employees_to_add.append(emp)
         if item.custom_fields:
             custom_fields_map[item.employee_code.strip()] = item.custom_fields
@@ -514,6 +517,8 @@ async def bulk_create_employees(
                     )
                     existing = existing_result.scalar_one_or_none()
                     if existing:
+                        if existing.mill_id is None and emp.mill_id:
+                            existing.mill_id = emp.mill_id
                         for field in ["name", "department", "designation", "section", "shift",
                                       "joining_date", "dob", "gen", "age", "gender", "grade",
                                       "phone", "bank_account_no", "basic", "house_rent", "medical",
@@ -605,8 +610,6 @@ async def bulk_create_employees(
         await db.rollback()
         return EmployeeBulkResponse(created=created_count, updated=updated, errors=errors + [_err(0, str(exc))])
     return EmployeeBulkResponse(created=created_count, updated=updated, errors=errors)
-
-
 @router.post("/hr/payroll/bulk", response_model=PayrollBulkResponse)
 async def bulk_create_payroll(
     req: PayrollBulkCreate,

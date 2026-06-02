@@ -1,0 +1,28 @@
+-- 002_fix_null_mill_id.sql
+--
+-- Fix employees imported with NULL mill_id (from earlier buggy import).
+-- Run AFTER verifying the target mill exists and belongs to your company.
+--
+-- Usage:
+--   1. Find the mill UUID:
+--      SELECT id, name FROM mills WHERE is_active = true;
+--
+--   2. Replace '<your_mill_uuid>' below and run:
+--      UPDATE employees SET mill_id = '<your_mill_uuid>' WHERE mill_id IS NULL;
+--
+--   3. Verify:
+--      SELECT mill_id, COUNT(*) FROM employees GROUP BY mill_id;
+--      SELECT e.code, e.name, e.mill_id, m.name AS mill_name
+--      FROM employees e
+--      LEFT JOIN mills m ON e.mill_id = m.id
+--      WHERE e.mill_id IS NULL;
+--
+-- Caution: Only run this if ALL NULL-mill_id employees belong to the SAME mill.
+-- If employees from multiple mills are missing their mill_id, set them individually.
+
+-- Preview NULL employees before updating:
+-- SELECT count(*) AS null_mill_count FROM employees WHERE mill_id IS NULL;
+-- SELECT code, name, department FROM employees WHERE mill_id IS NULL LIMIT 20;
+
+-- Run this after replacing the UUID:
+-- UPDATE employees SET mill_id = '<your_mill_uuid>' WHERE mill_id IS NULL;
