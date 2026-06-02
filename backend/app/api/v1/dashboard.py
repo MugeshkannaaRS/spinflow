@@ -460,7 +460,7 @@ async def get_dashboard_summary(
         # SECURITY: verify this mill belongs to user's company
         if effective_mill_id and current_user.company_id:
             mill_check = await db.execute(
-                select(Mill).where(Mill.id == effective_mill_id, Mill.company_id == current_user.company_id, Mill.deleted_at.is_(None))
+                select(Mill).where(Mill.id == effective_mill_id, Mill.company_id == current_user.company_id, Mill.is_active == True)
             )
             if not mill_check.scalar_one_or_none():
                 effective_mill_id = current_user.mill_id
@@ -468,7 +468,7 @@ async def get_dashboard_summary(
         # Fallback: try first mill in user's company
         if not effective_mill_id and current_user.company_id:
             mill_result = await db.execute(
-                select(Mill).where(Mill.company_id == current_user.company_id, Mill.deleted_at.is_(None)).limit(1)
+                select(Mill).where(Mill.company_id == current_user.company_id, Mill.is_active == True).limit(1)
             )
             mill = mill_result.scalar_one_or_none()
             effective_mill_id = mill.id if mill else None

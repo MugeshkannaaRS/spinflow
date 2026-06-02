@@ -192,7 +192,7 @@ async def get_me(db: AsyncSession = Depends(get_db), current_user: User = Depend
         company_mills = []
         if current_user.company_id:
             mills_result = await db.execute(
-                select(Mill).where(Mill.company_id == current_user.company_id, Mill.deleted_at.is_(None)).order_by(Mill.name)
+                select(Mill).where(Mill.company_id == current_user.company_id, Mill.is_active == True).order_by(Mill.name)
             )
             company_mills = [
                 {"id": str(m.id), "name": m.name, "code": m.code or ""}
