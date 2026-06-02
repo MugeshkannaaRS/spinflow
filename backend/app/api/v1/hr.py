@@ -392,6 +392,8 @@ async def bulk_create_employees(
                     )
                     errors.append(_err(row, f"Department '{dept_name}' not found — auto-created", "department", dept_name, "info"))
                 except Exception as dept_err:
+                    await db.rollback()
+                    logger.exception("Department auto-create failed", extra={"row": row, "department": dept_name})
                     errors.append(_err(row, f"Department '{dept_name}' auto-create failed: {dept_err}", "department", dept_name, "warning"))
 
         emp = Employee(
@@ -483,53 +485,48 @@ async def bulk_create_employees(
                 for f in new_fields:
                     existing_field_names[f.field_name] = f
     except Exception as exc:
-        logger.warning(f"Failed to pre-fetch/pre-create custom fields: {exc}")
+        await db.rollback()
+        logger.exception("Failed to pre-fetch/pre-create custom fields (will skip custom values for this import)")
 
-    BATCH_SIZE = 200
     imported = 0
     emp_id_map: Dict[str, str] = {}
-    for batch_start in range(0, len(employees_to_add), BATCH_SIZE):
-        batch = employees_to_add[batch_start:batch_start + BATCH_SIZE]
+    for idx, emp in enumerate(employees_to_add):
+        row_num = idx + 1
         try:
             async with await db.begin_nested():
-                for emp in batch:
-                    if emp.code in existing_codes:
-                        existing_result = await db.execute(
-                            select(Employee).where(
-                                Employee.code == emp.code,
-                                Employee.mill_id == mill_id
-                            )
+                if emp.code in existing_codes:
+                    existing_result = await db.execute(
+                        select(Employee).where(
+                            Employee.code == emp.code,
+                            Employee.mill_id == mill_id
                         )
-                        existing = existing_result.scalar_one_or_none()
-                        if existing:
-                            for field in ["name", "department", "designation", "section", "shift",
-                                          "joining_date", "dob", "gen", "age", "gender", "grade",
-                                          "phone", "bank_account_no", "basic", "house_rent", "medical",
-                                          "conveyance", "food_allowance", "wages", "increment",
-                                          "total_salary", "mobile_bill", "shift_benefit", "wages_of_month",
-                                          "days_of_month", "sl_no"]:
-                                val = getattr(emp, field, None)
-                                if val is not None:
-                                    setattr(existing, field, val)
-                            db.add(existing)
-                            emp_id_map[emp.code] = existing.id
-                            continue
-                    db.add(emp)
-
-                await db.flush()
-
-                for emp in batch:
-                    if emp.code not in emp_id_map:
-                        emp_id_map[emp.code] = emp.id
+                    )
+                    existing = existing_result.scalar_one_or_none()
+                    if existing:
+                        for field in ["name", "department", "designation", "section", "shift",
+                                      "joining_date", "dob", "gen", "age", "gender", "grade",
+                                      "phone", "bank_account_no", "basic", "house_rent", "medical",
+                                      "conveyance", "food_allowance", "wages", "increment",
+                                      "total_salary", "mobile_bill", "shift_benefit", "wages_of_month",
+                                      "days_of_month", "sl_no"]:
+                            val = getattr(emp, field, None)
+                            if val is not None:
+                                setattr(existing, field, val)
+                        db.add(existing)
+                        await db.flush()
+                        emp_id_map[emp.code] = existing.id
                         existing_codes.add(emp.code)
+                else:
+                    db.add(emp)
+                    await db.flush()
+                    emp_id_map[emp.code] = emp.id
+                    existing_codes.add(emp.code)
 
                 if resolved_company_id:
-                    for emp in batch:
-                        cf_fields = custom_fields_map.get(emp.code)
-                        if cf_fields:
-                            actual_emp_id = emp_id_map.get(emp.code)
-                            if not actual_emp_id:
-                                continue
+                    cf_fields = custom_fields_map.get(emp.code)
+                    if cf_fields:
+                        actual_emp_id = emp_id_map.get(emp.code)
+                        if actual_emp_id:
                             for fname, fval in cf_fields.items():
                                 field = existing_field_names.get(fname)
                                 if not field:
@@ -540,15 +537,14 @@ async def bulk_create_employees(
                                     value=str(fval) if fval is not None else None,
                                 )
                                 db.add(cv)
-            imported += len(batch)
+            imported += 1
         except Exception as exc:
-            for emp in batch:
-                if emp.code not in existing_codes:
-                    try:
-                        db.expunge(emp)
-                    except Exception:
-                        pass
-            errors.append(_err(batch_start + 1, str(exc)))
+            try:
+                db.expunge(emp)
+            except Exception:
+                pass
+            logger.exception("Employee import failed", extra={"row": row_num, "code": emp.code})
+            errors.append(_err(row_num, str(exc)))
             continue
 
     for emp, item in payroll_records:
