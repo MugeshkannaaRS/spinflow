@@ -377,7 +377,22 @@ async def bulk_create_employees(
             )
             dept = dept_result.scalar_one_or_none()
             if not dept:
-                errors.append(_err(row, f"Department '{dept_name}' not found in Masters. Employee imported but department not linked. Add department in Masters → Departments first.", "department", dept_name, "warning"))
+                try:
+                    from sqlalchemy import insert as sa_insert
+                    import uuid
+                    await db.execute(
+                        sa_insert(Department).values(
+                            id=str(uuid.uuid4()),
+                            mill_id=mill_id,
+                            code=dept_name,
+                            name=dept_name,
+                            department_type="General",
+                            is_active=True,
+                        )
+                    )
+                    errors.append(_err(row, f"Department '{dept_name}' not found — auto-created", "department", dept_name, "info"))
+                except Exception as dept_err:
+                    errors.append(_err(row, f"Department '{dept_name}' auto-create failed: {dept_err}", "department", dept_name, "warning"))
 
         emp = Employee(
             code=item.employee_code.strip(),
@@ -475,65 +490,66 @@ async def bulk_create_employees(
     emp_id_map: Dict[str, str] = {}
     for batch_start in range(0, len(employees_to_add), BATCH_SIZE):
         batch = employees_to_add[batch_start:batch_start + BATCH_SIZE]
-        for emp in batch:
-            if emp.code in existing_codes:
-                existing_result = await db.execute(
-                    select(Employee).where(
-                        Employee.code == emp.code,
-                        Employee.mill_id == mill_id
-                    )
-                )
-                existing = existing_result.scalar_one_or_none()
-                if existing:
-                    for field in ["name", "department", "designation", "section", "shift",
-                                  "joining_date", "dob", "gen", "age", "gender", "grade",
-                                  "phone", "bank_account_no", "basic", "house_rent", "medical",
-                                  "conveyance", "food_allowance", "wages", "increment",
-                                  "total_salary", "mobile_bill", "shift_benefit", "wages_of_month",
-                                  "days_of_month", "sl_no"]:
-                        val = getattr(emp, field, None)
-                        if val is not None:
-                            setattr(existing, field, val)
-                    db.add(existing)
-                    emp_id_map[emp.code] = existing.id
-                    continue
-            db.add(emp)
         try:
-            await db.flush()
+            async with await db.begin_nested():
+                for emp in batch:
+                    if emp.code in existing_codes:
+                        existing_result = await db.execute(
+                            select(Employee).where(
+                                Employee.code == emp.code,
+                                Employee.mill_id == mill_id
+                            )
+                        )
+                        existing = existing_result.scalar_one_or_none()
+                        if existing:
+                            for field in ["name", "department", "designation", "section", "shift",
+                                          "joining_date", "dob", "gen", "age", "gender", "grade",
+                                          "phone", "bank_account_no", "basic", "house_rent", "medical",
+                                          "conveyance", "food_allowance", "wages", "increment",
+                                          "total_salary", "mobile_bill", "shift_benefit", "wages_of_month",
+                                          "days_of_month", "sl_no"]:
+                                val = getattr(emp, field, None)
+                                if val is not None:
+                                    setattr(existing, field, val)
+                            db.add(existing)
+                            emp_id_map[emp.code] = existing.id
+                            continue
+                    db.add(emp)
+
+                await db.flush()
+
+                for emp in batch:
+                    if emp.code not in emp_id_map:
+                        emp_id_map[emp.code] = emp.id
+                        existing_codes.add(emp.code)
+
+                if resolved_company_id:
+                    for emp in batch:
+                        cf_fields = custom_fields_map.get(emp.code)
+                        if cf_fields:
+                            actual_emp_id = emp_id_map.get(emp.code)
+                            if not actual_emp_id:
+                                continue
+                            for fname, fval in cf_fields.items():
+                                field = existing_field_names.get(fname)
+                                if not field:
+                                    continue
+                                cv = EmployeeCustomValue(
+                                    employee_id=actual_emp_id,
+                                    field_id=field.id,
+                                    value=str(fval) if fval is not None else None,
+                                )
+                                db.add(cv)
+            imported += len(batch)
         except Exception as exc:
-            await db.rollback()
+            for emp in batch:
+                if emp.code not in existing_codes:
+                    try:
+                        db.expunge(emp)
+                    except Exception:
+                        pass
             errors.append(_err(batch_start + 1, str(exc)))
             continue
-
-        # After flush, populate IDs for new employees
-        for emp in batch:
-            if emp.code not in emp_id_map:
-                emp_id_map[emp.code] = emp.id
-                existing_codes.add(emp.code)
-
-        # Store custom field values for this batch (batch create)
-        try:
-            if resolved_company_id:
-                for emp in batch:
-                    cf_fields = custom_fields_map.get(emp.code)
-                    if cf_fields:
-                        actual_emp_id = emp_id_map.get(emp.code)
-                        if not actual_emp_id:
-                            continue
-                        for fname, fval in cf_fields.items():
-                            field = existing_field_names.get(fname)
-                            if not field:
-                                continue
-                            cv = EmployeeCustomValue(
-                                employee_id=actual_emp_id,
-                                field_id=field.id,
-                                value=str(fval) if fval is not None else None,
-                            )
-                            db.add(cv)
-        except Exception as exc:
-            logger.warning(f"Failed to store custom field values: {exc}")
-
-        imported += len(batch)
 
     for emp, item in payroll_records:
         if emp.id not in [e.id for e in employees_to_add[:imported]]:
