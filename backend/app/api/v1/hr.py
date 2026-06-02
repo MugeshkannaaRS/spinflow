@@ -425,6 +425,7 @@ async def bulk_create_employees(
 
     BATCH_SIZE = 50
     imported = 0
+    emp_id_map: Dict[str, str] = {}
     for batch_start in range(0, len(employees_to_add), BATCH_SIZE):
         batch = employees_to_add[batch_start:batch_start + BATCH_SIZE]
         for emp in batch:
@@ -446,42 +447,51 @@ async def bulk_create_employees(
                     if val is not None:
                         setattr(existing, field, val)
                 db.add(existing)
+                emp_id_map[emp.code] = existing.id
             else:
                 db.add(emp)
-            try:
-                await db.flush()
-            except Exception as exc:
-                await db.rollback()
-                errors.append(_err(batch_start + 1, str(exc)))
-                continue
+        try:
+            await db.flush()
+        except Exception as exc:
+            await db.rollback()
+            errors.append(_err(batch_start + 1, str(exc)))
+            continue
 
-            # Store custom field values for this batch
-            if resolved_company_id:
-                for emp in batch:
-                    cf_fields = custom_fields_map.get(emp.code)
-                    if cf_fields:
-                        for fname, fval in cf_fields.items():
-                            field_result = await db.execute(
-                                select(EmployeeCustomField).where(
-                                    EmployeeCustomField.company_id == resolved_company_id,
-                                    EmployeeCustomField.field_name == fname,
-                                )
+        # After flush, new employees now have IDs; populate map for them
+        for emp in batch:
+            if emp.code not in emp_id_map:
+                emp_id_map[emp.code] = emp.id
+
+        # Store custom field values for this batch
+        if resolved_company_id:
+            for emp in batch:
+                cf_fields = custom_fields_map.get(emp.code)
+                if cf_fields:
+                    actual_emp_id = emp_id_map.get(emp.code)
+                    if not actual_emp_id:
+                        continue
+                    for fname, fval in cf_fields.items():
+                        field_result = await db.execute(
+                            select(EmployeeCustomField).where(
+                                EmployeeCustomField.company_id == resolved_company_id,
+                                EmployeeCustomField.field_name == fname,
                             )
-                            field = field_result.scalar_one_or_none()
-                            if not field:
-                                field = EmployeeCustomField(
-                                    company_id=resolved_company_id,
-                                    field_name=fname,
-                                    field_type="text",
-                                )
-                                db.add(field)
-                                await db.flush()
-                            cv = EmployeeCustomValue(
-                                employee_id=emp.id,
-                                field_id=field.id,
-                                value=str(fval) if fval is not None else None,
+                        )
+                        field = field_result.scalar_one_or_none()
+                        if not field:
+                            field = EmployeeCustomField(
+                                company_id=resolved_company_id,
+                                field_name=fname,
+                                field_type="text",
                             )
-                            db.add(cv)
+                            db.add(field)
+                            await db.flush()
+                        cv = EmployeeCustomValue(
+                            employee_id=actual_emp_id,
+                            field_id=field.id,
+                            value=str(fval) if fval is not None else None,
+                        )
+                        db.add(cv)
 
         imported += len(batch)
 
