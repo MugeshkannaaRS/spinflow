@@ -446,7 +446,28 @@ async def bulk_create_employees(
         for f in ef_result.scalars().all():
             existing_field_names[f.field_name] = f
 
-    BATCH_SIZE = 50
+        # Pre-create all custom field definitions BEFORE the batch loop (one flush)
+        all_custom_names = set()
+        for emp in employees_to_add:
+            cf = custom_fields_map.get(emp.code)
+            if cf:
+                all_custom_names.update(cf.keys())
+        new_fields = []
+        for fname in all_custom_names:
+            if fname not in existing_field_names:
+                field = EmployeeCustomField(
+                    company_id=resolved_company_id,
+                    field_name=fname,
+                    field_type="text",
+                )
+                db.add(field)
+                new_fields.append(field)
+        if new_fields:
+            await db.flush()
+            for f in new_fields:
+                existing_field_names[f.field_name] = f
+
+    BATCH_SIZE = 200
     imported = 0
     emp_id_map: Dict[str, str] = {}
     for batch_start in range(0, len(employees_to_add), BATCH_SIZE):
@@ -499,14 +520,7 @@ async def bulk_create_employees(
                         for fname, fval in cf_fields.items():
                             field = existing_field_names.get(fname)
                             if not field:
-                                field = EmployeeCustomField(
-                                    company_id=resolved_company_id,
-                                    field_name=fname,
-                                    field_type="text",
-                                )
-                                db.add(field)
-                                await db.flush()
-                                existing_field_names[fname] = field
+                                continue
                             cv = EmployeeCustomValue(
                                 employee_id=actual_emp_id,
                                 field_id=field.id,
