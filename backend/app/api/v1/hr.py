@@ -16,8 +16,8 @@ class AttendanceImportRequest(BaseModel):
 from app.db.session import get_db
 from app.core.deps import get_current_user, require_module, log_audit, get_mill_scope
 from app.models.user import User
-from app.models.hr import Employee, Attendance, Leave, MonthlyPayroll
-from app.models.masters import Mill, Department
+from app.models.hr import Employee, Attendance, Leave, MonthlyPayroll, EmployeeCustomField, EmployeeCustomValue
+from app.models.masters import Mill, Department, Company
 from app.schemas.hr import (
     EmployeeCreate, EmployeeOut, EmployeeUpdate,
     AttendanceCreate, AttendanceOut, AttendanceBulkCreate, AttendanceSummary,
@@ -26,6 +26,7 @@ from app.schemas.hr import (
     PayrollBulkCreate, PayrollBulkResponse,
     MonthlyPayrollCreate, MonthlyPayrollOut, MonthlyPayrollUpdate,
     MonthlyPayrollListResponse, PayrollCalculateRequest, PayrollFinalizeRequest,
+    CustomFieldOut, EmployeeDetailOut, CustomValueOut,
 )
 
 router = APIRouter()
@@ -140,6 +141,51 @@ async def get_employees(
     except Exception as e:
         logger.error(f"HR employees list error: {e}")
         return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
+
+
+@router.get("/hr/employees/{employee_id}", response_model=EmployeeDetailOut)
+async def get_employee_detail(
+    employee_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("hr")),
+):
+    scope = await get_mill_scope(current_user)
+    stmt = select(Employee).where(Employee.id == employee_id)
+    if scope["mill_id"]:
+        stmt = stmt.where(Employee.mill_id == scope["mill_id"])
+    elif scope["company_id"]:
+        stmt = stmt.join(Mill, Employee.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    emp = result.scalar_one_or_none()
+    if not emp:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
+
+    resolved_company_id = scope.get("company_id")
+    if not resolved_company_id and emp.mill_id:
+        mill_row = (await db.execute(select(Mill).where(Mill.id == emp.mill_id))).scalar_one_or_none()
+        resolved_company_id = mill_row.company_id if mill_row else None
+
+    custom_values: List[Dict] = []
+    if resolved_company_id:
+        cv_result = await db.execute(
+            select(EmployeeCustomField, EmployeeCustomValue)
+            .join(EmployeeCustomValue, EmployeeCustomValue.field_id == EmployeeCustomField.id, isouter=True)
+            .where(
+                EmployeeCustomField.company_id == resolved_company_id,
+                EmployeeCustomValue.employee_id == employee_id,
+            )
+        )
+        for field, value in cv_result.all():
+            custom_values.append({
+                "field_id": field.id,
+                "field_name": field.field_name,
+                "field_type": field.field_type,
+                "value": value.value if value else None,
+            })
+
+    emp_data = EmployeeOut.model_validate(emp).model_dump()
+    emp_data["custom_values"] = custom_values
+    return emp_data
 
 
 @router.post("/hr/employees", response_model=EmployeeOut)
@@ -262,6 +308,12 @@ async def bulk_create_employees(
     scope = await get_mill_scope(current_user)
     mill_id = scope["mill_id"]
 
+    # Resolve company_id for custom fields
+    resolved_company_id = scope.get("company_id")
+    if not resolved_company_id and mill_id:
+        mill_row = (await db.execute(select(Mill).where(Mill.id == mill_id))).scalar_one_or_none()
+        resolved_company_id = mill_row.company_id if mill_row else None
+
     def _err(row: int, msg: str, field: Optional[str] = None, value: Optional[str] = None, severity: str = "error") -> ImportErrorDetail:
         return ImportErrorDetail(row=row, message=msg, field=field, value=value, severity=severity)
 
@@ -281,6 +333,7 @@ async def bulk_create_employees(
     employees_to_add: List[Employee] = []
     payroll_records: List[MonthlyPayroll] = []
     errors: List[ImportErrorDetail] = []
+    custom_fields_map: Dict[str, Dict[str, str]] = {}
     now = datetime.now(timezone.utc)
     cur_month = now.month
     cur_year = now.year
@@ -354,6 +407,8 @@ async def bulk_create_employees(
             mill_id=mill_id,
         )
         employees_to_add.append(emp)
+        if item.custom_fields:
+            custom_fields_map[item.employee_code.strip()] = item.custom_fields
         has_payroll = any(getattr(item, f, None) is not None for f in [
             "calculate_days", "actual_attendance", "day_off", "cl", "sl", "el",
             "comp_leave", "festival_holiday", "absent_days", "payable_days",
@@ -393,12 +448,40 @@ async def bulk_create_employees(
                 db.add(existing)
             else:
                 db.add(emp)
-        try:
-            await db.flush()
-        except Exception as exc:
-            await db.rollback()
-            errors.append(_err(batch_start + 1, str(exc)))
-            continue
+            try:
+                await db.flush()
+            except Exception as exc:
+                await db.rollback()
+                errors.append(_err(batch_start + 1, str(exc)))
+                continue
+
+            # Store custom field values for this batch
+            if resolved_company_id:
+                for emp in batch:
+                    cf_fields = custom_fields_map.get(emp.code)
+                    if cf_fields:
+                        for fname, fval in cf_fields.items():
+                            field_result = await db.execute(
+                                select(EmployeeCustomField).where(
+                                    EmployeeCustomField.company_id == resolved_company_id,
+                                    EmployeeCustomField.field_name == fname,
+                                )
+                            )
+                            field = field_result.scalar_one_or_none()
+                            if not field:
+                                field = EmployeeCustomField(
+                                    company_id=resolved_company_id,
+                                    field_name=fname,
+                                    field_type="text",
+                                )
+                                db.add(field)
+                                await db.flush()
+                            cv = EmployeeCustomValue(
+                                employee_id=emp.id,
+                                field_id=field.id,
+                                value=str(fval) if fval is not None else None,
+                            )
+                            db.add(cv)
 
         imported += len(batch)
 

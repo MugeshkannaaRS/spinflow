@@ -1,6 +1,7 @@
 from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Numeric, Date
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
+from typing import Optional
 from app.db.base import Base, TimestampMixin, generate_uuid
 
 
@@ -133,3 +134,21 @@ class EmployeeShift(Base):
     shift: Mapped[str] = mapped_column(String(10), nullable=False)
     effective_from: Mapped[str] = mapped_column(String(10), nullable=False)
     effective_to: Mapped[str] = mapped_column(String(10), nullable=True)
+
+
+class EmployeeCustomField(TimestampMixin, Base):
+    __tablename__ = "employee_custom_fields"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    company_id: Mapped[str] = mapped_column(String(36), ForeignKey("companies.id"), nullable=False, index=True)
+    field_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    field_type: Mapped[str] = mapped_column(String(20), default="text")
+
+
+class EmployeeCustomValue(TimestampMixin, Base):
+    __tablename__ = "employee_custom_values"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    employee_id: Mapped[str] = mapped_column(String(36), ForeignKey("employees.id"), nullable=False, index=True)
+    field_id: Mapped[str] = mapped_column(String(36), ForeignKey("employee_custom_fields.id"), nullable=False)
+    value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

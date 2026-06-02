@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/useColumnConfig";
 import { fuzzyMatchColumns, parseExcelDate, filterBlankRows, normalizeShift, generateImportTemplate } from "@/lib/excel-import";
 import { validateForm } from "@/lib/formValidation";
+import { api } from "@/lib/api";
 import { hrApi, uploadApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
@@ -595,6 +596,12 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
 
 // ─── Employee Detail Sheet ───────────────────────────────────────────────────────
 
+interface CustomValueItem {
+  field_name: string;
+  field_type: string;
+  value: string | null;
+}
+
 function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; onOpenChange: (v: boolean) => void; employee: EmployeeRow }) {
   const { millId } = useActiveMill();
   const empColConfig = useColumnConfig("hr_employees");
@@ -609,6 +616,15 @@ function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; 
     enabled: open,
     staleTime: 30_000,
   });
+
+  const { data: empDetail } = useQuery({
+    queryKey: ["hr-employee-detail", employee.id],
+    queryFn: () => api.get(`/hr/employees/${employee.id}`).then((r: any) => r.data),
+    enabled: open && !!employee.id,
+    staleTime: 30_000,
+  });
+
+  const customValues: CustomValueItem[] = empDetail?.custom_values ?? [];
 
   const Field = ({ label, value }: { label: string; value: string | number | undefined | null }) => (
     <div>
@@ -634,6 +650,9 @@ function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; 
           <button type="button" onClick={() => setPayrollTab("personal")} className={cn("px-3 py-1 text-sm rounded", payrollTab === "personal" ? "bg-primary text-primary-foreground" : "bg-muted")}>Personal Info</button>
           <button type="button" onClick={() => setPayrollTab("salary")} className={cn("px-3 py-1 text-sm rounded", payrollTab === "salary" ? "bg-primary text-primary-foreground" : "bg-muted")}>Salary Structure</button>
           <button type="button" onClick={() => setPayrollTab("monthly")} className={cn("px-3 py-1 text-sm rounded", payrollTab === "monthly" ? "bg-primary text-primary-foreground" : "bg-muted")}>Monthly Data</button>
+          {customValues.length > 0 && (
+            <button type="button" onClick={() => setPayrollTab("custom")} className={cn("px-3 py-1 text-sm rounded", payrollTab === "custom" ? "bg-primary text-primary-foreground" : "bg-muted")}>Additional Info</button>
+          )}
         </div>
 
         {payrollTab === "personal" && (
@@ -670,6 +689,17 @@ function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; 
             <Currency label={empColConfig.getLabel('shift_benefit')} value={employee.shift_benefit} />
             <Field label={empColConfig.getLabel('days_of_month')} value={employee.days_of_month ?? 26} />
             <Currency label={empColConfig.getLabel('wages_of_month')} value={employee.wages_of_month} />
+          </div>
+        )}
+
+        {payrollTab === "custom" && customValues.length > 0 && (
+          <div className="py-4 space-y-3">
+            <p className="text-sm font-medium text-muted-foreground">Additional Information</p>
+            <div className="grid grid-cols-2 gap-4">
+              {customValues.map((cv) => (
+                <Field key={cv.field_name} label={cv.field_name.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())} value={cv.value} />
+              ))}
+            </div>
           </div>
         )}
 

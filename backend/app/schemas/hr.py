@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator, model_validator
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import date, datetime
 
 
@@ -292,6 +292,7 @@ class EmployeeBulkItem(BaseModel):
     age: Optional[int] = None
     gender: Optional[str] = None
     grade: Optional[str] = None
+    custom_fields: Optional[Dict[str, str]] = None
 
     @field_validator("employee_code", mode="before")
     @classmethod
@@ -412,3 +413,29 @@ class ImportErrorDetail(BaseModel):
 class EmployeeBulkResponse(BaseModel):
     created: int
     errors: List[ImportErrorDetail]
+
+
+class CustomFieldCreate(BaseModel):
+    field_name: str
+    field_type: str = "text"
+
+
+class CustomFieldOut(BaseModel):
+    id: str
+    company_id: str
+    field_name: str
+    field_type: str
+
+    class Config:
+        from_attributes = True
+
+
+class CustomValueOut(BaseModel):
+    field_id: str
+    field_name: str
+    field_type: str
+    value: Optional[str] = None
+
+
+class EmployeeDetailOut(EmployeeOut):
+    custom_values: List[CustomValueOut] = []

@@ -54,6 +54,10 @@ interface ImportError {
   severity?: string;
 }
 
+function normalizeCustomFieldKey(header: string): string {
+  return header.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "custom_field";
+}
+
 function computeConfidence(
   header: string,
   col: ColumnConfig,
@@ -113,6 +117,7 @@ export function UniversalImportModal({
   const [importError, setImportError] = useState<string | null>(null);
   const [showStep5Errors, setShowStep5Errors] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [customFieldHeaders, setCustomFieldHeaders] = useState<Set<string>>(new Set());
 
   const colMap = useMemo(() => {
     const map: Record<string, ColumnConfig> = {};
@@ -135,6 +140,7 @@ export function UniversalImportModal({
       setIsImporting(false);
       setImportProgress({ current: 0, total: 0 });
       setImportResult(null);
+      setCustomFieldHeaders(new Set());
     }
   }, [isOpen]);
 
@@ -301,6 +307,7 @@ export function UniversalImportModal({
     const records: PreviewRecord[] = [];
     for (const row of rawRows) {
       const record: Record<string, any> = {};
+      record.custom_fields = {};
       const errors: string[] = [];
       const warnings: string[] = [];
 
@@ -310,6 +317,11 @@ export function UniversalImportModal({
         if (!fieldKey) continue;
         const colCfg = keyToConfig[fieldKey];
         let value = row[i];
+
+        if (customFieldHeaders.has(header)) {
+          record.custom_fields[normalizeCustomFieldKey(header)] = value ?? null;
+          continue;
+        }
 
         if (colCfg) {
           if (colCfg.type === "date") {
@@ -347,12 +359,12 @@ export function UniversalImportModal({
 
     setPreviewRecords(records);
 
-    const mappingsToSave: ImportMapping[] = Object.entries(mapping)
-      .filter(([, v]) => v !== null)
-      .map(([header, field]) => ({
-        excel_header: header,
-        spinflow_field: field,
-      }));
+      const mappingsToSave: ImportMapping[] = Object.entries(mapping)
+        .filter(([header, v]) => v !== null && !customFieldHeaders.has(header))
+        .map(([header, field]) => ({
+          excel_header: header,
+          spinflow_field: field,
+        }));
     try {
       saveMappingsMutation.mutate(mappingsToSave);
     } catch {
@@ -367,7 +379,14 @@ export function UniversalImportModal({
       setPreviewRecords((prev) => {
         const updated = [...prev];
         const row = { ...updated[rowIdx] };
-        row.data = { ...row.data, [fieldKey]: value };
+        row.data = { ...row.data };
+
+        if (fieldKey.startsWith("__custom__:")) {
+          const cfKey = fieldKey.replace("__custom__:", "");
+          row.data.custom_fields = { ...(row.data.custom_fields || {}), [cfKey]: value };
+        } else {
+          row.data[fieldKey] = value;
+        }
 
         const colCfg = colMap[fieldKey];
         const errors: string[] = [];
@@ -496,8 +515,18 @@ export function UniversalImportModal({
       const fieldMap = FIELD_MAP[tableName] ?? {};
       const validRecords = nonBlank.map((rec) => {
         const mapped: Record<string, any> = {};
+        const customFields: Record<string, string> = {};
         for (const [key, value] of Object.entries(rec)) {
-          mapped[fieldMap[key] ?? key] = value;
+          if (key === "custom_fields") {
+            if (value && typeof value === "object") {
+              Object.assign(customFields, value);
+            }
+          } else {
+            mapped[fieldMap[key] ?? key] = value;
+          }
+        }
+        if (Object.keys(customFields).length > 0) {
+          mapped.custom_fields = customFields;
         }
         return mapped;
       });
@@ -662,48 +691,99 @@ export function UniversalImportModal({
               <TableHead className="w-16 text-center">Skip</TableHead>
             </TableRow>
           </TableHeader>
-          <TableBody>
-            {headers.map((header) => (
-              <TableRow key={header}>
-                <TableCell className="font-medium">{header}</TableCell>
-                <TableCell>
-                  <Select
-                    value={mapping[header] ?? "__skip__"}
-                    onValueChange={(v) => handleMappingChange(header, v === "__skip__" ? null : v)}
-                  >
-                    <SelectTrigger className="w-56">
-                      <SelectValue placeholder="— Skip —" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__skip__">— Skip —</SelectItem>
-                      {colConfigs.map((c) => (
-                        <SelectItem key={c.key} value={c.key}>
-                          {c.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell>
-                  {mapping[header] ? getConfidenceBadge(confidence[header] ?? 0) : <span className="text-xs text-muted-foreground">—</span>}
-                </TableCell>
-                <TableCell className="text-center">
-                  <Checkbox
-                    checked={mapping[header] === null}
-                    onCheckedChange={(chk) => {
-                      if (chk) {
-                        handleMappingChange(header, null);
-                      } else if (headers.length > 0) {
-                        const fuzzyResult = fuzzyMatchColumns([header], colConfigs, savedMappings);
-                        const matched = fuzzyResult.get(header);
-                        handleMappingChange(header, matched?.key ?? null);
-                      }
-                    }}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
+              <TableBody>
+                {headers.map((header) => {
+                  const isCustom = customFieldHeaders.has(header);
+                  return (
+                    <TableRow key={header}>
+                      <TableCell className="font-medium">{header}</TableCell>
+                      <TableCell>
+                        {isCustom ? (
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300">
+                              Custom: {normalizeCustomFieldKey(header)}
+                            </Badge>
+                          </div>
+                        ) : (
+                          <Select
+                            value={mapping[header] ?? "__skip__"}
+                            onValueChange={(v) => handleMappingChange(header, v === "__skip__" ? null : v)}
+                          >
+                            <SelectTrigger className="w-56">
+                              <SelectValue placeholder="— Skip —" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__skip__">— Skip —</SelectItem>
+                              {colConfigs.map((c) => (
+                                <SelectItem key={c.key} value={c.key}>
+                                  {c.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isCustom ? (
+                          <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300">
+                            New
+                          </Badge>
+                        ) : mapping[header] ? (
+                          getConfidenceBadge(confidence[header] ?? 0)
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {isCustom ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-xs text-muted-foreground"
+                            onClick={() => {
+                              const next = new Set(customFieldHeaders);
+                              next.delete(header);
+                              setCustomFieldHeaders(next);
+                            }}
+                          >
+                            Undo
+                          </Button>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1">
+                            <Checkbox
+                              checked={mapping[header] === null}
+                              onCheckedChange={(chk) => {
+                                if (chk) {
+                                  handleMappingChange(header, null);
+                                } else if (headers.length > 0) {
+                                  const fuzzyResult = fuzzyMatchColumns([header], colConfigs, savedMappings);
+                                  const matched = fuzzyResult.get(header);
+                                  handleMappingChange(header, matched?.key ?? null);
+                                }
+                              }}
+                            />
+                            {!mapping[header] && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 text-xs text-blue-600 hover:text-blue-700 px-1"
+                                onClick={() => {
+                                  const next = new Set(customFieldHeaders);
+                                  next.add(header);
+                                  setCustomFieldHeaders(next);
+                                }}
+                                title="Create as custom field"
+                              >
+                                + Custom
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
         </Table>
       </div>
 
@@ -728,7 +808,11 @@ export function UniversalImportModal({
 
   const renderStep3 = () => {
     const displayRecords = previewRecords.slice(0, 20);
-    const mappedFields = Object.values(mapping).filter(Boolean) as string[];
+    const standardFields = Object.values(mapping).filter(Boolean) as string[];
+    const customKeys = [...customFieldHeaders].map(h => `__custom__:${normalizeCustomFieldKey(h)}`);
+    const mappedFields = [...standardFields, ...customKeys];
+    const isCustomKey = (k: string) => k.startsWith("__custom__:");
+    const customKeyToHeader = (k: string) => k.replace("__custom__:", "");
 
     return (
       <div className="space-y-4">
@@ -762,18 +846,36 @@ export function UniversalImportModal({
               {displayRecords.map((record, ri) => (
                 <TableRow key={ri} className={getRowVariant(record)}>
                   <TableCell className="text-xs text-muted-foreground">{ri + 1}</TableCell>
-                  {mappedFields.map((fk) => (
-                    <TableCell key={fk}>
-                      <Input
-                        className={cn(
-                          "h-7 text-xs border-0 bg-transparent p-0 focus-visible:ring-1 focus-visible:ring-offset-0",
-                          record.errors.some((e) => e.includes(colMap[fk]?.label ?? "")) && "text-red-600",
-                        )}
-                        value={String(record.data[fk] ?? "")}
-                        onChange={(e) => handleCellEdit(ri, fk, e.target.value)}
-                      />
-                    </TableCell>
-                  ))}
+                  {mappedFields.map((fk) => {
+                    if (isCustomKey(fk)) {
+                      const cfKey = customKeyToHeader(fk);
+                      return (
+                        <TableCell key={fk}>
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline" className="h-5 text-[10px] px-1 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300">Custom</Badge>
+                            <Input
+                              className="h-7 text-xs border-0 bg-transparent p-0 focus-visible:ring-1 focus-visible:ring-offset-0"
+                              value={String(record.data.custom_fields?.[cfKey] ?? "")}
+                              onChange={(e) => handleCellEdit(ri, fk, e.target.value)}
+                            />
+                          </div>
+                        </TableCell>
+                      );
+                    }
+                    const colLabel = colMap[fk]?.label ?? "";
+                    return (
+                      <TableCell key={fk}>
+                        <Input
+                          className={cn(
+                            "h-7 text-xs border-0 bg-transparent p-0 focus-visible:ring-1 focus-visible:ring-offset-0",
+                            record.errors.some((e) => e.includes(colLabel)) && "text-red-600",
+                          )}
+                          value={String(record.data[fk] ?? "")}
+                          onChange={(e) => handleCellEdit(ri, fk, e.target.value)}
+                        />
+                      </TableCell>
+                    );
+                  })}
                   <TableCell>
                     {record.errors.length > 0 ? (
                       <div className="flex items-center gap-1 text-red-600 text-xs" title={record.errors.join("; ")}>

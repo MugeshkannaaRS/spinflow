@@ -123,11 +123,10 @@ const STORAGE_KEY = (tid: string) => `dt_hidden_${tid}`;
 // ─── Export ───────────────────────────────────────────────────────────────────
 
 function exportToExcel<T>(rows: T[], columns: ColDef<T>[], filename: string) {
-  const exportCols = columns.filter((c) => !c.render);
   const ws = XLSX.utils.json_to_sheet(
     rows.map((row) => {
       const obj: Record<string, string> = {};
-      for (const col of exportCols) {
+      for (const col of columns) {
         obj[col.label] = getCellValue(row, col.key);
       }
       return obj;
@@ -139,10 +138,9 @@ function exportToExcel<T>(rows: T[], columns: ColDef<T>[], filename: string) {
 }
 
 function exportToCSV<T>(rows: T[], columns: ColDef<T>[], filename: string) {
-  const exportCols = columns.filter((c) => !c.render);
-  const lines = [exportCols.map((c) => `"${c.label}"`).join(",")];
+  const lines = [columns.map((c) => `"${c.label}"`).join(",")];
   for (const row of rows) {
-    lines.push(exportCols.map((c) => `"${getCellValue(row, c.key).replace(/"/g, '""')}"`).join(","));
+    lines.push(columns.map((c) => `"${getCellValue(row, c.key).replace(/"/g, '""')}"`).join(","));
   }
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -151,6 +149,26 @@ function exportToCSV<T>(rows: T[], columns: ColDef<T>[], filename: string) {
   a.download = `${filename}_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+async function exportToPDF<T>(rows: T[], columns: ColDef<T>[], title: string) {
+  const [{ jsPDF }, autoTable] = await Promise.all([
+    import("jspdf"),
+    import("jspdf-autotable"),
+  ]);
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  doc.setFontSize(10);
+  doc.text(title, 14, 10);
+  const headers = columns.map((c) => c.label);
+  const data = rows.map((row) => columns.map((col) => getCellValue(row, col.key)));
+  autoTable.default(doc, {
+    head: [headers],
+    body: data,
+    startY: 14,
+    styles: { fontSize: 7 },
+    headStyles: { fillColor: [15, 25, 35] },
+  });
+  doc.save(`${title}_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 // ─── Skeleton Row ─────────────────────────────────────────────────────────────
@@ -311,10 +329,11 @@ export function DataTable<T = any>({
   // ── Export ───────────────────────────────────────────────────────────────
   const [exportOpen, setExportOpen] = useState(false);
 
-  const handleExport = (format: "excel" | "csv") => {
+  const handleExport = async (format: "excel" | "csv" | "pdf") => {
     const fn = exportFilename ?? effectiveKey;
     if (format === "excel") exportToExcel(processed, allColumns, fn);
-    else exportToCSV(processed, allColumns, fn);
+    else if (format === "csv") exportToCSV(processed, allColumns, fn);
+    else await exportToPDF(processed, allColumns, fn);
     setExportOpen(false);
   };
 
@@ -396,6 +415,14 @@ export function DataTable<T = any>({
               >
                 <FileDown className="size-3.5 mr-2" />
                 Export CSV
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={false}
+                onCheckedChange={() => handleExport("pdf")}
+                className="text-xs cursor-pointer"
+              >
+                <FileDown className="size-3.5 mr-2" />
+                Export PDF
               </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
           </DropdownMenu>
