@@ -444,13 +444,10 @@ async def bulk_create_employees(
 
     # Don't abort — skip only the bad rows, import the rest
 
-    # Pre-fetch existing employee codes for this mill (speed optimization)
+    # Pre-fetch existing employee codes (global unique constraint on code)
     existing_codes: set = set()
-    if mill_id:
-        ec_result = await db.execute(
-            select(Employee.code).where(Employee.mill_id == mill_id)
-        )
-        existing_codes = {r[0] for r in ec_result.all()}
+    ec_result = await db.execute(select(Employee.code))
+    existing_codes = {r[0] for r in ec_result.all()}
 
     # Pre-fetch existing custom field names for the company
     existing_field_names: Dict[str, EmployeeCustomField] = {}
@@ -489,6 +486,7 @@ async def bulk_create_employees(
         logger.exception("Failed to pre-fetch/pre-create custom fields (will skip custom values for this import)")
 
     imported = 0
+    updated = 0
     emp_id_map: Dict[str, str] = {}
     for idx, emp in enumerate(employees_to_add):
         row_num = idx + 1
@@ -496,10 +494,7 @@ async def bulk_create_employees(
             async with await db.begin_nested():
                 if emp.code in existing_codes:
                     existing_result = await db.execute(
-                        select(Employee).where(
-                            Employee.code == emp.code,
-                            Employee.mill_id == mill_id
-                        )
+                        select(Employee).where(Employee.code == emp.code)
                     )
                     existing = existing_result.scalar_one_or_none()
                     if existing:
@@ -516,11 +511,13 @@ async def bulk_create_employees(
                         await db.flush()
                         emp_id_map[emp.code] = existing.id
                         existing_codes.add(emp.code)
+                        updated += 1
                 else:
                     db.add(emp)
                     await db.flush()
                     emp_id_map[emp.code] = emp.id
                     existing_codes.add(emp.code)
+                    imported += 1
 
                 if resolved_company_id:
                     cf_fields = custom_fields_map.get(emp.code)
@@ -591,8 +588,8 @@ async def bulk_create_employees(
         await db.commit()
     except Exception as exc:
         await db.rollback()
-        return EmployeeBulkResponse(created=imported, errors=errors + [_err(0, str(exc))])
-    return EmployeeBulkResponse(created=imported, errors=errors)
+        return EmployeeBulkResponse(created=imported, updated=updated, errors=errors + [_err(0, str(exc))])
+    return EmployeeBulkResponse(created=imported, updated=updated, errors=errors)
 
 
 @router.post("/hr/payroll/bulk", response_model=PayrollBulkResponse)

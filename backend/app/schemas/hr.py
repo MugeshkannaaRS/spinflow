@@ -413,6 +413,7 @@ class ImportErrorDetail(BaseModel):
 
 class EmployeeBulkResponse(BaseModel):
     created: int
+    updated: int = 0
     errors: List[ImportErrorDetail]
 
 

@@ -113,6 +113,8 @@ export function UniversalImportModal({
   const [importProgress, setImportProgress] = useState({ current: 0, total: 0 });
   const [importResult, setImportResult] = useState<{
     success: number;
+    created: number;
+    updated: number;
     skipped: number;
     errors: ImportError[];
   } | null>(null);
@@ -549,6 +551,8 @@ export function UniversalImportModal({
       const BATCH_SIZE = 20;
       const MAX_RETRIES = 3;
       let successCount = 0;
+      let totalCreated = 0;
+      let totalUpdated = 0;
       const errors: ImportError[] = [];
 
       for (let i = 0; i < validRecords.length; i += BATCH_SIZE) {
@@ -581,8 +585,11 @@ export function UniversalImportModal({
 
         const data: any = res.data;
         console.log("batch response data:", data);
-        const batchCreated = typeof data?.created === "number" ? data.created : batch.length;
-        successCount += batchCreated;
+        const batchCreated = typeof data?.created === "number" ? data.created : 0;
+        const batchUpdated = typeof data?.updated === "number" ? data.updated : 0;
+        totalCreated += batchCreated;
+        totalUpdated += batchUpdated;
+        successCount += batchCreated + batchUpdated;
         if (data?.errors?.length > 0) {
           for (const e of data.errors) {
             errors.push({
@@ -600,6 +607,8 @@ export function UniversalImportModal({
       setIsImporting(false);
       setImportResult({
         success: successCount,
+        created: totalCreated,
+        updated: totalUpdated,
         skipped: validRecords.length - successCount,
         errors,
       });
@@ -611,6 +620,8 @@ export function UniversalImportModal({
       setImportError(msg);
       setImportResult({
         success: 0,
+        created: 0,
+        updated: 0,
         skipped: 0,
         errors: [{ row: 0, message: msg }],
       });
@@ -954,7 +965,7 @@ export function UniversalImportModal({
             <div className="space-y-1">
               <p className="text-lg font-medium">Import completed with issues</p>
               <p className="text-sm text-muted-foreground">
-                {importResult!.success} records imported
+                {importResult!.created} created, {importResult!.updated} updated
                 {importResult!.skipped > 0 && (
                   <span className="text-red-500">, {importResult!.skipped} failed</span>
                 )}
@@ -969,7 +980,7 @@ export function UniversalImportModal({
             <div className="space-y-1">
               <p className="text-lg font-medium">Import complete!</p>
               <p className="text-sm text-muted-foreground">
-                {importResult?.success ?? 0} records imported successfully
+                {importResult?.created ?? 0} created, {importResult?.updated ?? 0} updated successfully
                   {warnings.length > 0 && (
                     <span className="text-yellow-600"> ({warnings.length} warnings)</span>
                   )}
