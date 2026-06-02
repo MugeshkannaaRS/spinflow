@@ -1,6 +1,7 @@
-from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Enum as SAEnum, Date, func
+from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Enum as SAEnum, Date, Numeric, JSON, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
+from typing import Optional
 from app.db.base import Base, TimestampMixin, SoftDeleteMixin, generate_uuid
 import enum
 
@@ -41,6 +42,14 @@ class Company(TimestampMixin, Base):
     email: Mapped[str] = mapped_column(String(200), nullable=True)
     logo_url: Mapped[str] = mapped_column(String(500), nullable=True)
     max_users: Mapped[int] = mapped_column(Integer, default=50)
+    plan: Mapped[str] = mapped_column(String(50), default="starter")
+    max_employees: Mapped[int] = mapped_column(Integer, default=100)
+    licence_fee: Mapped[Optional[float]] = mapped_column(Numeric(12,2), nullable=True, default=None)
+    maintenance_fee: Mapped[Optional[float]] = mapped_column(Numeric(12,2), nullable=True, default=None)
+    billing_cycle: Mapped[str] = mapped_column(String(20), default="annual")
+    plan_started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    plan_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    addons: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     mills = relationship("Mill", back_populates="company", cascade="all, delete-orphan")

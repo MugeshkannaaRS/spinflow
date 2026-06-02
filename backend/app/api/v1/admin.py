@@ -292,6 +292,41 @@ async def reset_user_password(
         raise HTTPException(500, str(e))
 
 
+@router.patch("/admin/companies/{company_id}")
+async def update_company_admin(
+    company_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        body = await request.json()
+        result = await db.execute(
+            select(Company).where(Company.id == company_id)
+        )
+        company = result.scalar_one_or_none()
+        if not company:
+            raise HTTPException(404, "Company not found")
+
+        if "plan" in body:
+            company.plan = body["plan"]
+        if "max_employees" in body:
+            company.max_employees = int(body["max_employees"])
+        if "max_users" in body:
+            val = int(body["max_users"])
+            if val < 1:
+                raise HTTPException(400, "max_users must be at least 1")
+            company.max_users = val
+
+        await db.commit()
+        return {"updated": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(500, detail=str(e))
+
+
 @router.patch("/admin/companies/{company_id}/limits")
 async def update_company_limits(
     company_id: str,
@@ -314,9 +349,13 @@ async def update_company_limits(
             raise HTTPException(404, "Company not found")
 
         company.max_users = int(max_users)
+        if "plan" in body:
+            company.plan = body["plan"]
+        if "max_employees" in body:
+            company.max_employees = int(body["max_employees"])
         await db.commit()
 
-        return {"max_users": company.max_users, "updated": True}
+        return {"max_users": company.max_users, "plan": company.plan, "max_employees": company.max_employees, "updated": True}
     except HTTPException:
         raise
     except Exception as e:

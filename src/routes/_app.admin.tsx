@@ -1007,7 +1007,8 @@ function EditCompanyDialog({ company, onClose, onDone }: { company: Company | nu
         phone: form.phone.trim() || undefined,
         email: form.email.trim() || undefined,
       });
-      await api.patch(`/admin/companies/${company.id}`, {
+      await api.patch(`/admin/companies/${company.id}/limits`, {
+        max_users: company.max_users ?? 50,
         plan: form.plan,
         max_employees: form.max_employees,
       });
