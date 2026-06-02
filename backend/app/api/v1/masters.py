@@ -19,7 +19,7 @@ from app.schemas.masters import (
     MasterVehicleCreate, MasterVehicleUpdate, MasterVehicleOut,
     RouteCreate, RouteUpdate, RouteOut,
 )
-from app.models.user import User
+from app.models.user import User, Role
 from app.models.masters import (
     Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route,
 )
@@ -27,6 +27,28 @@ from app.models.production import Machine
 from app.core.error_handler import SpinFlowException
 
 router = APIRouter()
+
+
+async def _resolve_role_code(current_user: User, db: AsyncSession) -> str:
+    role_result = await db.execute(
+        select(Role).where(Role.id == current_user.role_id)
+    )
+    role_obj = role_result.scalar_one_or_none()
+    return role_obj.code if role_obj else ""
+
+
+async def _resolve_company_id(current_user: User, db: AsyncSession) -> str | None:
+    if current_user.company_id:
+        return str(current_user.company_id)
+    if current_user.mill_id:
+        mill_result = await db.execute(
+            select(Mill).where(Mill.id == current_user.mill_id)
+        )
+        mill_obj = mill_result.scalar_one_or_none()
+        if mill_obj:
+            return str(mill_obj.company_id)
+    return None
+
 
 # ── Company ─────────────────────────────────────────────
 
@@ -103,14 +125,16 @@ async def list_mills(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    role_code = current_user.role or ""
+    role_code = await _resolve_role_code(current_user, db)
+    effective_company_id = await _resolve_company_id(current_user, db)
+
     query = select(Mill)
     if role_code == "SUPER_ADMIN":
         if company_id:
             query = query.where(Mill.company_id == company_id)
     else:
-        if current_user.company_id:
-            query = query.where(Mill.company_id == current_user.company_id)
+        if effective_company_id:
+            query = query.where(Mill.company_id == effective_company_id)
         else:
             return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
     if not include_inactive:
@@ -170,13 +194,14 @@ async def list_departments(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    role_code = current_user.role or ""
+    role_code = await _resolve_role_code(current_user, db)
+    effective_company_id = await _resolve_company_id(current_user, db)
     query = select(Department)
     if role_code == "SUPER_ADMIN":
         if mill_id:
             query = query.where(Department.mill_id == mill_id)
-    elif current_user.company_id:
-        query = query.join(Mill, Department.mill_id == Mill.id).where(Mill.company_id == current_user.company_id)
+    elif effective_company_id:
+        query = query.join(Mill, Department.mill_id == Mill.id).where(Mill.company_id == effective_company_id)
     else:
         return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
     if not include_inactive:
@@ -240,13 +265,14 @@ async def list_yarn_counts(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    role_code = current_user.role or ""
+    role_code = await _resolve_role_code(current_user, db)
+    effective_company_id = await _resolve_company_id(current_user, db)
     query = select(YarnCount)
     if role_code == "SUPER_ADMIN":
         if mill_id:
             query = query.where(YarnCount.mill_id == mill_id)
-    elif current_user.company_id:
-        query = query.join(Mill, YarnCount.mill_id == Mill.id).where(Mill.company_id == current_user.company_id)
+    elif effective_company_id:
+        query = query.join(Mill, YarnCount.mill_id == Mill.id).where(Mill.company_id == effective_company_id)
     else:
         return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
     if not include_inactive:
@@ -310,13 +336,14 @@ async def list_customers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    role_code = current_user.role or ""
+    role_code = await _resolve_role_code(current_user, db)
+    effective_company_id = await _resolve_company_id(current_user, db)
     query = select(Customer)
     if role_code == "SUPER_ADMIN":
         if mill_id:
             query = query.where(Customer.mill_id == mill_id)
-    elif current_user.company_id:
-        query = query.join(Mill, Customer.mill_id == Mill.id).where(Mill.company_id == current_user.company_id)
+    elif effective_company_id:
+        query = query.join(Mill, Customer.mill_id == Mill.id).where(Mill.company_id == effective_company_id)
     else:
         return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
     if not include_inactive:
@@ -389,13 +416,14 @@ async def list_vehicles(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    role_code = current_user.role or ""
+    role_code = await _resolve_role_code(current_user, db)
+    effective_company_id = await _resolve_company_id(current_user, db)
     query = select(MasterVehicle)
     if role_code == "SUPER_ADMIN":
         if mill_id:
             query = query.where(MasterVehicle.mill_id == mill_id)
-    elif current_user.company_id:
-        query = query.join(Mill, MasterVehicle.mill_id == Mill.id).where(Mill.company_id == current_user.company_id)
+    elif effective_company_id:
+        query = query.join(Mill, MasterVehicle.mill_id == Mill.id).where(Mill.company_id == effective_company_id)
     else:
         return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
     if not include_inactive:
@@ -459,13 +487,14 @@ async def list_routes(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    role_code = current_user.role or ""
+    role_code = await _resolve_role_code(current_user, db)
+    effective_company_id = await _resolve_company_id(current_user, db)
     query = select(Route)
     if role_code == "SUPER_ADMIN":
         if mill_id:
             query = query.where(Route.mill_id == mill_id)
-    elif current_user.company_id:
-        query = query.join(Mill, Route.mill_id == Mill.id).where(Mill.company_id == current_user.company_id)
+    elif effective_company_id:
+        query = query.join(Mill, Route.mill_id == Mill.id).where(Mill.company_id == effective_company_id)
     else:
         return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
     if not include_inactive:

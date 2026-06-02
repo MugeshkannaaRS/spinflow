@@ -15,7 +15,7 @@ const ROLE_MODULES: Record<string, string[]> = {
     "purchase","stores","inventory","dispatch","accounts","sales",
     "masters","reports","lotrac","lc_tracking","analytics"
   ],
-  PRODUCTION_MANAGER: ["dashboard","production","quality","maintenance","reports","analytics"],
+  PRODUCTION_MANAGER: ["dashboard","production","quality","maintenance","reports"],
   QUALITY_MANAGER: ["dashboard","quality","production","reports"],
   DISPATCH_MANAGER: ["dashboard","dispatch","lotrac","stores","inventory","reports"],
   STORE_MANAGER: ["dashboard","stores","inventory","purchase","maintenance","reports"],
@@ -104,11 +104,11 @@ export function useRBAC() {
     if (SYSTEM_MODULES.includes(dbKey)) return true;
 
     // Company module check
-    if (modulesLoaded && companyModules !== null) {
+    if (modulesLoaded && companyModules !== null && companyModules !== undefined) {
       return companyModules[dbKey] === true;
     }
 
-    return roleAllowed;
+    return false;
   }
 
   return { role, isSuperAdmin, canAccess, allowedModules, companyModulesLoaded };

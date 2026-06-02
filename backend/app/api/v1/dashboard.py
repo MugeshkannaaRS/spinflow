@@ -378,22 +378,45 @@ async def get_admin_summary(
         "companies": [],
     }
     try:
-        r1 = await db.execute(text("SELECT COUNT(*) FROM companies"))
+        r1 = await db.execute(text(
+            "SELECT COUNT(*) FROM companies WHERE is_active = true"
+        ))
         result["total_companies"] = r1.scalar() or 0
     except Exception as e:
         print(f"companies count failed: {e}")
+        try:
+            r1b = await db.execute(text("SELECT COUNT(*) FROM companies"))
+            result["total_companies"] = r1b.scalar() or 0
+        except:
+            result["total_companies"] = 0
 
     try:
-        r2 = await db.execute(text("SELECT COUNT(*) FROM mills"))
+        r2 = await db.execute(text(
+            "SELECT COUNT(*) FROM mills WHERE is_active = true"
+        ))
         result["total_mills"] = r2.scalar() or 0
     except Exception as e:
         print(f"mills count failed: {e}")
+        try:
+            r2b = await db.execute(text("SELECT COUNT(*) FROM mills"))
+            result["total_mills"] = r2b.scalar() or 0
+        except:
+            result["total_mills"] = 0
 
     try:
-        r3 = await db.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true"))
+        r3 = await db.execute(text(
+            "SELECT COUNT(*) FROM users WHERE is_active = true AND deleted_at IS NULL"
+        ))
         result["total_users"] = r3.scalar() or 0
     except Exception as e:
         print(f"users count failed: {e}")
+        try:
+            r3b = await db.execute(text(
+                "SELECT COUNT(*) FROM users WHERE is_active = true"
+            ))
+            result["total_users"] = r3b.scalar() or 0
+        except:
+            result["total_users"] = 0
 
     try:
         r4 = await db.execute(text("SELECT COUNT(*) FROM employees"))
@@ -404,7 +427,8 @@ async def get_admin_summary(
     try:
         r5 = await db.execute(text(
             "SELECT id::text, name, code, created_at "
-            "FROM companies ORDER BY created_at DESC LIMIT 20"
+            "FROM companies WHERE is_active = true "
+            "ORDER BY created_at DESC LIMIT 20"
         ))
         rows = r5.fetchall()
         result["companies"] = [
