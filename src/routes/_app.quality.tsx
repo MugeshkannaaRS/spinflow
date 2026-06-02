@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/sheet";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, CheckCircle2, XCircle, FlaskConical, AlertTriangle, Upload } from "lucide-react";
+import { Plus, CheckCircle2, XCircle, FlaskConical, AlertTriangle, ArrowDownToLine } from "lucide-react";
 import type { QualityTest } from "@/lib/types";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 
@@ -261,7 +261,7 @@ function ImportTestsDialog() {
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <Upload className="size-4 mr-1" />
+        <ArrowDownToLine className="size-4 mr-1" />
         Import Excel
       </Button>
       <UniversalImportModal

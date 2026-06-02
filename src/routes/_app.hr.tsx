@@ -72,8 +72,7 @@ import {
   XCircle,
   ClipboardCheck,
   UserPlus,
-  Upload,
-  Download,
+  ArrowDownToLine,
   Search,
   Pencil,
   Trash2,
@@ -1688,7 +1687,7 @@ function ImportEmployeeDialog() {
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <Upload className="size-4 mr-1" />
+        <ArrowDownToLine className="size-4 mr-1" />
         Import Excel
       </Button>
       <UniversalImportModal
@@ -2214,7 +2213,7 @@ function ImportAttendanceDialog({ month, year, onSuccess }: { month: number; yea
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <Upload className="size-4 mr-1" />
+        <ArrowDownToLine className="size-4 mr-1" />
         Import Excel
       </Button>
       <UniversalImportModal

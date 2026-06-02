@@ -22,7 +22,7 @@ import {
   FlaskConical,
   Truck,
   IndianRupee,
-  Download,
+  ArrowUpFromLine,
   Loader2,
 } from "lucide-react";
 import { exportApi } from "@/lib/api-service";
@@ -121,7 +121,7 @@ function ReportsPage() {
                 {exporting === "Production PDF" ? (
                   <Loader2 className="size-3 animate-spin mr-1" />
                 ) : (
-                  <Download className="size-3 mr-1" />
+                  <ArrowUpFromLine className="size-3 mr-1" />
                 )}
                 Prod PDF
               </Button>
@@ -134,7 +134,7 @@ function ReportsPage() {
                 {exporting === "Production XLSX" ? (
                   <Loader2 className="size-3 animate-spin mr-1" />
                 ) : (
-                  <Download className="size-3 mr-1" />
+                  <ArrowUpFromLine className="size-3 mr-1" />
                 )}
                 Prod XLSX
               </Button>
@@ -147,7 +147,7 @@ function ReportsPage() {
                 {exporting === "Dispatch PDF" ? (
                   <Loader2 className="size-3 animate-spin mr-1" />
                 ) : (
-                  <Download className="size-3 mr-1" />
+                  <ArrowUpFromLine className="size-3 mr-1" />
                 )}
                 Dispatch PDF
               </Button>

@@ -37,7 +37,7 @@ import { useState, useEffect } from "react";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import { toast } from "sonner";
-import { Plus, Warehouse, AlertTriangle, Package, Pencil, Upload } from "lucide-react";
+import { Plus, Warehouse, AlertTriangle, Package, Pencil, ArrowDownToLine } from "lucide-react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/stores")({
@@ -490,7 +490,7 @@ function ImportSparesDialog() {
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <Upload className="size-4 mr-1" />
+        <ArrowDownToLine className="size-4 mr-1" />
         Import Excel
       </Button>
       <UniversalImportModal

@@ -41,7 +41,7 @@ import type { ColDef } from "@/components/ui/DataTable";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, Upload } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, ArrowDownToLine } from "lucide-react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useActiveMill } from "@/hooks/useActiveMill";
 
@@ -470,7 +470,7 @@ function ImportShiftEntriesDialog() {
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <Upload className="size-4 mr-1" />
+        <ArrowDownToLine className="size-4 mr-1" />
         Import Excel
       </Button>
       <UniversalImportModal

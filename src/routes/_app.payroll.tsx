@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, Loader2, Download } from "lucide-react";
+import { CheckCircle2, Loader2, ArrowUpFromLine } from "lucide-react";
 import { exportApi } from "@/lib/api-service";
 import type { PayrollMonth, PayslipEntry } from "@/lib/types";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
@@ -333,7 +333,7 @@ function MonthSheet({
                     {exporting === "PDF" ? (
                       <Loader2 className="size-3 animate-spin mr-1" />
                     ) : (
-                      <Download className="size-3 mr-1" />
+                      <ArrowUpFromLine className="size-3 mr-1" />
                     )}
                     PDF
                   </Button>
@@ -347,7 +347,7 @@ function MonthSheet({
                     {exporting === "XLSX" ? (
                       <Loader2 className="size-3 animate-spin mr-1" />
                     ) : (
-                      <Download className="size-3 mr-1" />
+                      <ArrowUpFromLine className="size-3 mr-1" />
                     )}
                     XLSX
                   </Button>

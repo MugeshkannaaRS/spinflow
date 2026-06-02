@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/sheet";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Plus, Search, Settings, Blocks, Upload, Pencil } from "lucide-react";
+import { Plus, Search, Settings, Blocks, ArrowDownToLine, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
@@ -1710,7 +1710,7 @@ function ImportMachinesDialog() {
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <Upload className="size-4 mr-1" />
+        <ArrowDownToLine className="size-4 mr-1" />
         Import Excel
       </Button>
       <UniversalImportModal
@@ -1731,7 +1731,7 @@ function ImportCustomersDialog() {
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <Upload className="size-4 mr-1" />
+        <ArrowDownToLine className="size-4 mr-1" />
         Import Excel
       </Button>
       <UniversalImportModal

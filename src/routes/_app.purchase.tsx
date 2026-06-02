@@ -60,7 +60,7 @@ import {
   Layers,
   FlaskConical,
   BarChart2,
-  Download,
+  ArrowUpFromLine,
   CheckSquare,
   Square,
   TrendingUp,
@@ -1267,7 +1267,7 @@ function MixingPlanTab() {
             )}
             {blend && (
               <Button variant="outline" onClick={exportMixingPlan}>
-                <Download className="size-4 mr-1" />
+                <ArrowUpFromLine className="size-4 mr-1" />
                 Export Mixing Plan
               </Button>
             )}

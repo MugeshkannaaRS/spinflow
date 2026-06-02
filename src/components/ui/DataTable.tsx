@@ -33,7 +33,7 @@ import {
   Search,
   X,
   Settings2,
-  Download,
+  ArrowUpFromLine,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -376,7 +376,7 @@ export function DataTable<T = any>({
           <DropdownMenu open={exportOpen} onOpenChange={setExportOpen}>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
-                <Download className="size-3.5" />
+                <ArrowUpFromLine className="size-3.5" />
                 Export
               </Button>
             </DropdownMenuTrigger>
