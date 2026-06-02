@@ -646,20 +646,31 @@ function AddCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
 
   const [company, setCompany] = useState({ name: "", code: "", gstin: "", phone: "", email: "" });
   const [mill, setMill] = useState({ name: "", code: "", city: "", state: "" });
-  const [plan, setPlan] = useState({ max_users: 15 });
+  const [plan, setPlan] = useState({ plan: "starter", max_users: 10, max_employees: 100 });
   const [modules, setModules] = useState<Record<string, boolean>>(
     Object.fromEntries(ALL_MODULES.map(m => [m, true]))
   );
   const [owner, setOwner] = useState({ name: "", email: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const planTier = plan.max_users <= 10 ? "Starter" : plan.max_users <= 50 ? "Pro" : "Enterprise";
+  const PLANS = [
+    { value: "starter", label: "Starter", price: "₹3,50,000", maxEmp: 100, maxUsers: 10, desc: "Up to 100 employees" },
+    { value: "growth", label: "Growth", price: "₹7,50,000", maxEmp: 300, maxUsers: 25, desc: "Up to 300 employees" },
+    { value: "business", label: "Business", price: "₹15,00,000", maxEmp: 600, maxUsers: 50, desc: "Up to 600 employees" },
+    { value: "enterprise", label: "Enterprise", price: "₹28,00,000", maxEmp: 1500, maxUsers: 100, desc: "Up to 1500 employees" },
+    { value: "unlimited", label: "Unlimited", price: "₹45,00,000", maxEmp: 99999, maxUsers: 250, desc: "Unlimited employees" },
+  ];
+
+  const handlePlanChange = (planValue: string) => {
+    const p = PLANS.find(x => x.value === planValue);
+    if (p) setPlan({ plan: planValue, max_users: p.maxUsers, max_employees: p.maxEmp });
+  };
 
   const resetAll = () => {
     setStep(0); setLoading(false); setCreatedUser(null);
     setCompany({ name: "", code: "", gstin: "", phone: "", email: "" });
     setMill({ name: "", code: "", city: "", state: "" });
-    setPlan({ max_users: 15 });
+    setPlan({ plan: "starter", max_users: 10, max_employees: 100 });
     setModules(Object.fromEntries(ALL_MODULES.map(m => [m, true])));
     setOwner({ name: "", email: "" });
     setErrors({});
@@ -711,7 +722,11 @@ function AddCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
         await adminApi.createCompanyModules(companyId, enabledMods);
       }
 
-      await api.patch(`/admin/companies/${companyId}/limits`, { max_users: plan.max_users });
+      await api.patch(`/admin/companies/${companyId}/limits`, {
+        max_users: plan.max_users,
+        max_employees: plan.max_employees,
+        plan: plan.plan,
+      });
 
       const pw = generateTempPassword();
       setTempPassword(pw);
@@ -843,20 +858,34 @@ function AddCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
         {/* Step 3: Plan & First User */}
         {step === 2 && (
           <div className="space-y-4">
-            <div>
-              <Label className="text-sm font-semibold">Max Users</Label>
-              <input
-                type="number" min={1} max={500}
-                value={plan.max_users}
-                onChange={e => setPlan({ max_users: parseInt(e.target.value) || 1 })}
-                className="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <div className={`mt-2 p-2 rounded-lg text-xs font-medium ${
-                planTier === "Starter" ? "bg-gray-100 text-gray-600" :
-                planTier === "Pro" ? "bg-blue-50 text-blue-700" :
-                "bg-purple-50 text-purple-700"
-              }`}>
-                {planTier} Plan — {plan.max_users <= 10 ? "up to 10 users" : plan.max_users <= 50 ? "up to 50 users" : "unlimited users"}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Plan</label>
+              <div className="grid grid-cols-1 gap-2">
+                {PLANS.map(p => (
+                  <label key={p.value}
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer",
+                      "transition-all duration-150",
+                      plan.plan === p.value
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-gray-200 dark:border-slate-700 hover:border-blue-300"
+                    )}>
+                    <input type="radio" name="plan" value={p.value}
+                      checked={plan.plan === p.value}
+                      onChange={() => handlePlanChange(p.value)}
+                      className="sr-only" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-gray-900 dark:text-white">{p.label}</span>
+                        <span className="text-xs text-gray-500">{p.desc}</span>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">{p.maxUsers} users max</div>
+                    </div>
+                    <span className={cn("font-bold text-sm", plan.plan === p.value ? "text-blue-600" : "text-gray-500")}>
+                      {p.price}
+                    </span>
+                  </label>
+                ))}
               </div>
             </div>
 
@@ -1051,28 +1080,28 @@ function EditCompanyDialog({ company, onClose, onDone }: { company: Company | nu
 }
 
 const CORE_MODULES = [
-  { key: "dashboard", label: "Dashboard" },
-  { key: "production", label: "Production" },
-  { key: "quality", label: "Quality" },
-  { key: "maintenance", label: "Maintenance" },
-  { key: "hr", label: "Human Resources" },
-  { key: "payroll", label: "Payroll" },
-  { key: "purchase", label: "Cotton Purchase" },
-  { key: "stores", label: "Stores" },
-  { key: "inventory", label: "Inventory" },
-  { key: "dispatch", label: "Dispatch" },
-  { key: "accounts", label: "Accounts" },
-  { key: "sales", label: "Sales" },
-  { key: "masters", label: "Masters" },
-  { key: "users", label: "Users & Roles" },
-  { key: "reports", label: "Reports" },
+  { key: "dashboard", label: "Dashboard", icon: "📊" },
+  { key: "production", label: "Production", icon: "🏭" },
+  { key: "quality", label: "Quality Control", icon: "✅" },
+  { key: "maintenance", label: "Maintenance", icon: "🔧" },
+  { key: "hr", label: "Human Resources", icon: "👥" },
+  { key: "payroll", label: "Payroll", icon: "₹" },
+  { key: "purchase", label: "Cotton Purchase", icon: "📦" },
+  { key: "stores", label: "Stores & Spares", icon: "🏪" },
+  { key: "inventory", label: "Inventory", icon: "📋" },
+  { key: "dispatch", label: "Dispatch", icon: "🚛" },
+  { key: "accounts", label: "Accounts", icon: "📒" },
+  { key: "sales", label: "Sales", icon: "📈" },
+  { key: "masters", label: "Masters", icon: "⚙️" },
+  { key: "users", label: "Users & Roles", icon: "👤" },
+  { key: "reports", label: "Reports", icon: "📄" },
 ];
 
 const ADDON_MODULES = [
-  { key: "lotrac", label: "LoTrac — QR Dispatch Tracking", price: "₹1,999/month" },
-  { key: "whatsapp", label: "WhatsApp Alerts & Daily MIS", price: "₹2,999/month" },
-  { key: "lc_tracking", label: "LC (Letter of Credit) Tracking", price: "₹999/month" },
-  { key: "analytics", label: "Advanced Analytics & Lot Traceability", price: "₹1,499/month" },
+  { key: "lotrac", label: "LoTrac", desc: "QR-based sack tracking & delivery confirmation", price: "₹1,999/mo" },
+  { key: "whatsapp", label: "WhatsApp Alerts", desc: "Machine down, low stock, daily MIS report at 6 PM", price: "₹2,999/mo" },
+  { key: "lc_tracking", label: "LC Tracking", desc: "Letter of Credit management with expiry alerts", price: "₹999/mo" },
+  { key: "analytics", label: "Advanced Analytics", desc: "Lot traceability, P&L dashboard, efficiency benchmarks", price: "₹1,499/mo" },
 ];
 
 function ModulesDialog({ company, onClose, onDone }: { company: Company | null; onClose: () => void; onDone: () => void }) {
@@ -1107,46 +1136,79 @@ function ModulesDialog({ company, onClose, onDone }: { company: Company | null; 
 
   return (
     <Dialog open={!!company} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Module Access — {company?.name}</DialogTitle>
-          <DialogDescription>Toggle which modules this company can access.</DialogDescription>
+          <DialogDescription>
+            Toggle which modules this company can access based on their plan.
+          </DialogDescription>
         </DialogHeader>
-        <div className="py-4 space-y-6">
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
-              Core Modules (included in licence)
-            </h4>
-            <div className="grid grid-cols-2 gap-2">
-              {CORE_MODULES.map((mod) => (
-                <div key={mod.key} className="flex items-center justify-between p-2.5 rounded-lg border border-gray-100 dark:border-slate-700">
-                  <span className="text-sm text-gray-700 dark:text-slate-300">{mod.label}</span>
-                  <Switch checked={modules[mod.key] ?? false} onCheckedChange={(val) => setModules((prev) => ({ ...prev, [mod.key]: val }))} />
-                </div>
-              ))}
-            </div>
+
+        <div className="mt-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs font-bold uppercase tracking-widest text-gray-400">
+              Core Modules
+            </span>
+            <span className="text-xs text-gray-400">— included in licence</span>
           </div>
-          <div className="border-t border-gray-100 pt-4">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
-              Add-On Modules (monthly billing)
-            </h4>
-            <div className="space-y-2">
-              {ADDON_MODULES.map((mod) => (
-                <div key={mod.key} className="flex items-center justify-between p-3 rounded-lg border border-dashed border-blue-200 bg-blue-50/50 dark:bg-blue-900/10 dark:border-blue-800">
-                  <div>
-                    <span className="text-sm font-medium text-gray-700 dark:text-slate-300">{mod.label}</span>
-                    <span className="ml-2 text-xs text-blue-600 font-semibold">{mod.price}</span>
-                  </div>
-                  <Switch checked={modules[mod.key] ?? false} onCheckedChange={(val) => setModules((prev) => ({ ...prev, [mod.key]: val }))} />
-                </div>
-              ))}
-            </div>
+          <div className="grid grid-cols-2 gap-2">
+            {CORE_MODULES.map(mod => (
+              <div key={mod.key}
+                className="flex items-center justify-between p-2.5 rounded-lg
+                  border border-gray-100 dark:border-slate-700 hover:bg-gray-50
+                  dark:hover:bg-slate-700/50">
+                <span className="text-sm text-gray-700 dark:text-slate-300">
+                  {mod.icon} {mod.label}
+                </span>
+                <Switch
+                  checked={modules[mod.key] ?? false}
+                  onCheckedChange={v => setModules(p => ({...p, [mod.key]: v}))}
+                />
+              </div>
+            ))}
           </div>
         </div>
-        <DialogFooter>
+
+        <div className="mt-5 pt-4 border-t border-gray-100 dark:border-slate-700">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs font-bold uppercase tracking-widest text-blue-500">
+              Add-On Modules
+            </span>
+            <span className="text-xs text-blue-500">— monthly billing</span>
+          </div>
+          <div className="space-y-2">
+            {ADDON_MODULES.map(mod => (
+              <div key={mod.key}
+                className="flex items-center justify-between p-3 rounded-xl
+                  border border-dashed border-blue-200 dark:border-blue-800
+                  bg-blue-50/40 dark:bg-blue-900/10">
+                <div className="flex-1 min-w-0 mr-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-gray-800 dark:text-slate-200">
+                      {mod.label}
+                    </span>
+                    <span className="text-xs font-bold text-blue-600 bg-blue-100
+                      dark:bg-blue-900/40 dark:text-blue-400 px-2 py-0.5 rounded-full">
+                      {mod.price}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 truncate">
+                    {mod.desc}
+                  </p>
+                </div>
+                <Switch
+                  checked={modules[mod.key] ?? false}
+                  onCheckedChange={v => setModules(p => ({...p, [mod.key]: v}))}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <DialogFooter className="mt-5">
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : "Save Module Access"}
+            {saving ? "Saving..." : "Save Module Access"}
           </Button>
         </DialogFooter>
       </DialogContent>

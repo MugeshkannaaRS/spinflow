@@ -4,23 +4,28 @@ import { api } from "@/lib/api";
 
 const ROLE_MODULES: Record<string, string[]> = {
   SUPER_ADMIN: ["dashboard", "admin", "column_config"],
-  MILL_OWNER: ["dashboard", "production", "quality", "maintenance", "hr", "payroll",
-               "purchase", "stores", "inventory", "dispatch", "lotrac", "accounts",
-               "sales", "masters", "users", "column_config"],
-  GENERAL_MANAGER: ["dashboard", "production", "quality", "maintenance", "hr",
-                    "payroll", "purchase", "stores", "inventory", "dispatch",
-                    "accounts", "sales", "masters"],
-  PRODUCTION_MANAGER: ["dashboard", "production", "quality", "maintenance"],
-  QUALITY_MANAGER: ["dashboard", "quality", "production"],
-  DISPATCH_MANAGER: ["dashboard", "dispatch", "lotrac", "stores", "inventory"],
-  STORE_MANAGER: ["dashboard", "stores", "inventory", "purchase"],
-  HR_MANAGER: ["dashboard", "hr", "payroll"],
-  ACCOUNTANT: ["dashboard", "accounts", "sales", "payroll"],
-  MAINTENANCE_MANAGER: ["dashboard", "maintenance", "stores"],
-  SUPERVISOR: ["dashboard", "production"],
+  MILL_OWNER: [
+    "dashboard","production","quality","maintenance","hr","payroll",
+    "purchase","stores","inventory","dispatch","lotrac","accounts",
+    "sales","masters","users","reports","column_config",
+    "whatsapp","lc_tracking","analytics"
+  ],
+  GENERAL_MANAGER: [
+    "dashboard","production","quality","maintenance","hr","payroll",
+    "purchase","stores","inventory","dispatch","accounts","sales",
+    "masters","reports","lotrac","lc_tracking","analytics"
+  ],
+  PRODUCTION_MANAGER: ["dashboard","production","quality","maintenance","reports","analytics"],
+  QUALITY_MANAGER: ["dashboard","quality","production","reports"],
+  DISPATCH_MANAGER: ["dashboard","dispatch","lotrac","stores","inventory","reports"],
+  STORE_MANAGER: ["dashboard","stores","inventory","purchase","maintenance","reports"],
+  HR_MANAGER: ["dashboard","hr","payroll","reports"],
+  ACCOUNTANT: ["dashboard","accounts","sales","payroll","purchase","reports","lc_tracking"],
+  MAINTENANCE_MANAGER: ["dashboard","maintenance","stores","reports"],
+  SUPERVISOR: ["dashboard","production","reports"],
   MACHINE_OPERATOR: ["dashboard"],
   SECURITY_GATE: ["dashboard"],
-  AUDITOR: ["dashboard", "production", "quality", "hr", "accounts"],
+  AUDITOR: ["dashboard","production","quality","hr","accounts","reports"],
 };
 
 const DB_MODULE_KEY_MAP: Record<string, string> = {
@@ -83,27 +88,27 @@ export function useRBAC() {
   const allowedModules = ROLE_MODULES[role] ?? ["dashboard"];
   const companyModulesLoaded = isSuperAdmin ? true : modulesLoaded;
 
+  // System modules: always accessible if role permits, skip company_modules check
+  const SYSTEM_MODULES = ["dashboard","masters","users","column_config","admin","audit"];
+
   function canAccess(module: string): boolean {
     if (isSuperAdmin) {
-      return ["dashboard", "admin", "column_config"].includes(normaliseKey(module));
+      return ["dashboard","admin","column_config"].includes(module);
     }
 
-    const roleAllows = allowedModules.includes(module);
-    if (!roleAllows) return false;
+    const dbKey = DB_MODULE_KEY_MAP[module] ?? module.replace(/-/g,"_");
+    const roleAllowed = (ROLE_MODULES[role] ?? ["dashboard"]).includes(module);
+    if (!roleAllowed) return false;
 
-    const dbKey = normaliseKey(module);
+    // System modules: always allow if role permits
+    if (SYSTEM_MODULES.includes(dbKey)) return true;
 
-    // System features — always allow if role permits, never check company_modules
-    const SYSTEM_FEATURES = ["dashboard", "masters", "users", "column_config", "admin", "audit"];
-    if (SYSTEM_FEATURES.includes(dbKey)) return true;
-
-    if (modulesLoaded && companyModules !== null && companyModules !== undefined) {
-      const enabled = companyModules[dbKey];
-      console.log(`Module check: ${module} (${dbKey}) = ${enabled}`);
-      return enabled === true;
+    // Company module check
+    if (modulesLoaded && companyModules !== null) {
+      return companyModules[dbKey] === true;
     }
 
-    return roleAllows;
+    return roleAllowed;
   }
 
   return { role, isSuperAdmin, canAccess, allowedModules, companyModulesLoaded };
