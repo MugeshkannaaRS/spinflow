@@ -52,18 +52,31 @@ async def get_current_user(
     return user
 
 
+_ALWAYS_ALLOWED: dict[str, set[str]] = {
+    "users":         {"SUPER_ADMIN", "MILL_OWNER"},
+    "masters":       {"SUPER_ADMIN", "MILL_OWNER"},
+    "column_config": {"SUPER_ADMIN"},
+    "dashboard":     set(),  # handled by resolve_access
+}
+
+
 def require_module(module: str, write: bool = False):
     """Three-layer permission guard.
 
     Evaluates:
-      1. Company subscription (company_modules)
-      2. Role capability (ACCESS_MATRIX)
-      3. User module restrictions (module_restrictions)
+      1. ALWAYS_ALLOWED bypass (SUPER_ADMIN / MILL_OWNER on users+masters)
+      2. Company subscription (company_modules)
+      3. Role capability (ACCESS_MATRIX)
+      4. User module restrictions (module_restrictions)
     """
     async def dependency(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> User:
+        role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+        always = _ALWAYS_ALLOWED.get(module, set())
+        if role_code in always or role_code == "SUPER_ADMIN":
+            return current_user
         result = await resolve_access(db, current_user, module, write=write)
         if not result.granted:
             raise HTTPException(status_code=403, detail=result.reason)
@@ -75,28 +88,28 @@ async def get_mill_scope(current_user: User = Depends(get_current_user)):
     """Returns the data scope for the current user.
 
     SUPER_ADMIN: sees everything (mill_id=None, company_id=None)
-    MILL_OWNER: sees all mills in their company (see_all_company_mills=True)
-    All others: scoped to their assigned mill
+    MILL_OWNER:  sees all mills in their company (see_all_company_mills=True)
+    All others:  scoped to their assigned mill
     """
-    role_name = current_user.role
-    if role_name == "SUPER_ADMIN":
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code == "SUPER_ADMIN":
         return {
             "mill_id": None,
             "company_id": None,
-            "role": role_name,
+            "role": role_code,
             "see_all_company_mills": False,
         }
-    if role_name == "MILL_OWNER":
+    if role_code == "MILL_OWNER":
         return {
             "mill_id": None,  # MILL_OWNER sees all mills in their company
             "company_id": current_user.company_id,
-            "role": role_name,
+            "role": role_code,
             "see_all_company_mills": True,
         }
     return {
         "mill_id": current_user.mill_id,
         "company_id": current_user.company_id,
-        "role": role_name,
+        "role": role_code,
         "see_all_company_mills": False,
     }
 

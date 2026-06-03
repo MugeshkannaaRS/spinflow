@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from datetime import datetime, timezone, timedelta, date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,13 +13,40 @@ from app.models.production import Machine, ProductionEntry, Shift
 from app.models.maintenance import MaintenanceLog
 from app.models.quality import QualityTest
 from app.models.dispatch import Dispatch
-from app.models.hr import Employee, Attendance, Leave
+from app.models.hr import Employee, Attendance, Leave, MonthlyPayroll
 from app.models.masters import Department, Customer, Mill, Company
 from app.models.lotrac import Trip
 from app.models.inventory import Lot
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
+
+# ─── Role → sections mapping ────────────────────────────────────────────────
+
+ROLE_SECTIONS: dict[str, set[str]] = {
+    "SUPER_ADMIN":          {"production","machines","attendance","finance","quality","inventory","dispatch","payroll","alerts","pending_actions","schedule"},
+    "MILL_OWNER":           {"production","machines","attendance","finance","quality","inventory","dispatch","payroll","alerts","pending_actions","schedule"},
+    "GENERAL_MANAGER":      {"production","machines","attendance","finance","quality","inventory","dispatch","alerts","pending_actions"},
+    "PRODUCTION_MANAGER":   {"production","machines","attendance","alerts","schedule"},
+    "QUALITY_MANAGER":      {"quality","production","alerts"},
+    "DISPATCH_MANAGER":     {"dispatch","inventory","alerts"},
+    "HR_MANAGER":           {"attendance","payroll","alerts","pending_actions"},
+    "ACCOUNTANT":           {"finance","payroll","inventory","alerts"},
+    "MAINTENANCE_MANAGER":  {"machines","alerts","pending_actions"},
+    "STORE_MANAGER":        {"inventory","alerts","pending_actions"},
+    "SUPERVISOR":           {"production","attendance","machines","schedule","alerts"},
+    "MACHINE_OPERATOR":     {"production","schedule","alerts"},
+    "SECURITY_GATE":        {"attendance","schedule","alerts"},
+    "AUDITOR":              {"production","machines","attendance","finance","quality","inventory","dispatch","payroll","alerts"},
+}
+
+
+def _want(role: str, section: str) -> bool:
+    return section in ROLE_SECTIONS.get(role, set())
+
+
+# ─── Legacy KPI endpoints (kept for backward compat) ─────────────────────────
 
 @router.get("/dashboard/kpis")
 async def get_dashboard_kpis(
@@ -62,12 +90,11 @@ async def get_dashboard_kpis(
     eff_result = await db.execute(q)
     kpis["efficiency"] = round(float(eff_result.scalar() or 0), 1)
 
-    # Maintenance — filtered by mill
     if mill_id:
         active_breakdowns = await db.execute(
-            select(func.count()).select_from(MaintenanceLog).where(
-                MaintenanceLog.mill_id == mill_id, MaintenanceLog.status == "open"
-            )
+            select(func.count()).select_from(MaintenanceLog).join(
+                Machine, MaintenanceLog.machine_code == Machine.code
+            ).where(Machine.mill_id == mill_id, MaintenanceLog.status == "open")
         )
     else:
         active_breakdowns = await db.execute(
@@ -96,17 +123,8 @@ async def get_dashboard_kpis(
     prev_week_eff = await db.execute(q)
     kpis["prevWeekEfficiency"] = round(float(prev_week_eff.scalar() or 0), 1)
 
-    stock_value = 0
-    try:
-        from app.services.stock_service import StockLedgerService
-        stock_svc = StockLedgerService(db, current_user)
-        snapshot = await stock_svc.stock_snapshot(mill_id=scope.get("mill_id") or "m1")
-        stock_value = sum((r.get("weight_on_hand_kg", 0) or 0) * 150 for r in snapshot)
-    except Exception:
-        pass
-    kpis["stockValue"] = stock_value
+    kpis["stockValue"] = 0
 
-    # Dispatch — filtered by mill
     if mill_id:
         pending_dispatch = await db.execute(
             select(func.count()).select_from(Dispatch).where(
@@ -119,17 +137,16 @@ async def get_dashboard_kpis(
         )
     kpis["pendingDispatch"] = pending_dispatch.scalar() or 0
 
-    # Quality — filtered by mill
     if mill_id:
         total_tests_week = await db.execute(
-            select(func.count()).select_from(QualityTest).where(
-                QualityTest.mill_id == mill_id, QualityTest.date >= week_ago
-            )
+            select(func.count()).select_from(QualityTest).join(
+                Lot, QualityTest.lot_id == Lot.id
+            ).where(Lot.mill_id == mill_id, QualityTest.date >= week_ago)
         )
         failed_tests_week = await db.execute(
-            select(func.count()).select_from(QualityTest).where(
-                QualityTest.mill_id == mill_id, QualityTest.date >= week_ago, QualityTest.status == "fail"
-            )
+            select(func.count()).select_from(QualityTest).join(
+                Lot, QualityTest.lot_id == Lot.id
+            ).where(Lot.mill_id == mill_id, QualityTest.date >= week_ago, QualityTest.status == "fail")
         )
     else:
         total_tests_week = await db.execute(
@@ -272,13 +289,14 @@ async def get_chart_data(
     elif chart_type == "quality":
         quality_scope = []
         if scope.get("mill_id"):
-            quality_scope = [QualityTest.mill_id == scope["mill_id"]]
+            quality_scope = [Lot.mill_id == scope["mill_id"]]
         rows = await db.execute(
             select(
                 QualityTest.date,
                 func.count().label("total"),
                 func.coalesce(func.sum(case((QualityTest.status == "pass", 1), else_=0)), 0).label("passed"),
             )
+            .join(Lot, QualityTest.lot_id == Lot.id)
             .where(QualityTest.date >= start, *quality_scope)
             .group_by(QualityTest.date)
             .order_by(QualityTest.date)
@@ -317,12 +335,16 @@ async def get_chart_data(
     elif chart_type == "attendance":
         attendance_scope = []
         if scope.get("mill_id"):
-            attendance_scope = [Attendance.mill_id == scope["mill_id"]]
+            attendance_scope = [
+                Employee.mill_id == scope["mill_id"],
+                Attendance.employee_id == Employee.id,
+            ]
         rows = await db.execute(
             select(
                 Attendance.date,
                 func.count().label("total"),
             )
+            .join(Employee, Attendance.employee_id == Employee.id)
             .where(Attendance.date >= start, *attendance_scope)
             .group_by(Attendance.date)
             .order_by(Attendance.date)
@@ -379,51 +401,42 @@ async def get_admin_summary(
         "companies": [],
     }
     try:
-        r1 = await db.execute(text(
-            "SELECT COUNT(*) FROM companies WHERE is_active = true"
-        ))
+        r1 = await db.execute(text("SELECT COUNT(*) FROM companies WHERE is_active = true"))
         result["total_companies"] = r1.scalar() or 0
-    except Exception as e:
-        print(f"companies count failed: {e}")
+    except Exception:
         try:
             r1b = await db.execute(text("SELECT COUNT(*) FROM companies"))
             result["total_companies"] = r1b.scalar() or 0
-        except:
-            result["total_companies"] = 0
+        except Exception:
+            pass
 
     try:
-        r2 = await db.execute(text(
-            "SELECT COUNT(*) FROM mills WHERE is_active = true"
-        ))
+        r2 = await db.execute(text("SELECT COUNT(*) FROM mills WHERE is_active = true"))
         result["total_mills"] = r2.scalar() or 0
-    except Exception as e:
-        print(f"mills count failed: {e}")
+    except Exception:
         try:
             r2b = await db.execute(text("SELECT COUNT(*) FROM mills"))
             result["total_mills"] = r2b.scalar() or 0
-        except:
-            result["total_mills"] = 0
+        except Exception:
+            pass
 
     try:
         r3 = await db.execute(text(
             "SELECT COUNT(*) FROM users WHERE is_active = true AND deleted_at IS NULL"
         ))
         result["total_users"] = r3.scalar() or 0
-    except Exception as e:
-        print(f"users count failed: {e}")
+    except Exception:
         try:
-            r3b = await db.execute(text(
-                "SELECT COUNT(*) FROM users WHERE is_active = true"
-            ))
+            r3b = await db.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true"))
             result["total_users"] = r3b.scalar() or 0
-        except:
-            result["total_users"] = 0
+        except Exception:
+            pass
 
     try:
         r4 = await db.execute(text("SELECT COUNT(*) FROM employees"))
         result["total_employees"] = r4.scalar() or 0
-    except Exception as e:
-        print(f"employees count failed: {e}")
+    except Exception:
+        pass
 
     try:
         r5 = await db.execute(text(
@@ -437,12 +450,13 @@ async def get_admin_summary(
              "created_at": row[3].isoformat() if row[3] else None}
             for row in rows
         ]
-    except Exception as e:
-        print(f"companies list failed: {e}")
+    except Exception:
+        pass
 
-    print(f"Admin summary result: {result}")
     return result
 
+
+# ─── NEW: Role-aware single summary endpoint ─────────────────────────────────
 
 @router.get("/dashboard/summary")
 async def get_dashboard_summary(
@@ -450,362 +464,755 @@ async def get_dashboard_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    try:
-        role_code = current_user.role_rel.code if current_user.role_rel else ""
-        if role_code == "SUPER_ADMIN":
-            return _empty_dashboard()
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    today = date.today()
+    now_iso = datetime.now(timezone.utc).isoformat()
 
-        # Determine effective mill_id from param or current user
-        effective_mill_id = mill_id or current_user.mill_id
+    # ── Resolve effective mill / company scope ────────────────────────────────
+    scope = await get_mill_scope(current_user)
+    effective_mill_id: Optional[str] = None
+    effective_company_id: Optional[str] = scope.get("company_id")
+    mill_name: str = ""
+    company_name: str = ""
 
-        # SECURITY: verify this mill belongs to user's company
-        if effective_mill_id and current_user.company_id:
-            mill_check = await db.execute(
-                select(Mill).where(Mill.id == effective_mill_id, Mill.company_id == current_user.company_id, Mill.is_active == True)
+    if role_code == "SUPER_ADMIN":
+        # Cross-company: no mill filter
+        effective_mill_id = None
+        try:
+            r = await db.execute(select(func.count()).select_from(Mill))
+            _ = r.scalar()
+        except Exception:
+            pass
+    elif scope.get("mill_id"):
+        effective_mill_id = scope["mill_id"]
+    else:
+        # MILL_OWNER or company-scoped — use requested mill_id if valid, else first active mill
+        req_mill = mill_id or current_user.mill_id
+        if req_mill and effective_company_id:
+            chk = await db.execute(
+                select(Mill).where(
+                    Mill.id == req_mill,
+                    Mill.company_id == effective_company_id,
+                    Mill.is_active == True,
+                )
             )
-            if not mill_check.scalar_one_or_none():
-                effective_mill_id = current_user.mill_id
-
-        # Fallback: try first mill in user's company
-        if not effective_mill_id and current_user.company_id:
-            mill_result = await db.execute(
-                select(Mill).where(Mill.company_id == current_user.company_id, Mill.is_active == True).limit(1)
+            m = chk.scalar_one_or_none()
+            if m:
+                effective_mill_id = m.id
+                mill_name = m.name
+        if not effective_mill_id and effective_company_id:
+            chk2 = await db.execute(
+                select(Mill).where(
+                    Mill.company_id == effective_company_id,
+                    Mill.is_active == True,
+                ).limit(1)
             )
-            mill = mill_result.scalar_one_or_none()
-            effective_mill_id = mill.id if mill else None
+            m2 = chk2.scalar_one_or_none()
+            if m2:
+                effective_mill_id = m2.id
+                mill_name = m2.name
 
-        if not effective_mill_id:
-            return _empty_dashboard()
-
-        today = date.today()
-        results = {}
-
-        # Production today (via Machine join — ProductionEntry has no mill_id)
+    # Fetch mill/company names if not yet set
+    if not mill_name and effective_mill_id:
         try:
-            q = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
-            q = q.join(Machine, ProductionEntry.machine_code == Machine.code)
-            q = q.where(Machine.mill_id == effective_mill_id, ProductionEntry.date == today.isoformat())
-            results["production_today"] = float((await db.execute(q)).scalar() or 0)
+            mr = await db.execute(select(Mill).where(Mill.id == effective_mill_id))
+            mo = mr.scalar_one_or_none()
+            if mo:
+                mill_name = mo.name
+                effective_company_id = effective_company_id or str(mo.company_id)
         except Exception:
-            results["production_today"] = 0
+            pass
 
-        # Production target
+    if not company_name and effective_company_id:
         try:
-            q = select(func.coalesce(func.sum(Machine.target_kg), 0))
-            q = q.where(Machine.mill_id == effective_mill_id)
-            results["production_target"] = float((await db.execute(q)).scalar() or 1)
+            cr = await db.execute(select(Company).where(Company.id == effective_company_id))
+            co = cr.scalar_one_or_none()
+            if co:
+                company_name = co.name
         except Exception:
-            results["production_target"] = 3000
+            pass
 
-        # Waste %
-        try:
-            q = select(func.coalesce(func.sum(ProductionEntry.waste_kg), 0))
-            q = q.join(Machine, ProductionEntry.machine_code == Machine.code)
-            q = q.where(Machine.mill_id == effective_mill_id, ProductionEntry.date == today.isoformat())
-            waste = float((await db.execute(q)).scalar() or 0)
-            results["waste_percent"] = round(waste / results["production_today"] * 100, 1) if results["production_today"] > 0 else 0
-        except Exception:
-            results["waste_percent"] = 0
+    # Build machine scope filters used by production/machines queries
+    if effective_mill_id:
+        machine_filter = [Machine.mill_id == effective_mill_id]
+    elif effective_company_id:
+        mills_subq = select(Mill.id).where(Mill.company_id == effective_company_id).scalar_subquery()
+        machine_filter = [Machine.mill_id.in_(mills_subq)]
+    else:
+        machine_filter = []  # SUPER_ADMIN: no filter
 
-        # Efficiency today
-        try:
-            q = select(func.coalesce(func.avg(
-                ProductionEntry.produced_kg / func.nullif(Machine.target_kg, 0) * 100
-            ), 0))
-            q = q.join(Machine, ProductionEntry.machine_code == Machine.code)
-            q = q.where(Machine.mill_id == effective_mill_id, ProductionEntry.date == today.isoformat())
-            results["efficiency_today"] = round(float((await db.execute(q)).scalar() or 0), 1)
-        except Exception:
-            results["efficiency_today"] = 0
+    out: dict = {
+        "role": role_code,
+        "mill_name": mill_name,
+        "company_name": company_name,
+        "as_of": now_iso,
+    }
 
-        # Attendance
+    # ── PRODUCTION ────────────────────────────────────────────────────────────
+    if _want(role_code, "production"):
         try:
-            q = select(func.count(Employee.id)).where(Employee.mill_id == effective_mill_id, Employee.is_active == True)
-            total_emp = int((await db.execute(q)).scalar() or 0)
-            q = select(func.count(Attendance.id)).where(
-                Attendance.employee_id == Employee.id,
-                Employee.mill_id == effective_mill_id,
-                Attendance.date == today.isoformat(),
+            today_str = today.isoformat()
+            week_ago_str = (today - timedelta(days=6)).isoformat()
+
+            q_output = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
+            q_output = q_output.join(Machine, ProductionEntry.machine_code == Machine.code)
+            q_output = q_output.where(ProductionEntry.date == today_str, *machine_filter)
+            today_output = float((await db.execute(q_output)).scalar() or 0)
+
+            q_target = select(func.coalesce(func.sum(Machine.target_kg), 0))
+            q_target = q_target.where(*machine_filter) if machine_filter else q_target
+            today_target = float((await db.execute(q_target)).scalar() or 0)
+
+            q_waste = select(
+                func.coalesce(func.sum(ProductionEntry.waste_kg), 0),
+                func.coalesce(func.sum(ProductionEntry.produced_kg), 0),
             )
-            present = int((await db.execute(q)).scalar() or 0)
-            results["attendance_total"] = total_emp
-            results["attendance_present"] = present
-            results["attendance_absent"] = max(0, total_emp - present)
-        except Exception:
-            results["attendance_total"] = 0
-            results["attendance_present"] = 0
-            results["attendance_absent"] = 0
+            q_waste = q_waste.join(Machine, ProductionEntry.machine_code == Machine.code)
+            q_waste = q_waste.where(ProductionEntry.date == today_str, *machine_filter)
+            waste_row = (await db.execute(q_waste)).one()
+            waste_kg = float(waste_row[0] or 0)
+            input_kg = float(waste_row[1] or 0)
+            waste_pct = round(waste_kg / input_kg * 100, 1) if input_kg > 0 else 0.0
 
-        # Active machines
-        try:
-            q = select(func.count(Machine.id)).where(Machine.mill_id == effective_mill_id)
-            total = int((await db.execute(q)).scalar() or 0)
-            q = select(func.count(Machine.id)).where(Machine.mill_id == effective_mill_id, Machine.current_status == "running")
-            active = int((await db.execute(q)).scalar() or 0)
-            results["total_machines"] = total
-            results["active_machines"] = active
-        except Exception:
-            results["total_machines"] = 0
-            results["active_machines"] = 0
+            efficiency_pct = round(today_output / today_target * 100, 1) if today_target > 0 else 0.0
 
-        # Revenue (from production entries this month)
-        try:
-            month_start = today.replace(day=1)
-            q = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
-            q = q.join(Machine, ProductionEntry.machine_code == Machine.code)
-            q = q.where(Machine.mill_id == effective_mill_id, ProductionEntry.date >= month_start)
-            month_kg = float((await db.execute(q)).scalar() or 0)
-            results["monthly_revenue"] = month_kg * 150
-            q = select(func.coalesce(func.sum(Machine.target_kg), 0))
-            q = q.where(Machine.mill_id == effective_mill_id)
-            total_target = float((await db.execute(q)).scalar() or 1)
-            results["revenue_target"] = total_target * 150 if total_target > 0 else 3000000
-        except Exception:
-            results["monthly_revenue"] = 0
-            results["revenue_target"] = 3000000
-
-        # Pending payments
-        try:
-            results["pending_payments"] = 0
-            results["overdue_customers"] = 0
-        except Exception:
-            results["pending_payments"] = 0
-            results["overdue_customers"] = 0
-
-        # Quality rejection (via Lot join — QualityTest has no mill_id)
-        try:
-            week_ago = today - timedelta(days=7)
-            q = select(func.count(QualityTest.id))
-            q = q.join(Lot, QualityTest.lot_id == Lot.id)
-            q = q.where(Lot.mill_id == effective_mill_id, QualityTest.date >= week_ago)
-            total_tests = int((await db.execute(q)).scalar() or 1)
-            q = select(func.count(QualityTest.id))
-            q = q.join(Lot, QualityTest.lot_id == Lot.id)
-            q = q.where(Lot.mill_id == effective_mill_id, QualityTest.date >= week_ago, QualityTest.status == "fail")
-            failed = int((await db.execute(q)).scalar() or 0)
-            results["quality_rejection"] = round(failed / total_tests * 100, 1) if total_tests > 1 else 0
-        except Exception:
-            results["quality_rejection"] = 0
-
-        # Target achievement
-        try:
-            month_start = today.replace(day=1)
-            q = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
-            q = q.join(Machine, ProductionEntry.machine_code == Machine.code)
-            q = q.where(Machine.mill_id == effective_mill_id, ProductionEntry.date >= month_start)
-            month_prod = float((await db.execute(q)).scalar() or 0)
-            q = select(func.coalesce(func.sum(Machine.target_kg), 0))
-            q = q.where(Machine.mill_id == effective_mill_id)
-            month_target = float((await db.execute(q)).scalar() or 1)
-            results["target_achievement"] = round(month_prod / month_target * 100, 1) if month_target > 0 else 0
-        except Exception:
-            results["target_achievement"] = 0
-
-        # Active breakdowns (via Machine join — MaintenanceLog has no mill_id)
-        try:
-            q = select(func.count(MaintenanceLog.id))
-            q = q.join(Machine, MaintenanceLog.machine_code == Machine.code)
-            q = q.where(Machine.mill_id == effective_mill_id, MaintenanceLog.status == "open")
-            results["active_breakdowns"] = int((await db.execute(q)).scalar() or 0)
-        except Exception:
-            results["active_breakdowns"] = 0
-
-        # Pending dispatch
-        try:
-            q = select(func.count(Trip.id)).where(Trip.mill_id == effective_mill_id, Trip.status == "pending")
-            results["pending_dispatch"] = int((await db.execute(q)).scalar() or 0)
-        except Exception:
-            results["pending_dispatch"] = 0
-
-        # Total employees / stock lots
-        try:
-            q = select(func.count(Employee.id)).where(Employee.mill_id == effective_mill_id, Employee.is_active == True)
-            results["total_employees"] = int((await db.execute(q)).scalar() or 0)
-        except Exception:
-            results["total_employees"] = 0
-        try:
-            q = select(func.count(Lot.id)).where(Lot.mill_id == effective_mill_id, Lot.status == "in-stock")
-            results["stock_lots"] = int((await db.execute(q)).scalar() or 0)
-        except Exception:
-            results["stock_lots"] = 0
-
-        # ── Production trend (last 7 days) ──
-        try:
-            trend = []
-            week_ago_dt = today - timedelta(days=6)
+            # Last 7 days trend
             trend_q = (
-                select(ProductionEntry.date, func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
+                select(
+                    ProductionEntry.date,
+                    func.coalesce(func.sum(ProductionEntry.produced_kg), 0).label("output_kg"),
+                )
                 .join(Machine, ProductionEntry.machine_code == Machine.code)
                 .where(
-                    Machine.mill_id == effective_mill_id,
-                    ProductionEntry.date >= week_ago_dt.isoformat(),
-                    ProductionEntry.date <= today.isoformat(),
-                    ProductionEntry.status == "approved",
+                    ProductionEntry.date >= week_ago_str,
+                    ProductionEntry.date <= today_str,
+                    *machine_filter,
                 )
                 .group_by(ProductionEntry.date)
             )
             trend_by_date: dict[str, float] = {}
             for row in (await db.execute(trend_q)).all():
-                trend_by_date[row[0]] = float(row[1])
+                trend_by_date[str(row[0])] = float(row[1])
+
+            last_7_days = []
             for i in range(7):
-                d = week_ago_dt + timedelta(days=i)
-                produced = trend_by_date.get(d.isoformat(), 0.0)
-                trend.append({"day": d.strftime("%a"), "produced": produced, "target": 5000})
-            results["production_trend"] = trend
-        except Exception:
-            results["production_trend"] = []
+                d = (today - timedelta(days=6 - i)).isoformat()
+                last_7_days.append({
+                    "date": d,
+                    "output_kg": trend_by_date.get(d, 0.0),
+                    "target_kg": today_target,
+                })
 
-        # ── Department attendance ──
+            out["production"] = {
+                "today_output_kg": today_output,
+                "today_target_kg": today_target,
+                "efficiency_pct": efficiency_pct,
+                "waste_pct": waste_pct,
+                "last_7_days": last_7_days,
+            }
+        except Exception as e:
+            logger.warning(f"dashboard production section error: {e}")
+            out["production"] = {
+                "today_output_kg": 0, "today_target_kg": 0,
+                "efficiency_pct": 0, "waste_pct": 0, "last_7_days": [],
+            }
+
+    # ── MACHINES ──────────────────────────────────────────────────────────────
+    if _want(role_code, "machines"):
         try:
-            dept_data = []
-            dept_present_q = (
-                select(Employee.department, func.count(Attendance.id))
+            q_total = select(func.count()).select_from(Machine)
+            if machine_filter:
+                q_total = q_total.where(*machine_filter)
+            total_m = int((await db.execute(q_total)).scalar() or 0)
+
+            q_active = select(func.count()).select_from(Machine).where(
+                Machine.current_status == "running",
+                *(machine_filter),
+            )
+            active_m = int((await db.execute(q_active)).scalar() or 0)
+
+            q_down = select(func.count()).select_from(Machine).where(
+                Machine.current_status == "breakdown",
+                *(machine_filter),
+            )
+            down_m = int((await db.execute(q_down)).scalar() or 0)
+
+            q_maint = select(func.count()).select_from(Machine).where(
+                Machine.current_status == "idle",
+                *(machine_filter),
+            )
+            maint_m = int((await db.execute(q_maint)).scalar() or 0)
+
+            out["machines"] = {
+                "total": total_m,
+                "active": active_m,
+                "down": down_m,
+                "maintenance": maint_m,
+            }
+        except Exception as e:
+            logger.warning(f"dashboard machines section error: {e}")
+            out["machines"] = {"total": 0, "active": 0, "down": 0, "maintenance": 0}
+
+    # ── ATTENDANCE ────────────────────────────────────────────────────────────
+    if _want(role_code, "attendance"):
+        try:
+            today_str = today.isoformat()
+
+            if effective_mill_id:
+                emp_filter = [Employee.mill_id == effective_mill_id]
+            elif effective_company_id:
+                mill_sq = select(Mill.id).where(Mill.company_id == effective_company_id).scalar_subquery()
+                emp_filter = [Employee.mill_id.in_(mill_sq)]
+            else:
+                emp_filter = []
+
+            q_total_emp = select(func.count()).select_from(Employee).where(
+                Employee.is_active == True, *emp_filter
+            )
+            total_emp = int((await db.execute(q_total_emp)).scalar() or 0)
+
+            q_present = (
+                select(func.count())
+                .select_from(Attendance)
+                .join(Employee, Attendance.employee_id == Employee.id)
                 .where(
-                    Attendance.employee_id == Employee.id,
-                    Employee.mill_id == effective_mill_id,
-                    Employee.is_active == True,
-                    Employee.department.isnot(None),
-                    Attendance.date == today.isoformat(),
+                    Attendance.date == today_str,
                     Attendance.status == "present",
+                    Employee.is_active == True,
+                    *emp_filter,
                 )
-                .group_by(Employee.department)
             )
-            present_by_dept: dict[str, int] = {}
-            for row in (await db.execute(dept_present_q)).all():
-                present_by_dept[row[0]] = int(row[1])
+            today_present = int((await db.execute(q_present)).scalar() or 0)
 
-            dept_count_q = (
-                select(Employee.department, func.count(Employee.id))
+            today_absent = max(0, total_emp - today_present)
+            present_pct = round(today_present / total_emp * 100, 1) if total_emp > 0 else 0.0
+
+            # By department
+            q_dept_present = (
+                select(Employee.department, func.count().label("present"))
+                .join(Attendance, Attendance.employee_id == Employee.id)
                 .where(
-                    Employee.mill_id == effective_mill_id,
+                    Attendance.date == today_str,
+                    Attendance.status == "present",
                     Employee.is_active == True,
                     Employee.department.isnot(None),
+                    *emp_filter,
                 )
                 .group_by(Employee.department)
             )
-            for dept_name, emp_count in (await db.execute(dept_count_q)).all():
-                if dept_name and emp_count > 0:
-                    present_count = present_by_dept.get(dept_name, 0)
-                    pct = round((present_count / emp_count) * 100, 1) if emp_count > 0 else 0
-                    dept_data.append({"dept": dept_name, "pct": pct})
-            results["dept_attendance"] = dept_data
-        except Exception:
-            results["dept_attendance"] = []
+            dept_present: dict[str, int] = {}
+            for row in (await db.execute(q_dept_present)).all():
+                dept_present[row[0]] = int(row[1])
 
-        # ── Alerts ──
+            q_dept_total = (
+                select(Employee.department, func.count().label("total"))
+                .where(Employee.is_active == True, Employee.department.isnot(None), *emp_filter)
+                .group_by(Employee.department)
+            )
+            by_department = []
+            for row in (await db.execute(q_dept_total)).all():
+                dept = row[0]
+                if dept:
+                    p = dept_present.get(dept, 0)
+                    by_department.append({
+                        "department": dept,
+                        "present": p,
+                        "absent": max(0, int(row[1]) - p),
+                    })
+
+            out["attendance"] = {
+                "today_present": today_present,
+                "today_absent": today_absent,
+                "today_total": total_emp,
+                "present_pct": present_pct,
+                "by_department": by_department,
+            }
+        except Exception as e:
+            logger.warning(f"dashboard attendance section error: {e}")
+            out["attendance"] = {
+                "today_present": 0, "today_absent": 0, "today_total": 0,
+                "present_pct": 0.0, "by_department": [],
+            }
+
+    # ── FINANCE ───────────────────────────────────────────────────────────────
+    if _want(role_code, "finance"):
         try:
-            alerts_list = []
-            # Open maintenance logs
-            maint_q = select(MaintenanceLog).join(Machine, MaintenanceLog.machine_code == Machine.code)
-            maint_q = maint_q.where(Machine.mill_id == effective_mill_id, MaintenanceLog.status == "open")
-            maint_q = maint_q.order_by(MaintenanceLog.date.desc()).limit(5)
-            for ml in (await db.execute(maint_q)).scalars().all():
-                alerts_list.append({
-                    "type": "critical",
-                    "message": f"{ml.machine_code or 'Machine'} — {ml.description or 'maintenance needed'}",
-                    "time": "just now",
+            # Finance from production proxy (no invoices table yet)
+            today_dt = today
+            month_start = today_dt.replace(day=1)
+
+            q_rev = (
+                select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
+                .join(Machine, ProductionEntry.machine_code == Machine.code)
+                .where(
+                    ProductionEntry.date >= month_start.isoformat(),
+                    *machine_filter,
+                )
+            )
+            month_kg = float((await db.execute(q_rev)).scalar() or 0)
+            monthly_revenue = month_kg * 150  # ₹150/kg proxy
+
+            # Revenue trend last 6 months
+            revenue_trend = []
+            for i in range(5, -1, -1):
+                mn = today_dt.replace(day=1) - timedelta(days=30 * i)
+                mn = mn.replace(day=1)
+                if i == 0:
+                    me = today_dt
+                else:
+                    next_m = mn.replace(day=28) + timedelta(days=4)
+                    me = next_m.replace(day=1) - timedelta(days=1)
+
+                q_m = (
+                    select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
+                    .join(Machine, ProductionEntry.machine_code == Machine.code)
+                    .where(
+                        ProductionEntry.date >= mn.isoformat(),
+                        ProductionEntry.date <= me.isoformat(),
+                        *machine_filter,
+                    )
+                )
+                m_kg = float((await db.execute(q_m)).scalar() or 0)
+                revenue_trend.append({
+                    "month": mn.strftime("%b %Y"),
+                    "revenue": m_kg * 150,
+                    "purchases": 0.0,
                 })
-            # Pending leaves
-            leave_q = select(func.count(Leave.id)).where(
-                Leave.employee_id == Employee.id,
-                Employee.mill_id == effective_mill_id,
-                Leave.status == "pending",
+
+            out["finance"] = {
+                "monthly_revenue": monthly_revenue,
+                "monthly_purchases": 0.0,
+                "outstanding": 0.0,
+                "overdue_count": 0,
+                "revenue_trend": revenue_trend,
+            }
+        except Exception as e:
+            logger.warning(f"dashboard finance section error: {e}")
+            out["finance"] = {
+                "monthly_revenue": 0, "monthly_purchases": 0,
+                "outstanding": 0, "overdue_count": 0, "revenue_trend": [],
+            }
+
+    # ── QUALITY ───────────────────────────────────────────────────────────────
+    if _want(role_code, "quality"):
+        try:
+            today_str = today.isoformat()
+            q_scope = [Lot.mill_id == effective_mill_id] if effective_mill_id else (
+                [Lot.mill_id.in_(select(Mill.id).where(Mill.company_id == effective_company_id).scalar_subquery())]
+                if effective_company_id else []
             )
-            pending_leaves = int((await db.execute(leave_q)).scalar() or 0)
-            if pending_leaves > 0:
-                alerts_list.append({
-                    "type": "warning",
-                    "message": f"{pending_leaves} leave request(s) pending approval",
-                    "time": "today",
+
+            q_total = (
+                select(func.count())
+                .select_from(QualityTest)
+                .join(Lot, QualityTest.lot_id == Lot.id)
+                .where(QualityTest.date == today_str, *q_scope)
+            )
+            tests_today = int((await db.execute(q_total)).scalar() or 0)
+
+            q_pass = (
+                select(func.count())
+                .select_from(QualityTest)
+                .join(Lot, QualityTest.lot_id == Lot.id)
+                .where(QualityTest.date == today_str, QualityTest.status == "pass", *q_scope)
+            )
+            pass_count = int((await db.execute(q_pass)).scalar() or 0)
+
+            q_pending = (
+                select(func.count())
+                .select_from(QualityTest)
+                .join(Lot, QualityTest.lot_id == Lot.id)
+                .where(QualityTest.status == "pending", *q_scope)
+            )
+            pending_approvals = int((await db.execute(q_pending)).scalar() or 0)
+
+            q_fail = (
+                select(func.count())
+                .select_from(QualityTest)
+                .join(Lot, QualityTest.lot_id == Lot.id)
+                .where(QualityTest.date == today_str, QualityTest.status == "fail", *q_scope)
+            )
+            fail_count = int((await db.execute(q_fail)).scalar() or 0)
+
+            pass_rate = round(pass_count / tests_today * 100, 1) if tests_today > 0 else 0.0
+            defect_rate = round(fail_count / tests_today * 100, 1) if tests_today > 0 else 0.0
+
+            out["quality"] = {
+                "tests_today": tests_today,
+                "pass_rate_pct": pass_rate,
+                "pending_approvals": pending_approvals,
+                "defect_rate_pct": defect_rate,
+            }
+        except Exception as e:
+            logger.warning(f"dashboard quality section error: {e}")
+            out["quality"] = {
+                "tests_today": 0, "pass_rate_pct": 0, "pending_approvals": 0, "defect_rate_pct": 0,
+            }
+
+    # ── INVENTORY ─────────────────────────────────────────────────────────────
+    if _want(role_code, "inventory"):
+        try:
+            lot_filter = [Lot.mill_id == effective_mill_id] if effective_mill_id else (
+                [Lot.mill_id.in_(select(Mill.id).where(Mill.company_id == effective_company_id).scalar_subquery())]
+                if effective_company_id else []
+            )
+
+            q_total_lots = select(func.count()).select_from(Lot).where(*lot_filter)
+            total_items = int((await db.execute(q_total_lots)).scalar() or 0)
+
+            # Low stock = lots with quality_status = 'pending' or status = 'in-stock' and quantity <= 0
+            # (No reorder_level on Lot; use quantity <= 100 as proxy for low stock)
+            q_low = select(func.count()).select_from(Lot).where(
+                Lot.status == "in-stock",
+                Lot.quantity <= 100,
+                *lot_filter,
+            )
+            low_stock_count = int((await db.execute(q_low)).scalar() or 0)
+
+            q_low_items = (
+                select(Lot.lot_no, Lot.quantity, Lot.unit, Lot.type)
+                .where(Lot.status == "in-stock", Lot.quantity <= 100, *lot_filter)
+                .order_by(Lot.quantity)
+                .limit(5)
+            )
+            low_stock_items = []
+            for row in (await db.execute(q_low_items)).all():
+                low_stock_items.append({
+                    "name": row[0],
+                    "current": float(row[1]),
+                    "reorder_level": 100.0,
+                    "unit": row[2] or "kg",
                 })
-            results["alerts"] = alerts_list
-        except Exception:
-            results["alerts"] = []
 
-        # ── Pending actions ──
+            out["inventory"] = {
+                "total_items": total_items,
+                "low_stock_count": low_stock_count,
+                "low_stock_items": low_stock_items,
+            }
+        except Exception as e:
+            logger.warning(f"dashboard inventory section error: {e}")
+            out["inventory"] = {"total_items": 0, "low_stock_count": 0, "low_stock_items": []}
+
+    # ── DISPATCH ──────────────────────────────────────────────────────────────
+    if _want(role_code, "dispatch"):
         try:
-            qual_q = select(func.count(QualityTest.id))
-            qual_q = qual_q.join(Lot, QualityTest.lot_id == Lot.id)
-            qual_q = qual_q.where(Lot.mill_id == effective_mill_id, QualityTest.status == "pending")
-            qual_count = int((await db.execute(qual_q)).scalar() or 0)
-
-            trip_q = select(func.count(Trip.id)).where(Trip.mill_id == effective_mill_id, Trip.status == "draft")
-            trip_count = int((await db.execute(trip_q)).scalar() or 0)
-
-            leave_q = select(func.count(Leave.id)).where(
-                Leave.employee_id == Employee.id,
-                Employee.mill_id == effective_mill_id,
-                Leave.status == "pending",
+            today_str = today.isoformat()
+            trip_filter = [Trip.mill_id == effective_mill_id] if effective_mill_id else (
+                [Trip.mill_id.in_(select(Mill.id).where(Mill.company_id == effective_company_id).scalar_subquery())]
+                if effective_company_id else []
             )
-            leave_count = int((await db.execute(leave_q)).scalar() or 0)
 
-            results["pending_actions"] = [
-                {"label": "Quality tests pending approval", "count": qual_count},
-                {"label": "Dispatch trips to confirm", "count": trip_count},
-                {"label": "Leave requests pending", "count": leave_count},
-            ]
-        except Exception:
-            results["pending_actions"] = []
+            q_today_trips = select(func.count()).select_from(Trip).where(
+                func.date(Trip.created_at) == today_str, *trip_filter
+            )
+            today_trips = int((await db.execute(q_today_trips)).scalar() or 0)
 
-        # ── Schedule (shifts for today) ──
+            q_pending = select(func.count()).select_from(Trip).where(
+                Trip.status == "in_transit", *trip_filter
+            )
+            pending_deliveries = int((await db.execute(q_pending)).scalar() or 0)
+
+            q_delivered = select(func.count()).select_from(Trip).where(
+                Trip.status == "delivered",
+                func.date(Trip.delivered_at) == today_str,
+                *trip_filter,
+            )
+            delivered_today = int((await db.execute(q_delivered)).scalar() or 0)
+
+            # Sacks = sum of loaded_bags for today's trips
+            q_sacks = select(func.coalesce(func.sum(Trip.loaded_bags), 0)).where(
+                func.date(Trip.created_at) == today_str, *trip_filter
+            )
+            today_sacks = int((await db.execute(q_sacks)).scalar() or 0)
+
+            out["dispatch"] = {
+                "today_trips": today_trips,
+                "today_sacks": today_sacks,
+                "pending_deliveries": pending_deliveries,
+                "delivered_today": delivered_today,
+            }
+        except Exception as e:
+            logger.warning(f"dashboard dispatch section error: {e}")
+            out["dispatch"] = {
+                "today_trips": 0, "today_sacks": 0, "pending_deliveries": 0, "delivered_today": 0,
+            }
+
+    # ── PAYROLL ───────────────────────────────────────────────────────────────
+    if _want(role_code, "payroll"):
         try:
-            shift_result = await db.execute(
-                select(Shift).where(Shift.mill_id == effective_mill_id).order_by(Shift.start_time)
+            if effective_mill_id:
+                pay_filter = [MonthlyPayroll.mill_id == effective_mill_id]
+            elif effective_company_id:
+                mill_sq = select(Mill.id).where(Mill.company_id == effective_company_id).scalar_subquery()
+                pay_filter = [MonthlyPayroll.mill_id.in_(mill_sq)]
+            else:
+                pay_filter = []
+
+            cur_month = today.month
+            cur_year = today.year
+
+            q_emp_total = select(func.count()).select_from(Employee).where(
+                Employee.is_active == True,
+                *([Employee.mill_id == effective_mill_id] if effective_mill_id else
+                  [Employee.mill_id.in_(select(Mill.id).where(Mill.company_id == effective_company_id).scalar_subquery())]
+                  if effective_company_id else [])
             )
-            schedule_data = []
-            for s in shift_result.scalars().all():
-                label = f"{s.name} starts {s.start_time}" if s.name else f"Shift at {s.start_time}"
-                schedule_data.append({"label": label, "time": s.start_time, "done": False})
-            if not schedule_data:
-                schedule_data = [
-                    {"label": "A Shift starts 6:00 AM", "time": "06:00", "done": True},
-                    {"label": "B Shift starts 2:00 PM", "time": "14:00", "done": False},
-                    {"label": "C Shift starts 10:00 PM", "time": "22:00", "done": False},
-                ]
-            results["schedule"] = schedule_data
-        except Exception:
-            results["schedule"] = [
-                {"label": "A Shift starts 6:00 AM", "time": "06:00", "done": True},
-                {"label": "B Shift starts 2:00 PM", "time": "14:00", "done": False},
-                {"label": "C Shift starts 10:00 PM", "time": "22:00", "done": False},
-            ]
+            total_employees = int((await db.execute(q_emp_total)).scalar() or 0)
 
-        results.setdefault("waste_percent", 0)
-        results.setdefault("efficiency_today", 0)
-        results.setdefault("quality_rejection", 0)
-        results.setdefault("target_achievement", 0)
-        results.setdefault("production_target", 3000)
-        results.setdefault("attendance_present", 0)
-        results.setdefault("attendance_total", 0)
-        results.setdefault("attendance_absent", 0)
-        results.setdefault("active_machines", 0)
-        results.setdefault("total_machines", 0)
-        results.setdefault("monthly_revenue", 0)
-        results.setdefault("revenue_target", 3000000)
-        results.setdefault("pending_payments", 0)
-        results.setdefault("overdue_customers", 0)
-        results.setdefault("active_breakdowns", 0)
-        results.setdefault("pending_dispatch", 0)
-        results.setdefault("total_employees", 0)
-        results.setdefault("stock_lots", 0)
+            q_processed = select(func.count()).select_from(MonthlyPayroll).where(
+                MonthlyPayroll.month == cur_month,
+                MonthlyPayroll.year == cur_year,
+                MonthlyPayroll.is_finalized == True,
+                *pay_filter,
+            )
+            processed_count = int((await db.execute(q_processed)).scalar() or 0)
 
-        return results
+            q_pending = select(func.count()).select_from(MonthlyPayroll).where(
+                MonthlyPayroll.month == cur_month,
+                MonthlyPayroll.year == cur_year,
+                MonthlyPayroll.is_finalized == False,
+                *pay_filter,
+            )
+            pending_count = int((await db.execute(q_pending)).scalar() or 0)
+
+            q_total_pay = select(func.coalesce(func.sum(MonthlyPayroll.net_payable), 0)).where(
+                MonthlyPayroll.month == cur_month,
+                MonthlyPayroll.year == cur_year,
+                *pay_filter,
+            )
+            total_payable = float((await db.execute(q_total_pay)).scalar() or 0)
+
+            out["payroll"] = {
+                "current_month": today.strftime("%b %Y"),
+                "total_employees": total_employees,
+                "processed_count": processed_count,
+                "pending_count": pending_count,
+                "total_payable": total_payable,
+            }
+        except Exception as e:
+            logger.warning(f"dashboard payroll section error: {e}")
+            out["payroll"] = {
+                "current_month": today.strftime("%b %Y"),
+                "total_employees": 0, "processed_count": 0,
+                "pending_count": 0, "total_payable": 0,
+            }
+
+    # ── ALERTS ────────────────────────────────────────────────────────────────
+    alerts: list[dict] = []
+    try:
+        # Machines down
+        if effective_mill_id:
+            mf = [Machine.mill_id == effective_mill_id]
+        elif effective_company_id:
+            mf = [Machine.mill_id.in_(select(Mill.id).where(Mill.company_id == effective_company_id).scalar_subquery())]
+        else:
+            mf = []
+
+        q_down_mach = select(func.count()).select_from(Machine).where(
+            Machine.current_status == "breakdown", *mf
+        )
+        down_count = int((await db.execute(q_down_mach)).scalar() or 0)
+        if down_count > 0:
+            alerts.append({"type": "error", "message": f"{down_count} machine(s) down", "module": "machines"})
+
+        # Open maintenance
+        q_open_maint = (
+            select(func.count())
+            .select_from(MaintenanceLog)
+            .join(Machine, MaintenanceLog.machine_code == Machine.code)
+            .where(MaintenanceLog.status == "open", *mf)
+        )
+        open_maint = int((await db.execute(q_open_maint)).scalar() or 0)
+        if open_maint > 0:
+            alerts.append({"type": "warning", "message": f"{open_maint} open maintenance job(s)", "module": "maintenance"})
+
+        # Pending leaves
+        if effective_mill_id:
+            ef = [Employee.mill_id == effective_mill_id]
+        elif effective_company_id:
+            mill_sq = select(Mill.id).where(Mill.company_id == effective_company_id).scalar_subquery()
+            ef = [Employee.mill_id.in_(mill_sq)]
+        else:
+            ef = []
+
+        q_leaves = (
+            select(func.count())
+            .select_from(Leave)
+            .join(Employee, Leave.employee_id == Employee.id)
+            .where(Leave.status == "pending", *ef)
+        )
+        pending_leaves = int((await db.execute(q_leaves)).scalar() or 0)
+        if pending_leaves > 0:
+            alerts.append({"type": "info", "message": f"{pending_leaves} leave request(s) pending approval", "module": "hr"})
+
+        # Low inventory
+        if "inventory" in out and out["inventory"]["low_stock_count"] > 0:
+            alerts.append({"type": "warning", "message": f"{out['inventory']['low_stock_count']} low stock lot(s)", "module": "inventory"})
+
+        # Overdue quality
+        if "quality" in out and out["quality"]["pending_approvals"] > 0:
+            alerts.append({"type": "info", "message": f"{out['quality']['pending_approvals']} quality test(s) pending approval", "module": "quality"})
 
     except Exception as e:
-        print(f"Dashboard summary error: {e}")
-        return _empty_dashboard()
+        logger.warning(f"dashboard alerts error: {e}")
 
+    out["alerts"] = alerts
 
-def _empty_dashboard():
-    return {
-        "production_today": 0, "production_target": 3000, "waste_percent": 0,
-        "efficiency_today": 0, "quality_rejection": 0, "target_achievement": 0,
-        "attendance_present": 0, "attendance_total": 0, "attendance_absent": 0,
-        "active_machines": 0, "total_machines": 0,
-        "monthly_revenue": 0, "revenue_target": 3000000,
-        "pending_payments": 0, "overdue_customers": 0,
-        "active_breakdowns": 0, "pending_dispatch": 0,
-        "total_employees": 0, "stock_lots": 0,
-        "production_trend": [], "dept_attendance": [], "alerts": [],
-        "pending_actions": [], "schedule": [],
-    }
+    # ── PENDING ACTIONS ───────────────────────────────────────────────────────
+    if _want(role_code, "pending_actions"):
+        pending_actions = []
+        try:
+            if effective_mill_id:
+                ef = [Employee.mill_id == effective_mill_id]
+            elif effective_company_id:
+                mill_sq = select(Mill.id).where(Mill.company_id == effective_company_id).scalar_subquery()
+                ef = [Employee.mill_id.in_(mill_sq)]
+            else:
+                ef = []
+
+            q_leave_pa = (
+                select(func.count())
+                .select_from(Leave)
+                .join(Employee, Leave.employee_id == Employee.id)
+                .where(Leave.status == "pending", *ef)
+            )
+            leave_count = int((await db.execute(q_leave_pa)).scalar() or 0)
+            if leave_count > 0:
+                pending_actions.append({"label": "Leave requests pending", "count": leave_count, "route": "/hr"})
+
+            if effective_mill_id:
+                trip_filter = [Trip.mill_id == effective_mill_id]
+            elif effective_company_id:
+                mill_sq2 = select(Mill.id).where(Mill.company_id == effective_company_id).scalar_subquery()
+                trip_filter = [Trip.mill_id.in_(mill_sq2)]
+            else:
+                trip_filter = []
+
+            q_draft_trips = select(func.count()).select_from(Trip).where(
+                Trip.status == "draft", *trip_filter
+            )
+            trip_count = int((await db.execute(q_draft_trips)).scalar() or 0)
+            if trip_count > 0:
+                pending_actions.append({"label": "Dispatch trips to confirm", "count": trip_count, "route": "/lotrac"})
+
+            q_scope = [Lot.mill_id == effective_mill_id] if effective_mill_id else (
+                [Lot.mill_id.in_(select(Mill.id).where(Mill.company_id == effective_company_id).scalar_subquery())]
+                if effective_company_id else []
+            )
+            q_qual_pending = (
+                select(func.count())
+                .select_from(QualityTest)
+                .join(Lot, QualityTest.lot_id == Lot.id)
+                .where(QualityTest.status == "pending", *q_scope)
+            )
+            qual_count = int((await db.execute(q_qual_pending)).scalar() or 0)
+            if qual_count > 0:
+                pending_actions.append({"label": "Quality tests pending approval", "count": qual_count, "route": "/quality"})
+
+        except Exception as e:
+            logger.warning(f"dashboard pending_actions error: {e}")
+
+        out["pending_actions"] = pending_actions
+
+    # ── SCHEDULE ──────────────────────────────────────────────────────────────
+    if _want(role_code, "schedule"):
+        try:
+            shift_filter = [Shift.mill_id == effective_mill_id] if effective_mill_id else []
+            shift_result = await db.execute(
+                select(Shift).where(*shift_filter).order_by(Shift.start_time)
+            )
+            shifts = shift_result.scalars().all()
+
+            now_local = datetime.now(timezone.utc)
+            current_shift_name = ""
+            for s in shifts:
+                try:
+                    sh, sm = map(int, s.start_time.split(":"))
+                    eh, em = map(int, s.end_time.split(":"))
+                    h = now_local.hour
+                    if sh <= h < eh or (sh > eh and (h >= sh or h < eh)):
+                        current_shift_name = s.code
+                except Exception:
+                    pass
+
+            if shifts:
+                s0 = shifts[0]
+                out["schedule"] = {
+                    "current_shift": current_shift_name or (shifts[0].code if shifts else "A"),
+                    "shift_start": s0.start_time,
+                    "shift_end": s0.end_time,
+                }
+            else:
+                out["schedule"] = {
+                    "current_shift": "A",
+                    "shift_start": "06:00",
+                    "shift_end": "14:00",
+                }
+        except Exception as e:
+            logger.warning(f"dashboard schedule error: {e}")
+            out["schedule"] = {"current_shift": "A", "shift_start": "06:00", "shift_end": "14:00"}
+
+    # Also include legacy flat fields for backward compatibility with existing
+    # dashboard components that still read the old shape
+    try:
+        if "production" in out:
+            p = out["production"]
+            out["production_today"] = p["today_output_kg"]
+            out["production_target"] = p["today_target_kg"]
+            out["efficiency_today"] = p["efficiency_pct"]
+            out["waste_percent"] = p["waste_pct"]
+            out["production_trend"] = [
+                {"day": d["date"][-5:], "produced": d["output_kg"], "target": d["target_kg"]}
+                for d in p["last_7_days"]
+            ]
+
+        if "machines" in out:
+            m = out["machines"]
+            out["total_machines"] = m["total"]
+            out["active_machines"] = m["active"]
+
+        if "attendance" in out:
+            a = out["attendance"]
+            out["attendance_present"] = a["today_present"]
+            out["attendance_absent"] = a["today_absent"]
+            out["attendance_total"] = a["today_total"]
+            out["dept_attendance"] = [
+                {"dept": d["department"], "pct": round(d["present"] / (d["present"] + d["absent"]) * 100, 1)
+                 if (d["present"] + d["absent"]) > 0 else 0}
+                for d in a["by_department"]
+            ]
+
+        if "finance" in out:
+            f = out["finance"]
+            out["monthly_revenue"] = f["monthly_revenue"]
+            out["revenue_target"] = f["monthly_revenue"] * 1.1 or 3000000
+            out["pending_payments"] = f["outstanding"]
+            out["overdue_customers"] = f["overdue_count"]
+
+        out.setdefault("quality_rejection", 0)
+        out.setdefault("target_achievement", 0)
+        out.setdefault("active_breakdowns", 0)
+        out.setdefault("pending_dispatch", 0)
+        out.setdefault("total_employees", 0)
+        out.setdefault("stock_lots", 0)
+        out.setdefault("production_today", 0)
+        out.setdefault("production_target", 0)
+        out.setdefault("efficiency_today", 0)
+        out.setdefault("waste_percent", 0)
+        out.setdefault("production_trend", [])
+        out.setdefault("dept_attendance", [])
+        out.setdefault("total_machines", 0)
+        out.setdefault("active_machines", 0)
+        out.setdefault("attendance_present", 0)
+        out.setdefault("attendance_absent", 0)
+        out.setdefault("attendance_total", 0)
+        out.setdefault("monthly_revenue", 0)
+        out.setdefault("revenue_target", 3000000)
+        out.setdefault("pending_payments", 0)
+        out.setdefault("overdue_customers", 0)
+        out.setdefault("schedule", [])
+        out.setdefault("pending_actions", [])
+    except Exception as e:
+        logger.warning(f"dashboard compat fields error: {e}")
+
+    return out
