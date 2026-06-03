@@ -464,7 +464,7 @@ async def generate_invoice(
     db.add(invoice)
     await db.commit()
     await db.refresh(invoice)
-    await log_audit(db, current_user, "invoice_generated", f"Invoice {invoice_number} for {company.name}")
+    await log_audit(db, current_user.id, current_user.role or "UNKNOWN", "invoice_generated", "billing_invoice", invoice.id, f"Invoice {invoice_number} for {company.name}")
     return invoice
 
 
@@ -534,7 +534,7 @@ async def create_change_request(
     db.add(change_request)
     await db.commit()
     await db.refresh(change_request)
-    await log_audit(db, current_user, "change_request_created", f"{req.change_type} to {target_plan.name}")
+    await log_audit(db, current_user.id, current_user.role or "UNKNOWN", "change_request_created", "subscription_change_request", change_request.id, f"{req.change_type} to {target_plan.name}")
     return change_request
 
 
@@ -591,7 +591,7 @@ async def review_change_request(
 
     await db.commit()
     await db.refresh(change_request)
-    await log_audit(db, current_user, "change_request_reviewed", f"{req.status} plan change {request_id}")
+    await log_audit(db, current_user.id, current_user.role or "UNKNOWN", "change_request_reviewed", "subscription_change_request", request_id, f"{req.status} plan change {request_id}")
     return change_request
 
 
