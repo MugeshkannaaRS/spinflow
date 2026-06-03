@@ -30,7 +30,6 @@ class MachineResponse(BaseModel):
     amc_expiry: Optional[date] = None
     status: Optional[bool] = None
     current_status: Optional[str] = None
-    department: Optional[str] = None
     target_kg: float
 
     class Config:

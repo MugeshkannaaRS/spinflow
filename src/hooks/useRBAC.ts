@@ -7,21 +7,37 @@ const ROLE_MODULES: Record<string, string[]> = {
   MILL_OWNER: [
     "dashboard","production","quality","maintenance","hr","payroll",
     "purchase","stores","inventory","dispatch","lotrac","accounts",
-    "sales","masters","users","reports","column_config",
-    "whatsapp","lc_tracking","analytics"
+    "sales","masters","users","reports","column_config","stock",
+    "whatsapp","lc_tracking","analytics","uploads","audit"
   ],
   GENERAL_MANAGER: [
-    "dashboard","production","quality","maintenance","hr","payroll",
-    "purchase","stores","inventory","dispatch","accounts","sales",
-    "masters","reports","lotrac","lc_tracking","analytics"
+    "dashboard","production","quality","maintenance",
+    "stores","inventory","dispatch","purchase","lotrac",
+    "reports","stock","sales","analytics","lc_tracking","uploads",
+    "payroll","hr","accounts","audit","masters"
   ],
-  PRODUCTION_MANAGER: ["dashboard","production","quality","maintenance","reports"],
-  QUALITY_MANAGER: ["dashboard","quality","production","reports"],
-  DISPATCH_MANAGER: ["dashboard","dispatch","lotrac","stores","inventory","reports"],
-  STORE_MANAGER: ["dashboard","stores","inventory","purchase","maintenance","reports"],
-  HR_MANAGER: ["dashboard","hr","payroll","reports"],
-  ACCOUNTANT: ["dashboard","accounts","sales","payroll","purchase","reports","lc_tracking"],
-  MAINTENANCE_MANAGER: ["dashboard","maintenance","stores","reports"],
+  PRODUCTION_MANAGER: [
+    "dashboard","production","quality","maintenance",
+    "reports","analytics","uploads","inventory","stock"
+  ],
+  QUALITY_MANAGER: [
+    "dashboard","quality","production","reports","uploads",
+    "inventory","stock"
+  ],
+  DISPATCH_MANAGER: [
+    "dashboard","dispatch","lotrac","stores","inventory",
+    "reports","uploads","stock","sales"
+  ],
+  STORE_MANAGER: [
+    "dashboard","stores","inventory","purchase","maintenance",
+    "reports","stock","uploads"
+  ],
+  HR_MANAGER: ["dashboard","hr","payroll","reports","uploads"],
+  ACCOUNTANT: [
+    "dashboard","accounts","payroll","purchase","dispatch","sales",
+    "reports","lc_tracking","uploads"
+  ],
+  MAINTENANCE_MANAGER: ["dashboard","maintenance","stores","reports","uploads"],
   SUPERVISOR: ["dashboard","production","reports"],
   MACHINE_OPERATOR: ["dashboard"],
   SECURITY_GATE: ["dashboard"],
@@ -93,7 +109,7 @@ export function useRBAC() {
 
   function canAccess(module: string): boolean {
     if (isSuperAdmin) {
-      return ["dashboard","admin","column_config"].includes(module);
+      return true;
     }
 
     const dbKey = DB_MODULE_KEY_MAP[module] ?? module.replace(/-/g,"_");
@@ -106,6 +122,11 @@ export function useRBAC() {
     // Company module check
     if (modulesLoaded && companyModules !== null && companyModules !== undefined) {
       return companyModules[dbKey] === true;
+    }
+
+    // If modules loaded but companyModules is null (fetch error), fall through to role-based access
+    if (modulesLoaded && companyModules === null) {
+      return true;
     }
 
     return false;

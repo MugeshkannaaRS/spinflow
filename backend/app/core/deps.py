@@ -6,9 +6,8 @@ from app.core.security import decode_token
 from app.models.user import User
 from app.models.audit import AuditLog
 from app.models.masters import Mill
-from app.core.rbac import can_access, can_write
+from app.core.rbac import can_access, can_write, ROLE_MODULE_ACCESS
 from app.models.masters import CompanyModule
-from app.models.user import Role
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 import uuid
@@ -51,34 +50,6 @@ async def get_current_user(
     return user
 
 
-ROLE_MODULE_ACCESS = {
-    "MILL_OWNER": ["dashboard","production","quality","maintenance","hr",
-                   "payroll","purchase","stores","inventory","dispatch",
-                   "lotrac","accounts","sales","masters","users",
-                   "reports","column_config","whatsapp","lc_tracking",
-                   "analytics"],
-    "GENERAL_MANAGER": ["dashboard","production","quality","maintenance",
-                        "hr","payroll","purchase","stores","inventory",
-                        "dispatch","accounts","sales","masters","reports",
-                        "lotrac","lc_tracking","analytics"],
-    "PRODUCTION_MANAGER": ["dashboard","production","quality",
-                           "maintenance","reports","analytics"],
-    "QUALITY_MANAGER": ["dashboard","quality","production","reports"],
-    "DISPATCH_MANAGER": ["dashboard","dispatch","lotrac","stores",
-                         "inventory","reports"],
-    "STORE_MANAGER": ["dashboard","stores","inventory","purchase",
-                      "maintenance","reports"],
-    "HR_MANAGER": ["dashboard","hr","payroll","reports"],
-    "ACCOUNTANT": ["dashboard","accounts","sales","payroll","purchase",
-                   "reports","lc_tracking"],
-    "MAINTENANCE_MANAGER": ["dashboard","maintenance","stores","reports"],
-    "SUPERVISOR": ["dashboard","production","reports"],
-    "MACHINE_OPERATOR": ["dashboard"],
-    "SECURITY_GATE": ["dashboard"],
-    "AUDITOR": ["dashboard","production","quality","hr","accounts",
-                "reports"],
-}
-
 SYSTEM_MODULES = {"dashboard","masters","users","column_config","audit"}
 
 def require_module(module: str, write: bool = False):
@@ -86,11 +57,7 @@ def require_module(module: str, write: bool = False):
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> User:
-        role_result = await db.execute(
-            select(Role).where(Role.id == current_user.role_id)
-        )
-        role = role_result.scalar_one_or_none()
-        role_code = role.code if role else "MACHINE_OPERATOR"
+        role_code = current_user.role
 
         if role_code == "SUPER_ADMIN":
             return current_user

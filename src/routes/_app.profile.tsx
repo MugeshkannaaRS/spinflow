@@ -56,7 +56,7 @@ function ProfilePage() {
 
       <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-gray-100 dark:border-slate-700 shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-full bg-blue-600 flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
+          <div className="w-14 h-14 rounded-full bg-[#0d9488] flex items-center justify-center text-white text-xl font-bold flex-shrink-0">
             {user.name?.charAt(0)?.toUpperCase() ?? "U"}
           </div>
           <div>

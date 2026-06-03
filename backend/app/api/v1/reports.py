@@ -25,67 +25,87 @@ async def get_report_summary(
     current_user: User = Depends(require_module("reports")),
 ):
     scope = await get_mill_scope(current_user)
+    mill_id = scope.get("mill_id")
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     total_produced, total_target = 0, 0
     try:
-        prod_res = await db.execute(select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0)))
+        prod_stmt = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
+        if mill_id:
+            prod_stmt = prod_stmt.where(ProductionEntry.mill_id == mill_id)
+        prod_res = await db.execute(prod_stmt)
         total_produced = float(prod_res.scalar() or 0)
         tgt_res = await db.execute(select(func.coalesce(func.sum(Machine.target_kg), 0)))
         total_target = float(tgt_res.scalar() or 1)
     except Exception:
         pass
 
-    eff_res = await db.execute(
-        select(func.coalesce(func.avg(
-            ProductionEntry.produced_kg / func.nullif(Machine.target_kg, 0) * 100
-        ), 0))
-        .join(Machine, ProductionEntry.machine_code == Machine.code)
-    )
+    eff_stmt = select(func.coalesce(func.avg(
+        ProductionEntry.produced_kg / func.nullif(Machine.target_kg, 0) * 100
+    ), 0)).join(Machine, ProductionEntry.machine_code == Machine.code)
+    if mill_id:
+        eff_stmt = eff_stmt.where(ProductionEntry.mill_id == mill_id)
+    eff_res = await db.execute(eff_stmt)
     avg_eff = round(float(eff_res.scalar() or 0), 1)
 
-    waste_res = await db.execute(select(func.coalesce(func.sum(ProductionEntry.waste_kg), 0)))
+    waste_stmt = select(func.coalesce(func.sum(ProductionEntry.waste_kg), 0))
+    if mill_id:
+        waste_stmt = waste_stmt.where(ProductionEntry.mill_id == mill_id)
+    waste_res = await db.execute(waste_stmt)
     total_waste = float(waste_res.scalar() or 0)
     waste_pct = round(total_waste / total_produced * 100, 1) if total_produced > 0 else 0
 
-    total_tests = await db.execute(select(func.count()).select_from(QualityTest))
-    total_t = total_tests.scalar() or 1
-    pass_count = await db.execute(
-        select(func.count()).select_from(QualityTest).where(QualityTest.status == "pass")
-    )
-    total_pass = pass_count.scalar() or 0
+    total_tests_stmt = select(func.count()).select_from(QualityTest)
+    pass_count_stmt = select(func.count()).select_from(QualityTest).where(QualityTest.status == "pass")
+    if mill_id:
+        total_tests_stmt = total_tests_stmt.where(QualityTest.mill_id == mill_id)
+        pass_count_stmt = pass_count_stmt.where(QualityTest.mill_id == mill_id)
+    total_t = (await db.execute(total_tests_stmt)).scalar() or 1
+    total_pass = (await db.execute(pass_count_stmt)).scalar() or 0
 
-    pending = await db.execute(
-        select(func.count()).select_from(Dispatch).where(Dispatch.status == "pending")
-    )
-    dispatched = await db.execute(
-        select(func.count()).select_from(Dispatch).where(Dispatch.status.in_(["loaded", "gate-out"]))
-    )
-    delivered = await db.execute(
-        select(func.count()).select_from(Dispatch).where(Dispatch.status.in_(["dispatched", "delivered"]))
-    )
+    pending_stmt = select(func.count()).select_from(Dispatch).where(Dispatch.status == "pending")
+    dispatched_stmt = select(func.count()).select_from(Dispatch).where(Dispatch.status.in_(["loaded", "gate-out"]))
+    delivered_stmt = select(func.count()).select_from(Dispatch).where(Dispatch.status.in_(["dispatched", "delivered"]))
+    if mill_id:
+        pending_stmt = pending_stmt.where(Dispatch.mill_id == mill_id)
+        dispatched_stmt = dispatched_stmt.where(Dispatch.mill_id == mill_id)
+        delivered_stmt = delivered_stmt.where(Dispatch.mill_id == mill_id)
+    pending = (await db.execute(pending_stmt)).scalar() or 0
+    dispatched = (await db.execute(dispatched_stmt)).scalar() or 0
+    delivered_val = (await db.execute(delivered_stmt)).scalar() or 0
 
-    sales = await db.execute(
-        select(func.coalesce(func.sum(Invoice.total), 0)).where(Invoice.type == "sales")
-    )
-    purchases = await db.execute(
-        select(func.coalesce(func.sum(CottonPurchase.net_kg * CottonPurchase.rate_per_kg), 0))
-    )
-    gst = await db.execute(
-        select(func.coalesce(func.sum(Invoice.gst), 0)).where(Invoice.type == "sales")
-    )
+    sales_stmt = select(func.coalesce(func.sum(Invoice.total), 0)).where(Invoice.type == "sales")
+    gst_stmt = select(func.coalesce(func.sum(Invoice.gst), 0)).where(Invoice.type == "sales")
+    if mill_id:
+        sales_stmt = sales_stmt.where(Invoice.mill_id == mill_id)
+        gst_stmt = gst_stmt.where(Invoice.mill_id == mill_id)
+    sales = (await db.execute(sales_stmt)).scalar() or 0
+    gst = (await db.execute(gst_stmt)).scalar() or 0
 
-    total_employees = await db.execute(select(func.count()).select_from(Employee))
-    today_present = await db.execute(
-        select(func.count()).select_from(Attendance).where(
-            Attendance.date == today,
-            Attendance.status == "present",
-        )
+    purchases_stmt = select(func.coalesce(func.sum(CottonPurchase.net_kg * CottonPurchase.rate_per_kg), 0))
+    if mill_id:
+        purchases_stmt = purchases_stmt.where(CottonPurchase.mill_id == mill_id)
+    purchases = (await db.execute(purchases_stmt)).scalar() or 0
+
+    total_employees_stmt = select(func.count()).select_from(Employee)
+    if mill_id:
+        total_employees_stmt = total_employees_stmt.where(Employee.mill_id == mill_id)
+    total_employees = (await db.execute(total_employees_stmt)).scalar() or 0
+
+    present_stmt = select(func.count()).select_from(Attendance).where(
+        Attendance.date == today, Attendance.status == "present",
     )
-    pending_leaves = await db.execute(
-        select(func.count()).select_from(Leave).where(Leave.status == "pending")
-    )
+    leaves_stmt = select(func.count()).select_from(Leave).where(Leave.status == "pending")
+    if mill_id:
+        present_stmt = present_stmt.select_from(Attendance).join(
+            Employee, Attendance.employee_id == Employee.id
+        ).where(Employee.mill_id == mill_id)
+        leaves_stmt = leaves_stmt.select_from(Leave).join(
+            Employee, Leave.employee_id == Employee.id
+        ).where(Employee.mill_id == mill_id)
+    today_present = (await db.execute(present_stmt)).scalar() or 0
+    pending_leaves_val = (await db.execute(leaves_stmt)).scalar() or 0
 
     return {
         "production_summary": {
@@ -100,19 +120,19 @@ async def get_report_summary(
             "fail_rate": round(((total_t - total_pass) / total_t) * 100, 1) if total_t else 0,
         },
         "dispatch_summary": {
-            "pending": pending.scalar() or 0,
-            "in_transit": dispatched.scalar() or 0,
-            "delivered": delivered.scalar() or 0,
+            "pending": pending,
+            "in_transit": dispatched,
+            "delivered": delivered_val,
         },
         "financial_summary": {
-            "sales_total": float(sales.scalar() or 0),
-            "purchase_total": float(purchases.scalar() or 0),
-            "gst_collected": float(gst.scalar() or 0),
+            "sales_total": float(sales),
+            "purchase_total": float(purchases),
+            "gst_collected": float(gst),
         },
         "hr_summary": {
-            "total_employees": total_employees.scalar() or 0,
-            "present_today": today_present.scalar() or 0,
-            "pending_leaves": pending_leaves.scalar() or 0,
+            "total_employees": total_employees,
+            "present_today": today_present,
+            "pending_leaves": pending_leaves_val,
         },
         "stock_summary": {
             "total_lots": 0,
@@ -197,6 +217,7 @@ async def generate_production_report(
     current_user: User = Depends(require_module("reports")),
 ):
     scope = await get_mill_scope(current_user)
+    mill_id = scope.get("mill_id")
     query = select(
         ProductionEntry.date,
         ProductionEntry.shift,
@@ -210,6 +231,8 @@ async def generate_production_report(
         ProductionEntry.date >= date_from,
         ProductionEntry.date <= date_to,
     )
+    if mill_id:
+        query = query.where(ProductionEntry.mill_id == mill_id)
     if department:
         query = query.where(ProductionEntry.department == department)
     query = query.order_by(ProductionEntry.date, ProductionEntry.shift)

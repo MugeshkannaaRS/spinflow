@@ -3,8 +3,6 @@ import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { useAuth } from "@/stores/auth";
-import { MODULE_ACCESS } from "@/lib/rbac";
-
 vi.mock("@/stores/auth", () => ({
   useAuth: vi.fn(() => ({
     user: {

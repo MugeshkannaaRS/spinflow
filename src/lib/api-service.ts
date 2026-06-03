@@ -47,6 +47,7 @@ export const productionApi = {
   getMachines: (params?: Record<string, any>) =>
     api.get("/production/machines", { params }).then((r: any) => extractList(r.data)),
   createMachine: (data: any) => api.post("/production/machines", data).then((r) => r.data),
+  updateMachine: (id: string, data: any) => api.put(`/production/machines/${id}`, data).then((r) => r.data),
   getEntries: () => api.get("/production/entries").then((r: any) => extractList(r.data)),
   createEntry: (data: any) => api.post("/production/entries", data).then((r) => r.data),
   createBulkEntries: (data: any) => api.post("/production/entries/bulk", data).then((r) => r.data),

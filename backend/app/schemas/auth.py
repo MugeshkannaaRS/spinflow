@@ -97,6 +97,7 @@ class UserCreateRequest(BaseModel):
     mill_id: Optional[str] = None
     mill_name: Optional[str] = None
     phone: Optional[str] = None
+    company_id: Optional[str] = None
 
 
 class UserUpdateRequest(BaseModel):

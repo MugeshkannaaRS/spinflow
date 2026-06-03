@@ -73,21 +73,35 @@ export const useAuth = create<AuthState>()(
     }),
     {
       name: "spinflow-auth",
+      partialize: (state) => ({
+        user: state.user,
+        token: state.token,
+        isAuthenticated: state.isAuthenticated,
+        activeMill: state.activeMill,
+      }),
+      merge: (persisted: unknown, current) => {
+        const p = persisted as Record<string, unknown> | null;
+        if (!p) return current;
+        return {
+          ...current,
+          ...p,
+          refreshToken: null,
+        };
+      },
       migrate: (persisted: unknown) => {
         const p = persisted as Record<string, unknown> | null;
         if (!p) return initialState;
-        // Handle old store shape that had a nested `data` object
         if (p.data && typeof p.data === "object") {
           const d = p.data as Record<string, unknown>;
           return {
             ...initialState,
             token: (p.token as string | null) ?? null,
-            refreshToken: (p.refreshToken as string | null) ?? null,
+            refreshToken: null,
           };
         }
-        return p;
+        return { ...initialState, ...p, refreshToken: null };
       },
-      version: 2,
+      version: 3,
     },
   ),
 );

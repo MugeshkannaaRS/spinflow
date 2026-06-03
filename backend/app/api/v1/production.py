@@ -19,6 +19,7 @@ from app.schemas.production import (
 from app.services.production_service import ProductionService
 
 router = APIRouter()
+MAX_BATCH = 500
 
 
 @router.get("/production/machines")
@@ -227,6 +228,8 @@ async def create_entries_bulk(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production", write=True)),
 ):
+    if len(req.entries) > MAX_BATCH:
+        raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     svc = ProductionService(db, current_user)
     return await svc.create_entries_bulk(req)
 
@@ -324,6 +327,17 @@ async def resolve_downtime(
 ):
     svc = ProductionService(db, current_user)
     return await svc.resolve_downtime(downtime_id)
+
+
+@router.put("/production/machines/{machine_id}", response_model=MachineResponse)
+async def update_machine(
+    machine_id: str,
+    req: MachineCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    svc = ProductionService(db, current_user)
+    return await svc.update_machine(machine_id, req.model_dump(exclude_unset=True))
 
 
 @router.patch("/production/machines/{machine_id}/status", response_model=MachineResponse)

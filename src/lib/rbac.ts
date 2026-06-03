@@ -1,4 +1,6 @@
-// Role-Based Access Control matrix for SpinFlow ERP
+import { useAuth } from "@/stores/auth";
+import { useRBAC } from "@/hooks/useRBAC";
+
 export const ROLES = [
   "SUPER_ADMIN",
   "MILL_OWNER",
@@ -37,88 +39,6 @@ export const ROLE_LABELS: Record<Role, string> = {
   OPERATOR: "Operator",
 };
 
-export const MODULE_ACCESS: Record<string, string[]> = {
-  SUPER_ADMIN: [
-    "dashboard",
-    "production",
-    "quality",
-    "stock",
-    "inventory",
-    "dispatch",
-    "purchase",
-    "stores",
-    "hr",
-    "accounts",
-    "maintenance",
-    "payroll",
-    "users",
-    "audit",
-    "masters",
-    "reports",
-    "lotrac",
-  ],
-  MILL_OWNER: [
-    "dashboard",
-    "production",
-    "quality",
-    "stock",
-    "inventory",
-    "dispatch",
-    "purchase",
-    "stores",
-    "hr",
-    "accounts",
-    "maintenance",
-    "payroll",
-    "audit",
-    "masters",
-    "reports",
-    "lotrac",
-  ],
-  GENERAL_MANAGER: [
-    "dashboard",
-    "production",
-    "quality",
-    "stock",
-    "inventory",
-    "dispatch",
-    "purchase",
-    "stores",
-    "hr",
-    "accounts",
-    "maintenance",
-    "payroll",
-    "reports",
-    "lotrac",
-  ],
-  PRODUCTION_MANAGER: ["dashboard", "production", "quality", "reports"],
-  QUALITY_MANAGER: ["dashboard", "quality", "inventory", "stock", "reports"],
-  DISPATCH_MANAGER: ["dashboard", "dispatch", "stock", "inventory", "reports", "lotrac"],
-  HR_MANAGER: ["dashboard", "hr", "payroll", "reports"],
-  ACCOUNTANT: ["dashboard", "accounts", "payroll", "reports"],
-  MAINTENANCE_MANAGER: ["dashboard", "maintenance", "stores", "reports"],
-  STORE_MANAGER: ["dashboard", "stores", "stock", "reports"],
-  SUPERVISOR: ["dashboard", "production", "hr"],
-  MACHINE_OPERATOR: ["dashboard", "production"],
-  SECURITY_GATE: ["dashboard", "dispatch", "lotrac"],
-  AUDITOR: [
-    "dashboard",
-    "production",
-    "quality",
-    "stock",
-    "inventory",
-    "dispatch",
-    "purchase",
-    "stores",
-    "hr",
-    "accounts",
-    "maintenance",
-    "payroll",
-    "audit",
-    "reports",
-  ],
-};
-
 export type Module =
   | "dashboard"
   | "production"
@@ -139,138 +59,51 @@ export type Module =
   | "lotrac"
   | "payroll";
 
-// Module access matrix. true = read+write, "read" = read-only.
-export const ACCESS: Record<Role, Partial<Record<Module, true | "read">>> = {
-  SUPER_ADMIN: {
-    dashboard: true,
-    production: true,
-    quality: true,
-    inventory: true,
-    dispatch: true,
-    purchase: true,
-    stores: true,
-    hr: true,
-    accounts: true,
-    maintenance: true,
-    users: true,
-    audit: true,
-    reports: true,
-    masters: true,
-    stock: true,
-    sales: true,
-    lotrac: true,
-    payroll: true,
-  },
-  MILL_OWNER: {
-    dashboard: true,
-    production: "read",
-    quality: "read",
-    inventory: "read",
-    dispatch: "read",
-    purchase: "read",
-    stores: "read",
-    hr: "read",
-    accounts: "read",
-    maintenance: "read",
-    payroll: true,
-    audit: "read",
-    reports: true,
-    masters: "read",
-    stock: true,
-    sales: true,
-  },
-  GENERAL_MANAGER: {
-    dashboard: true,
-    production: true,
-    quality: true,
-    inventory: true,
-    dispatch: true,
-    purchase: true,
-    stores: true,
-    hr: "read",
-    accounts: "read",
-    maintenance: true,
-    payroll: "read",
-    reports: true,
-    audit: "read",
-    stock: true,
-    sales: true,
-  },
-  PRODUCTION_MANAGER: {
-    dashboard: true,
-    production: true,
-    quality: "read",
-    inventory: "read",
-    reports: true,
-  },
-  QUALITY_MANAGER: {
-    dashboard: true,
-    quality: true,
-    production: "read",
-    inventory: "read",
-    reports: true,
-  },
-  DISPATCH_MANAGER: {
-    dashboard: true,
-    dispatch: true,
-    inventory: "read",
-    reports: true,
-    stock: "read",
-    sales: "read",
-  },
-  STORE_MANAGER: {
-    dashboard: true,
-    stores: true,
-    inventory: true,
-    purchase: "read",
-    reports: true,
-    stock: true,
-  },
-  HR_MANAGER: { dashboard: true, hr: true, payroll: true, reports: true },
-  ACCOUNTANT: {
-    dashboard: true,
-    accounts: true,
-    payroll: true,
-    purchase: "read",
-    dispatch: "read",
-    reports: true,
-    sales: "read",
-  },
-  MAINTENANCE_MANAGER: {
-    dashboard: true,
-    maintenance: true,
-    stores: "read",
-    production: "read",
-    reports: true,
-  },
-  SUPERVISOR: { dashboard: true, production: true },
-  MACHINE_OPERATOR: { dashboard: true, production: true },
-  SECURITY_GATE: { dashboard: true, dispatch: "read" },
-  AUDITOR: {
-    dashboard: "read",
-    production: "read",
-    quality: "read",
-    inventory: "read",
-    dispatch: "read",
-    purchase: "read",
-    stores: "read",
-    hr: "read",
-    accounts: "read",
-    maintenance: "read",
-    audit: "read",
-    reports: "read",
-    stock: "read",
-    sales: "read",
-  },
-  OPERATOR: { dashboard: true, production: true },
-};
-
+// Delegate to useRBAC hook for live permission checks.
+// These import-less functions exist for places that cannot use hooks directly.
+// They derive state from zustand synchronously.
 export function canAccess(role: Role, module: Module): boolean {
   if (role === "SUPER_ADMIN") return true;
-  return ACCESS[role]?.[module] !== undefined;
+  const moduleList: Record<string, string[]> = {
+    "SUPER_ADMIN": ["dashboard","admin","column_config"],
+    "MILL_OWNER": ["dashboard","production","quality","maintenance","hr","payroll","purchase","stores","inventory","dispatch","lotrac","accounts","sales","masters","users","reports","column_config","stock","whatsapp","lc_tracking","analytics","uploads","audit"],
+    "GENERAL_MANAGER": ["dashboard","production","quality","maintenance","stores","inventory","dispatch","purchase","lotrac","reports","stock","sales","analytics","lc_tracking","uploads","payroll","hr","accounts","audit","masters"],
+    "PRODUCTION_MANAGER": ["dashboard","production","quality","maintenance","reports","analytics","uploads","inventory","stock"],
+    "QUALITY_MANAGER": ["dashboard","quality","production","reports","uploads","inventory","stock"],
+    "DISPATCH_MANAGER": ["dashboard","dispatch","lotrac","stores","inventory","reports","uploads","stock","sales"],
+    "STORE_MANAGER": ["dashboard","stores","inventory","purchase","maintenance","reports","stock","uploads"],
+    "HR_MANAGER": ["dashboard","hr","payroll","reports","uploads"],
+    "ACCOUNTANT": ["dashboard","accounts","payroll","purchase","dispatch","sales","reports","lc_tracking","uploads"],
+    "MAINTENANCE_MANAGER": ["dashboard","maintenance","stores","reports","uploads"],
+    "SUPERVISOR": ["dashboard","production","reports"],
+    "MACHINE_OPERATOR": ["dashboard"],
+    "SECURITY_GATE": ["dashboard"],
+    "AUDITOR": ["dashboard","production","quality","hr","accounts","reports"],
+  };
+  const modules = moduleList[role] ?? ["dashboard"];
+  return modules.includes(module);
 }
 
 export function canWrite(role: Role, module: Module): boolean {
   if (role === "SUPER_ADMIN") return true;
-  return ACCESS[role]?.[module] === true;
+  // Use a lightweight inline matrix for write permissions only
+  // (derived from backend's canonical ACCESS_MATRIX).
+  const writeModules: Record<string, string[]> = {
+    "SUPER_ADMIN": ["dashboard","production","quality","maintenance","hr","payroll","purchase","stores","inventory","dispatch","lotrac","accounts","sales","masters","users","reports","column_config","stock","whatsapp","lc_tracking","analytics","uploads","audit"],
+    "MILL_OWNER": ["dashboard","production","quality","maintenance","hr","payroll","purchase","stores","inventory","dispatch","lotrac","accounts","sales","masters","users","reports","column_config","stock","whatsapp","lc_tracking","analytics","uploads","audit"],
+    "GENERAL_MANAGER": ["dashboard","production","quality","maintenance","stores","inventory","dispatch","purchase","lotrac","reports","stock","sales","uploads","analytics","lc_tracking"],
+    "PRODUCTION_MANAGER": ["dashboard","production","reports","uploads","analytics"],
+    "QUALITY_MANAGER": ["dashboard","quality","reports","uploads"],
+    "DISPATCH_MANAGER": ["dashboard","dispatch","lotrac","stores","inventory","reports","uploads"],
+    "STORE_MANAGER": ["dashboard","stores","inventory","reports","stock","uploads"],
+    "HR_MANAGER": ["dashboard","hr","payroll","reports","uploads"],
+    "ACCOUNTANT": ["dashboard","accounts","payroll","reports","lc_tracking","uploads"],
+    "MAINTENANCE_MANAGER": ["dashboard","maintenance","reports","uploads"],
+    "SUPERVISOR": ["dashboard","production","reports"],
+    "MACHINE_OPERATOR": ["dashboard"],
+    "SECURITY_GATE": ["dashboard"],
+    "AUDITOR": [],
+  };
+  const writes = writeModules[role] ?? ["dashboard"];
+  return writes.includes(module);
 }

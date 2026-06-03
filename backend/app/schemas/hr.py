@@ -211,7 +211,6 @@ class AttendanceOut(BaseModel):
     check_in: Optional[str] = None
     check_out: Optional[str] = None
     overtime_hours: Optional[float] = None
-    marked_by: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:

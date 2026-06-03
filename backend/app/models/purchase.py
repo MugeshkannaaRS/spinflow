@@ -8,6 +8,7 @@ class Supplier(TimestampMixin, Base):
     __tablename__ = "suppliers"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     contact_person: Mapped[str] = mapped_column(String(200), nullable=True)
@@ -16,7 +17,7 @@ class Supplier(TimestampMixin, Base):
     address: Mapped[str] = mapped_column(Text, nullable=True)
     city: Mapped[str] = mapped_column(String(100), nullable=True)
     state: Mapped[str] = mapped_column(String(100), nullable=True)
-    gstin: Mapped[str] = mapped_column(String(15), nullable=True)
+    gstin: Mapped[str] = mapped_column(String(20), nullable=True)
     grade: Mapped[str] = mapped_column(String(10), nullable=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
 

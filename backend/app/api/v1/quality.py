@@ -25,6 +25,9 @@ class QualityTestBulkRequest(BaseModel):
     items: List[Dict[str, Any]]
 
 
+MAX_BATCH = 500
+
+
 # Performance indexes (run on database):
 #   CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_quality_tests_lot_date_status
 #     ON quality_tests (lot_id, date, status);
@@ -123,6 +126,8 @@ async def bulk_create_tests(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality", write=True)),
 ):
+    if len(req.items) > MAX_BATCH:
+        raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     scope = await get_mill_scope(current_user)
     created = 0
     skipped = 0
@@ -278,6 +283,8 @@ async def csp_trend(
 @router.get("/quality/approvals")
 async def list_approvals(
     mill_id: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):
@@ -298,25 +305,45 @@ async def list_approvals(
             if mill_check.scalar_one_or_none():
                 effective_mill_id = mill_id
 
-    stmt = select(QualityApproval).join(Lot, QualityApproval.lot_id == Lot.id).order_by(QualityApproval.created_at.desc())
+    base = select(QualityApproval).join(Lot, QualityApproval.lot_id == Lot.id)
     if effective_mill_id:
-        stmt = stmt.where(Lot.mill_id == effective_mill_id)
+        base = base.where(Lot.mill_id == effective_mill_id)
     elif scope["company_id"]:
-        stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+        base = base.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+
+    count_stmt = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    stmt = base.order_by(QualityApproval.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     try:
         result = await db.execute(stmt)
         approvals = result.scalars().all()
     except Exception as e:
         logger.error(f"quality.approvals list error: {e}")
-        return []
+        return {"items": [], "total": 0, "page": page, "page_size": page_size}
+
+    # Batch-fetch latest LabReport per lot_id
+    lot_ids = list({a.lot_id for a in approvals if a.lot_id})
+    reports_by_lot: dict[str, LabReport | None] = {}
+    if lot_ids:
+        from sqlalchemy import desc as sa_desc
+        latest_sub = (
+            select(LabReport.lot_id, func.max(LabReport.created_at).label("max_created"))
+            .where(LabReport.lot_id.in_(lot_ids))
+            .group_by(LabReport.lot_id)
+        ).subquery()
+        report_result = await db.execute(
+            select(LabReport).join(
+                latest_sub,
+                (LabReport.lot_id == latest_sub.c.lot_id) & (LabReport.created_at == latest_sub.c.max_created),
+            )
+        )
+        for r in report_result.scalars().all():
+            reports_by_lot[r.lot_id] = r
 
     out = []
     for a in approvals:
-        report_result = await db.execute(
-            select(LabReport).where(LabReport.lot_id == a.lot_id).order_by(LabReport.created_at.desc()).limit(1)
-        )
-        report = report_result.scalar_one_or_none()
-
+        report = reports_by_lot.get(a.lot_id)
         out.append({
             "id": a.id,
             "lotNo": a.lot_no,
@@ -331,7 +358,7 @@ async def list_approvals(
             "approvedBy": a.approved_by or "",
             "approvedAt": a.approved_at.isoformat() if a.approved_at else "",
         })
-    return out
+    return {"items": out, "total": total, "page": page, "page_size": page_size}
 
 
 @router.post("/quality/approvals/action")
@@ -383,12 +410,11 @@ async def approve_or_reject_approval(
 @router.get("/quality/rejections")
 async def list_rejections(
     mill_id: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):
-    from app.models.quality import QualityTest
-    from sqlalchemy import select
-
     scope = await get_mill_scope(current_user)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
@@ -406,17 +432,22 @@ async def list_rejections(
             if mill_check.scalar_one_or_none():
                 effective_mill_id = mill_id
 
-    stmt = select(QualityTest).join(Lot, QualityTest.lot_id == Lot.id).where(QualityTest.status == "fail").order_by(QualityTest.created_at.desc())
+    base = select(QualityTest).join(Lot, QualityTest.lot_id == Lot.id).where(QualityTest.status == "fail")
     if effective_mill_id:
-        stmt = stmt.where(Lot.mill_id == effective_mill_id)
+        base = base.where(Lot.mill_id == effective_mill_id)
     elif scope["company_id"]:
-        stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+        base = base.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+
+    count_stmt = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    stmt = base.order_by(QualityTest.created_at.desc()).offset((page - 1) * page_size).limit(page_size)
     try:
         result = await db.execute(stmt)
         tests = result.scalars().all()
     except Exception as e:
         logger.error(f"quality.rejections list error: {e}")
-        return []
+        return {"items": [], "total": 0, "page": page, "page_size": page_size}
 
     out = []
     for t in tests:
@@ -430,4 +461,4 @@ async def list_rejections(
             "disposition": "rework",
             "notedBy": t.tested_by or "",
         })
-    return out
+    return {"items": out, "total": total, "page": page, "page_size": page_size}

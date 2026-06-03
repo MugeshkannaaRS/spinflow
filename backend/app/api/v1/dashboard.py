@@ -632,12 +632,23 @@ async def get_dashboard_summary(
         try:
             trend = []
             week_ago_dt = today - timedelta(days=6)
+            trend_q = (
+                select(ProductionEntry.date, func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
+                .join(Machine, ProductionEntry.machine_code == Machine.code)
+                .where(
+                    Machine.mill_id == effective_mill_id,
+                    ProductionEntry.date >= week_ago_dt.isoformat(),
+                    ProductionEntry.date <= today.isoformat(),
+                    ProductionEntry.status == "approved",
+                )
+                .group_by(ProductionEntry.date)
+            )
+            trend_by_date: dict[str, float] = {}
+            for row in (await db.execute(trend_q)).all():
+                trend_by_date[row[0]] = float(row[1])
             for i in range(7):
                 d = week_ago_dt + timedelta(days=i)
-                q = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
-                q = q.join(Machine, ProductionEntry.machine_code == Machine.code)
-                q = q.where(Machine.mill_id == effective_mill_id, ProductionEntry.date == d.isoformat(), ProductionEntry.status == "approved")
-                produced = float((await db.execute(q)).scalar() or 0)
+                produced = trend_by_date.get(d.isoformat(), 0.0)
                 trend.append({"day": d.strftime("%a"), "produced": produced, "target": 5000})
             results["production_trend"] = trend
         except Exception:
@@ -646,7 +657,23 @@ async def get_dashboard_summary(
         # ── Department attendance ──
         try:
             dept_data = []
-            dept_result = await db.execute(
+            dept_present_q = (
+                select(Employee.department, func.count(Attendance.id))
+                .where(
+                    Attendance.employee_id == Employee.id,
+                    Employee.mill_id == effective_mill_id,
+                    Employee.is_active == True,
+                    Employee.department.isnot(None),
+                    Attendance.date == today.isoformat(),
+                    Attendance.status == "present",
+                )
+                .group_by(Employee.department)
+            )
+            present_by_dept: dict[str, int] = {}
+            for row in (await db.execute(dept_present_q)).all():
+                present_by_dept[row[0]] = int(row[1])
+
+            dept_count_q = (
                 select(Employee.department, func.count(Employee.id))
                 .where(
                     Employee.mill_id == effective_mill_id,
@@ -655,17 +682,9 @@ async def get_dashboard_summary(
                 )
                 .group_by(Employee.department)
             )
-            for dept_name, emp_count in dept_result.all():
+            for dept_name, emp_count in (await db.execute(dept_count_q)).all():
                 if dept_name and emp_count > 0:
-                    present_q = select(func.count(Attendance.id))
-                    present_q = present_q.where(
-                        Attendance.employee_id == Employee.id,
-                        Employee.mill_id == effective_mill_id,
-                        Employee.department == dept_name,
-                        Attendance.date == today.isoformat(),
-                        Attendance.status == "present",
-                    )
-                    present_count = int((await db.execute(present_q)).scalar() or 0)
+                    present_count = present_by_dept.get(dept_name, 0)
                     pct = round((present_count / emp_count) * 100, 1) if emp_count > 0 else 0
                     dept_data.append({"dept": dept_name, "pct": pct})
             results["dept_attendance"] = dept_data

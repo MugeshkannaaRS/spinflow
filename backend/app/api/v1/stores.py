@@ -23,6 +23,7 @@ class SpareBulkRequest(BaseModel):
     items: List[Dict[str, Any]]
 
 router = APIRouter()
+MAX_BATCH = 500
 
 
 @router.get("/stores/spares")
@@ -104,6 +105,8 @@ async def bulk_create_spares(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores", write=True)),
 ):
+    if len(req.items) > MAX_BATCH:
+        raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     scope = await get_mill_scope(current_user)
     mill_id = scope.get("mill_id") or current_user.mill_id
     created = 0
@@ -117,7 +120,7 @@ async def bulk_create_spares(
                 skipped += 1
                 errors.append(f"Row {i + 1}: missing item_code or name")
                 continue
-            existing = await db.execute(select(Spare).where(Spare.code == code))
+            existing = await db.execute(select(Spare).where(Spare.code == code, Spare.mill_id == mill_id))
             if existing.scalar_one_or_none():
                 skipped += 1
                 continue

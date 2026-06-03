@@ -1,12 +1,13 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from typing import List, Optional
 from pydantic import BaseModel
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, get_mill_scope
+from app.core.deps import get_current_user, get_mill_scope, require_module, log_audit
+from app.core.limiter import limiter
 from app.models.user import User
 from app.models.import_mapping import ImportMapping
 
@@ -30,7 +31,7 @@ async def get_import_mappings(
     table: str = Query(...),
     mill_id: str = Query(...),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_module("masters")),
 ):
     scope = await get_mill_scope(current_user)
     if scope["mill_id"] and scope["mill_id"] != mill_id:
@@ -67,10 +68,12 @@ async def get_import_mappings(
         return []
 
 @router.post("/import/mappings")
+@limiter.limit("10/minute")
 async def save_import_mappings(
+    request: Request,
     req: SaveMappingsRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_module("masters", write=True)),
 ):
     scope = await get_mill_scope(current_user)
     if scope["mill_id"] and scope["mill_id"] != req.mill_id:
@@ -102,7 +105,10 @@ async def save_import_mappings(
             db.add(mapping)
             count += 1
 
-        await db.flush()
+        await db.commit()
+        role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+        client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "0.0.0.0").split(",")[0].strip()
+        await log_audit(db, current_user.id, role_code, "import_mappings", "import", req.mill_id, f"Saved {count} import mappings for {req.table_name}", ip_address=client_ip)
         return {"saved": count, "mill_id": req.mill_id, "table_name": req.table_name}
     except Exception as e:
         logger.error(f"Error saving import mappings: {e}", exc_info=True)

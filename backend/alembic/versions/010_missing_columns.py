@@ -17,23 +17,32 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("spares", sa.Column("mill_id", sa.String(36), sa.ForeignKey("mills.id"), nullable=True))
-    op.create_index("ix_spares_mill_id", "spares", ["mill_id"])
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing_tables = inspector.get_table_names()
 
-    op.add_column("spare_issues", sa.Column("mill_id", sa.String(36), sa.ForeignKey("mills.id"), nullable=True))
-    op.create_index("ix_spare_issues_mill_id", "spare_issues", ["mill_id"])
+    existing_spares_cols = [c["name"] for c in inspector.get_columns("spares")]
+    if "mill_id" not in existing_spares_cols:
+        op.add_column("spares", sa.Column("mill_id", sa.String(36), sa.ForeignKey("mills.id"), nullable=True))
+        op.create_index("ix_spares_mill_id", "spares", ["mill_id"])
 
-    op.create_table(
-        "machine_parameters",
-        sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("machine_code", sa.String(50), nullable=False, index=True),
-        sa.Column("parameter_name", sa.String(200), nullable=False),
-        sa.Column("standard_value", sa.String(100), nullable=True),
-        sa.Column("min_value", sa.String(100), nullable=True),
-        sa.Column("max_value", sa.String(100), nullable=True),
-        sa.Column("unit", sa.String(50), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
-    )
+    existing_spare_issues_cols = [c["name"] for c in inspector.get_columns("spare_issues")]
+    if "mill_id" not in existing_spare_issues_cols:
+        op.add_column("spare_issues", sa.Column("mill_id", sa.String(36), sa.ForeignKey("mills.id"), nullable=True))
+        op.create_index("ix_spare_issues_mill_id", "spare_issues", ["mill_id"])
+
+    if "machine_parameters" not in existing_tables:
+        op.create_table(
+            "machine_parameters",
+            sa.Column("id", sa.String(36), primary_key=True),
+            sa.Column("machine_code", sa.String(50), nullable=False, index=True),
+            sa.Column("parameter_name", sa.String(200), nullable=False),
+            sa.Column("standard_value", sa.String(100), nullable=True),
+            sa.Column("min_value", sa.String(100), nullable=True),
+            sa.Column("max_value", sa.String(100), nullable=True),
+            sa.Column("unit", sa.String(50), nullable=True),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
+        )
 
 
 def downgrade() -> None:

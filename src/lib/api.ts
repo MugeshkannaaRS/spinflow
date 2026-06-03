@@ -9,6 +9,7 @@ export const api = axios.create({
   baseURL: API_BASE ? `${API_BASE}/api/v1` : "/api/v1",
   timeout: 60000,
   headers: { "Content-Type": "application/json" },
+  withCredentials: true,
 });
 
 let slowToastId: string | number | null = null;
@@ -54,15 +55,28 @@ api.interceptors.response.use(
 
       if (!url.includes("/auth/")) {
         const { refreshToken, logout } = useAuth.getState();
-        if (refreshToken && error.config && !error.config._retry) {
+        if (error.config && !error.config._retry) {
           error.config._retry = true;
           try {
-            const res = await api.post("/auth/refresh", { refresh_token: refreshToken });
+            const res = await api.post("/auth/refresh");
             const { access_token, refresh_token } = res.data;
             useAuth.getState().setTokens(access_token, refresh_token);
             error.config.headers.Authorization = `Bearer ${access_token}`;
             return api(error.config);
           } catch {
+            if (refreshToken) {
+              try {
+                const res = await api.post("/auth/refresh", { refresh_token: refreshToken });
+                const { access_token, refresh_token } = res.data;
+                useAuth.getState().setTokens(access_token, refresh_token);
+                error.config.headers.Authorization = `Bearer ${access_token}`;
+                return api(error.config);
+              } catch {
+                logout();
+                window.location.href = "/login";
+                return Promise.reject(error);
+              }
+            }
             logout();
             window.location.href = "/login";
             return Promise.reject(error);

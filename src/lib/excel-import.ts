@@ -109,8 +109,28 @@ export function parseExcelDate(value: any): string | null {
     return d.toISOString().split("T")[0];
   }
   if (typeof value === "string") {
-    const d = new Date(value);
-    if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+    const dmY = /^(\d{2})\/(\d{2})\/(\d{4})$/
+    const yMd = /^(\d{4})-(\d{2})-(\d{2})$/
+    const dmYMatch = value.match(dmY)
+    if (dmYMatch) return `${dmYMatch[3]}-${dmYMatch[2].padStart(2, "0")}-${dmYMatch[1].padStart(2, "0")}`
+    if (value.match(yMd)) return value
+  }
+  return null;
+}
+
+export function isValidNumericString(value: any): boolean {
+  if (value === null || value === undefined || value === "") return false;
+  if (typeof value === "number") return !isNaN(value);
+  if (typeof value === "string") {
+    return /^-?\d+(\.\d+)?$/.test(value.trim());
+  }
+  return false;
+}
+
+export function validateDateString(value: any): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().split("T")[0];
+  if (typeof value === "string") {
     const dmY = /^(\d{2})\/(\d{2})\/(\d{4})$/
     const yMd = /^(\d{4})-(\d{2})-(\d{2})$/
     const dmYMatch = value.match(dmY)

@@ -1777,16 +1777,24 @@ function MachineForm({ item, departments }: { item?: MasterMachine; departments:
   const createM = useMutation({
     mutationFn: () => productionApi.createMachine(form),
     onSuccess: () => {
-      toast.success(item ? "Machine updated" : "Machine created");
+      toast.success("Machine created");
       qc.invalidateQueries({ queryKey: ["masters", "machines"] });
     },
+  });
+  const updateM = useMutation({
+    mutationFn: () => productionApi.updateMachine(item!.id, form),
+    onSuccess: () => {
+      toast.success("Machine updated");
+      qc.invalidateQueries({ queryKey: ["masters", "machines"] });
+    },
+    onError: () => toast.error("Failed to update machine"),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
     if (!isComplete) return;
-    createM.mutate();
+    (item ? updateM : createM).mutate();
   };
 
   return (

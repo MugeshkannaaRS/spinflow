@@ -20,6 +20,7 @@ from app.schemas.maintenance import (
 )
 
 router = APIRouter()
+MAX_BATCH = 500
 
 
 @router.get("/maintenance/tasks")
@@ -209,6 +210,8 @@ async def bulk_create_schedules(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
+    if len(req.items) > MAX_BATCH:
+        raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     scope = await get_mill_scope(current_user)
     created = 0
     skipped = 0
@@ -331,6 +334,8 @@ async def bulk_create_parameters(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
+    if len(req.items) > MAX_BATCH:
+        raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     scope = await get_mill_scope(current_user)
     created = 0
     skipped = 0

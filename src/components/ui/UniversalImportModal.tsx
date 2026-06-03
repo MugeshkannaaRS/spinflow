@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import {
   fuzzyMatchColumns, parseExcelDate, filterBlankRows, generateImportTemplate,
+  isValidNumericString, validateDateString,
   FIELD_ALIASES,
   type ImportMapping,
 } from "@/lib/excel-import";
@@ -333,11 +334,10 @@ export function UniversalImportModal({
 
         if (colCfg) {
           if (colCfg.type === "date") {
-            value = parseExcelDate(value);
+            value = validateDateString(value) ?? value;
           }
           if (colCfg.type === "number" && typeof value === "string" && value) {
-            const parsed = parseFloat(value);
-            value = isNaN(parsed) ? value : parsed;
+            value = isValidNumericString(value) ? parseFloat(value) : value;
           }
           if (colCfg.type === "boolean") {
             if (typeof value === "string") {
@@ -474,10 +474,20 @@ export function UniversalImportModal({
       const errors: string[] = [];
       const warnings: string[] = [];
       for (const c of colConfigs) {
+        const val = record[c.key];
         if (c.isRequired) {
-          const val = record[c.key];
           if (val === undefined || val === null || val === "") {
             errors.push(`${c.label} is required`);
+          }
+        }
+        if (c.type === "number" && typeof val === "string" && val !== "") {
+          if (!isValidNumericString(val)) {
+            errors.push(`${c.label}: '${val}' is not a valid number`);
+          }
+        }
+        if (c.type === "date" && typeof val === "string" && val !== "") {
+          if (!validateDateString(val)) {
+            errors.push(`${c.label}: '${val}' is not a valid date (use YYYY-MM-DD or DD/MM/YYYY)`);
           }
         }
       }
@@ -504,6 +514,19 @@ export function UniversalImportModal({
       code: "item_code",
       stock: "current_stock",
       min_stock: "reorder_level",
+    },
+    production_entries: {
+    },
+    quality_tests: {
+    },
+    maintenance_schedules: {
+      description: "task_description",
+      last_done: "last_done_date",
+      next_due: "next_due_date",
+    },
+    masters_machines: {
+    },
+    masters_customers: {
     },
   };
 

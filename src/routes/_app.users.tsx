@@ -40,7 +40,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import {
   ShieldCheck,
@@ -787,7 +787,7 @@ function UserModulesPanel({ user, onClose }: { user: any; onClose: () => void })
   const [initialized, setInitialized] = useState(false);
   const companyName = modulesQ.data?.company_name ?? "Unknown Company";
 
-  useMemo(() => {
+  useEffect(() => {
     if (modulesQ.data?.modules && !initialized) {
       setModules(modulesQ.data.modules);
       setInitialized(true);

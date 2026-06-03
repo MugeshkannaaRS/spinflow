@@ -1,4 +1,4 @@
-from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Enum as SAEnum, Date, func
+from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Enum as SAEnum, Date, func, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from app.db.base import Base, TimestampMixin, generate_uuid
@@ -66,8 +66,12 @@ class ProductionEntry(TimestampMixin, Base):
 class Shift(Base):
     __tablename__ = "shifts"
 
+    __table_args__ = (
+        UniqueConstraint("mill_id", "code", name="uq_shift_mill_code"),
+    )
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
-    code: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(10), nullable=False)
     name: Mapped[str] = mapped_column(String(50), nullable=False)
     start_time: Mapped[str] = mapped_column(String(5), nullable=False)
     end_time: Mapped[str] = mapped_column(String(5), nullable=False)

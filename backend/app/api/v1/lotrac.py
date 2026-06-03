@@ -6,7 +6,7 @@ from typing import Optional
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, require_module
 from app.models.user import User
 from app.services.trip_service import TripService
 from app.schemas.lotrac import (
@@ -30,7 +30,7 @@ async def list_trips(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_module("lotrac")),
 ):
     try:
         svc = TripService(db, current_user)
@@ -48,7 +48,7 @@ async def list_trips(
 async def create_trip(
     req: TripCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_module("lotrac", write=True)),
 ):
     svc = TripService(db, current_user)
     result = await svc.create_trip(
@@ -76,7 +76,7 @@ async def create_trip(
 async def get_trip(
     trip_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_module("lotrac")),
 ):
     svc = TripService(db, current_user)
     return await svc.get_trip_detail(trip_id)
@@ -86,7 +86,7 @@ async def get_trip(
 async def start_loading(
     trip_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_module("lotrac", write=True)),
 ):
     svc = TripService(db, current_user)
     return await svc.start_loading(
@@ -102,7 +102,7 @@ async def loader_scan(
     req: LoaderScanRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_module("lotrac", write=True)),
 ):
     svc = TripService(db, current_user)
     role = current_user.role_rel.code if current_user.role_rel else ""
@@ -120,7 +120,7 @@ async def loader_scan(
 async def depart_trip(
     trip_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_module("lotrac", write=True)),
 ):
     svc = TripService(db, current_user)
     return await svc.depart_trip(
@@ -136,7 +136,7 @@ async def receiver_scan(
     req: ReceiverScanRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_module("lotrac", write=True)),
 ):
     svc = TripService(db, current_user)
     role = current_user.role_rel.code if current_user.role_rel else ""
@@ -156,7 +156,7 @@ async def confirm_pod(
     trip_id: str,
     notes: Optional[str] = Body(None, embed=True),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_module("lotrac", write=True)),
 ):
     svc = TripService(db, current_user)
     return await svc.confirm_pod(
@@ -172,7 +172,7 @@ async def get_scan_log(
     trip_id: str,
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_module("lotrac")),
 ):
     try:
         svc = TripService(db, current_user)
@@ -186,7 +186,7 @@ async def get_scan_log(
 async def generate_qr_for_bag(
     bag_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_module("inventory", write=True)),
 ):
     result = await db.execute(select(InventoryBag).where(InventoryBag.id == bag_id))
     bag = result.scalar_one_or_none()

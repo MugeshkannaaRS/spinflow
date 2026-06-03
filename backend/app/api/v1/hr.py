@@ -354,6 +354,7 @@ async def bulk_create_employees(
     payroll_records: List[MonthlyPayroll] = []
     errors: List[ImportErrorDetail] = []
     custom_fields_map: Dict[str, Dict[str, str]] = {}
+    batch_seen_codes: set = set()
     now = datetime.now(timezone.utc)
     cur_month = now.month
     cur_year = now.year
@@ -367,6 +368,12 @@ async def bulk_create_employees(
         if not item.full_name:
             errors.append(_err(row, "Field 'full_name' is required", "full_name", item.full_name))
             continue
+
+        code_key = item.employee_code.strip()
+        if code_key in batch_seen_codes:
+            errors.append(_err(row, f"Duplicate employee code '{code_key}' in same batch (row {row})", "employee_code"))
+            continue
+        batch_seen_codes.add(code_key)
 
         doj = parse_date(item.date_of_joining, row)
         if item.date_of_joining and not doj:
@@ -408,14 +415,14 @@ async def bulk_create_employees(
                     )
                     errors.append(_err(row, f"Department '{dept_name}' not found — auto-created", "department", dept_name, "info"))
                 except Exception as dept_err:
-                    await db.rollback()
-                    logger.exception("Department auto-create failed", extra={"row": row, "department": dept_name})
+                    logger.warning("Department auto-create failed (transaction preserved)", extra={"row": row, "department": dept_name})
                     errors.append(_err(row, f"Department '{dept_name}' auto-create failed: {dept_err}", "department", dept_name, "warning"))
 
         emp = Employee(
             code=item.employee_code.strip(),
             name=item.full_name.strip(),
             department=dept_name,
+            department_name=dept_name,
             designation=_str(item.designation),
             section=_str(item.section),
             shift=item.shift or "General",
@@ -463,9 +470,11 @@ async def bulk_create_employees(
 
     # Don't abort — skip only the bad rows, import the rest
 
-    # Pre-fetch existing employee codes (global unique constraint on code)
+    # Pre-fetch existing employee codes scoped to this mill
     existing_codes: set = set()
-    ec_result = await db.execute(select(Employee.code))
+    ec_result = await db.execute(
+        select(Employee.code).where(Employee.mill_id == mill_id)
+    )
     existing_codes = {r[0] for r in ec_result.all()}
 
     # Pre-fetch existing custom field names for the company
@@ -501,8 +510,7 @@ async def bulk_create_employees(
                 for f in new_fields:
                     existing_field_names[f.field_name] = f
     except Exception as exc:
-        await db.rollback()
-        logger.exception("Failed to pre-fetch/pre-create custom fields (will skip custom values for this import)")
+        logger.warning("Failed to pre-fetch/pre-create custom fields (will skip custom values for this import, transaction preserved)")
 
     created_count = 0
     updated = 0
@@ -513,7 +521,10 @@ async def bulk_create_employees(
             async with await db.begin_nested():
                 if emp.code in existing_codes:
                     existing_result = await db.execute(
-                        select(Employee).where(Employee.code == emp.code)
+                        select(Employee).where(
+                            Employee.code == emp.code,
+                            Employee.mill_id == mill_id,
+                        )
                     )
                     existing = existing_result.scalar_one_or_none()
                     if existing:
@@ -568,7 +579,7 @@ async def bulk_create_employees(
         if emp.code not in emp_id_map:
             continue
         mp = MonthlyPayroll(
-            employee_id=emp.id,
+            employee_id=emp_id_map[emp.code],
             mill_id=mill_id,
             month=cur_month,
             year=cur_year,
@@ -616,6 +627,9 @@ async def bulk_create_payroll(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr", write=True)),
 ):
+    MAX_BATCH = 500
+    if len(req.records) > MAX_BATCH:
+        raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     scope = await get_mill_scope(current_user)
     if scope.get("mill_id") and req.mill_id != scope["mill_id"]:
         raise HTTPException(403, "Cannot create payroll for a different mill")
@@ -1019,6 +1033,9 @@ async def create_bulk_attendance(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr", write=True)),
 ):
+    MAX_BATCH = 500
+    if len(req.records) > MAX_BATCH:
+        raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     records = []
     for rec in req.records:
         emp = await db.get(Employee, rec.employee_id)
@@ -1045,6 +1062,9 @@ async def bulk_import_attendance(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr", write=True)),
 ):
+    MAX_BATCH = 500
+    if len(req.items) > MAX_BATCH:
+        raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     STATUS_MAP = {"p": "present", "a": "absent", "h": "holiday", "l": "leave",
                   "present": "present", "absent": "absent", "holiday": "holiday", "leave": "leave"}
     created = 0

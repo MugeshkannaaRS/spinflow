@@ -12,22 +12,22 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     DEBUG: bool = False
 
-    # Database
-    DATABASE_URL: str = "postgresql+asyncpg://spinflow:X7k9mP2qR5vB8wN1fL4jH6cY3aE0gT8uWxZ@localhost:5432/spinflow_db"
-    DATABASE_SYNC_URL: str = "postgresql://spinflow:X7k9mP2qR5vB8wN1fL4jH6cY3aE0gT8uWxZ@localhost:5432/spinflow_db"
+    # Database — no defaults; must be set via .env or env vars
+    DATABASE_URL: str = ""
+    DATABASE_SYNC_URL: str = ""
 
-    # JWT — 64-char hex secrets
-    SECRET_KEY: str = "3b14cff4f6ce9e395b89e738a277c30e4bb692824c1a63657c4a5eadad78bf41"
-    REFRESH_SECRET_KEY: str = "e76756cc9ab58da55e48df07667f00c9ed86a386ce6509e734bf09739afea9c3"
+    # JWT — no defaults; must be set via .env or env vars
+    SECRET_KEY: str = ""
+    REFRESH_SECRET_KEY: str = ""
     JWT_ALGORITHM: str = "HS512"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # Redis
-    REDIS_URL: str = "redis://:X8kLm9pQ4rT2vB6nW1cY3zA7eR5fH0jG@localhost:6379/0"
+    # Redis — no default
+    REDIS_URL: str = ""
 
     # CORS — explicit origins only (no glob/wildcard), wildcard subdomains go in CORS_ORIGIN_REGEX
-    CORS_ORIGINS: str = "https://spinflow.onrender.com,https://spinflow-f.onrender.com,http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173"
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173"
     CORS_ORIGIN_REGEX: str = r"^https://(.*\.ngrok(?:-free)?\.dev|.*\.onrender\.com)$"
 
     @property
@@ -37,8 +37,8 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
 
-    # QR
-    QR_SECRET_KEY: str = "4d8f1c2e9a7b3d5f6c0e8a2b4d1f7c9e0a3b5d8f"
+    # QR — no default
+    QR_SECRET_KEY: str = ""
 
     # SMTP
     SMTP_HOST: str = ""
@@ -52,11 +52,23 @@ class Settings(BaseSettings):
         case_sensitive = True
 
     def check_secrets(self):
-        if "change-this" in self.SECRET_KEY or "change" in self.SECRET_KEY or len(self.SECRET_KEY) < 32:
-            import warnings
-            warnings.warn(
-                "WARNING: SECRET_KEY is insecure or too short. Generate a strong key with: "
-                "python -c \"import secrets; print(secrets.token_hex(32))\""
+        required = {
+            "DATABASE_URL": self.DATABASE_URL,
+            "SECRET_KEY": self.SECRET_KEY,
+            "REFRESH_SECRET_KEY": self.REFRESH_SECRET_KEY,
+            "REDIS_URL": self.REDIS_URL,
+            "QR_SECRET_KEY": self.QR_SECRET_KEY,
+        }
+        missing = [name for name, val in required.items() if not val]
+        if missing:
+            raise RuntimeError(
+                f"CRITICAL: Missing required environment variables: {', '.join(missing)}. "
+                "Set them in .env or the environment before starting."
+            )
+        if len(self.SECRET_KEY) < 32:
+            raise RuntimeError(
+                f"SECRET_KEY must be at least 32 characters (got {len(self.SECRET_KEY)}). "
+                "Generate a strong key with: python -c \"import secrets; print(secrets.token_hex(32))\""
             )
 
 

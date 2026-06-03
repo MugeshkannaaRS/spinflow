@@ -27,6 +27,7 @@ from app.models.production import Machine
 from app.core.error_handler import SpinFlowException
 
 router = APIRouter()
+MAX_BATCH = 500
 
 
 async def _resolve_role_code(current_user: User, db: AsyncSession) -> str:
@@ -562,6 +563,8 @@ async def bulk_create_machines(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
+    if len(req.items) > MAX_BATCH:
+        raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     scope = await get_mill_scope(current_user)
     mill_id = scope.get("mill_id")
     if not mill_id:
@@ -622,6 +625,8 @@ async def bulk_create_customers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
+    if len(req.items) > MAX_BATCH:
+        raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     scope = await get_mill_scope(current_user)
     mill_id = scope.get("mill_id")
     if not mill_id:
@@ -638,7 +643,7 @@ async def bulk_create_customers(
                 errors.append(f"Row {i + 1}: missing code or name")
                 continue
             existing = await db.execute(
-                select(Customer).where(Customer.code == code)
+                select(Customer).where(Customer.code == code, Customer.mill_id == mill_id)
             )
             if existing.scalar_one_or_none():
                 skipped += 1

@@ -1,3 +1,4 @@
+import json
 import logging
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, Request
@@ -10,7 +11,7 @@ from passlib.context import CryptContext
 logger = logging.getLogger(__name__)
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, get_mill_scope
+from app.core.deps import get_current_user, get_mill_scope, log_audit
 from app.models.user import User, Role
 from app.models.masters import Company, CompanyModule, Mill, MillSettings
 
@@ -59,19 +60,21 @@ async def update_company_modules(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        if current_user.role != "SUPER_ADMIN":
+        role_code = current_user.role_rel.code if current_user.role_rel else ""
+        if role_code != "SUPER_ADMIN":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage modules")
         modules_data: Dict[str, bool] = body.get("modules")
         if modules_data is None:
             modules_data = {k: bool(v) for k, v in body.items() if k in ALL_MODULE_KEYS}
-        for module_name, is_enabled in modules_data.items():
-            existing = await db.execute(
-                select(CompanyModule).where(
-                    CompanyModule.company_id == company_id,
-                    CompanyModule.module_name == module_name,
-                )
+        existing_result = await db.execute(
+            select(CompanyModule).where(
+                CompanyModule.company_id == company_id,
+                CompanyModule.module_name.in_(list(modules_data.keys())),
             )
-            record = existing.scalar_one_or_none()
+        )
+        existing_map: dict[str, CompanyModule] = {cm.module_name: cm for cm in existing_result.scalars().all()}
+        for module_name, is_enabled in modules_data.items():
+            record = existing_map.get(module_name)
             if record:
                 record.is_enabled = bool(is_enabled)
             else:
@@ -82,6 +85,9 @@ async def update_company_modules(
                     enabled_by=current_user.id,
                 ))
         await db.commit()
+        role_code_audit = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+        changed = [f"{k}={v}" for k, v in modules_data.items()]
+        await log_audit(db, current_user.id, role_code_audit, "update_company_modules", "company", company_id, f"Modules changed: {', '.join(changed)}")
         return {"saved": True}
     except HTTPException:
         raise
@@ -125,6 +131,9 @@ async def create_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can create users via admin panel")
     try:
         body = await request.json()
         name = body.get("name")
@@ -134,8 +143,8 @@ async def create_user(
         company_id = body.get("company_id")
         mill_id = body.get("mill_id") or None
 
-        if not password or len(str(password)) < 6:
-            raise HTTPException(400, "Password must be at least 6 characters")
+        if not password or len(str(password)) < 8:
+            raise HTTPException(400, "Password must be at least 8 characters")
         if not name or not name.strip():
             raise HTTPException(400, "Name is required")
         if not email or "@" not in email:
@@ -187,6 +196,13 @@ async def create_user(
             must_change_password=True,
         )
         db.add(new_user)
+        await db.flush()
+        role_code_audit = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+        client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "0.0.0.0").split(",")[0].strip()
+        await log_audit(
+            db, current_user.id, role_code_audit, "create_user", "user", new_user.id,
+            f"Admin created user: {email} (role: {role_code})", ip_address=client_ip,
+        )
         await db.commit()
         await db.refresh(new_user)
 
@@ -217,10 +233,18 @@ async def list_all_users(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN or MILL_OWNER can list users")
     try:
         query = select(User).where(User.deleted_at.is_(None))
         if company_id:
+            if role_code == "MILL_OWNER":
+                if str(company_id) != str(current_user.company_id):
+                    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="MILL_OWNER can only list users in their own company")
             query = query.where(User.company_id == company_id)
+        elif role_code == "MILL_OWNER":
+            query = query.where(User.company_id == current_user.company_id)
         query = query.order_by(User.created_at.desc())
 
         count_q = select(func.count()).select_from(query.subquery())
@@ -268,11 +292,14 @@ async def reset_user_password(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can reset passwords")
     try:
         body = await request.json()
         new_password = body.get("password")
-        if not new_password or len(new_password) < 6:
-            raise HTTPException(400, "Password must be at least 6 characters")
+        if not new_password or len(new_password) < 8:
+            raise HTTPException(400, "Password must be at least 8 characters")
 
         result = await db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
@@ -282,6 +309,8 @@ async def reset_user_password(
         user.password_hash = pwd_context.hash(new_password)
         user.must_change_password = True
         await db.commit()
+        role_code_audit = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+        await log_audit(db, current_user.id, role_code_audit, "reset_user_password", "user", user_id, "Password reset by admin")
 
         return {"reset": True, "must_change_password": True}
     except HTTPException:
@@ -299,6 +328,9 @@ async def update_company_admin(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can modify company settings")
     try:
         body = await request.json()
         result = await db.execute(
@@ -319,6 +351,8 @@ async def update_company_admin(
             company.max_users = val
 
         await db.commit()
+        role_code_audit = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+        await log_audit(db, current_user.id, role_code_audit, "update_company", "company", company_id, f"Updated company: {json.dumps({k: body[k] for k in ('plan', 'max_employees', 'max_users') if k in body})}")
         return {"updated": True}
     except HTTPException:
         raise
@@ -334,6 +368,9 @@ async def update_company_limits(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can modify company limits")
     try:
         body = await request.json()
         max_users = body.get("max_users")
@@ -354,6 +391,8 @@ async def update_company_limits(
         if "max_employees" in body:
             company.max_employees = int(body["max_employees"])
         await db.commit()
+        role_code_audit = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+        await log_audit(db, current_user.id, role_code_audit, "update_company_limits", "company", company_id, f"Limits updated: max_users={company.max_users}, plan={company.plan}")
 
         return {"max_users": company.max_users, "plan": company.plan, "max_employees": company.max_employees, "updated": True}
     except HTTPException:
@@ -369,6 +408,9 @@ async def toggle_company_status(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can suspend companies")
     try:
         result = await db.execute(
             select(Company).where(Company.id == company_id)
@@ -379,26 +421,15 @@ async def toggle_company_status(
         current = getattr(company, "is_active", True)
         company.is_active = not current
         await db.commit()
-        status = "activated" if company.is_active else "suspended"
-        return {"status": status, "is_active": company.is_active}
+        new_status = "activated" if company.is_active else "suspended"
+        role_code_audit = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+        await log_audit(db, current_user.id, role_code_audit, "toggle_company_status", "company", company_id, f"Company {new_status}")
+        return {"status": new_status, "is_active": company.is_active}
     except HTTPException:
         raise
     except Exception as e:
         await db.rollback()
         logger.error(f"admin.companies suspend error: {e}")
-        try:
-            from sqlalchemy import text
-            await db.execute(text("ALTER TABLE companies ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE"))
-            await db.commit()
-            result = await db.execute(select(Company).where(Company.id == company_id))
-            company = result.scalar_one_or_none()
-            if company:
-                company.is_active = not getattr(company, "is_active", True)
-                await db.commit()
-                return {"status": "activated" if company.is_active else "suspended", "is_active": company.is_active}
-        except Exception as e2:
-            logger.error(f"admin.companies suspend fallback also failed: {e2}")
-            await db.rollback()
         raise HTTPException(500, detail=str(e))
 
 
@@ -408,6 +439,9 @@ async def get_mill_settings(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN or MILL_OWNER can view mill settings")
     try:
         result = await db.execute(
             select(MillSettings).where(MillSettings.mill_id == mill_id)
@@ -428,15 +462,11 @@ async def get_mill_settings(
             "currency": settings.currency,
             "timezone": settings.timezone,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"admin.mill_settings get error: {e}")
-        return {
-            "working_hours_per_day": 8,
-            "shifts_per_day": 3,
-            "production_target_kg": 0,
-            "currency": "INR",
-            "timezone": "Asia/Kolkata",
-        }
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.put("/admin/mills/{mill_id}/settings")
@@ -446,6 +476,9 @@ async def update_mill_settings(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can modify mill settings")
     try:
         result = await db.execute(
             select(MillSettings).where(MillSettings.mill_id == mill_id)
@@ -495,14 +528,15 @@ async def update_user_modules(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     modules_data: Dict[str, bool] = body.get("modules", {})
-    for module_name, is_enabled in modules_data.items():
-        existing = await db.execute(
-            select(CompanyModule).where(
-                CompanyModule.company_id == target_user.company_id,
-                CompanyModule.module_name == module_name,
-            )
+    existing_result = await db.execute(
+        select(CompanyModule).where(
+            CompanyModule.company_id == target_user.company_id,
+            CompanyModule.module_name.in_(list(modules_data.keys())),
         )
-        cm = existing.scalar_one_or_none()
+    )
+    existing_map: dict[str, CompanyModule] = {cm.module_name: cm for cm in existing_result.scalars().all()}
+    for module_name, is_enabled in modules_data.items():
+        cm = existing_map.get(module_name)
         if cm:
             cm.is_enabled = is_enabled
         else:
@@ -513,4 +547,7 @@ async def update_user_modules(
                 enabled_by=current_user.id,
             ))
     await db.commit()
+    role_code_audit = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+    changed = [f"{k}={v}" for k, v in modules_data.items()]
+    await log_audit(db, current_user.id, role_code_audit, "update_user_modules", "user", user_id, f"User modules changed: {', '.join(changed)}")
     return {"message": "Module access updated successfully"}

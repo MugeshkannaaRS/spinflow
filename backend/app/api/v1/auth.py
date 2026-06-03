@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Header, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Header, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, func
@@ -23,6 +23,19 @@ from app.schemas.auth import (
     ResetPasswordRequest, VerifyOTPRequest, UserCreateRequest, UserUpdateRequest,
     MeResponse, MillSettingsOut, CompanyInfo,
 )
+
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    secure = not settings.DEBUG
+    response.set_cookie(
+        key="refresh_token",
+        value=token,
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        httponly=True,
+        secure=secure,
+        samesite="lax",
+        path="/api/v1/auth/refresh",
+    )
 from app.models.masters import Company, CompanyModule, MillSettings, Mill
 from app.models.ui_config import ColumnConfig
 from pydantic import BaseModel, Field
@@ -39,8 +52,8 @@ class ForceChangePasswordRequest(BaseModel):
 
 
 @router.post("/auth/login", response_model=LoginResponse)
-@limiter.limit("100/minute")
-async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], request: Request, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     try:
         result = await db.execute(
             select(User).options(selectinload(User.role_rel)).where(
@@ -106,6 +119,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
         await db.flush()
         client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "0.0.0.0").split(",")[0].strip()
         await log_audit(db, user.id, role_code, "login", "auth", user.id, "User logged in", ip_address=client_ip)
+        _set_refresh_cookie(response, refresh_token)
         return LoginResponse(
             access_token=access_token,
             refresh_token=refresh_token,
@@ -132,8 +146,18 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
 
 
 @router.post("/auth/refresh", response_model=TokenResponse)
-async def refresh(req: RefreshRequest, db: AsyncSession = Depends(get_db)):
-    result = verify_and_refresh(req.refresh_token)
+async def refresh(request: Request, response: Response, req: Optional[RefreshRequest] = None, body: Optional[dict] = None, db: AsyncSession = Depends(get_db)):
+    # Read refresh token: cookie first, then body (backward compat)
+    token = request.cookies.get("refresh_token")
+    if not token and req:
+        token = req.refresh_token
+    if not token:
+        raise SpinFlowException(
+            status_code=401,
+            code=ErrorCode.TOKEN_INVALID,
+            message="No refresh token provided",
+        )
+    result = verify_and_refresh(token)
     if not result:
         raise SpinFlowException(
             status_code=401,
@@ -142,7 +166,7 @@ async def refresh(req: RefreshRequest, db: AsyncSession = Depends(get_db)):
         )
     new_access, new_refresh, payload = result
     session_result = await db.execute(
-        select(UserSession).where(UserSession.refresh_token == req.refresh_token, UserSession.is_active == True)
+        select(UserSession).where(UserSession.refresh_token == token, UserSession.is_active == True)
     )
     session = session_result.scalar_one_or_none()
     if session:
@@ -155,6 +179,7 @@ async def refresh(req: RefreshRequest, db: AsyncSession = Depends(get_db)):
             expires_at=new_expires,
         )
         db.add(new_session)
+    _set_refresh_cookie(response, new_refresh)
     return TokenResponse(access_token=new_access, refresh_token=new_refresh)
 
 
@@ -289,7 +314,7 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("users")),
 ):
-    stmt = select(User).where(User.deleted_at.is_(None))
+    stmt = select(User).options(selectinload(User.role_rel)).where(User.deleted_at.is_(None))
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
@@ -324,8 +349,14 @@ async def list_users(
 async def create_user(
     req: UserCreateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_module("users", write=True)),
 ):
+    requester_role = current_user.role_rel.code if current_user.role_rel else ""
+    company_id = current_user.company_id
+    if requester_role == "SUPER_ADMIN":
+        company_id = req.company_id or company_id
+    if not company_id:
+        raise SpinFlowException.bad_request("Cannot determine company for new user", ErrorCode.INVALID_VALUE)
     existing = await db.execute(select(User).where(User.email == req.email, User.deleted_at.is_(None)))
     if existing.scalar_one_or_none():
         raise SpinFlowException.bad_request("Email already exists", ErrorCode.ALREADY_EXISTS)
@@ -335,12 +366,12 @@ async def create_user(
         raise SpinFlowException.bad_request("Invalid role", ErrorCode.INVALID_VALUE)
     user_count_result = await db.execute(
         select(func.count(User.id)).where(
-            User.company_id == req.company_id,
+            User.company_id == company_id,
             User.is_active == True,
         )
     )
     current_count = user_count_result.scalar() or 0
-    company = await db.get(Company, req.company_id)
+    company = await db.get(Company, company_id)
     max_users = getattr(company, "max_users", 10) or 10
     if current_count >= max_users:
         raise HTTPException(status_code=403, detail=f"User limit reached ({current_count}/{max_users}). Upgrade your plan to add more users.")
@@ -353,6 +384,7 @@ async def create_user(
         mill_id=req.mill_id,
         mill_name=req.mill_name,
         phone=req.phone,
+        company_id=company_id,
         is_active=True,
     )
     db.add(user)
@@ -376,8 +408,13 @@ async def create_user(
 @router.post("/auth/force-change-password", response_model=LoginResponse)
 async def force_change_password(
     req: ForceChangePasswordRequest,
+    response: Response,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code not in ("SUPER_ADMIN", "MILL_ADMIN"):
+        raise SpinFlowException.forbidden("Only admins can force change passwords", ErrorCode.ACCESS_DENIED)
     if len(req.new_password) < 8:
         raise SpinFlowException.bad_request("Password must be at least 8 characters", ErrorCode.INVALID_VALUE)
     if not re.search(r"[A-Z]", req.new_password):
@@ -386,6 +423,11 @@ async def force_change_password(
         raise SpinFlowException.bad_request("Password must contain at least one digit", ErrorCode.INVALID_VALUE)
     if not re.search(r"[!@#$%^&*(),.?\":{}|<>_\-+=\[\]\\';/`~]", req.new_password):
         raise SpinFlowException.bad_request("Password must contain at least one special character", ErrorCode.INVALID_VALUE)
+
+    # Only the user themself or a SUPER_ADMIN can force-change a password
+    requester_role = current_user.role_rel.code if current_user.role_rel else ""
+    if current_user.id != req.user_id and requester_role != "SUPER_ADMIN":
+        raise SpinFlowException.forbidden("You can only change your own password unless you are a SUPER_ADMIN")
 
     result = await db.execute(select(User).where(User.id == req.user_id, User.deleted_at.is_(None)))
     user = result.scalar_one_or_none()
@@ -415,6 +457,7 @@ async def force_change_password(
     await db.flush()
     client_ip = "0.0.0.0"
     await log_audit(db, user.id, role_code, "force_change_password", "auth", user.id, "Password changed via force change", ip_address=client_ip)
+    _set_refresh_cookie(response, refresh_token)
     return LoginResponse(
         access_token=access_token,
         refresh_token=refresh_token,

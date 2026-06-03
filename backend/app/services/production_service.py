@@ -279,6 +279,22 @@ class ProductionService(BaseService):
             "data": items,
         }
 
+    async def update_machine(self, machine_id: str, data: dict) -> Machine:
+        machine = await self.get_or_404(Machine, machine_id)
+        for key, value in data.items():
+            if hasattr(machine, key) and value is not None:
+                setattr(machine, key, value)
+        await self.db.flush()
+        await self._audit(
+            action="update",
+            entity="Machine",
+            entity_id=machine.id,
+            details=f"Machine {machine.code} updated",
+            old_value=None,
+            new_value=data,
+        )
+        return machine
+
     async def update_machine_status(self, machine_id: str, current_status: str) -> Machine:
         machine = await self.get_or_404(Machine, machine_id)
         old_status = machine.current_status

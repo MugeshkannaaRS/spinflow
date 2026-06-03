@@ -331,9 +331,9 @@ export function DataTable<T = any>({
 
   const handleExport = async (format: "excel" | "csv" | "pdf") => {
     const fn = exportFilename ?? effectiveKey;
-    if (format === "excel") exportToExcel(processed, allColumns, fn);
-    else if (format === "csv") exportToCSV(processed, allColumns, fn);
-    else await exportToPDF(processed, allColumns, fn);
+    if (format === "excel") exportToExcel(processed, visibleCols, fn);
+    else if (format === "csv") exportToCSV(processed, visibleCols, fn);
+    else await exportToPDF(processed, visibleCols, fn);
     setExportOpen(false);
   };
 
