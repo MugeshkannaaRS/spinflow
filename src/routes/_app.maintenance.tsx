@@ -24,6 +24,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
@@ -451,7 +452,7 @@ function MaintenancePage() {
                       { key: "technician", label: taskColConfig.getLabel("technician") },
                       { key: "downtimeMin", label: taskColConfig.getLabel("downtime_min"), render: (t: any) => `${t.downtimeMin} min` },
                       { key: "spareUsed", label: taskColConfig.getLabel("spare_used"), render: (t: any) => t.spareUsed || "—" },
-                      { key: "status", label: taskColConfig.getLabel("status"), type: "status", render: (t: any) => <Badge variant={t.status === "completed" ? "default" : t.status === "in-progress" ? "secondary" : "destructive"}>{t.status}</Badge> },
+                      { key: "status", label: taskColConfig.getLabel("status"), type: "status", render: (t: any) => <StatusBadge status={t.status} size="sm" /> },
                     ] satisfies ColDef[]}
                     data={tasks}
                     loading={maintQ.isLoading}

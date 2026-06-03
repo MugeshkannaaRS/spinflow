@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
@@ -182,7 +183,7 @@ function QualityPage() {
                       { key: "sample_ref", label: testColConfig.getLabel('sample_ref') },
                       { key: "result", label: testColConfig.getLabel('result'), render: (t: any) => `${t.result} ${t.unit}` },
                       { key: "standard", label: testColConfig.getLabel('standard'), render: (t: any) => `${t.standard} ${t.unit}` },
-                      { key: "status", label: testColConfig.getLabel('status'), type: "status", render: (t: any) => <Badge variant={t.status === "pass" ? "default" : t.status === "fail" ? "destructive" : "secondary"}>{t.status === "pass" && <CheckCircle2 className="size-3 mr-1 inline" />}{t.status}</Badge> },
+                      { key: "status", label: testColConfig.getLabel('status'), type: "status", render: (t: any) => <StatusBadge status={t.status} size="sm" /> },
                       { key: "tested_by", label: testColConfig.getLabel('tested_by') },
                     ] satisfies ColDef[]}
                     data={tests}
@@ -211,7 +212,7 @@ function QualityPage() {
                       { key: "count_result", label: lotColConfig.getLabel('count_result') },
                       { key: "moisture_result", label: lotColConfig.getLabel('moisture_result'), render: (l: any) => l.moisture_result != null ? `${l.moisture_result}%` : "—" },
                       { key: "strength_result", label: lotColConfig.getLabel('strength_result') },
-                      { key: "status", label: lotColConfig.getLabel('status'), type: "status", render: (l: any) => <Badge variant={l.status === "approved" ? "default" : l.status === "rejected" ? "destructive" : "secondary"}>{l.status}</Badge> },
+                      { key: "status", label: lotColConfig.getLabel('status'), type: "status", render: (l: any) => <StatusBadge status={l.status} size="sm" /> },
                     ] satisfies ColDef[]}
                     data={lots}
                     loading={lotsQ.isLoading}

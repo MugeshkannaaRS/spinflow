@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -151,9 +152,7 @@ function DispatchPage() {
     { key: "quantityKg", label: orderColConfig.getLabel('quantity_kg') },
     {
       key: "status", label: orderColConfig.getLabel('status'), type: "status",
-      render: (o: any) => (
-        <Badge variant={["delivered", "dispatched"].includes(o.status) ? "default" : ["loaded", "processing"].includes(o.status) ? "secondary" : "outline"}>{o.status}</Badge>
-      ),
+      render: (o: any) => <StatusBadge status={o.status} size="sm" />,
     },
   ];
 
@@ -166,11 +165,7 @@ function DispatchPage() {
     { key: "planned_weight_kg", label: tripColConfig.getLabel('planned_weight_kg') || "Weight (kg)", type: "number" },
     {
       key: "status", label: tripColConfig.getLabel('status') || "Status", type: "status",
-      render: (t: any) => (
-        <Badge variant={t.status === "delivered" ? "default" : t.status === "loading" ? "secondary" : t.status === "in_transit" ? "outline" : "secondary"}>
-          {t.status === "in_transit" ? "In Transit" : t.status}
-        </Badge>
-      ),
+      render: (t: any) => <StatusBadge status={t.status} size="sm" />,
     },
     {
       key: "created_at", label: "Created", type: "date",

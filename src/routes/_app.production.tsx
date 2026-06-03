@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -738,7 +739,7 @@ function ProductionPage() {
                       { key: "target_kg", label: "Target (kg)", render: (m: any) => fmtNumber(m.target_kg ?? m.targetKg) },
                       { key: "produced_kg", label: "Produced (kg)", render: (m: any) => fmtNumber(m.produced_kg ?? m.producedKg) },
                       { key: "efficiency", label: "Efficiency", render: (m: any) => <span className={(m.efficiency ?? 0) >= 85 ? "text-green-600 font-medium" : (m.efficiency ?? 0) >= 70 ? "" : "text-destructive font-medium"}>{m.efficiency ?? 0}%</span> },
-                      { key: "current_status", label: machineColConfig.getLabel('machine_status'), type: "status", render: (m: any) => <Badge variant={(m.current_status ?? m.status) === "running" ? "default" : (m.current_status ?? m.status) === "breakdown" ? "destructive" : "secondary"}>{m.current_status ?? m.status}</Badge> },
+                      { key: "current_status", label: machineColConfig.getLabel('machine_status'), type: "status", render: (m: any) => <StatusBadge status={m.current_status ?? m.status ?? "idle"} size="sm" /> },
                     ] satisfies ColDef[]}
                     data={machines}
                     loading={machinesQ.isLoading}
@@ -880,7 +881,7 @@ function ProductionPage() {
                       { key: "count", label: machineColConfig.getLabel('count') },
                       { key: "producedKg", label: machineColConfig.getLabel('produced_kg'), render: (s: any) => `${s.producedKg} kg` },
                       { key: "wasteKg", label: machineColConfig.getLabel('waste_kg'), render: (s: any) => <span className="text-muted-foreground">{s.wasteKg} kg</span> },
-                      { key: "status", label: machineColConfig.getLabel('status'), type: "status", render: (s: any) => <Badge variant={s.status === "approved" ? "default" : s.status === "rejected" ? "destructive" : "secondary"}>{s.status === "approved" && <CheckCircle2 className="size-3 mr-1 inline" />}{s.status}</Badge> },
+                      { key: "status", label: machineColConfig.getLabel('status'), type: "status", render: (s: any) => <StatusBadge status={s.status} size="sm" /> },
                     ] satisfies ColDef[]}
                     data={shifts}
                     loading={shiftsQ.isLoading}
@@ -929,7 +930,7 @@ function ProductionPage() {
                       { key: "reason", label: "Reason" },
                       { key: "startedAt", label: "Started" },
                       { key: "durationMin", label: "Duration", render: (d: any) => `${d.durationMin} min` },
-                      { key: "resolved", label: "Status", type: "status", render: (d: any) => <Badge variant={d.resolved ? "default" : "destructive"}>{d.resolved ? "Resolved" : "Open"}</Badge> },
+                      { key: "resolved", label: "Status", type: "status", render: (d: any) => <StatusBadge status={d.resolved ? "active" : "down"} label={d.resolved ? "Resolved" : "Open"} size="sm" /> },
                     ] satisfies ColDef[]}
                     data={downtime}
                     loading={downQ.isLoading}

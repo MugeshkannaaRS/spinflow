@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { DataTable, type ColDef } from "@/components/ui/DataTable";
 import { Input } from "@/components/ui/input";
@@ -455,7 +456,7 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
     { key: "basic", label: empColConfig.getLabel('basic'), type: "number", render: (e) => currencyRender(e.basic) },
     { key: "wages", label: empColConfig.getLabel('wages'), type: "number", render: (e) => currencyRender(e.wages) },
     { key: "total_salary", label: empColConfig.getLabel('total_salary'), type: "number", render: (e) => currencyRender(e.total_salary) },
-    { key: "is_active", label: empColConfig.getLabel('is_active') || "Status", type: "status", render: (e) => <Badge variant={e.is_active ? "default" : "secondary"}>{e.is_active ? "Active" : "Inactive"}</Badge> },
+    { key: "is_active", label: empColConfig.getLabel('is_active') || "Status", type: "status", render: (e) => <StatusBadge status={e.is_active ? "active" : "inactive"} /> },
   ];
 
   const groupColMap: Record<string, ColDef<EmployeeRow>[]> = {
@@ -2366,9 +2367,7 @@ function LeavesTab({
                 </TableCell>
                 <TableCell className="max-w-xs truncate" title={l.reason}>{l.reason}</TableCell>
                 <TableCell>
-                  <Badge variant={l.status === "approved" ? "default" : l.status === "rejected" ? "destructive" : "secondary"}>
-                    {l.status}
-                  </Badge>
+                  <StatusBadge status={l.status} />
                 </TableCell>
                 <TableCell>
                   {l.status === "pending" && canEdit ? (

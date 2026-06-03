@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -56,7 +57,7 @@ function InventoryPage() {
 
   const lotCols: ColDef[] = [
     { key: "lotNo", label: lotColConfig.getLabel('lot_no'), className: "font-mono text-xs" },
-    { key: "type", label: lotColConfig.getLabel('type'), type: "status", render: (l: any) => <Badge variant="outline">{l.type}</Badge> },
+    { key: "type", label: lotColConfig.getLabel('type'), type: "status", render: (l: any) => <StatusBadge status="idle" label={l.type} size="sm" /> },
     { key: "department", label: lotColConfig.getLabel('department'), type: "status" },
     { key: "quantity", label: lotColConfig.getLabel('quantity'), render: (l: any) => <span className="text-right">{(l.quantity ?? 0).toLocaleString()}</span> },
     { key: "location", label: lotColConfig.getLabel('location'), type: "status" },
@@ -70,9 +71,7 @@ function InventoryPage() {
     { key: "age", label: lotColConfig.getLabel('age'), render: (l: any) => <span className={l.age > 14 ? "text-destructive font-medium" : ""}>{l.age}</span> },
     {
       key: "status", label: lotColConfig.getLabel('status'), type: "status",
-      render: (l: any) => (
-        <Badge variant={l.status === "in-stock" ? "default" : l.status === "transferred" ? "secondary" : "outline"}>{l.status}</Badge>
-      ),
+      render: (l: any) => <StatusBadge status={l.status} size="sm" />,
     },
   ];
 
@@ -83,7 +82,7 @@ function InventoryPage() {
     { key: "toLocation", label: transferColConfig.getLabel('to_location'), type: "status", render: (t: any) => <span><ArrowRightLeft className="size-3 inline mr-1 text-muted-foreground" />{t.toLocation}</span> },
     { key: "quantity", label: transferColConfig.getLabel('quantity'), render: (t: any) => `${t.quantity} ${t.unit}` },
     { key: "transferredBy", label: transferColConfig.getLabel('transferred_by') },
-    { key: "status", label: transferColConfig.getLabel('status'), type: "status", render: (t: any) => <Badge variant={t.status === "completed" ? "default" : "secondary"}>{t.status}</Badge> },
+    { key: "status", label: transferColConfig.getLabel('status'), type: "status", render: (t: any) => <StatusBadge status={t.status} size="sm" /> },
   ];
 
   return (

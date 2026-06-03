@@ -9,6 +9,7 @@ import { fmtNumber } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import { Button } from "@/components/ui/button";
@@ -119,11 +120,9 @@ function PayrollPage() {
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-semibold text-sm">{name}</span>
                           {pm ? (
-                            <Badge variant={STATUS_COLORS[pm.status] ?? "outline"}>
-                              {pm.status}
-                            </Badge>
+                            <StatusBadge status={pm.status} size="sm" />
                           ) : (
-                            <Badge variant="outline">—</Badge>
+                            <StatusBadge status="draft" label="—" size="sm" />
                           )}
                         </div>
                         {pm ? (
@@ -248,7 +247,7 @@ function MonthSheet({
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span>Status</span>
-                  <Badge>{pm.status}</Badge>
+                  <StatusBadge status={pm.status} size="sm" />
                 </div>
                 <div className="flex justify-between">
                   <span>Gross</span>
@@ -442,7 +441,7 @@ function PayslipsTab({ millId, year }: { millId: string; year: number }) {
               { key: "pf_employee", label: payslipColConfig.getLabel('pf_employee'), render: (p: any) => `₹${fmtNumber(p.pf_employee)}` },
               { key: "esic_employee", label: payslipColConfig.getLabel('esic_employee'), render: (p: any) => `₹${fmtNumber(p.esic_employee)}` },
               { key: "net_wage", label: payslipColConfig.getLabel('net_wage'), render: (p: any) => <span className="font-medium">₹{fmtNumber(p.net_wage)}</span> },
-              { key: "status", label: payslipColConfig.getLabel('status'), type: "status", render: (p: any) => <Badge variant={p.status === "paid" ? "default" : "secondary"}>{p.status}</Badge> },
+              { key: "status", label: payslipColConfig.getLabel('status'), type: "status", render: (p: any) => <StatusBadge status={p.status} size="sm" /> },
             ] satisfies ColDef[]}
             data={payslips}
             loading={payslipsQ.isLoading}

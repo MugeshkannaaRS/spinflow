@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import { Input } from "@/components/ui/input";
@@ -193,11 +194,11 @@ function AccountsPage() {
                       { key: "invoiceNo", label: invColConfig.getLabel('invoice_no'), className: "font-mono text-xs" },
                       { key: "date", label: invColConfig.getLabel('date'), type: "date" },
                       { key: "customer", label: invColConfig.getLabel('customer'), render: (inv: any) => <span className="font-medium">{inv.customer}</span> },
-                      { key: "type", label: invColConfig.getLabel('type'), type: "status", render: (inv: any) => <Badge variant={inv.type === "sales" ? "default" : "secondary"}>{inv.type}</Badge> },
+                      { key: "type", label: invColConfig.getLabel('type'), type: "status", render: (inv: any) => <StatusBadge status={inv.type === "sales" ? "active" : "idle"} label={inv.type} size="sm" /> },
                       { key: "amount", label: invColConfig.getLabel('amount'), render: (inv: any) => `₹${(inv.amount ?? 0).toLocaleString()}` },
                       { key: "gst", label: invColConfig.getLabel('gst'), render: (inv: any) => `₹${(inv.gst ?? 0).toLocaleString()}` },
                       { key: "total", label: invColConfig.getLabel('total'), render: (inv: any) => <span className="font-medium">₹{(inv.total ?? 0).toLocaleString()}</span> },
-                      { key: "status", label: invColConfig.getLabel('status'), type: "status", render: (inv: any) => <Badge variant={inv.status === "paid" ? "default" : inv.status === "overdue" ? "destructive" : inv.status === "posted" ? "secondary" : "outline"}>{inv.status}</Badge> },
+                      { key: "status", label: invColConfig.getLabel('status'), type: "status", render: (inv: any) => <StatusBadge status={inv.status} size="sm" /> },
                     ] satisfies ColDef[]}
                     data={invoices}
                     loading={invQ.isLoading}
@@ -236,7 +237,7 @@ function AccountsPage() {
                       { key: "dueDate", label: recvColConfig.getLabel('due_date'), type: "date" },
                       { key: "amount", label: recvColConfig.getLabel('amount'), render: (r: any) => `₹${(r.amount ?? 0).toLocaleString()}` },
                       { key: "outstanding", label: recvColConfig.getLabel('outstanding'), render: (r: any) => <span className="font-medium text-destructive">₹{(r.outstanding ?? 0).toLocaleString()}</span> },
-                      { key: "status", label: recvColConfig.getLabel('status'), type: "status", render: (r: any) => <Badge variant={r.status === "paid" ? "default" : r.status === "overdue" ? "destructive" : "secondary"}>{r.status === "paid" && <CheckCircle2 className="size-3 mr-1 inline" />}{r.status}</Badge> },
+                      { key: "status", label: recvColConfig.getLabel('status'), type: "status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
                       { key: "daysOverdue", label: recvColConfig.getLabel('days_overdue'), render: (r: any) => r.daysOverdue > 0 ? <span className="text-destructive font-medium">{r.daysOverdue}d</span> : "—" },
                     ] satisfies ColDef[]}
                     data={receivables as any[]}
