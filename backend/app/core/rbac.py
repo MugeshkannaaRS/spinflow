@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Canonical RBAC matrix — single source of truth for all access decisions.
 
 Every permission check in backend and frontend derives from ACCESS_MATRIX below.

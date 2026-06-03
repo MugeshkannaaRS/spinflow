@@ -1,3 +1,4 @@
+from __future__ import annotations
 SUPER_ADMIN = "SUPER_ADMIN"
 
 ROLE_MODULE_ACCESS = {
