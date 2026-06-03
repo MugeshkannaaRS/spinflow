@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Header, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +9,8 @@ from datetime import datetime, timezone, timedelta
 import random
 import string
 import re
+
+logger = logging.getLogger(__name__)
 
 from app.db.session import get_db
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token, verify_and_refresh
@@ -63,7 +66,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
         )
         user = result.scalar_one_or_none()
     except Exception as e:
-        print(f"Login DB error: {e}")
+        logger.exception("Login DB error")
         raise HTTPException(status_code=500, detail="Login failed. Please try again.")
 
     if not user or not verify_password(form_data.password, user.password_hash):
@@ -141,7 +144,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
     except SpinFlowException:
         raise
     except Exception as e:
-        print(f"Login post-auth error: {e}")
+        logger.exception("Login post-auth error")
         raise HTTPException(status_code=500, detail="Login failed. Please try again.")
 
 

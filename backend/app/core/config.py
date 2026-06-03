@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = ""
 
     # CORS — explicit origins only (no glob/wildcard), wildcard subdomains go in CORS_ORIGIN_REGEX
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173"
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173,https://spinflow-f.onrender.com"
     CORS_ORIGIN_REGEX: str = r"^https://(.*\.ngrok(?:-free)?\.dev|.*\.onrender\.com)$"
 
     @property
