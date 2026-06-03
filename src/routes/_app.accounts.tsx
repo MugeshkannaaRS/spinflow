@@ -5,6 +5,7 @@ import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { fmtLakh } from "@/lib/formatters";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -136,8 +137,7 @@ function AccountsPage() {
                   Total Sales
                 </div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <IndianRupee className="size-5 text-primary" />₹{(totalSales / 100000).toFixed(2)}{" "}
-                  L
+                  <IndianRupee className="size-5 text-primary" />{fmtLakh(totalSales)}
                 </div>
               </CardContent>
             </Card>
@@ -147,7 +147,7 @@ function AccountsPage() {
                   Total Purchases
                 </div>
                 <div className="text-2xl font-semibold mt-2">
-                  ₹{(totalPurchases / 100000).toFixed(2)} L
+                  {fmtLakh(totalPurchases)}
                 </div>
               </CardContent>
             </Card>
@@ -157,8 +157,7 @@ function AccountsPage() {
                   Outstanding
                 </div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <AlertTriangle className="size-5 text-warning" />₹
-                  {(outstandingTotal / 100000).toFixed(2)} L
+                  <AlertTriangle className="size-5 text-warning" />{fmtLakh(outstandingTotal)}
                 </div>
               </CardContent>
             </Card>

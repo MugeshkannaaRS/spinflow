@@ -35,7 +35,7 @@ async def get_trips(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dispatch")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -106,7 +106,7 @@ async def create_trip(
     current_user: User = Depends(require_module("dispatch", write=True)),
 ):
     try:
-        scope = await get_mill_scope(current_user)
+        scope = await get_mill_scope(current_user, db)
         mill_id = scope["mill_id"] or ""
         if not mill_id:
             raise HTTPException(status_code=400, detail="Mill ID required")
@@ -152,7 +152,7 @@ async def get_dispatches(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dispatch")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -312,7 +312,7 @@ async def dispatch_trip(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dispatch", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(Trip).where(Trip.id == trip_id)
     if scope["mill_id"]:
         stmt = stmt.where(Trip.mill_id == scope["mill_id"])
@@ -340,7 +340,7 @@ async def deliver_trip(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dispatch", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(Trip).where(Trip.id == trip_id)
     if scope["mill_id"]:
         stmt = stmt.where(Trip.mill_id == scope["mill_id"])
@@ -373,7 +373,7 @@ async def dispatch_page_init(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dispatch")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 

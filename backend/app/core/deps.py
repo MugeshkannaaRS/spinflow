@@ -84,12 +84,19 @@ def require_module(module: str, write: bool = False):
     return dependency
 
 
-async def get_mill_scope(current_user: User = Depends(get_current_user)):
+async def get_mill_scope(
+    current_user: User,
+    db: Optional[AsyncSession] = None,
+):
     """Returns the data scope for the current user.
 
     SUPER_ADMIN: sees everything (mill_id=None, company_id=None)
     MILL_OWNER:  sees all mills in their company (see_all_company_mills=True)
     All others:  scoped to their assigned mill
+
+    Falls back to a DB lookup to derive company_id from mill_id when
+    the user record has no company_id set directly (e.g. MILL_OWNER
+    created via import without explicit company_id).
     """
     role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
     if role_code == "SUPER_ADMIN":
@@ -99,16 +106,29 @@ async def get_mill_scope(current_user: User = Depends(get_current_user)):
             "role": role_code,
             "see_all_company_mills": False,
         }
+
+    company_id = str(current_user.company_id) if current_user.company_id else None
+
+    # Fallback: derive company_id from mill when not stored on user
+    if not company_id and current_user.mill_id and db is not None:
+        try:
+            r = await db.execute(select(Mill).where(Mill.id == current_user.mill_id))
+            m = r.scalar_one_or_none()
+            if m and m.company_id:
+                company_id = str(m.company_id)
+        except Exception:
+            pass
+
     if role_code == "MILL_OWNER":
         return {
             "mill_id": None,  # MILL_OWNER sees all mills in their company
-            "company_id": current_user.company_id,
+            "company_id": company_id,
             "role": role_code,
             "see_all_company_mills": True,
         }
     return {
         "mill_id": current_user.mill_id,
-        "company_id": current_user.company_id,
+        "company_id": company_id,
         "role": role_code,
         "see_all_company_mills": False,
     }

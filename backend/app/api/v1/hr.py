@@ -73,7 +73,7 @@ async def get_employees(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -149,7 +149,7 @@ async def get_employee_detail(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(Employee).where(Employee.id == employee_id)
     if scope["mill_id"]:
         stmt = stmt.where(Employee.mill_id == scope["mill_id"])
@@ -194,7 +194,7 @@ async def create_employee(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = req.mill_id or scope["mill_id"]
 
     total_sal = req.total_salary
@@ -243,7 +243,7 @@ async def update_employee(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(Employee).where(Employee.id == employee_id)
     if scope["mill_id"]:
         stmt = stmt.where(Employee.mill_id == scope["mill_id"])
@@ -281,7 +281,7 @@ async def delete_employee(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(Employee).where(Employee.id == employee_id)
     if scope["mill_id"]:
         stmt = stmt.where(Employee.mill_id == scope["mill_id"])
@@ -305,7 +305,7 @@ async def bulk_create_employees(
     if len(req.items) > 100:
         raise HTTPException(status_code=400, detail="Maximum 100 employees per batch")
 
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = req.mill_id or scope["mill_id"]
 
     # If still no mill_id, try first available company mill
@@ -630,7 +630,7 @@ async def bulk_create_payroll(
     MAX_BATCH = 500
     if len(req.records) > MAX_BATCH:
         raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     if scope.get("mill_id") and req.mill_id != scope["mill_id"]:
         raise HTTPException(403, "Cannot create payroll for a different mill")
 
@@ -742,7 +742,7 @@ async def get_payroll(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     effective_mill = mill_id or scope["mill_id"]
     if not effective_mill:
         raise HTTPException(400, "mill_id is required")
@@ -779,7 +779,7 @@ async def calculate_payroll(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
 
     existing = await db.execute(
         select(MonthlyPayroll).where(
@@ -901,7 +901,7 @@ async def get_attendance(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -956,7 +956,7 @@ async def get_attendance_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -1160,7 +1160,7 @@ async def get_leaves(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -1252,7 +1252,7 @@ async def hr_page_init(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     result: Dict[str, Any] = {}
     try:
         dept_query = select(Department.id, Department.name, Department.code).where(

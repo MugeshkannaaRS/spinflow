@@ -31,7 +31,7 @@ async def get_machines(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -80,7 +80,7 @@ async def create_machine(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     machine = Machine(**req.model_dump())
     if scope["mill_id"]:
         machine.mill_id = scope["mill_id"]
@@ -97,7 +97,7 @@ async def get_shifts(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -133,7 +133,7 @@ async def create_shift(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     shift = Shift(**req.model_dump())
     if scope["mill_id"]:
         shift.mill_id = scope["mill_id"]
@@ -157,7 +157,7 @@ async def get_entries(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -262,7 +262,7 @@ async def get_downtime(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -376,7 +376,7 @@ async def production_page_init(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 

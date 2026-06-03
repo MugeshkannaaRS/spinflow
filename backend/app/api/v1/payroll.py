@@ -27,7 +27,7 @@ async def get_payroll_months(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("payroll")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     if scope["mill_id"]:
         mill_id = scope["mill_id"]
     elif scope["company_id"]:
@@ -90,7 +90,7 @@ async def get_payslips(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("payroll")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     pm = await db.get(PayrollMonth, payroll_month_id)
     if pm:
         if scope["mill_id"] and pm.mill_id != scope["mill_id"]:
@@ -115,7 +115,7 @@ async def get_employee_payslip(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("payroll")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     if scope["mill_id"]:
         emp = await db.get(Employee, employee_id)
         if emp and emp.mill_id != scope["mill_id"]:
@@ -137,7 +137,7 @@ async def payroll_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("payroll")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     if scope["mill_id"]:
         mill_id = scope["mill_id"]
     elif scope["company_id"]:

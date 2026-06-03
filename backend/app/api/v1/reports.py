@@ -24,7 +24,7 @@ async def get_report_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("reports")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id")
 
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -216,7 +216,7 @@ async def generate_production_report(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("reports")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id")
     query = select(
         ProductionEntry.date,

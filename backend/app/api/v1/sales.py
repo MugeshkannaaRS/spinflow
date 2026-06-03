@@ -27,7 +27,7 @@ async def list_orders(
     current_user: User = Depends(require_module("sales")),
 ):
     try:
-        scope = await get_mill_scope(current_user)
+        scope = await get_mill_scope(current_user, db)
         role_code = scope.get("role", "")
         effective_mill_id = scope.get("mill_id")
 

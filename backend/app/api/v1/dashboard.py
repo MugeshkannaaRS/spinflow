@@ -55,7 +55,7 @@ async def get_dashboard_kpis(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dashboard")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id") or current_user.mill_id
     eff_role = role or current_user.role
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -228,7 +228,7 @@ async def get_chart_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dashboard")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     start = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
 
     machine_scope = []
@@ -363,7 +363,7 @@ async def get_setup_status(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dashboard")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
 
     async def count(model):
         stmt = select(func.count()).select_from(model)
@@ -469,7 +469,7 @@ async def get_dashboard_summary(
     now_iso = datetime.now(timezone.utc).isoformat()
 
     # ── Resolve effective mill / company scope ────────────────────────────────
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     effective_mill_id: Optional[str] = None
     effective_company_id: Optional[str] = scope.get("company_id")
     mill_name: str = ""

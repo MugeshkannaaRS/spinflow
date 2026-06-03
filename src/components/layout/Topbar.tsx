@@ -3,7 +3,7 @@ import { useAuth } from "@/stores/auth";
 import { useTheme } from "@/hooks/useTheme";
 import { useSidebar } from "@/components/layout/SidebarContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
-import { useNavigate, Link } from "@tanstack/react-router";
+import { useNavigate, Link, useLocation } from "@tanstack/react-router";
 import {
   Bell,
   BellOff,
@@ -32,6 +32,31 @@ const ROLE_BADGE_COLORS: Record<string, string> = {
   MACHINE_OPERATOR:     "bg-slate-100 text-slate-500",
   SECURITY_GATE:        "bg-slate-100 text-slate-500",
   AUDITOR:              "bg-slate-100 text-slate-500",
+};
+
+const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
+  "/dashboard":          { title: "Dashboard",        subtitle: "Live operations overview" },
+  "/production":         { title: "Production",        subtitle: "Daily output & efficiency" },
+  "/quality":            { title: "Quality",           subtitle: "Tests & approvals" },
+  "/maintenance":        { title: "Maintenance",       subtitle: "Machine upkeep & logs" },
+  "/hr":                 { title: "Human Resources",   subtitle: "Employees & attendance" },
+  "/payroll":            { title: "Payroll",           subtitle: "Monthly salary processing" },
+  "/purchase":           { title: "Cotton Purchase",   subtitle: "Procurement & suppliers" },
+  "/stores":             { title: "Stores",            subtitle: "Receipts, issues & balance" },
+  "/inventory":          { title: "Inventory",         subtitle: "Stock levels & reorder" },
+  "/dispatch":           { title: "Dispatch",          subtitle: "Trips, trucks & delivery" },
+  "/lotrac":             { title: "LoTrac",            subtitle: "QR sack tracking" },
+  "/accounts":           { title: "Accounts",          subtitle: "Invoices & receivables" },
+  "/sales":              { title: "Sales",             subtitle: "Orders & revenue" },
+  "/masters":            { title: "Masters",           subtitle: "Reference data & config" },
+  "/users":              { title: "Users & Roles",     subtitle: "Access management" },
+  "/audit":              { title: "Audit Logs",        subtitle: "Activity history" },
+  "/admin":              { title: "Admin Panel",       subtitle: "System administration" },
+  "/admin/column-config":{ title: "Column Config",     subtitle: "Field customization" },
+  "/company/billing":    { title: "Billing",           subtitle: "Subscription & payments" },
+  "/profile":            { title: "My Profile",        subtitle: "Account settings" },
+  "/reports":            { title: "Reports",           subtitle: "Analytics & exports" },
+  "/stock":              { title: "Stock",             subtitle: "Lot & warehouse tracking" },
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -117,8 +142,8 @@ function NotificationsDropdown() {
 }
 
 export function Topbar({
-  title = "SpinFlow",
-  subtitle,
+  title: titleProp,
+  subtitle: subtitleProp,
   children,
 }: {
   title?: string;
@@ -129,8 +154,19 @@ export function Topbar({
   const { toggle } = useSidebar();
   const { theme, toggle: toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Derive page title from route path, falling back to the prop or default
+  const pagePath = location.pathname;
+  // Find longest matching prefix in PAGE_TITLES
+  const matched = Object.entries(PAGE_TITLES)
+    .filter(([k]) => pagePath === k || pagePath.startsWith(k + "/"))
+    .sort((a, b) => b[0].length - a[0].length)[0];
+  const pageInfo = matched?.[1] ?? { title: "SpinFlow ERP", subtitle: "" };
+  const title = titleProp ?? pageInfo.title;
+  const subtitle = subtitleProp ?? pageInfo.subtitle;
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

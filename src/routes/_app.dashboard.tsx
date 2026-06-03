@@ -172,7 +172,7 @@ function DashboardPage() {
                     ? {
                         value: att!.today_present,
                         max: att!.today_total,
-                        color: (att?.present_pct ?? 0) < 80 ? "bg-red-500" : "bg-green-500",
+                        color: (att?.present_pct ?? 0) < 80 ? "#dc2626" : "#16a34a",
                       }
                     : undefined
                 }

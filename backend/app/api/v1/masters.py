@@ -62,7 +62,7 @@ async def list_companies(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     try:
         service = MastersService(db, current_user)
         if scope["company_id"] is not None:
@@ -235,7 +235,7 @@ async def create_department(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id") or current_user.mill_id
     if mill_id:
         req.mill_id = mill_id
@@ -306,7 +306,7 @@ async def create_yarn_count(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id") or current_user.mill_id
     if mill_id:
         req.mill_id = mill_id
@@ -377,7 +377,7 @@ async def create_customer(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id") or current_user.mill_id
     if mill_id:
         req.mill_id = mill_id
@@ -457,7 +457,7 @@ async def create_vehicle(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id") or current_user.mill_id
     if mill_id:
         req.mill_id = mill_id
@@ -528,7 +528,7 @@ async def create_route(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id") or current_user.mill_id
     if mill_id:
         req.mill_id = mill_id
@@ -571,7 +571,7 @@ async def bulk_create_machines(
 ):
     if len(req.items) > MAX_BATCH:
         raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id")
     if not mill_id:
         raise HTTPException(400, "mill_id is required")
@@ -633,7 +633,7 @@ async def bulk_create_customers(
 ):
     if len(req.items) > MAX_BATCH:
         raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id")
     if not mill_id:
         raise HTTPException(400, "mill_id is required")

@@ -51,7 +51,7 @@ async def get_tests(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -129,7 +129,7 @@ async def bulk_create_tests(
 ):
     if len(req.items) > MAX_BATCH:
         raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     created = 0
     skipped = 0
     errors: List[str] = []
@@ -205,7 +205,7 @@ async def list_lots(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -289,7 +289,7 @@ async def list_approvals(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -380,7 +380,7 @@ async def approve_or_reject_approval(
 
     action_status = "approved" if action == "approve" else "rejected"
 
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(QualityApproval).join(Lot, QualityApproval.lot_id == Lot.id).where(QualityApproval.id == approval_id)
     if scope["mill_id"]:
         stmt = stmt.where(Lot.mill_id == scope["mill_id"])
@@ -416,7 +416,7 @@ async def list_rejections(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 

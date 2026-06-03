@@ -21,7 +21,7 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("users")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(User).options(selectinload(User.role_rel)).where(User.deleted_at.is_(None))
     if scope["mill_id"] is None and scope["company_id"] is None:
         pass  # SUPER_ADMIN sees all
@@ -65,7 +65,7 @@ async def create_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("users", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
 
     # Require mill_id for non-owner roles
     if req.role not in ("SUPER_ADMIN", "MILL_OWNER") and not req.mill_id:
@@ -153,7 +153,7 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("users", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(User).options(selectinload(User.role_rel)).where(User.id == user_id, User.deleted_at.is_(None))
     if scope["mill_id"]:
         stmt = stmt.where(User.mill_id == scope["mill_id"])
@@ -202,7 +202,7 @@ async def deactivate_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("users", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(User).options(selectinload(User.role_rel)).where(User.id == user_id, User.deleted_at.is_(None))
     if scope["mill_id"]:
         stmt = stmt.where(User.mill_id == scope["mill_id"])
@@ -237,7 +237,7 @@ async def reset_user_password(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("users", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(User).options(selectinload(User.role_rel)).where(User.id == user_id, User.deleted_at.is_(None))
     if scope["mill_id"]:
         stmt = stmt.where(User.mill_id == scope["mill_id"])

@@ -67,7 +67,7 @@ async def get_purchases(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -140,7 +140,7 @@ async def get_suppliers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -207,7 +207,7 @@ async def get_bale_stats(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -299,7 +299,7 @@ async def get_bales(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -433,7 +433,7 @@ async def get_grns(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 

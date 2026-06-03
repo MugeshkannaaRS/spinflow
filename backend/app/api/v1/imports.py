@@ -33,7 +33,7 @@ async def get_import_mappings(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     if scope["mill_id"] and scope["mill_id"] != mill_id:
         raise HTTPException(403, "Access denied")
     if scope["company_id"] and not scope["mill_id"]:
@@ -75,7 +75,7 @@ async def save_import_mappings(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     if scope["mill_id"] and scope["mill_id"] != req.mill_id:
         raise HTTPException(403, "Access denied")
     if scope["company_id"] and not scope["mill_id"]:

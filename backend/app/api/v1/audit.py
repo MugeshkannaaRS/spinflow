@@ -41,7 +41,7 @@ async def get_audit_logs(
     entity: Optional[str] = None,
 ):
     try:
-        scope = await get_mill_scope(current_user)
+        scope = await get_mill_scope(current_user, db)
         query = (
             select(AuditLog, User.name.label("resolved_user_name"))
             .outerjoin(User, AuditLog.user_id == User.id)

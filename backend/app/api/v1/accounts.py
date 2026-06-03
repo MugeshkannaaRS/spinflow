@@ -29,7 +29,7 @@ async def get_invoices(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -76,7 +76,7 @@ async def create_invoice(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope["mill_id"] or current_user.mill_id
     if not mill_id and scope["company_id"]:
         raise HTTPException(status_code=400, detail="mill_id is required for MILL_OWNER")
@@ -104,7 +104,7 @@ async def update_invoice(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(Invoice).where(Invoice.id == invoice_id)
     if scope["mill_id"]:
         stmt = stmt.where(Invoice.mill_id == scope["mill_id"])
@@ -133,7 +133,7 @@ async def delete_invoice(
     current_user: User = Depends(require_module("accounts", write=True)),
 ):
     try:
-        scope = await get_mill_scope(current_user)
+        scope = await get_mill_scope(current_user, db)
         stmt = select(Invoice).where(Invoice.id == invoice_id)
         if scope["mill_id"]:
             stmt = stmt.where(Invoice.mill_id == scope["mill_id"])
@@ -161,7 +161,7 @@ async def get_receivables(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -208,7 +208,7 @@ async def create_payment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     payment = Payment(
         invoice_id=req.invoice_id,
         date=req.payment_date.isoformat(),
@@ -242,7 +242,7 @@ async def get_pl(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     if scope["mill_id"]:
         mill_id = scope["mill_id"]
     elif scope["company_id"]:
@@ -260,7 +260,7 @@ async def get_receivables_ageing(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     if scope["mill_id"]:
         mill_id = scope["mill_id"]
     elif scope["company_id"]:
@@ -278,7 +278,7 @@ async def get_payables(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     if scope["mill_id"]:
         mill_id = scope["mill_id"]
     elif scope["company_id"]:
@@ -298,7 +298,7 @@ async def get_gst(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     if scope["mill_id"]:
         mill_id = scope["mill_id"]
     elif scope["company_id"]:
@@ -318,7 +318,7 @@ async def get_cogs(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     if scope["mill_id"]:
         mill_id = scope["mill_id"]
     elif scope["company_id"]:
@@ -336,7 +336,7 @@ async def accounts_page_init(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 

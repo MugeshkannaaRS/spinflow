@@ -29,7 +29,7 @@ async def export_production_pdf(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     svc = ProductionService(db, current_user)
     stmt = select(ProductionEntry).order_by(ProductionEntry.date.desc())
     if scope.get("mill_id"):
@@ -75,7 +75,7 @@ async def export_production_xlsx(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(ProductionEntry).order_by(ProductionEntry.date.desc())
     if scope.get("mill_id"):
         stmt = stmt.where(ProductionEntry.mill_id == scope["mill_id"])
@@ -194,7 +194,7 @@ async def export_dispatch_pdf(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dispatch")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(Dispatch).order_by(Dispatch.date.desc())
     if scope.get("mill_id"):
         stmt = stmt.where(Dispatch.mill_id == scope["mill_id"])
@@ -240,7 +240,7 @@ async def export_gst_xlsx(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     date_prefix = f"{year}-{month:02d}"
 
     output = await db.execute(

@@ -31,7 +31,7 @@ async def get_tasks(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -89,7 +89,7 @@ async def create_task(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     await _validate_machine_in_scope(db, req.machine_id, scope)
     task = MaintenanceLog(
         date=datetime.now().strftime("%Y-%m-%d"),
@@ -111,7 +111,7 @@ async def update_task_status(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(MaintenanceLog).join(Machine, MaintenanceLog.machine_code == Machine.code).where(MaintenanceLog.id == task_id)
     if scope["mill_id"]:
         stmt = stmt.where(Machine.mill_id == scope["mill_id"])
@@ -141,7 +141,7 @@ async def get_schedules(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -187,7 +187,7 @@ async def create_schedule(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     await _validate_machine_in_scope(db, req.machine_id, scope)
     schedule = MaintenanceSchedule(
         machine_code=req.machine_id,
@@ -212,7 +212,7 @@ async def bulk_create_schedules(
 ):
     if len(req.items) > MAX_BATCH:
         raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     created = 0
     skipped = 0
     errors: List[str] = []
@@ -257,7 +257,7 @@ async def update_schedule(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(MaintenanceSchedule).join(Machine, MaintenanceSchedule.machine_code == Machine.code).where(MaintenanceSchedule.id == schedule_id)
     if scope["mill_id"]:
         stmt = stmt.where(Machine.mill_id == scope["mill_id"])
@@ -292,7 +292,7 @@ async def get_parameters(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -336,7 +336,7 @@ async def bulk_create_parameters(
 ):
     if len(req.items) > MAX_BATCH:
         raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     created = 0
     skipped = 0
     errors: List[str] = []
@@ -376,7 +376,7 @@ async def maintenance_page_init(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 

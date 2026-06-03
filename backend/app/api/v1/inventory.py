@@ -29,7 +29,7 @@ async def get_lots(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -78,7 +78,7 @@ async def get_transfers(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -125,7 +125,7 @@ async def create_transfer(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     loc = await db.execute(select(Warehouse).where(Warehouse.name == req.from_location))
     from_wh = loc.scalar_one_or_none()
     loc2 = await db.execute(select(Warehouse).where(Warehouse.name == req.to_location))
@@ -168,7 +168,7 @@ async def create_lot(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope["mill_id"] or current_user.mill_id
     if not mill_id:
         if scope["company_id"]:
@@ -198,7 +198,7 @@ async def get_warehouses(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -234,7 +234,7 @@ async def create_warehouse(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope["mill_id"] or current_user.mill_id
     if not mill_id and scope["company_id"]:
         raise HTTPException(status_code=400, detail="mill_id is required for MILL_OWNER")

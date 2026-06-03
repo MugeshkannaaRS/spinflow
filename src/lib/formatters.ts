@@ -13,14 +13,17 @@ export const fmtNumber = (n: unknown, decimals = 0): string => {
 /** Alias used in dashboard: fmt(1234) → "1,234" */
 export const fmt = fmtNumber
 
-/** ₹ with Cr / L abbreviation for large numbers */
-export const fmtCurrency = (n: unknown): string => {
+/** ₹ with Cr / L abbreviation — always uses Indian scale for ERP numbers */
+export const fmtLakh = (n: unknown): string => {
   const num = Number(n ?? 0)
   if (isNaN(num)) return '₹0'
-  if (num >= 10000000) return `₹${fmtNumber(num / 10000000, 2)} Cr`
-  if (num >= 100000)   return `₹${fmtNumber(num / 100000, 2)} L`
-  return `₹${fmtNumber(num)}`
+  if (num >= 10000000) return `₹${(num / 10000000).toFixed(2)} Cr`
+  if (num >= 100000)   return `₹${(num / 100000).toFixed(2)} L`
+  return `₹${num.toLocaleString('en-IN')}`
 }
+
+/** Alias kept for backward compat */
+export const fmtCurrency = fmtLakh
 
 /** 1 decimal percent, e.g. "4.2%" */
 export const fmtPercent = (n: unknown): string => `${fmtNumber(n, 1)}%`

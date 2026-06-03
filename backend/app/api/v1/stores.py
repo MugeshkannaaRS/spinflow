@@ -34,7 +34,7 @@ async def get_spares(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -80,7 +80,7 @@ async def create_spare(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope["mill_id"] or current_user.mill_id
     if not mill_id and scope["company_id"]:
         raise HTTPException(status_code=400, detail="Cannot determine mill_id for MILL_OWNER")
@@ -107,7 +107,7 @@ async def bulk_create_spares(
 ):
     if len(req.items) > MAX_BATCH:
         raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id") or current_user.mill_id
     created = 0
     skipped = 0
@@ -150,7 +150,7 @@ async def get_issues(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 
@@ -196,7 +196,7 @@ async def create_issue(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     mill_id = scope["mill_id"] or current_user.mill_id
     if not mill_id and scope["company_id"]:
         raise HTTPException(status_code=400, detail="Cannot determine mill_id for MILL_OWNER")
@@ -232,7 +232,7 @@ async def update_spare(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(Spare).where(Spare.id == spare_id)
     if scope["mill_id"]:
         stmt = stmt.where(Spare.mill_id == scope["mill_id"])
@@ -267,7 +267,7 @@ async def receive_spare_stock(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores", write=True)),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     stmt = select(Spare).where(Spare.id == spare_id)
     if scope["mill_id"]:
         stmt = stmt.where(Spare.mill_id == scope["mill_id"])
@@ -290,7 +290,7 @@ async def stores_page_init(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stores")),
 ):
-    scope = await get_mill_scope(current_user)
+    scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
     effective_mill_id = scope.get("mill_id")
 

@@ -58,7 +58,7 @@ export function KpiCard({
     >
       {/* Top row: label + icon */}
       <div className="flex items-start justify-between">
-        <p className="text-[12px] font-semibold uppercase tracking-[0.06em] text-[#64748b]">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-[#64748b]">
           {label}
         </p>
         <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0", iconBg)}>
@@ -98,16 +98,16 @@ export function KpiCard({
 
       {/* Progress bar */}
       {progress !== undefined && (
-        <div className="w-full h-1.5 rounded-full bg-[#e2e8f0] overflow-hidden">
+        <div className="mt-1 h-1.5 rounded-full bg-[#e2e8f0] overflow-hidden">
           <div
-            className={cn(
-              "h-full rounded-full transition-all duration-500",
-              progress.color ??
-                (progressPct >= 90 ? "bg-green-500"
-               : progressPct >= 70 ? "bg-yellow-500"
-               : "bg-red-500"),
-            )}
-            style={{ width: `${progressPct}%` }}
+            className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${progressPct}%`,
+              backgroundColor: progress.color ??
+                (progressPct >= 90 ? "#16a34a"
+               : progressPct >= 70 ? "#d97706"
+               : "#dc2626"),
+            }}
           />
         </div>
       )}
