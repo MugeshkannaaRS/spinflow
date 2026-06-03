@@ -16,11 +16,29 @@ import {
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/utils/time";
 
+// Role → badge color (matches Sidebar)
+const ROLE_BADGE_COLORS: Record<string, string> = {
+  SUPER_ADMIN:          "bg-purple-100 text-purple-700",
+  MILL_OWNER:           "bg-blue-100 text-blue-700",
+  GENERAL_MANAGER:      "bg-cyan-100 text-cyan-700",
+  PRODUCTION_MANAGER:   "bg-green-100 text-green-700",
+  QUALITY_MANAGER:      "bg-yellow-100 text-yellow-700",
+  DISPATCH_MANAGER:     "bg-orange-100 text-orange-700",
+  HR_MANAGER:           "bg-pink-100 text-pink-700",
+  ACCOUNTANT:           "bg-indigo-100 text-indigo-700",
+  MAINTENANCE_MANAGER:  "bg-red-100 text-red-700",
+  STORE_MANAGER:        "bg-teal-100 text-teal-700",
+  SUPERVISOR:           "bg-slate-100 text-slate-600",
+  MACHINE_OPERATOR:     "bg-slate-100 text-slate-500",
+  SECURITY_GATE:        "bg-slate-100 text-slate-500",
+  AUDITOR:              "bg-slate-100 text-slate-500",
+};
+
 const TYPE_COLORS: Record<string, string> = {
   success: "bg-emerald-500",
-  info: "bg-blue-500",
+  info:    "bg-blue-500",
   warning: "bg-amber-500",
-  error: "bg-red-500",
+  error:   "bg-red-500",
 };
 
 function NotificationsDropdown() {
@@ -31,9 +49,7 @@ function NotificationsDropdown() {
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -50,9 +66,10 @@ function NotificationsDropdown() {
     <div ref={ref} className="relative">
       <button
         onClick={handleToggle}
-        className="relative w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500"
+        className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+        title="Notifications"
       >
-        <Bell className="w-4 h-4" />
+        <Bell className="w-[18px] h-[18px]" />
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
@@ -60,9 +77,12 @@ function NotificationsDropdown() {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-100 rounded-xl shadow-lg z-50 overflow-hidden">
-          <div className="px-4 py-2 text-xs font-medium text-gray-500 border-b border-gray-100">
-            Notifications
+        <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+          <div className="px-4 py-2.5 text-xs font-semibold text-gray-500 border-b border-gray-100 flex items-center justify-between">
+            <span>Notifications</span>
+            {unreadCount > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>
+            )}
           </div>
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-8 text-gray-400">
@@ -70,21 +90,16 @@ function NotificationsDropdown() {
               <span className="text-sm">No new alerts</span>
             </div>
           ) : (
-            <div className="max-h-80 overflow-y-auto">
+            <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
               {notifications.slice(0, 10).map((n) => (
                 <div
                   key={n.id}
-                  className="flex items-start gap-3 px-4 py-2.5 text-sm border-b last:border-0 border-gray-50 hover:bg-gray-50 transition-colors"
+                  className="flex items-start gap-3 px-4 py-3 text-sm hover:bg-gray-50 transition-colors"
                 >
-                  <span
-                    className={cn(
-                      "mt-1.5 w-2 h-2 shrink-0 rounded-full",
-                      TYPE_COLORS[n.type] || "bg-gray-300",
-                    )}
-                  />
+                  <span className={cn("mt-1.5 w-2 h-2 shrink-0 rounded-full", TYPE_COLORS[n.type] || "bg-gray-300")} />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{n.title}</p>
-                    <p className="text-xs text-gray-500 truncate">
+                    <p className="font-semibold text-gray-900 truncate">{n.title}</p>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">
                       {n.message.length > 60 ? n.message.slice(0, 60) + "…" : n.message}
                     </p>
                   </div>
@@ -140,42 +155,55 @@ export function Topbar({
     navigate({ to: "/login" });
   };
 
+  const roleBadgeClass = ROLE_BADGE_COLORS[user?.role ?? ""] ?? "bg-slate-100 text-slate-600";
+  const roleLabel = user?.role?.replace(/_/g, " ") ?? "";
+
   return (
-    <header className="sticky top-0 z-30 h-14 bg-white border-b border-gray-100 flex items-center px-4 lg:px-6 gap-3">
-      {/* Left */}
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        <button
-          onClick={toggle}
-          className="lg:hidden w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-        <div className="min-w-0">
-          <h1 className="text-[17px] font-semibold text-gray-900 truncate">{title}</h1>
-          {subtitle && (
-            <p className="text-xs text-gray-400 truncate hidden sm:block">{subtitle}</p>
-          )}
-        </div>
+    <header
+      className="sticky top-0 z-30 bg-white border-b border-gray-200 flex items-center px-4 lg:px-6 gap-3"
+      style={{ height: 56, minHeight: 56 }}
+    >
+      {/* Hamburger (mobile only) */}
+      <button
+        onClick={toggle}
+        className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+        aria-label="Open menu"
+      >
+        <Menu className="w-5 h-5" />
+      </button>
+
+      {/* Page title */}
+      <div className="flex-1 min-w-0">
+        <h1 className="text-[18px] font-bold text-[#0f172a] truncate leading-tight">{title}</h1>
+        {subtitle && (
+          <p className="text-[12px] text-[#64748b] truncate hidden sm:block leading-tight">{subtitle}</p>
+        )}
       </div>
 
       {children && <div className="flex items-center gap-2">{children}</div>}
 
-      {/* Right */}
+      {/* Right cluster */}
       <div className="flex items-center gap-2 flex-shrink-0">
         <NotificationsDropdown />
 
+        {/* Role chip — hidden on very small screens */}
         {user && (
-          <div className="hidden sm:flex items-center px-3 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-600">
-            {user.role.replace(/_/g, " ")}
+          <div className={cn(
+            "hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide",
+            roleBadgeClass,
+          )}>
+            {roleLabel}
           </div>
         )}
 
+        {/* Avatar + dropdown */}
         {user && (
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="w-8 h-8 rounded-full text-white text-xs font-bold flex items-center justify-center hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: "#0d9488" }}
+              className="w-9 h-9 rounded-full text-white text-xs font-bold flex items-center justify-center hover:opacity-90 transition-opacity shadow-sm"
+              style={{ backgroundColor: "#3b82f6" }}
+              aria-label="User menu"
             >
               {initials}
             </button>
@@ -183,35 +211,44 @@ export function Topbar({
             {dropdownOpen && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
-                <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-gray-100 rounded-xl shadow-lg z-50 overflow-hidden">
+                <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                  {/* User info */}
                   <div className="px-4 py-3 border-b border-gray-100">
                     <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
                     <p className="text-xs text-gray-400 truncate mt-0.5">{user.email}</p>
+                    <div className="mt-2">
+                      <span className={cn("inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide", roleBadgeClass)}>
+                        {roleLabel}
+                      </span>
+                    </div>
                   </div>
+
                   <div className="py-1">
                     <Link
                       to="/profile"
                       onClick={() => setDropdownOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                      className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                     >
-                      <User className="w-4 h-4 text-gray-400" /> Profile
+                      <User className="w-4 h-4 text-gray-400" />
+                      <span>My Profile</span>
                     </Link>
                     <button
                       onClick={() => { toggleTheme(); setDropdownOpen(false); }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                     >
                       {theme === "dark"
                         ? <Sun className="w-4 h-4 text-gray-400" />
                         : <Moon className="w-4 h-4 text-gray-400" />
                       }
-                      {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                      <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
                     </button>
                     <div className="h-px bg-gray-100 mx-3 my-1" />
                     <button
                       onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                     >
-                      <LogOut className="w-4 h-4" /> Logout
+                      <LogOut className="w-4 h-4" />
+                      <span>Sign out</span>
                     </button>
                   </div>
                 </div>

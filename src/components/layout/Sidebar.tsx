@@ -25,6 +25,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -33,6 +34,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useNavigate } from "@tanstack/react-router";
 
 type NavItem = {
   to: string;
@@ -49,42 +51,42 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Operations",
     items: [
-      { to: "/production", label: "Production", icon: Factory, module: "production" },
-      { to: "/quality", label: "Quality", icon: BadgeCheck, module: "quality" },
-      { to: "/maintenance", label: "Maintenance", icon: Wrench, module: "maintenance" },
+      { to: "/production", label: "Production",   icon: Factory,     module: "production" },
+      { to: "/quality",    label: "Quality",       icon: BadgeCheck,  module: "quality" },
+      { to: "/maintenance",label: "Maintenance",   icon: Wrench,      module: "maintenance" },
     ],
   },
   {
     label: "People",
     items: [
-      { to: "/hr", label: "Human Resources", icon: Users, module: "hr" },
-      { to: "/payroll", label: "Payroll", icon: Banknote, module: "payroll" },
+      { to: "/hr",      label: "Human Resources", icon: Users,   module: "hr" },
+      { to: "/payroll", label: "Payroll",          icon: Banknote, module: "payroll" },
     ],
   },
   {
     label: "Supply Chain",
     items: [
-      { to: "/purchase", label: "Cotton Purchase", icon: Package, module: "purchase" },
-      { to: "/stores", label: "Stores", icon: Warehouse, module: "stores" },
-      { to: "/inventory", label: "Inventory", icon: Boxes, module: "inventory" },
-      { to: "/dispatch", label: "Dispatch", icon: Truck, module: "dispatch" },
-      { to: "/lotrac", label: "LoTrac", icon: QrCode, module: "lotrac" },
+      { to: "/purchase",   label: "Cotton Purchase", icon: Package,   module: "purchase" },
+      { to: "/stores",     label: "Stores",          icon: Warehouse,  module: "stores" },
+      { to: "/inventory",  label: "Inventory",       icon: Boxes,      module: "inventory" },
+      { to: "/dispatch",   label: "Dispatch",        icon: Truck,      module: "dispatch" },
+      { to: "/lotrac",     label: "LoTrac",          icon: QrCode,     module: "lotrac" },
     ],
   },
   {
     label: "Finance",
     items: [
-      { to: "/accounts", label: "Accounts", icon: Receipt, module: "accounts" },
-      { to: "/sales", label: "Sales", icon: TrendingUp, module: "sales" },
+      { to: "/accounts", label: "Accounts", icon: Receipt,    module: "accounts" },
+      { to: "/sales",    label: "Sales",    icon: TrendingUp, module: "sales" },
     ],
   },
   {
     label: "Settings",
     items: [
-      { to: "/masters", label: "Masters", icon: Settings2, module: "masters" },
-      { to: "/users", label: "Users & Roles", icon: UserCog, module: "users" },
-      { to: "/audit", label: "Audit Logs", icon: ClipboardList, module: "audit" },
-      { to: "/admin", label: "Admin Panel", icon: Shield, module: "admin" },
+      { to: "/masters",           label: "Masters",       icon: Settings2,       module: "masters" },
+      { to: "/users",             label: "Users & Roles", icon: UserCog,         module: "users" },
+      { to: "/audit",             label: "Audit Logs",    icon: ClipboardList,   module: "audit" },
+      { to: "/admin",             label: "Admin Panel",   icon: Shield,          module: "admin" },
       { to: "/admin/column-config", label: "Column Config", icon: SlidersHorizontal, module: "column_config" },
     ],
   },
@@ -92,36 +94,74 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
 
 const COMPANY_OWNER_ROLES = new Set(["MILL_OWNER", "SUPER_ADMIN"]);
 
+// Role → badge color
+const ROLE_BADGE_COLORS: Record<string, string> = {
+  SUPER_ADMIN:          "bg-purple-600 text-white",
+  MILL_OWNER:           "bg-blue-600 text-white",
+  GENERAL_MANAGER:      "bg-cyan-600 text-white",
+  PRODUCTION_MANAGER:   "bg-green-600 text-white",
+  QUALITY_MANAGER:      "bg-yellow-500 text-white",
+  DISPATCH_MANAGER:     "bg-orange-600 text-white",
+  HR_MANAGER:           "bg-pink-600 text-white",
+  ACCOUNTANT:           "bg-indigo-600 text-white",
+  MAINTENANCE_MANAGER:  "bg-red-600 text-white",
+  STORE_MANAGER:        "bg-teal-600 text-white",
+  SUPERVISOR:           "bg-slate-500 text-white",
+  MACHINE_OPERATOR:     "bg-slate-400 text-white",
+  SECURITY_GATE:        "bg-slate-400 text-white",
+  AUDITOR:              "bg-slate-400 text-white",
+};
+
+function RoleBadge({ role, small = false }: { role: string; small?: boolean }) {
+  const colorClass = ROLE_BADGE_COLORS[role] ?? "bg-slate-500 text-white";
+  const label = role.replace(/_/g, " ");
+  return (
+    <span className={cn(
+      "inline-block rounded font-semibold uppercase tracking-wider leading-none",
+      small ? "text-[9px] px-1.5 py-0.5" : "text-[10px] px-2 py-0.5",
+      colorClass,
+    )}>
+      {label}
+    </span>
+  );
+}
+
 function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavClick?: () => void }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { canAccess, isSuperAdmin, companyModulesLoaded, isDashboardOnly } = useRBAC();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
 
   if (!user) return null;
 
   const isActive = (to: string) => {
     if (to === "/admin") return pathname === "/admin";
-    return pathname === to;
+    return pathname === to || pathname.startsWith(to + "/");
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate({ to: "/login" });
   };
 
   if (!isSuperAdmin && !companyModulesLoaded) {
     return (
-      <div className="flex flex-col h-full" style={{ backgroundColor: "#0f1923" }}>
-        <div className="flex-shrink-0 px-5 py-5 border-b border-[rgba(255,255,255,0.06)]">
+      <div className="flex flex-col h-full" style={{ backgroundColor: "#0f172a" }}>
+        <div className="flex-shrink-0 px-4 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
           {collapsed ? (
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center">
               <span className="text-white font-bold text-sm">S</span>
             </div>
           ) : (
             <div>
-              <div className="text-white font-semibold text-[15px]">SpinFlow ERP</div>
-              <div className="text-[#6b7280] text-[11px] mt-0.5">Loading...</div>
+              <div className="text-white font-semibold text-base">SpinFlow ERP</div>
+              <div className="text-[#94a3b8] text-xs mt-0.5">Loading…</div>
             </div>
           )}
         </div>
-        <nav className="flex-1 overflow-y-auto py-3 px-2">
+        <nav className="flex-1 py-3 px-2">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-9 bg-[#1e2d3d] rounded-lg animate-pulse mx-2 mb-1" />
+            <div key={i} className="h-10 rounded-lg animate-pulse mx-1 mb-1" style={{ backgroundColor: "#1e293b" }} />
           ))}
         </nav>
       </div>
@@ -141,23 +181,26 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
   const showBilling = COMPANY_OWNER_ROLES.has(user.role) && !isDashboardOnly();
 
   return (
-    <div className="flex flex-col h-full" style={{ backgroundColor: "#0f1923" }}>
+    <div className="flex flex-col h-full" style={{ backgroundColor: "#0f172a" }}>
       {/* Logo */}
-      <div className="flex-shrink-0 px-5 py-5 border-b border-[rgba(255,255,255,0.06)]">
+      <div
+        className="flex-shrink-0 px-4 py-4 border-b"
+        style={{ borderColor: "rgba(255,255,255,0.08)", minHeight: 64 }}
+      >
         {collapsed ? (
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">S</span>
-          </div>
-        ) : (
-          <Link to="/dashboard" className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+          <Link to="/dashboard" className="flex justify-center">
+            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
               S
             </div>
-            <div>
-              <div className="text-white font-semibold text-[15px] leading-tight">SpinFlow ERP</div>
-              <div className="text-[#6b7280] text-[11px] mt-0.5">
-                {user?.millName ?? "Your mill"}
-              </div>
+          </Link>
+        ) : (
+          <Link to="/dashboard" className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+              S
+            </div>
+            <div className="min-w-0">
+              <div className="text-white font-semibold text-base leading-tight truncate">SpinFlow ERP</div>
+              <div className="text-[#94a3b8] text-xs mt-0.5 truncate">{user?.millName ?? "Your mill"}</div>
             </div>
           </Link>
         )}
@@ -168,7 +211,10 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
         {filteredGroups.map((group) => (
           <div key={group.label} className="mb-1">
             {!collapsed && (
-              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#64748b]">
+              <div
+                className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em]"
+                style={{ color: "#475569" }}
+              >
                 {group.label}
               </div>
             )}
@@ -181,20 +227,36 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                   to={item.to}
                   onClick={onNavClick}
                   className={cn(
-                    "flex items-center rounded-lg transition-all duration-150 mb-0.5 cursor-pointer",
-                    collapsed ? "justify-center py-2.5" : "px-3 py-2",
+                    "flex items-center rounded-md transition-all duration-150 mb-0.5 cursor-pointer min-h-[40px]",
+                    collapsed ? "justify-center px-2" : "px-3",
                     active
-                      ? "bg-[#1e2d3d] text-white"
-                      : "text-[#94a3b8] hover:bg-[#1a2d42] hover:text-[#d1d5db]",
+                      ? "text-white"
+                      : "hover:text-white",
                   )}
+                  style={
+                    active
+                      ? { backgroundColor: "#3b82f6" }
+                      : undefined
+                  }
+                  onMouseEnter={active ? undefined : (e) => {
+                    (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
+                  }}
+                  onMouseLeave={active ? undefined : (e) => {
+                    (e.currentTarget as HTMLElement).style.backgroundColor = "";
+                  }}
                 >
                   <Icon
                     className={cn(
                       "shrink-0",
-                      collapsed ? "w-5 h-5" : "w-4 h-4 mr-3",
+                      collapsed ? "w-5 h-5" : "w-[18px] h-[18px] mr-3",
+                      active ? "text-white" : "text-[#94a3b8]",
                     )}
                   />
-                  {!collapsed && <span className="text-sm font-medium truncate">{item.label}</span>}
+                  {!collapsed && (
+                    <span className={cn("text-[14px] font-medium truncate", active ? "text-white" : "text-[#94a3b8]")}>
+                      {item.label}
+                    </span>
+                  )}
                 </Link>
               );
               if (collapsed) {
@@ -202,7 +264,11 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                   <TooltipProvider key={item.to}>
                     <Tooltip>
                       <TooltipTrigger asChild>{link}</TooltipTrigger>
-                      <TooltipContent side="right" className="bg-[#0f1923] text-white border border-[rgba(255,255,255,0.1)] text-xs">
+                      <TooltipContent
+                        side="right"
+                        className="text-xs"
+                        style={{ backgroundColor: "#0f172a", color: "white", border: "1px solid rgba(255,255,255,0.1)" }}
+                      >
                         {item.label}
                       </TooltipContent>
                     </Tooltip>
@@ -213,11 +279,12 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
             })}
           </div>
         ))}
-        {/* Billing nav item for company owners */}
+
+        {/* Billing */}
         {showBilling && (
           <div className="mb-1">
             {!collapsed && (
-              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#64748b]">
+              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "#475569" }}>
                 Company
               </div>
             )}
@@ -228,15 +295,19 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                   to="/company/billing"
                   onClick={onNavClick}
                   className={cn(
-                    "flex items-center rounded-lg transition-all duration-150 mb-0.5 cursor-pointer",
-                    collapsed ? "justify-center py-2.5" : "px-3 py-2",
-                    active
-                      ? "bg-[#1e2d3d] text-white"
-                      : "text-[#94a3b8] hover:bg-[#1a2d42] hover:text-[#d1d5db]",
+                    "flex items-center rounded-md transition-all duration-150 mb-0.5 cursor-pointer min-h-[40px]",
+                    collapsed ? "justify-center px-2" : "px-3",
                   )}
+                  style={active ? { backgroundColor: "#3b82f6" } : undefined}
+                  onMouseEnter={active ? undefined : (e) => {
+                    (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
+                  }}
+                  onMouseLeave={active ? undefined : (e) => {
+                    (e.currentTarget as HTMLElement).style.backgroundColor = "";
+                  }}
                 >
-                  <CreditCard className={cn("shrink-0", collapsed ? "w-5 h-5" : "w-4 h-4 mr-3")} />
-                  {!collapsed && <span className="text-sm font-medium truncate">Billing</span>}
+                  <CreditCard className={cn("shrink-0", collapsed ? "w-5 h-5" : "w-[18px] h-[18px] mr-3", active ? "text-white" : "text-[#94a3b8]")} />
+                  {!collapsed && <span className={cn("text-[14px] font-medium truncate", active ? "text-white" : "text-[#94a3b8]")}>Billing</span>}
                 </Link>
               );
               if (collapsed) {
@@ -244,7 +315,7 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>{link}</TooltipTrigger>
-                      <TooltipContent side="right" className="bg-[#0f1923] text-white border border-[rgba(255,255,255,0.1)] text-xs">
+                      <TooltipContent side="right" className="text-xs" style={{ backgroundColor: "#0f172a", color: "white", border: "1px solid rgba(255,255,255,0.1)" }}>
                         Billing
                       </TooltipContent>
                     </Tooltip>
@@ -257,37 +328,71 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
         )}
       </nav>
 
-      {/* Bottom */}
-      <div className="flex-shrink-0 px-3 py-3 border-t border-[rgba(255,255,255,0.06)]">
+      {/* Bottom — user info + role badge + collapse toggle */}
+      <div className="flex-shrink-0 px-3 py-3 border-t space-y-1" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
         {!collapsed ? (
           <Link
             to="/profile"
             onClick={onNavClick}
-            className="flex items-center gap-3 px-2 py-2 rounded-lg text-[#9ca3af] hover:bg-[#1a2d42] transition-colors"
+            className="flex items-center gap-3 px-2 py-2 rounded-lg transition-colors"
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = ""; }}
           >
-            <div className="w-7 h-7 rounded-full bg-[#0d9488] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+              style={{ backgroundColor: "#3b82f6" }}
+            >
               {user?.name?.charAt(0)?.toUpperCase() ?? "U"}
             </div>
-            <div className="min-w-0">
-              <div className="text-xs font-medium text-white truncate">{user?.name}</div>
-              <div className="text-[10px] text-[#94a3b8] truncate">{user?.role?.replace(/_/g, " ")}</div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[13px] font-semibold text-white truncate">{user?.name}</div>
+              <RoleBadge role={user?.role ?? ""} small />
             </div>
           </Link>
         ) : (
-          <Link to="/profile" onClick={onNavClick} className="flex justify-center py-2">
-            <div className="w-7 h-7 rounded-full bg-[#0d9488] flex items-center justify-center text-white text-xs font-bold">
-              {user?.name?.charAt(0)?.toUpperCase() ?? "U"}
-            </div>
-          </Link>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link to="/profile" onClick={onNavClick} className="flex justify-center py-1.5">
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                    style={{ backgroundColor: "#3b82f6" }}
+                  >
+                    {user?.name?.charAt(0)?.toUpperCase() ?? "U"}
+                  </div>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-xs" style={{ backgroundColor: "#0f172a", color: "white", border: "1px solid rgba(255,255,255,0.1)" }}>
+                {user?.name}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
 
+        {/* Logout */}
+        {!collapsed && (
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[#94a3b8] hover:text-red-400 transition-colors text-[13px]"
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b"; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = ""; }}
+          >
+            <LogOut className="w-4 h-4 shrink-0" />
+            <span>Logout</span>
+          </button>
+        )}
+
+        {/* Collapse toggle */}
         <button
           onClick={() => {
             const isCollapsed = localStorage.getItem("spinflow_sidebar_collapsed") === "true";
             localStorage.setItem("spinflow_sidebar_collapsed", String(!isCollapsed));
             window.dispatchEvent(new Event("sidebar-collapse-change"));
           }}
-          className="hidden lg:flex w-full items-center justify-center mt-2 py-1.5 rounded-lg text-[#94a3b8] hover:bg-[#1a2d42] transition-colors"
+          className="hidden lg:flex w-full items-center justify-center py-1.5 rounded-lg text-[#94a3b8] hover:text-white transition-colors min-h-[40px]"
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b"; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = ""; }}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
@@ -317,7 +422,7 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
           "fixed top-0 left-0 h-screen flex flex-col overflow-hidden z-30 transition-all duration-200 ease-in-out hidden lg:flex",
           collapsed ? "w-16" : "w-60",
         )}
-        style={{ backgroundColor: "#0f1923" }}
+        style={{ backgroundColor: "#0f172a" }}
       >
         <SidebarContent collapsed={collapsed} />
       </aside>
@@ -336,15 +441,15 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
             onClick={onClose}
           />
           <div
-            className="absolute left-0 top-0 h-full w-72 transition-transform duration-200"
+            className="absolute left-0 top-0 h-full w-72 transition-transform duration-200 shadow-2xl"
             style={{
               transform: open ? "translateX(0)" : "translateX(-100%)",
-              backgroundColor: "#0f1923",
+              backgroundColor: "#0f172a",
             }}
           >
             <button
               onClick={onClose}
-              className="absolute right-3 top-4 p-1 rounded-md text-[#6b7280] hover:bg-[#1a2d42]"
+              className="absolute right-3 top-4 p-1.5 rounded-md text-[#94a3b8] hover:bg-[#1e293b] hover:text-white transition-colors"
             >
               <X className="size-5" />
             </button>
