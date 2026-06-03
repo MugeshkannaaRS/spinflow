@@ -1,6 +1,8 @@
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, Text, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import JSON
 from datetime import datetime
+from typing import Optional
 from app.db.base import Base, TimestampMixin, SoftDeleteMixin, generate_uuid
 
 
@@ -39,12 +41,20 @@ class User(TimestampMixin, SoftDeleteMixin, Base):
     otp_code: Mapped[str] = mapped_column(String(10), nullable=True)
     otp_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    module_restrictions: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, default=None)
+
     role_rel = relationship("Role", back_populates="users")
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
 
     @property
     def role(self):
         return self.role_rel.code if self.role_rel else None
+
+    def get_module_restrictions(self) -> dict[str, bool]:
+        """Returns module restriction map. Only modules present here are restricted.
+        A module with value False means the user cannot access it.
+        """
+        return self.module_restrictions or {}
 
 
 class UserSession(Base):

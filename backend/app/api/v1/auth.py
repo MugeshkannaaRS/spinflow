@@ -234,6 +234,7 @@ async def get_me(db: AsyncSession = Depends(get_db), current_user: User = Depend
             "mill_name": mill_name,
             "company_mills": company_mills,
             "must_change_password": current_user.must_change_password,
+            "module_restrictions": current_user.get_module_restrictions(),
         }
 
     except Exception as e:

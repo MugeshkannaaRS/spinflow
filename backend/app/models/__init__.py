@@ -1,6 +1,7 @@
 from app.db.base import Base
 from app.models.user import User, Role, UserSession
 from app.models.audit import AuditLog
+from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest
 from app.models.production import Machine, ProductionEntry, Shift, DowntimeLog
 from app.models.quality import QualityTest, LabReport, QualityApproval
 from app.models.inventory import InventoryItem, Lot, StockMovement, InventoryBag, Warehouse

@@ -158,6 +158,12 @@ async def create_user(
         if existing.scalar_one_or_none():
             raise HTTPException(400, f"Email {email} is already in use")
 
+        from app.services.pricing_service import PricingService
+        pricing_svc = PricingService(db)
+        ok, msg = await pricing_svc.can_create_user(company_id)
+        if not ok:
+            raise HTTPException(status_code=403, detail=msg)
+
         user_count = await db.execute(
             select(func.count(User.id)).where(
                 User.company_id == company_id,
@@ -549,5 +555,51 @@ async def update_user_modules(
     await db.commit()
     role_code_audit = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
     changed = [f"{k}={v}" for k, v in modules_data.items()]
-    await log_audit(db, current_user.id, role_code_audit, "update_user_modules", "user", user_id, f"User modules changed: {', '.join(changed)}")
-    return {"message": "Module access updated successfully"}
+    await log_audit(db, current_user.id, role_code_audit, "update_user_modules", "user", user_id, f"Company modules changed: {', '.join(changed)}")
+    return {"message": "Company module access updated successfully"}
+
+
+@router.get("/admin/users/{user_id}/restrictions")
+async def get_user_restrictions(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role = current_user.role_rel.code if current_user.role_rel else ""
+    if role not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN or MILL_OWNER can view restrictions")
+    target_user = await db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return {
+        "user_id": user_id,
+        "module_restrictions": target_user.get_module_restrictions(),
+    }
+
+
+@router.put("/admin/users/{user_id}/restrictions")
+async def update_user_restrictions(
+    user_id: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role = current_user.role_rel.code if current_user.role_rel else ""
+    if role != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super Admin only")
+    target_user = await db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    old_value = dict(target_user.get_module_restrictions())
+    new_restrictions: Dict[str, bool] = body.get("module_restrictions", {})
+    target_user.module_restrictions = new_restrictions
+    await db.commit()
+    await db.refresh(target_user)
+    role_code_audit = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+    await log_audit(
+        db, current_user.id, role_code_audit,
+        "update_user_restrictions", "user", user_id,
+        f"Module restrictions updated",
+        old_value=str(old_value), new_value=str(new_restrictions),
+    )
+    return {"message": "User module restrictions updated", "module_restrictions": new_restrictions}

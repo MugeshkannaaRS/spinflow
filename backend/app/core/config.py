@@ -40,6 +40,19 @@ class Settings(BaseSettings):
     # QR — no default
     QR_SECRET_KEY: str = ""
 
+    # Razorpay
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
+    RAZORPAY_WEBHOOK_SECRET: str = ""
+
+    # Observability
+    SENTRY_DSN: str = ""
+    SENTRY_ENVIRONMENT: str = "development"
+    LOG_LEVEL: str = "INFO"
+    LOG_FORMAT: str = "json"
+    SLOW_QUERY_THRESHOLD: int = 500
+    ENVIRONMENT: str = "development"
+
     # SMTP
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587
@@ -70,6 +83,9 @@ class Settings(BaseSettings):
                 f"SECRET_KEY must be at least 32 characters (got {len(self.SECRET_KEY)}). "
                 "Generate a strong key with: python -c \"import secrets; print(secrets.token_hex(32))\""
             )
+        if self.SENTRY_DSN and not self.SENTRY_DSN.startswith("https://"):
+            logger = __import__("logging").getLogger("spinflow")
+            logger.warning("SENTRY_DSN does not look like a valid DSN (expected https://...)")
 
 
 settings = Settings()

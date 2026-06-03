@@ -1,13 +1,13 @@
 from fastapi import Depends, HTTPException, status, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, List
+from typing import Optional
 from app.db.session import get_db
 from app.core.security import decode_token
 from app.models.user import User
 from app.models.audit import AuditLog
 from app.models.masters import Mill
-from app.core.rbac import can_access, can_write, ROLE_MODULE_ACCESS
-from app.models.masters import CompanyModule
+from app.core.access import resolve_access
+from app.core.rbac import SYSTEM_MODULES, is_dashboard_only
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 import uuid
@@ -34,7 +34,9 @@ async def get_current_user(
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
-    result = await db.execute(select(User).options(selectinload(User.role_rel)).where(User.id == user_id, User.deleted_at.is_(None)))
+    result = await db.execute(
+        select(User).options(selectinload(User.role_rel)).where(User.id == user_id, User.deleted_at.is_(None))
+    )
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
@@ -50,59 +52,53 @@ async def get_current_user(
     return user
 
 
-SYSTEM_MODULES = {"dashboard","masters","users","column_config","audit"}
-
 def require_module(module: str, write: bool = False):
+    """Three-layer permission guard.
+
+    Evaluates:
+      1. Company subscription (company_modules)
+      2. Role capability (ACCESS_MATRIX)
+      3. User module restrictions (module_restrictions)
+    """
     async def dependency(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> User:
-        role_code = current_user.role
-
-        if role_code == "SUPER_ADMIN":
-            return current_user
-
-        allowed_by_role = module in ROLE_MODULE_ACCESS.get(role_code, ["dashboard"])
-        if not allowed_by_role:
-            raise HTTPException(
-                status_code=403,
-                detail=f"Your role ({role_code}) does not have access to this module. Contact your administrator if you need access."
-            )
-
-        if write and not can_write(role_code, module):
-            raise HTTPException(
-                status_code=403,
-                detail=f"Write access denied for module: {module}"
-            )
-
-        if module in SYSTEM_MODULES:
-            return current_user
-
-        if current_user.company_id:
-            cm_result = await db.execute(
-                select(CompanyModule).where(
-                    CompanyModule.company_id == current_user.company_id,
-                    CompanyModule.module_name == module,
-                    CompanyModule.is_enabled == True
-                )
-            )
-            if not cm_result.scalar_one_or_none():
-                raise HTTPException(
-                    status_code=403,
-                    detail=f"Module '{module}' is not enabled for your company. Contact SpinFlow support to upgrade your plan."
-                )
-
+        result = await resolve_access(db, current_user, module, write=write)
+        if not result.granted:
+            raise HTTPException(status_code=403, detail=result.reason)
         return current_user
     return dependency
 
 
 async def get_mill_scope(current_user: User = Depends(get_current_user)):
+    """Returns the data scope for the current user.
+
+    SUPER_ADMIN: sees everything (mill_id=None, company_id=None)
+    MILL_OWNER: sees all mills in their company (see_all_company_mills=True)
+    All others: scoped to their assigned mill
+    """
     role_name = current_user.role
     if role_name == "SUPER_ADMIN":
-        return {"mill_id": None, "company_id": None, "role": role_name, "see_all_company_mills": False}
+        return {
+            "mill_id": None,
+            "company_id": None,
+            "role": role_name,
+            "see_all_company_mills": False,
+        }
     if role_name == "MILL_OWNER":
-        return {"mill_id": current_user.mill_id, "company_id": current_user.company_id, "role": role_name, "see_all_company_mills": True}
-    return {"mill_id": current_user.mill_id, "company_id": current_user.company_id, "role": role_name, "see_all_company_mills": False}
+        return {
+            "mill_id": None,  # MILL_OWNER sees all mills in their company
+            "company_id": current_user.company_id,
+            "role": role_name,
+            "see_all_company_mills": True,
+        }
+    return {
+        "mill_id": current_user.mill_id,
+        "company_id": current_user.company_id,
+        "role": role_name,
+        "see_all_company_mills": False,
+    }
 
 
 async def log_audit(

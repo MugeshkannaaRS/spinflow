@@ -46,6 +46,8 @@ import {
   UserPlus,
   Eye,
   EyeOff,
+  CreditCard,
+  Receipt,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { fmtDate } from "@/lib/format";
@@ -62,6 +64,9 @@ import {
 import { DialogFooter } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { Company } from "@/lib/types";
+import { BillingDashboard } from "@/components/admin/BillingDashboard";
+import { PlanManager } from "@/components/admin/PlanManager";
+import { CompanySubscriptionPanel } from "@/components/admin/CompanySubscription";
 
 const AdminSearchSchema = z.object({
   tab: z.string().optional(),
@@ -226,6 +231,8 @@ function AdminPage() {
               <TabsTrigger value="limits">User Limits</TabsTrigger>
               <TabsTrigger value="users">Users</TabsTrigger>
               <TabsTrigger value="audit">Audit</TabsTrigger>
+              <TabsTrigger value="billing"><CreditCard className="size-3.5 mr-1 inline" />Billing</TabsTrigger>
+              <TabsTrigger value="plans"><Receipt className="size-3.5 mr-1 inline" />Plans</TabsTrigger>
             </TabsList>
 
             <TabsContent value="companies">
@@ -540,6 +547,21 @@ function AdminPage() {
                   />
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="billing">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Billing Dashboard</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BillingDashboard />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="plans">
+              <PlanManager />
             </TabsContent>
           </Tabs>
         </div>

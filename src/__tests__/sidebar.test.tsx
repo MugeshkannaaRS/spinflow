@@ -38,6 +38,7 @@ vi.mock("@/hooks/useRBAC", () => ({
         return !["admin", "column_config"].includes(module);
       },
       isSuperAdmin,
+      isDashboardOnly: () => false,
       companyModulesLoaded: true,
     };
   }),

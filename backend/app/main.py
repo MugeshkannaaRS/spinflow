@@ -18,10 +18,17 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.core.config import settings
 from app.core.error_handler import register_error_handlers
 from app.core.limiter import limiter
+from app.core.logging_config import setup_logging
+from app.core.observability import init_sentry, install_slow_query_logging, check_database, check_redis, collect_system_info
 from app.db.session import engine
 from app.api.v1 import auth, production, quality, inventory, dispatch, purchase, stores, hr, accounts, maintenance, dashboard, qr_system, reports, users, audit, masters, stock as stock_router, sales as sales_router, lotrac as lotrac_router, payroll as payroll_router, uploads as uploads_router, exports as exports_router, ui_config as ui_config_router, imports as imports_router
 from app.api.v1.admin import router as admin_router
+from app.api.v1.billing import router as billing_router
 from app.ws.notifications import router as ws_router
+
+setup_logging()
+init_sentry()
+install_slow_query_logging(engine)
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +131,41 @@ async def lifespan(app: FastAPI):
         logger.info("Database migrations applied successfully")
     except Exception as exc:
         logger.error(f"Failed to apply database migrations: {exc}", exc_info=True)
+
+    try:
+        from app.db.session import get_db
+        from app.services.pricing_service import PricingService
+        async for session in get_db():
+            await PricingService(session).seed_default_plans()
+            break
+        logger.info("Default plans seeded")
+    except Exception as exc:
+        logger.error(f"Failed to seed default plans: {exc}", exc_info=True)
+
+    expiry_task = None
+    try:
+        from app.db.session import get_db
+
+        async def _expiry_loop():
+            while True:
+                try:
+                    async for session in get_db():
+                        await PricingService(session).process_expirations()
+                        await session.commit()
+                        break
+                except Exception as exc:
+                    logger.error(f"Expiry check failed: {exc}", exc_info=True)
+                await asyncio.sleep(3600)
+
+        expiry_task = asyncio.create_task(_expiry_loop())
+        logger.info("Expiry automation started (3600s interval)")
+    except Exception as exc:
+        logger.error(f"Failed to start expiry automation: {exc}", exc_info=True)
+
     yield
+
+    if expiry_task:
+        expiry_task.cancel()
     await engine.dispose()
 
 
@@ -205,9 +246,33 @@ app.include_router(exports_router.router, prefix=API_PREFIX, tags=["Exports"])
 app.include_router(ui_config_router.router, prefix=API_PREFIX, tags=["UI Config"])
 app.include_router(imports_router.router, prefix=API_PREFIX, tags=["Imports"])
 app.include_router(admin_router, prefix=API_PREFIX, tags=["Admin"])
+app.include_router(billing_router, prefix=API_PREFIX, tags=["Billing"])
 app.include_router(ws_router)
 
 
 @app.get("/api/health")
 async def health():
-    return {"status": "healthy", "app": settings.APP_NAME, "version": settings.VERSION}
+    db_status = {"status": "not_checked"}
+    redis_status = {"status": "not_checked"}
+    try:
+        from app.db.session import get_db
+        async for session in get_db():
+            db_status = await check_database(session)
+            break
+    except Exception as exc:
+        db_status = {"status": "unhealthy", "error": str(exc)}
+    try:
+        redis_status = await check_redis()
+    except Exception as exc:
+        redis_status = {"status": "unhealthy", "error": str(exc)}
+    system = collect_system_info()
+    overall = all(s.get("status") == "healthy" for s in [db_status, redis_status] if s.get("status") != "not_configured")
+    return {
+        "status": "healthy" if overall else "degraded",
+        "app": settings.APP_NAME,
+        "version": settings.VERSION,
+        "environment": settings.ENVIRONMENT,
+        "database": db_status,
+        "redis": redis_status,
+        "system": system,
+    }

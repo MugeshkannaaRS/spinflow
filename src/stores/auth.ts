@@ -20,6 +20,7 @@ export interface AuthUser {
   allowedModules?: string[];
   mustChangePassword?: boolean;
   companyMills?: CompanyMill[];
+  moduleRestrictions?: Record<string, boolean> | null;
 }
 
 interface AuthState {

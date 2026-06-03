@@ -3,13 +3,27 @@ import { useAuth } from "@/stores/auth";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/layout/SidebarContext";
 import { AlertBanner } from "@/components/common/AlertBanner";
+import { DashboardOnlyGuard } from "@/components/DashboardOnlyGuard";
+import { DASHBOARD_ONLY_ROLES } from "@/lib/access";
 import { useEffect, useState } from "react";
 import { Topbar } from "@/components/layout/Topbar";
 import { cn } from "@/lib/utils";
 
+const ALLOWED_DASHBOARD_ONLY_PATHS = ["/dashboard", "/profile", "/login"];
+
 export const Route = createFileRoute("/_app")({
-  beforeLoad: () => {
-    if (!useAuth.getState().user) throw redirect({ to: "/login" });
+  beforeLoad: ({ location }) => {
+    const state = useAuth.getState();
+    const user = state.user;
+    if (!user) throw redirect({ to: "/login" });
+
+    if (DASHBOARD_ONLY_ROLES.has(user.role)) {
+      const path = location.pathname;
+      const allowed = ALLOWED_DASHBOARD_ONLY_PATHS.some((p) => path === p || path.startsWith(p + "/"));
+      if (!allowed) {
+        throw redirect({ to: "/dashboard" });
+      }
+    }
   },
   component: AppLayout,
 });
@@ -81,7 +95,9 @@ function AppShell() {
         <Topbar />
         <AlertBanner />
         <main className="flex-1 overflow-y-auto bg-white lg:bg-gray-50 dark:bg-slate-900 p-4 lg:p-6">
-          <Outlet />
+          <DashboardOnlyGuard>
+            <Outlet />
+          </DashboardOnlyGuard>
         </main>
       </div>
     </div>

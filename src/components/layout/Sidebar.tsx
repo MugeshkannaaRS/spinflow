@@ -21,6 +21,7 @@ import {
   ClipboardList,
   Shield,
   SlidersHorizontal,
+  CreditCard,
   ChevronLeft,
   ChevronRight,
   X,
@@ -89,9 +90,11 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   },
 ];
 
+const COMPANY_OWNER_ROLES = new Set(["MILL_OWNER", "SUPER_ADMIN"]);
+
 function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavClick?: () => void }) {
   const { user } = useAuth();
-  const { canAccess, isSuperAdmin, companyModulesLoaded } = useRBAC();
+  const { canAccess, isSuperAdmin, companyModulesLoaded, isDashboardOnly } = useRBAC();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   if (!user) return null;
@@ -128,9 +131,14 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
   const filteredGroups = NAV_GROUPS
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => canAccess(item.module)),
+      items: group.items.filter((item) => {
+        if (isDashboardOnly()) return item.module === "dashboard";
+        return canAccess(item.module);
+      }),
     }))
     .filter((group) => group.items.length > 0);
+
+  const showBilling = COMPANY_OWNER_ROLES.has(user.role) && !isDashboardOnly();
 
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#0f1923" }}>
@@ -205,6 +213,48 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
             })}
           </div>
         ))}
+        {/* Billing nav item for company owners */}
+        {showBilling && (
+          <div className="mb-1">
+            {!collapsed && (
+              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-[#64748b]">
+                Company
+              </div>
+            )}
+            {(() => {
+              const active = isActive("/company/billing");
+              const link = (
+                <Link
+                  to="/company/billing"
+                  onClick={onNavClick}
+                  className={cn(
+                    "flex items-center rounded-lg transition-all duration-150 mb-0.5 cursor-pointer",
+                    collapsed ? "justify-center py-2.5" : "px-3 py-2",
+                    active
+                      ? "bg-[#1e2d3d] text-white"
+                      : "text-[#94a3b8] hover:bg-[#1a2d42] hover:text-[#d1d5db]",
+                  )}
+                >
+                  <CreditCard className={cn("shrink-0", collapsed ? "w-5 h-5" : "w-4 h-4 mr-3")} />
+                  {!collapsed && <span className="text-sm font-medium truncate">Billing</span>}
+                </Link>
+              );
+              if (collapsed) {
+                return (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>{link}</TooltipTrigger>
+                      <TooltipContent side="right" className="bg-[#0f1923] text-white border border-[rgba(255,255,255,0.1)] text-xs">
+                        Billing
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              }
+              return link;
+            })()}
+          </div>
+        )}
       </nav>
 
       {/* Bottom */}

@@ -33,6 +33,7 @@ import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppAuditRouteImport } from './routes/_app.audit'
 import { Route as AppAdminRouteImport } from './routes/_app.admin'
 import { Route as AppAccountsRouteImport } from './routes/_app.accounts'
+import { Route as AppCompanyBillingRouteImport } from './routes/_app.company.billing'
 import { Route as AppAdminColumnConfigRouteImport } from './routes/_app.admin.column-config'
 
 const LoginRoute = LoginRouteImport.update({
@@ -154,6 +155,11 @@ const AppAccountsRoute = AppAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCompanyBillingRoute = AppCompanyBillingRouteImport.update({
+  id: '/company/billing',
+  path: '/company/billing',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminColumnConfigRoute = AppAdminColumnConfigRouteImport.update({
   id: '/column-config',
   path: '/column-config',
@@ -185,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/stores': typeof AppStoresRoute
   '/users': typeof AppUsersRoute
   '/admin/column-config': typeof AppAdminColumnConfigRoute
+  '/company/billing': typeof AppCompanyBillingRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -211,6 +218,7 @@ export interface FileRoutesByTo {
   '/stores': typeof AppStoresRoute
   '/users': typeof AppUsersRoute
   '/admin/column-config': typeof AppAdminColumnConfigRoute
+  '/company/billing': typeof AppCompanyBillingRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -239,6 +247,7 @@ export interface FileRoutesById {
   '/_app/stores': typeof AppStoresRoute
   '/_app/users': typeof AppUsersRoute
   '/_app/admin/column-config': typeof AppAdminColumnConfigRoute
+  '/_app/company/billing': typeof AppCompanyBillingRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -267,6 +276,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/users'
     | '/admin/column-config'
+    | '/company/billing'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -293,6 +303,7 @@ export interface FileRouteTypes {
     | '/stores'
     | '/users'
     | '/admin/column-config'
+    | '/company/billing'
   id:
     | '__root__'
     | '/'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/_app/stores'
     | '/_app/users'
     | '/_app/admin/column-config'
+    | '/_app/company/billing'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -499,6 +511,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAccountsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/company/billing': {
+      id: '/_app/company/billing'
+      path: '/company/billing'
+      fullPath: '/company/billing'
+      preLoaderRoute: typeof AppCompanyBillingRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/column-config': {
       id: '/_app/admin/column-config'
       path: '/column-config'
@@ -542,6 +561,7 @@ interface AppRouteChildren {
   AppStockRoute: typeof AppStockRoute
   AppStoresRoute: typeof AppStoresRoute
   AppUsersRoute: typeof AppUsersRoute
+  AppCompanyBillingRoute: typeof AppCompanyBillingRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -565,6 +585,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppStockRoute: AppStockRoute,
   AppStoresRoute: AppStoresRoute,
   AppUsersRoute: AppUsersRoute,
+  AppCompanyBillingRoute: AppCompanyBillingRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

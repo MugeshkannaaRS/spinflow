@@ -31,6 +31,7 @@ class UserResponse(BaseModel):
     is_active: bool
     last_login: Optional[datetime] = None
     must_change_password: bool = False
+    module_restrictions: Optional[dict] = None
 
     class Config:
         from_attributes = True

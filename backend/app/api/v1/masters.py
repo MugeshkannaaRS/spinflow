@@ -162,6 +162,11 @@ async def create_mill(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
+    from app.services.pricing_service import PricingService
+    svc = PricingService(db)
+    ok, msg = await svc.can_create_mill(req.company_id)
+    if not ok:
+        raise HTTPException(status_code=403, detail=msg)
     service = MastersService(db, current_user)
     return await service.create_mill(req, created_by=current_user.id)
 

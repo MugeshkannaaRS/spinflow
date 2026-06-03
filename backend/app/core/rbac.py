@@ -1,4 +1,13 @@
-from typing import Union
+"""Canonical RBAC matrix — single source of truth for all access decisions.
+
+Every permission check in backend and frontend derives from ACCESS_MATRIX below.
+All three layers are enforced at the API level via access.py:
+  1. Company subscription (company_modules)
+  2. Role capability (this matrix)
+  3. User module assignment (user_modules)
+"""
+
+from typing import Union, Literal
 
 ROLES = [
     "SUPER_ADMIN", "MILL_OWNER", "GENERAL_MANAGER",
@@ -16,73 +25,121 @@ MODULES = [
     "column_config", "whatsapp", "lc_tracking", "analytics", "uploads",
 ]
 
-# Canonical access matrix.
-# True = read + write, "read" = read-only, absent = no access.
-ACCESS_MATRIX: dict[str, dict[str, Union[bool, str]]] = {
+SYSTEM_MODULES = frozenset({"dashboard", "masters", "users", "column_config", "audit"})
+
+DASHBOARD_ONLY_ROLES = frozenset({"MACHINE_OPERATOR", "SECURITY_GATE"})
+
+# Access level
+#   True  = full read + write
+#   "read" = read-only
+#   absent = no access
+AccessLevel = Union[Literal[True], Literal["read"]]
+
+# ── CANONICAL ACCESS MATRIX ──────────────────────────────────────────────────
+# Every change to role permissions happens HERE and nowhere else.
+ACCESS_MATRIX: dict[str, dict[str, AccessLevel]] = {
     "SUPER_ADMIN": {m: True for m in MODULES},
+
     "MILL_OWNER": {m: True for m in MODULES},
+
     "GENERAL_MANAGER": {
         "dashboard": True, "production": True, "quality": True,
         "maintenance": True, "stores": True, "inventory": True,
         "dispatch": True, "purchase": True, "lotrac": True,
         "reports": True, "stock": True, "sales": True,
-        "payroll": "read", "hr": "read", "accounts": "read", "audit": "read",
         "uploads": True, "analytics": True, "lc_tracking": True,
-        "masters": "read",
+        "hr": "read", "payroll": "read", "accounts": "read",
+        "audit": "read", "masters": "read",
     },
+
     "PRODUCTION_MANAGER": {
-        "dashboard": True, "production": True, "quality": "read",
-        "maintenance": "read", "inventory": "read", "stock": "read",
+        "dashboard": True, "production": True, "maintenance": "read",
+        "quality": "read", "inventory": "read", "stock": "read",
         "reports": True, "uploads": True, "analytics": True,
     },
+
     "QUALITY_MANAGER": {
         "dashboard": True, "quality": True, "production": "read",
-        "inventory": "read", "stock": "read", "reports": True,
-        "uploads": True,
+        "inventory": "read", "stock": "read",
+        "reports": True, "uploads": True,
     },
+
     "DISPATCH_MANAGER": {
         "dashboard": True, "dispatch": True, "lotrac": True,
-        "stores": True, "inventory": True, "reports": True,
-        "stock": "read", "sales": "read", "uploads": True,
+        "stores": True, "inventory": True, "sales": "read",
+        "stock": "read", "reports": True, "uploads": True,
     },
+
     "STORE_MANAGER": {
         "dashboard": True, "stores": True, "inventory": True,
         "purchase": "read", "maintenance": "read",
         "reports": True, "stock": True, "uploads": True,
     },
+
     "HR_MANAGER": {
         "dashboard": True, "hr": True, "payroll": True,
         "reports": True, "uploads": True,
     },
+
     "ACCOUNTANT": {
         "dashboard": True, "accounts": True, "payroll": True,
         "purchase": "read", "dispatch": "read", "sales": "read",
         "reports": True, "lc_tracking": True, "uploads": True,
     },
+
     "MAINTENANCE_MANAGER": {
         "dashboard": True, "maintenance": True,
         "stores": "read", "production": "read",
         "reports": True, "uploads": True,
     },
+
     "SUPERVISOR": {
         "dashboard": True, "production": True, "reports": True,
     },
+
     "MACHINE_OPERATOR": {
         "dashboard": True,
     },
+
     "SECURITY_GATE": {
         "dashboard": True,
     },
+
     "AUDITOR": {
-        "dashboard": "read", "production": "read", "quality": "read",
-        "hr": "read", "accounts": "read", "reports": "read",
+        "dashboard": True, "production": "read", "quality": "read",
+        "hr": "read", "accounts": "read", "reports": True,
+        "audit": True,
     },
 }
 
-# Derive ROLE_MODULE_ACCESS from ACCESS_MATRIX (one source of truth).
+# ── DERIVED LOOKUPS ──────────────────────────────────────────────────────────
+
+def role_modules(role: str) -> list[str]:
+    """Modules a role can see at all (read or write)."""
+    return list(ACCESS_MATRIX.get(role, {}).keys())
+
+def role_write_modules(role: str) -> list[str]:
+    """Modules a role has write (True) access to."""
+    return [m for m, v in ACCESS_MATRIX.get(role, {}).items() if v is True]
+
+def role_readonly_modules(role: str) -> list[str]:
+    """Modules a role has read-only access to."""
+    return [m for m, v in ACCESS_MATRIX.get(role, {}).items() if v == "read"]
+
+def can_access(role: str, module: str) -> bool:
+    """Role-level: does this role have ANY access (read or write) to this module?"""
+    return ACCESS_MATRIX.get(role, {}).get(module) is not None
+
+def can_write(role: str, module: str) -> bool:
+    """Role-level: does this role have write access to this module?"""
+    return ACCESS_MATRIX.get(role, {}).get(module) is True
+
+def is_dashboard_only(role: str) -> bool:
+    """True if this role should only see the dashboard."""
+    return role in DASHBOARD_ONLY_ROLES
+
 ROLE_MODULE_ACCESS: dict[str, list[str]] = {
-    role: list(modules.keys())
-    for role, modules in ACCESS_MATRIX.items()
+    role: role_modules(role) for role in ROLES
 }
 
 ROLE_LABELS: dict[str, str] = {
@@ -101,11 +158,3 @@ ROLE_LABELS: dict[str, str] = {
     "SECURITY_GATE": "Security Gate",
     "AUDITOR": "Auditor (Read-only)",
 }
-
-
-def can_access(role: str, module: str) -> bool:
-    return ACCESS_MATRIX.get(role, {}).get(module) is not None
-
-
-def can_write(role: str, module: str) -> bool:
-    return ACCESS_MATRIX.get(role, {}).get(module) is True
