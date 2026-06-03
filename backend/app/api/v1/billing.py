@@ -12,7 +12,7 @@ from app.db.session import get_db
 from app.core.deps import get_current_user, log_audit
 from app.models.user import User
 from app.models.masters import Company, CompanyModule, Mill
-from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingBillingInvoice, SubscriptionChangeRequest
+from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest
 from app.services.pricing_service import PricingService
 
 logger = logging.getLogger(__name__)
