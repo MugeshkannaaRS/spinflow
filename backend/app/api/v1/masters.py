@@ -760,6 +760,12 @@ async def bulk_create_machines(
     mode=skip   → skip rows whose code already exists
     mode=create → always insert (appends suffix if duplicate)
     Accepts both "items" and "machines" as payload key.
+
+    Handles:
+    - Duplicate codes within batch → suffix _02, _03, etc.
+    - Null/empty codes → auto-generate from department abbreviation + counter
+    - Leading/trailing whitespace in department names → stripped
+    - Structured error details with code and name
     """
     scope = await get_mill_scope(current_user, db)
     eff_mill_id = await _resolve_mill_id(scope, current_user, db, mill_id)
@@ -772,13 +778,21 @@ async def bulk_create_machines(
     dept_res = await db.execute(
         select(Department.id, Department.name).where(Department.mill_id == eff_mill_id)
     )
-    dept_map: Dict[str, str] = {r.name.strip().lower(): str(r.id) for r in dept_res}
+    dept_map: Dict[str, str] = {}
+    for r in dept_res:
+        key = str(r.name).strip().lower() if r.name else ""
+        if key:
+            dept_map[key] = str(r.id)
 
     # ── Pre-fetch existing machine codes ──────────────────────────────
     existing_res = await db.execute(
         select(Machine.code, Machine.id).where(Machine.mill_id == eff_mill_id)
     )
-    existing_map: Dict[str, str] = {r.code.strip().lower(): str(r.id) for r in existing_res}
+    existing_map: Dict[str, str] = {}
+    for r in existing_res:
+        key = str(r.code).strip().lower() if r.code else ""
+        if key:
+            existing_map[key] = str(r.id)
 
     num_headers = len(raw_items[0]) if raw_items else 0
 
@@ -799,12 +813,20 @@ async def bulk_create_machines(
             row["_brand"] = current_brand
         if current_country and not row.get("country"):
             row["_country"] = current_country
+        # Strip leading/trailing whitespace from department names
+        if row.get("department"):
+            row["department"] = str(row["department"]).strip()
         valid_items.append(row)
 
-    # ── Pass 2: sort by department + assign GLOBAL serial numbers ─────
+    # ── Pass 2: assign serial numbers + collect per-dept counters ─────
     valid_items.sort(key=lambda r: str(r.get("department") or "").lower())
     for sno, row in enumerate(valid_items, start=1):
         row["_serial_no"] = sno
+
+    # Per-department counter for auto-generating machine codes
+    dept_counters: Dict[str, int] = {}
+    # Track codes seen within this batch to avoid duplicates
+    seen_in_batch: Dict[str, int] = {}
 
     created = updated = skipped = 0
     errors: List[Dict[str, Any]] = []
@@ -812,36 +834,45 @@ async def bulk_create_machines(
 
     for row in valid_items:
         try:
-            # ── Code ──────────────────────────────────────────────────
-            raw_code = (
-                row.get("code") or row.get("mc code") or row.get("Mc Code")
-                or row.get("mc_code") or ""
-            )
+            row_code = row.get("code") or row.get("mc code") or row.get("Mc Code") or row.get("mc_code") or ""
             dept_name = str(row.get("department") or "").strip()
             si_no = _safe_int(row.get("si_no") or row.get("SI No") or row.get("Sl No"))
 
-            if not str(raw_code).strip():
+            # ── Code: auto-generate if null/empty ──────────────────
+            if not str(row_code).strip():
                 dept_abbr = dept_name[:2].upper().replace(" ", "") if dept_name else "MC"
-                raw_code = (
-                    f"{dept_abbr}{si_no:03d}" if si_no
-                    else f"MC{row['_serial_no']:04d}"
-                )
-            code = str(raw_code).strip()
+                # Increment per-department counter
+                dept_counters[dept_name] = dept_counters.get(dept_name, 0) + 1
+                counter = si_no or dept_counters[dept_name]
+                row_code = f"{dept_abbr}{counter:03d}"
+            code = str(row_code).strip()
 
-            # ── Name (required) ───────────────────────────────────────
+            # ── Code: deduplicate within batch ─────────────────────
+            code_lower = code.lower()
+            if code_lower in seen_in_batch:
+                seen_in_batch[code_lower] += 1
+                code = f"{code}_{seen_in_batch[code_lower]:02d}"
+            else:
+                seen_in_batch[code_lower] = 1
+
+            # ── Name (required) ───────────────────────────────────
             name = str(
                 row.get("name") or row.get("Name Of Item") or
                 row.get("name_of_item") or ""
             ).strip()
             if not name:
-                errors.append({"row": row["_serial_no"], "error": "name is required"})
+                errors.append({
+                    "row": row["_serial_no"],
+                    "code": code,
+                    "name": "",
+                    "error": "Name is required"
+                })
                 skipped += 1
                 continue
 
-            # ── Department → ID (auto-create if missing) ──────────────
+            # ── Department → ID (auto-create if missing) ──────────
             dept_id: Optional[str] = dept_map.get(dept_name.lower()) if dept_name else None
             if dept_name and not dept_id:
-                # Use a safe code: strip dots/spaces, max 50 chars, unique per mill
                 dept_code = dept_name[:6].upper().replace(" ", "").replace(".", "")
                 if not dept_code:
                     dept_code = f"D{len(dept_map)+1:03d}"
@@ -851,7 +882,7 @@ async def bulk_create_machines(
                         mill_id=eff_mill_id,
                         code=dept_code,
                         name=dept_name,
-                        department_type="general",  # NOT NULL column — required default
+                        department_type="general",
                         is_active=True,
                     )
                     db.add(new_dept)
@@ -860,7 +891,6 @@ async def bulk_create_machines(
                     dept_map[dept_name.lower()] = dept_id
                     auto_created_depts.append(dept_name)
                 except Exception as dept_err:
-                    # Unique constraint on code — try to find existing dept
                     await db.rollback()
                     logger.warning(f"Dept auto-create failed for '{dept_name}': {dept_err}")
                     existing_dept = await db.execute(
@@ -874,7 +904,7 @@ async def bulk_create_machines(
                         dept_id = str(existing_d.id)
                         dept_map[dept_name.lower()] = dept_id
 
-            # ── Brand / country → make field ──────────────────────────
+            # ── Brand / country → make field ──────────────────────
             brand = str(
                 row.get("brand") or row.get("make") or row.get("_brand") or ""
             ).strip()
@@ -883,13 +913,13 @@ async def bulk_create_machines(
             if make_val and country:
                 make_val = f"{brand} ({country})"
 
-            # ── Type/model ────────────────────────────────────────────
+            # ── Type/model ────────────────────────────────────────
             machine_type = str(
                 row.get("machine_type") or row.get("type_no") or
                 row.get("Type No") or row.get("model") or ""
             ).strip() or None
 
-            # ── Installation date ─────────────────────────────────────
+            # ── Installation date ─────────────────────────────────
             inst_date_str = _safe_date(
                 row.get("installation_date") or row.get("comm_date") or
                 row.get("Comm Date") or row.get("commission_date")
@@ -902,7 +932,7 @@ async def bulk_create_machines(
                 except Exception:
                     pass
 
-            # ── Manufacturing year → stored in model field ─────────────
+            # ── Manufacturing year ──────────────────────────────
             mfg_year = _safe_year(
                 row.get("manufacturing_year") or row.get("Manufacturing Year")
                 or row.get("mfg_year")
@@ -938,8 +968,8 @@ async def bulk_create_machines(
                 status=True,
             )
 
-            # ── Upsert logic ──────────────────────────────────────────
-            existing_id = existing_map.get(code.lower())
+            # ── Upsert logic ──────────────────────────────────────
+            existing_id = existing_map.get(code_lower)
             if existing_id:
                 if mode == "skip":
                     skipped += 1
@@ -968,7 +998,14 @@ async def bulk_create_machines(
 
         except Exception as e:
             logger.warning(f"Machine row error (row {row.get('_serial_no','?')}): {e}")
-            errors.append({"row": row.get("_serial_no", "?"), "error": str(e)[:200]})
+            err_code = str(row.get("code") or row.get("mc code") or row.get("Mc Code") or row.get("mc_code") or "")
+            err_name = str(row.get("name") or row.get("Name Of Item") or row.get("name_of_item") or "")
+            errors.append({
+                "row": row.get("_serial_no", "?"),
+                "code": err_code,
+                "name": err_name,
+                "error": str(e)[:200],
+            })
             skipped += 1
             continue  # always continue — never abort the whole batch
 

@@ -173,8 +173,9 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
       ...group,
       items: group.items.filter((item) => {
         if (isDashboardOnly()) return item.module === "dashboard";
-        // SUPER_ADMIN always sees every item — belt-and-suspenders
-        if (isSuperAdmin) return true;
+        // SUPER_ADMIN = vendor: only sees vendor modules
+        const SA_MODULES = new Set(["dashboard", "admin", "column_config", "users", "audit"]);
+        if (isSuperAdmin) return SA_MODULES.has(item.module);
         return canAccess(item.module);
       }),
     }))

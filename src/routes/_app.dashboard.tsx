@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
@@ -11,7 +11,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import {
-  Factory, Gauge, Users, Cpu, TrendingUp,
+  Factory, Gauge, Users, Cpu, TrendingUp, Building2,
   AlertTriangle, Package, Truck, CreditCard, Wrench,
 } from "lucide-react";
 import { fmt, fmtCurrency, fmtDate } from "@/lib/formatters";
@@ -71,7 +71,18 @@ function DashboardPage() {
   const { user } = useAuth();
   const { millId, millName } = useActiveMill();
   const role = user?.role ?? "";
+  const isSuperAdmin = role === "SUPER_ADMIN";
 
+  // SUPER_ADMIN → admin summary (vendor KPIs)
+  const adminQ = useQuery({
+    queryKey: ["admin-summary"],
+    queryFn: () => api.get("/dashboard/admin-summary").then(r => r.data),
+    staleTime: 3 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    enabled: isSuperAdmin,
+  });
+
+  // MILL_OWNER/other → mill dashboard summary
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["dashboard-summary", millId],
     queryFn: () =>
@@ -80,8 +91,59 @@ function DashboardPage() {
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 2,
-    enabled: true,
+    enabled: !isSuperAdmin,
   });
+
+  // ── SUPER_ADMIN: vendor admin dashboard ────────────────────────────────
+  if (isSuperAdmin) {
+    const ad = adminQ.data ?? {};
+    const companies = ad.companies ?? [];
+
+    return (
+      <div className="flex flex-col min-h-full bg-[#f8fafc]">
+        <PageHeader
+          title={`${greet()}, ${user?.name ?? "Admin"}`}
+          subtitle="Vendor dashboard · System-wide overview"
+          onRefresh={() => adminQ.refetch()}
+          isRefreshing={adminQ.isFetching}
+        />
+        <div className="p-6 space-y-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard label="Active Companies" value={fmt(ad.total_companies ?? 0)} icon={Building2} iconColor="text-blue-600" iconBg="bg-blue-50" />
+            <KpiCard label="Active Mills" value={fmt(ad.total_mills ?? 0)} icon={Factory} iconColor="text-cyan-600" iconBg="bg-cyan-50" />
+            <KpiCard label="Total Users" value={fmt(ad.total_users ?? 0)} icon={Users} iconColor="text-green-600" iconBg="bg-green-50" />
+            <KpiCard label="Total Employees" value={fmt(ad.total_employees ?? 0)} icon={Cpu} iconColor="text-indigo-600" iconBg="bg-indigo-50" />
+          </div>
+
+          {companies.length > 0 && (
+            <div className="bg-white border border-[#e2e8f0] rounded-lg overflow-hidden">
+              <div className="px-5 py-4 border-b border-[#e2e8f0]">
+                <h3 className="text-sm font-semibold text-[#0f172a]">Recent Companies</h3>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#f1f5f9] border-b border-[#e2e8f0]">
+                    <th className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">Name</th>
+                    <th className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">Code</th>
+                    <th className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">Created</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {companies.map((c: any) => (
+                    <tr key={c.id} className="border-t border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors">
+                      <td className="px-4 py-3 text-[#0f172a] font-medium">{c.name}</td>
+                      <td className="px-4 py-3 text-[#64748b]">{c.code}</td>
+                      <td className="px-4 py-3 text-[#64748b]">{c.created_at ? fmtDate(c.created_at) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // Convenience: check if a top-level section key exists in the response
   const has = (...keys: string[]) =>

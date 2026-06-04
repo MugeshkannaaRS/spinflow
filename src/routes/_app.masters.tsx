@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, productionApi, inventoryApi, adminApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
@@ -183,6 +183,11 @@ function MastersPage() {
 
   if (!user) return null;
 
+  // SUPER_ADMIN should not land on Masters — redirect to Admin
+  if (user.role === "SUPER_ADMIN") {
+    return <Navigate to="/admin" replace />;
+  }
+
   return (
     <>
       <PageHeader
@@ -217,7 +222,7 @@ function MastersPage() {
                   { key: "shifts", label: "Shifts" },
                   { key: "warehouses", label: "Warehouses" },
                 ];
-                const isSuperAdmin = user?.role === "SUPER_ADMIN";
+                const isSuperAdmin = false;
                 return allTabs.filter(t =>
                   isSuperAdmin ? ["companies", "mills"].includes(t.key) : t.key !== "companies"
                 ).map(t => (
@@ -265,9 +270,15 @@ function MastersPage() {
                   { key: "phone", label: "Phone" },
                 ]}
                 activeKey="is_active"
-                canEdit={canEdit}
-                onAdd={<MillForm companies={companiesData} />}
+                canEdit={canEdit && user?.role !== "MILL_OWNER"}
+                onAdd={user?.role !== "MILL_OWNER" ? <MillForm companies={companiesData} /> : (<></>)}
                 onEdit={(item) => <MillForm item={item} companies={companiesData} />}
+                headerExtra={user?.role === "MILL_OWNER" ? (
+                  <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+                    <span>Need another mill?</span>
+                    <Link to="/company/billing" className="font-semibold text-amber-800 hover:text-amber-900 underline">Upgrade plan</Link>
+                  </div>
+                ) : undefined}
                 extraActions={(item) => (
                   <Button size="sm" variant="outline" onClick={() => setSettingsMill(item as Mill)}>
                     <Settings className="size-3.5 mr-1" /> Settings

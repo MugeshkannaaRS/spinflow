@@ -697,9 +697,9 @@ export function UniversalImportModal({
           for (const e of data.errors) {
             errors.push({
               row: (i + (e.row ?? 1)),
-              message: e.message ?? "Import error",
-              field: e.field,
-              value: e.value,
+              message: e.error ?? e.message ?? "Import error",
+              field: e.code ? `Code: ${e.code}` : e.field,
+              value: e.name ?? e.value,
               severity: e.severity ?? "error",
             });
           }
@@ -1155,7 +1155,7 @@ export function UniversalImportModal({
                     <span className="font-medium">Row {err.row}</span>
                     {err.field ? ` — ${err.field}` : ''}
                     {err.value ? ` ("${err.value}")` : ''}
-                    : {err.message || 'Unknown error'}
+                    {err.message ? `: ${err.message}` : ''}
                   </div>
                 ))}
                 {warnings.map((err, i) => (

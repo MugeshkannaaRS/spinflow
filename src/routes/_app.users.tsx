@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { usersApi, mastersApi, adminApi } from "@/lib/api-service";
 import { ROLES, ROLE_LABELS, type Module } from "@/lib/rbac";
@@ -281,6 +281,13 @@ function UsersPage() {
               <h1 className="text-lg font-semibold">Users & Roles</h1>
               <p className="text-sm text-muted-foreground">User management, role assignment, permissions & activity tracking</p>
             </div>
+            {atUserLimit && (
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                <AlertTriangle className="size-4 shrink-0" />
+                <span>User limit reached ({sub?.current_users ?? 0}/{sub?.max_users ?? 10}). </span>
+                <Link to="/company/billing" className="font-semibold underline hover:text-red-800">Upgrade plan</Link>
+              </div>
+            )}
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
                 <Button onClick={openNewUser} disabled={atUserLimit} title={atUserLimit ? "User limit reached. Upgrade plan." : ""}>
