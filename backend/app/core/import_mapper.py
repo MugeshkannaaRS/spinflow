@@ -136,3 +136,82 @@ class SmartColumnMapper:
 
 # Module-level singleton
 mapper = SmartColumnMapper()
+
+
+def parse_excel_all_sheets(file_bytes: bytes) -> dict:
+    """
+    Parse ALL sheets in an Excel workbook, combine into a single row list.
+    Header detection: finds the first row with ≥40% non-empty cells and ≥2 string cells.
+    Skips annotation rows (< 2 filled cells).
+    Returns { headers, rows, total, sheets }.
+    """
+    import io
+    import openpyxl
+
+    wb = openpyxl.load_workbook(
+        filename=io.BytesIO(file_bytes),
+        read_only=True,
+        data_only=True,
+    )
+
+    all_rows: list = []
+    detected_headers: Optional[list] = None
+    sheet_info: list = []
+
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            continue
+
+        # Find header row (first 6 rows)
+        header_row_idx: Optional[int] = None
+        for idx, row in enumerate(rows[:6]):
+            non_empty = [c for c in row if c is not None and str(c).strip()]
+            str_cells = [c for c in non_empty if isinstance(c, str)]
+            if (len(non_empty) >= max(3, len(row) * 0.4)) and len(str_cells) >= 2:
+                header_row_idx = idx
+                break
+
+        if header_row_idx is None:
+            continue
+
+        raw_headers = rows[header_row_idx]
+        headers = [
+            str(c).strip() if (c is not None and str(c).strip()) else f"__col_{i}__"
+            for i, c in enumerate(raw_headers)
+        ]
+        # Trim trailing empty columns
+        while headers and headers[-1].startswith("__col_"):
+            headers.pop()
+
+        if detected_headers is None:
+            detected_headers = headers
+
+        sheet_rows = 0
+        for row in rows[header_row_idx + 1:]:
+            # Skip fully empty rows
+            if all(c is None or str(c).strip() == "" for c in row):
+                continue
+            # Skip rows with < 2 filled cells (section headers / totals)
+            filled = [c for c in row if c is not None and str(c).strip() != ""]
+            if len(filled) < 2:
+                continue
+
+            row_dict: dict = {}
+            for i, h in enumerate(headers):
+                if i < len(row) and row[i] is not None:
+                    row_dict[h] = row[i]
+
+            all_rows.append(row_dict)
+            sheet_rows += 1
+
+        sheet_info.append({"sheet": sheet_name, "rows": sheet_rows})
+
+    wb.close()
+    return {
+        "headers": detected_headers or [],
+        "rows": all_rows,
+        "total": len(all_rows),
+        "sheets": sheet_info,
+    }

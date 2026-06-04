@@ -1,7 +1,9 @@
 from __future__ import annotations
 import logging
+import uuid as _uuid_mod
+from datetime import date as _date, datetime as _datetime, timedelta as _timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update as _sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, model_validator
@@ -617,70 +619,347 @@ async def _build_dept_map(db: AsyncSession, mill_id: str, dept_names: List[str])
     return {d.name.lower(): str(d.id) for d in result.scalars().all()}
 
 
+# ── Import helper functions ────────────────────────────────────────────
+
+def _safe_date(val: Any) -> Optional[str]:
+    if not val:
+        return None
+    if isinstance(val, _date) and not isinstance(val, _datetime):
+        return val.isoformat()
+    if isinstance(val, _datetime):
+        return val.date().isoformat()
+    s = str(val).strip()
+    if not s or s.lower() in ("-", "—", "nil", "n/a", "na", "none", ""):
+        return None
+    for fmt in [
+        "%d.%m.%y", "%d.%m.%Y",
+        "%d/%m/%Y", "%d/%m/%y",
+        "%d-%m-%Y", "%d-%m-%y",
+        "%Y-%m-%d", "%m/%d/%Y",
+        "%d %b %Y", "%d %B %Y",
+    ]:
+        try:
+            return _datetime.strptime(s, fmt).date().isoformat()
+        except ValueError:
+            continue
+    try:
+        serial = float(s)
+        if 1000 < serial < 100000:
+            return (_date(1899, 12, 30) + _timedelta(days=int(serial))).isoformat()
+    except (ValueError, TypeError):
+        pass
+    return None
+
+
+def _safe_year(val: Any) -> Optional[int]:
+    if not val:
+        return None
+    try:
+        y = int(float(str(val).strip().split(".")[0].replace(",", "")))
+        return y if 1900 <= y <= 2035 else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _safe_int(val: Any) -> Optional[int]:
+    try:
+        return int(float(str(val).replace(",", "").strip())) if val else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _safe_float(val: Any) -> Optional[float]:
+    try:
+        return float(str(val).replace(",", "").strip()) if val else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _normalize_status_machine(val: Any) -> str:
+    if not val:
+        return "running"
+    v = str(val).strip().lower()
+    if v in ("running", "active", "working", "ok", "good", "yes", "1", "true", "run"):
+        return "running"
+    if v in ("down", "breakdown", "stopped", "no", "0", "false", "stop"):
+        return "breakdown"
+    if v in ("maintenance", "service", "repair", "under maintenance", "idle"):
+        return "idle"
+    return "running"
+
+
+def _normalize_gender(val: Any) -> str:
+    if not val:
+        return "Male"
+    v = str(val).strip().lower()
+    if v in ("m", "male", "man", "boy"):
+        return "Male"
+    if v in ("f", "female", "woman", "girl"):
+        return "Female"
+    return "Other"
+
+
+def _normalize_mobile(val: Any) -> Optional[str]:
+    if not val:
+        return None
+    digits = "".join(c for c in str(val) if c.isdigit())
+    if digits.startswith("91") and len(digits) == 12:
+        digits = digits[2:]
+    return digits[-10:] if len(digits) >= 10 else None
+
+
+def _is_annotation_row(row_dict: dict, num_headers: int) -> bool:
+    """Return True for section-header / brand-annotation / total rows."""
+    values = [str(v).strip() for v in row_dict.values() if v and str(v).strip()]
+    if not values:
+        return True
+    annotation_patterns = [
+        "brand:-", "brand:", "country name:-", "country:",
+        "department:", "section:", "note:", "total:", "sub total",
+        "grand total", "s.no", "si no", "sr no", "sl no",
+    ]
+    for val in values:
+        vl = val.lower()
+        if any(p in vl for p in annotation_patterns):
+            return True
+    # Rows with ≤2 values in a wide table = section label
+    if len(values) <= 2 and num_headers > 4:
+        return True
+    return False
+
+
+def _extract_brand_country(row_dict: dict) -> tuple:
+    """Extract brand and country from annotation-style row values."""
+    brand = country = ""
+    for val in row_dict.values():
+        s = str(val or "")
+        sl = s.lower()
+        if "brand" in sl:
+            parts = s.replace("Brand:-", "").replace("Brand:", "").strip()
+            if "Country" in parts:
+                brand = parts.split("Country")[0].strip()
+                country = parts.split(":-")[-1].strip()
+            else:
+                brand = parts.split("\n")[0].strip()
+        elif "country" in sl:
+            country = s.split(":-")[-1].split("\n")[0].strip()
+    return brand, country
+
+
 @router.post("/masters/machines/bulk")
 async def bulk_create_machines(
     req: MachineBulkRequest,
+    mode: str = Query("update", regex="^(skip|update|create)$"),
     mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
-    if len(req.items) > MAX_BATCH:
-        raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
+    """
+    Bulk upsert machines.
+    mode=update → update existing by code (default)
+    mode=skip   → skip rows whose code already exists
+    mode=create → always insert (appends suffix if duplicate)
+    Accepts both "items" and "machines" as payload key.
+    """
     scope = await get_mill_scope(current_user, db)
     eff_mill_id = await _resolve_mill_id(scope, current_user, db, mill_id)
 
-    # Pre-build department name → id map (case-insensitive, single query)
-    dept_names = list({str(r.get("department") or "").strip() for r in req.items if r.get("department")})
-    dept_map = await _build_dept_map(db, eff_mill_id, dept_names)
+    raw_items: List[Dict[str, Any]] = req.items
+    if len(raw_items) > 1000:
+        raise HTTPException(400, detail="Maximum 1000 items per batch")
 
-    created = 0
-    skipped = 0
-    errors: List[str] = []
+    # ── Pre-fetch all departments for this mill ────────────────────────
+    dept_res = await db.execute(
+        select(Department.id, Department.name).where(Department.mill_id == eff_mill_id)
+    )
+    dept_map: Dict[str, str] = {r.name.strip().lower(): str(r.id) for r in dept_res}
 
-    for i, row in enumerate(req.items):
+    # ── Pre-fetch existing machine codes ──────────────────────────────
+    existing_res = await db.execute(
+        select(Machine.code, Machine.id).where(Machine.mill_id == eff_mill_id)
+    )
+    existing_map: Dict[str, str] = {r.code.strip().lower(): str(r.id) for r in existing_res}
+
+    num_headers = len(raw_items[0]) if raw_items else 0
+
+    # ── Pass 1: filter annotation rows, extract brand/country context ─
+    valid_items: List[Dict[str, Any]] = []
+    current_brand = current_country = ""
+
+    for row in raw_items:
+        if _is_annotation_row(row, num_headers):
+            b, c = _extract_brand_country(row)
+            if b:
+                current_brand = b
+            if c:
+                current_country = c
+            continue
+        # Inherit brand/country from preceding annotation rows
+        if current_brand and not row.get("brand") and not row.get("make"):
+            row["_brand"] = current_brand
+        if current_country and not row.get("country"):
+            row["_country"] = current_country
+        valid_items.append(row)
+
+    # ── Pass 2: sort by department + assign GLOBAL serial numbers ─────
+    valid_items.sort(key=lambda r: str(r.get("department") or "").lower())
+    for sno, row in enumerate(valid_items, start=1):
+        row["_serial_no"] = sno
+
+    created = updated = skipped = 0
+    errors: List[Dict[str, Any]] = []
+    auto_created_depts: List[str] = []
+
+    for row in valid_items:
         try:
-            code = str(row.get("code") or "").strip()
-            if not code:
-                # Auto-generate code
-                code = f"MC{(i + 1):04d}"
-
-            existing = await db.execute(
-                select(Machine).where(Machine.code == code, Machine.mill_id == eff_mill_id)
+            # ── Code ──────────────────────────────────────────────────
+            raw_code = (
+                row.get("code") or row.get("mc code") or row.get("Mc Code")
+                or row.get("mc_code") or ""
             )
-            if existing.scalar_one_or_none():
+            dept_name = str(row.get("department") or "").strip()
+            si_no = _safe_int(row.get("si_no") or row.get("SI No") or row.get("Sl No"))
+
+            if not str(raw_code).strip():
+                dept_abbr = dept_name[:2].upper().replace(" ", "") if dept_name else "MC"
+                raw_code = (
+                    f"{dept_abbr}{si_no:03d}" if si_no
+                    else f"MC{row['_serial_no']:04d}"
+                )
+            code = str(raw_code).strip()
+
+            # ── Name (required) ───────────────────────────────────────
+            name = str(
+                row.get("name") or row.get("Name Of Item") or
+                row.get("name_of_item") or ""
+            ).strip()
+            if not name:
+                errors.append({"row": row["_serial_no"], "error": "name is required"})
                 skipped += 1
                 continue
 
-            dept_name = str(row.get("department") or "").strip()
-            dept_id = row.get("department_id") or dept_map.get(dept_name.lower()) or None
+            # ── Department → ID (auto-create if missing) ──────────────
+            dept_id: Optional[str] = dept_map.get(dept_name.lower()) if dept_name else None
+            if dept_name and not dept_id:
+                dept_code = dept_name[:6].upper().replace(" ", "")
+                new_dept = Department(
+                    id=str(_uuid_mod.uuid4()),
+                    mill_id=eff_mill_id,
+                    code=dept_code,
+                    name=dept_name,
+                    department_type="general",
+                    is_active=True,
+                )
+                db.add(new_dept)
+                await db.flush()
+                dept_id = str(new_dept.id)
+                dept_map[dept_name.lower()] = dept_id
+                auto_created_depts.append(dept_name)
 
-            # Coerce status
-            raw_status = str(row.get("current_status") or row.get("status") or "running").lower().strip()
-            status_map = {"active": "running", "inactive": "idle", "down": "breakdown"}
-            current_status = status_map.get(raw_status, raw_status)
-            if current_status not in ("running", "idle", "breakdown", "maintenance"):
-                current_status = "running"
+            # ── Brand / country → make field ──────────────────────────
+            brand = str(
+                row.get("brand") or row.get("make") or row.get("_brand") or ""
+            ).strip()
+            country = str(row.get("country") or row.get("_country") or "").strip()
+            make_val = brand or None
+            if make_val and country:
+                make_val = f"{brand} ({country})"
 
-            machine = Machine(
-                code=code,
-                name=str(row.get("name") or "").strip() or None,
-                machine_type=str(row.get("machine_type") or row.get("type_no") or "").strip() or None,
+            # ── Type/model ────────────────────────────────────────────
+            machine_type = str(
+                row.get("machine_type") or row.get("type_no") or
+                row.get("Type No") or row.get("model") or ""
+            ).strip() or None
+
+            # ── Installation date ─────────────────────────────────────
+            inst_date_str = _safe_date(
+                row.get("installation_date") or row.get("comm_date") or
+                row.get("Comm Date") or row.get("commission_date")
+            )
+            inst_date = None
+            if inst_date_str:
+                try:
+                    from datetime import date as dt_date
+                    inst_date = dt_date.fromisoformat(inst_date_str)
+                except Exception:
+                    pass
+
+            # ── Manufacturing year → stored in model field ─────────────
+            mfg_year = _safe_year(
+                row.get("manufacturing_year") or row.get("Manufacturing Year")
+                or row.get("mfg_year")
+            )
+            model_val = str(row.get("model_no") or row.get("Type No") or "").strip() or None
+            if mfg_year and not model_val:
+                model_val = str(mfg_year)
+            elif mfg_year and model_val:
+                model_val = f"{model_val} ({mfg_year})"
+
+            spindles = _safe_int(
+                row.get("spindles") or row.get("no_of_delivery_head") or
+                row.get("No Of Delivery Head") or row.get("heads")
+            )
+
+            current_status = _normalize_status_machine(
+                row.get("current_status") or row.get("status") or row.get("Status")
+            )
+
+            global_serial = str(row["_serial_no"])
+
+            field_values: Dict[str, Any] = dict(
+                name=name,
                 department_id=dept_id,
                 department=dept_name or None,
-                target_kg=float(row.get("target_kg") or 0),
-                spindles=int(float(row.get("spindles") or 0)) if row.get("spindles") else None,
+                machine_type=machine_type,
+                make=make_val,
+                model=model_val,
+                spindles=spindles,
+                installation_date=inst_date,
                 current_status=current_status,
+                serial_no=global_serial,
                 status=True,
-                mill_id=eff_mill_id,
             )
-            db.add(machine)
+
+            # ── Upsert logic ──────────────────────────────────────────
+            existing_id = existing_map.get(code.lower())
+            if existing_id:
+                if mode == "skip":
+                    skipped += 1
+                    continue
+                elif mode == "update":
+                    await db.execute(
+                        _sa_update(Machine)
+                        .where(Machine.id == existing_id)
+                        .values(**field_values)
+                    )
+                    updated += 1
+                    continue
+                else:  # create mode → append suffix
+                    code = f"{code}_{row['_serial_no']}"
+
+            db.add(Machine(
+                id=str(_uuid_mod.uuid4()),
+                mill_id=eff_mill_id,
+                code=code,
+                **field_values,
+            ))
             created += 1
+
+            if (created + updated) % 50 == 0:
+                await db.flush()
+
         except Exception as e:
+            errors.append({"row": row.get("_serial_no", "?"), "error": str(e)})
             skipped += 1
-            errors.append(f"Row {i + 1}: {str(e)}")
 
     await db.commit()
-    return {"created": created, "skipped": skipped, "errors": errors}
+    return {
+        "created": created,
+        "updated": updated,
+        "skipped": skipped,
+        "errors": errors[:20],
+        "auto_created_departments": list(dict.fromkeys(auto_created_depts)),
+    }
 
 
 @router.post("/masters/customers/bulk")

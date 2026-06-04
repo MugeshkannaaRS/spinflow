@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import * as XLSX from "xlsx";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import {
@@ -118,7 +118,10 @@ export function UniversalImportModal({
     updated: number;
     skipped: number;
     errors: ImportError[];
+    auto_created_departments?: string[];
   } | null>(null);
+  const [duplicateMode, setDuplicateMode] = useState<"skip" | "update" | "create">("update");
+  const qc = useQueryClient();
   const [importError, setImportError] = useState<string | null>(null);
   const [showStep5Errors, setShowStep5Errors] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -646,7 +649,9 @@ export function UniversalImportModal({
       let successCount = 0;
       let totalCreated = 0;
       let totalUpdated = 0;
+      let totalSkipped = 0;
       const errors: ImportError[] = [];
+      const autoDepts: string[] = [];
 
       for (let i = 0; i < validRecords.length; i += BATCH_SIZE) {
         const batch = validRecords.slice(i, i + BATCH_SIZE);
@@ -661,7 +666,7 @@ export function UniversalImportModal({
         let lastErr: any;
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
           try {
-            res = await api.post(endpoint, { items: sanitized, mill_id: millId });
+            res = await api.post(`${endpoint}?mode=${duplicateMode}`, { items: sanitized, mill_id: millId });
             break;
           } catch (err: any) {
             lastErr = err;
@@ -680,9 +685,14 @@ export function UniversalImportModal({
         console.log("batch response data:", data);
         const batchCreated = typeof data?.created === "number" ? data.created : 0;
         const batchUpdated = typeof data?.updated === "number" ? data.updated : 0;
+        const batchSkipped = typeof data?.skipped === "number" ? data.skipped : 0;
         totalCreated += batchCreated;
         totalUpdated += batchUpdated;
+        totalSkipped += batchSkipped;
         successCount += batchCreated + batchUpdated;
+        if (Array.isArray(data?.auto_created_departments)) {
+          autoDepts.push(...data.auto_created_departments);
+        }
         if (data?.errors?.length > 0) {
           for (const e of data.errors) {
             errors.push({
@@ -702,11 +712,18 @@ export function UniversalImportModal({
         success: successCount,
         created: totalCreated,
         updated: totalUpdated,
-        skipped: validRecords.length - successCount,
+        skipped: totalSkipped || (validRecords.length - successCount),
         errors,
+        auto_created_departments: autoDepts.length > 0 ? [...new Set(autoDepts)] : undefined,
       });
       setStep(5);
       onSuccess?.(successCount);
+      // Invalidate all relevant queries so UI reflects the import
+      qc.invalidateQueries({ queryKey: ["dashboard-summary"] });
+      qc.invalidateQueries({ queryKey: ["machines"] });
+      qc.invalidateQueries({ queryKey: ["employees"] });
+      qc.invalidateQueries({ queryKey: ["masters"] });
+      qc.invalidateQueries({ queryKey: ["hr-employees"] });
     } catch (err: any) {
       setIsImporting(false);
       const msg = err?.message ?? String(err) ?? "Unknown error during import";
@@ -1055,14 +1072,30 @@ export function UniversalImportModal({
             <div className="mx-auto size-16 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
               <AlertTriangle className="size-8 text-yellow-600" />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2">
               <p className="text-lg font-medium">Import completed with issues</p>
-              <p className="text-sm text-muted-foreground">
-                {importResult!.created} created, {importResult!.updated} updated
-                {importResult!.skipped > 0 && (
-                  <span className="text-red-500">, {importResult!.skipped} failed</span>
+              <div className="flex justify-center gap-3 flex-wrap">
+                {importResult!.created > 0 && (
+                  <span className="text-sm font-semibold text-green-700 bg-green-50 px-2.5 py-1 rounded-full">
+                    ✓ {importResult!.created} created
+                  </span>
                 )}
-              </p>
+                {importResult!.updated > 0 && (
+                  <span className="text-sm font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full">
+                    ↻ {importResult!.updated} updated
+                  </span>
+                )}
+                {importResult!.skipped > 0 && (
+                  <span className="text-sm font-semibold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">
+                    ⊘ {importResult!.skipped} skipped
+                  </span>
+                )}
+                {hardErrors.length > 0 && (
+                  <span className="text-sm font-semibold text-red-700 bg-red-50 px-2.5 py-1 rounded-full">
+                    ✗ {hardErrors.length} errors
+                  </span>
+                )}
+              </div>
             </div>
           </>
         ) : (
@@ -1070,15 +1103,39 @@ export function UniversalImportModal({
             <div className="mx-auto size-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
               <CheckCircle2 className="size-8 text-green-600" />
             </div>
-            <div className="space-y-1">
-              <p className="text-lg font-medium">Import complete!</p>
-              <p className="text-sm text-muted-foreground">
-                {importResult?.created ?? 0} created, {importResult?.updated ?? 0} updated successfully
-                  {warnings.length > 0 && (
-                    <span className="text-yellow-600"> ({warnings.length} warnings)</span>
-                  )}
-              </p>
+            <p className="text-lg font-medium">Import complete!</p>
+            {/* 4-stat summary row */}
+            <div className="flex justify-center gap-4 flex-wrap mt-2">
+              {(importResult?.created ?? 0) > 0 && (
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-green-700 bg-green-50 px-3 py-1.5 rounded-full">
+                  <CheckCircle2 className="w-4 h-4" />
+                  {importResult!.created} created
+                </div>
+              )}
+              {(importResult?.updated ?? 0) > 0 && (
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-full">
+                  ↻ {importResult!.updated} updated
+                </div>
+              )}
+              {(importResult?.skipped ?? 0) > 0 && (
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-full">
+                  ⊘ {importResult!.skipped} skipped
+                </div>
+              )}
+              {warnings.length > 0 && (
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-full">
+                  <AlertTriangle className="w-4 h-4" /> {warnings.length} warnings
+                </div>
+              )}
             </div>
+            {/* Auto-created departments banner */}
+            {(importResult?.auto_created_departments?.length ?? 0) > 0 && (
+              <div className="mt-3 text-left bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
+                <strong>New departments auto-created:</strong>{" "}
+                {importResult!.auto_created_departments!.join(", ")}
+                <div className="text-xs text-blue-600 mt-1">Review them in Masters → Departments.</div>
+              </div>
+            )}
           </>
         )}
 

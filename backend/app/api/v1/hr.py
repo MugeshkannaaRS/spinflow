@@ -512,6 +512,11 @@ async def bulk_create_employees(
     except Exception as exc:
         logger.warning("Failed to pre-fetch/pre-create custom fields (will skip custom values for this import, transaction preserved)")
 
+    # ── Assign GLOBAL serial numbers sorted by department ─────────────────
+    employees_to_add.sort(key=lambda e: (e.department or "").lower())
+    for sno, emp in enumerate(employees_to_add, start=1):
+        emp.sl_no = sno  # overwrite Excel SI No with SpinFlow global sequence
+
     created_count = 0
     updated = 0
     emp_id_map: Dict[str, str] = {}

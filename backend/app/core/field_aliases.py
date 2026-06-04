@@ -9,51 +9,54 @@ FIELD_ALIASES_BY_MODULE: dict[str, dict[str, list[str]]] = {
         "code": [
             "code", "mc code", "machine code", "machine no", "machine number",
             "mc no", "mc_code", "machinecode", "item code", "asset code",
-            "equipment code", "sl no", "si no", "serial no", "serial number",
-            "sr no", "id", "machine id", "asset no", "asset number",
-            "unit no", "unit number", "equipment no", "plant code",
-            "m/c code", "m/c no", "mach code", "mach no",
+            "equipment code", "sr no", "serial no", "serial number", "sl no",
+            "si no", "id", "machine id", "asset no",
+        ],
+        "si_no": [
+            "si no", "si", "sl no", "sl", "sr no", "sr", "#", "s.no",
+            "s no", "sno", "serial", "seq", "s/no",
         ],
         "name": [
             "name", "name of item", "item name", "machine name", "description",
-            "machine description", "equipment name", "asset name", "item",
-            "particulars", "name of machine", "model name",
-        ],
-        "machine_type": [
-            "type no", "type number", "type", "model", "model no", "model number",
-            "make", "manufacturer model", "machine type", "type of machine",
-            "equipment type", "asset type",
+            "equipment name", "asset name", "item", "machine", "particulars",
         ],
         "department": [
             "department", "dept", "section", "area", "location", "dept name",
             "department name", "division",
         ],
-        "target_kg": [
-            "target kg", "target", "production target", "daily target",
-            "target output", "daily output",
+        "machine_type": [
+            "type no", "type number", "type", "model", "model no", "model number",
+            "type/model", "machine type", "equipment type",
+        ],
+        "make": [
+            "brand", "brand:-", "make", "manufacturer", "made by", "oem",
+            "make/brand", "brand name",
+        ],
+        "model": [
+            "model", "model no", "model number", "type no", "type number",
+        ],
+        "manufacturing_year": [
+            "manufacturing year", "mfg year", "year", "year of manufacture",
+            "manufacture year", "built year", "year made", "mfg. year", "yom",
         ],
         "spindles": [
             "spindles", "spindle count", "no of spindles",
             "number of spindles", "spindle no", "no of delivery head",
             "delivery head", "heads", "no of heads", "delivery heads",
+            "no. of delivery head",
+        ],
+        "installation_date": [
+            "comm date", "commissioning date", "commission date",
+            "installation date", "installed date", "commissioned on",
+            "date of commissioning", "start date",
         ],
         "current_status": [
             "status", "condition", "machine status", "working status",
             "state", "operational status",
         ],
-        "manufacturing_year": [
-            "manufacturing year", "mfg year", "year", "year of manufacture",
-            "manufacture year", "built year", "year made", "yom",
-        ],
-        "installation_date": [
-            "installation date", "installed date", "comm date",
-            "commissioning date", "commission date", "start date",
-            "date of installation", "induction date", "purchase date",
-        ],
         "serial_no": [
-            "serial no", "serial number", "sr no", "asset serial",
+            "asset serial", "serial no.", "factory serial", "mfg serial",
         ],
-        "remarks": ["remarks", "notes", "comment", "comments", "note", "observation"],
     },
 
     "employees": {
@@ -90,11 +93,11 @@ FIELD_ALIASES_BY_MODULE: dict[str, dict[str, list[str]]] = {
         "shift_benefit": [
             "shift benefit", "shift benifit", "shift allow", "shift allowance",
         ],
-        "joining_date": [
+        "date_of_joining": [
             "joining date", "date of joining", "doj", "join date",
             "start date", "hired date", "joining",
         ],
-        "date_of_birth": ["date of birth", "dob", "birth date", "born"],
+        "dob": ["date of birth", "dob", "birth date", "born"],
         "phone": ["phone", "mobile no", "contact no", "cell", "phone no"],
         "aadhar": ["aadhar", "aadhaar", "aadhar no", "uid", "aadhar number"],
         "pf_no": ["pf no", "pf number", "provident fund no", "epf no"],
