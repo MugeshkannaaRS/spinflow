@@ -6,7 +6,7 @@ using alias matching + substring scoring + fuzzy Levenshtein fallback.
 from __future__ import annotations
 import re
 import logging
-from typing import Any
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ class SmartColumnMapper:
 
         for header in headers:
             normalized = self._norm(header)
-            matched_field: str | None = None
+            matched_field: Optional[str] = None
             best_score = 0
 
             for system_field, alias_list in aliases.items():
@@ -81,7 +81,7 @@ class SmartColumnMapper:
 
         return result
 
-    def infer_field_from_values(self, values: list[Any]) -> str | None:
+    def infer_field_from_values(self, values: list[Any]) -> Optional[str]:
         """Infer system field from sample values."""
         sample = [str(v).strip() for v in values[:10] if v is not None and str(v).strip()][:5]
         if not sample:
@@ -93,7 +93,7 @@ class SmartColumnMapper:
             return "joining_date"
 
         # Pure numeric
-        def to_float(s: str) -> float | None:
+        def to_float(s: str) -> Optional[float]:
             try:
                 return float(s.replace(",", ""))
             except ValueError:

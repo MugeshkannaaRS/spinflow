@@ -325,7 +325,7 @@ async def list_approvals(
 
     # Batch-fetch latest LabReport per lot_id
     lot_ids = list({a.lot_id for a in approvals if a.lot_id})
-    reports_by_lot: dict[str, LabReport | None] = {}
+    reports_by_lot: Dict[str, Optional[LabReport]] = {}
     if lot_ids:
         from sqlalchemy import desc as sa_desc
         latest_sub = (

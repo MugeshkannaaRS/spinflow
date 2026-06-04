@@ -3,13 +3,13 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
-from app.core.deps import require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope, get_current_user
 from app.services.masters_service import MastersService
 from app.schemas.masters import (
     CompanyCreate, CompanyUpdate, CompanyOut,
@@ -39,7 +39,7 @@ async def _resolve_role_code(current_user: User, db: AsyncSession) -> str:
     return role_obj.code if role_obj else ""
 
 
-async def _resolve_company_id(current_user: User, db: AsyncSession) -> str | None:
+async def _resolve_company_id(current_user: User, db: AsyncSession) -> Optional[str]:
     if current_user.company_id:
         return str(current_user.company_id)
     if current_user.mill_id:
@@ -678,10 +678,10 @@ async def bulk_create_customers(
 class MillOwnerCreateRequest(BaseModel):
     name: str
     code: str
-    city: str | None = None
-    state: str | None = None
-    phone: str | None = None
-    address: str | None = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
 
 
 @router.post("/mills")
