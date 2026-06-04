@@ -399,8 +399,18 @@ class PayrollBulkResponse(BaseModel):
 
 
 class EmployeeBulkCreate(BaseModel):
-    items: List[EmployeeBulkItem]
+    items: List[EmployeeBulkItem] = []
     mill_id: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_any_key(cls, values):
+        if isinstance(values, dict) and not values.get("items"):
+            for key in ["employees", "records", "data", "rows", "workers", "staff"]:
+                if values.get(key):
+                    values["items"] = values[key]
+                    break
+        return values
 
 
 class ImportErrorDetail(BaseModel):

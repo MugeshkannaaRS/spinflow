@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from app.db.session import get_db
 
@@ -555,121 +555,185 @@ async def update_route(
     return await service.update_route(id, req, updated_by=current_user.id)
 
 
+_BULK_KEY_ALIASES = [
+    "items", "machines", "employees", "departments", "customers",
+    "vehicles", "routes", "yarn_counts", "shifts", "warehouses",
+    "records", "data", "rows",
+]
+
+
+def _make_bulk_validator():
+    """Return a Pydantic model_validator that accepts any key alias for 'items'."""
+    @model_validator(mode="before")
+    @classmethod
+    def accept_any_key(cls, values):
+        if isinstance(values, dict) and not values.get("items"):
+            for key in _BULK_KEY_ALIASES:
+                if values.get(key):
+                    values["items"] = values[key]
+                    break
+        return values
+    return accept_any_key
+
+
 class MachineBulkRequest(BaseModel):
-    items: List[Dict[str, Any]]
+    items: List[Dict[str, Any]] = []
+    accept_any_key = _make_bulk_validator()
 
 
 class CustomerBulkRequest(BaseModel):
-    items: List[Dict[str, Any]]
+    items: List[Dict[str, Any]] = []
+    accept_any_key = _make_bulk_validator()
+
+
+async def _resolve_mill_id(scope: dict, current_user: User, db: AsyncSession, req_mill_id: Optional[str] = None) -> str:
+    """Resolve an effective mill_id for bulk imports, with company fallback."""
+    mill_id = req_mill_id or scope.get("mill_id")
+    if not mill_id:
+        company_id = scope.get("company_id") or (str(current_user.company_id) if current_user.company_id else None)
+        if company_id:
+            res = await db.execute(
+                select(Mill).where(Mill.company_id == company_id, Mill.is_active == True).limit(1)
+            )
+            first = res.scalar_one_or_none()
+            if first:
+                mill_id = str(first.id)
+    if not mill_id:
+        raise HTTPException(400, detail="No mill found for this user. Assign a mill or pass mill_id.")
+    return str(mill_id)
+
+
+async def _build_dept_map(db: AsyncSession, mill_id: str, dept_names: List[str]) -> dict:
+    """Build {dept_name_lower: dept_id} for fast lookup during bulk import."""
+    if not dept_names:
+        return {}
+    result = await db.execute(
+        select(Department).where(
+            Department.mill_id == mill_id,
+            func.lower(Department.name).in_([d.lower() for d in dept_names]),
+            Department.is_active == True,
+        )
+    )
+    return {d.name.lower(): str(d.id) for d in result.scalars().all()}
 
 
 @router.post("/masters/machines/bulk")
 async def bulk_create_machines(
     req: MachineBulkRequest,
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
     if len(req.items) > MAX_BATCH:
         raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     scope = await get_mill_scope(current_user, db)
-    mill_id = scope.get("mill_id")
-    if not mill_id:
-        raise HTTPException(400, "mill_id is required")
+    eff_mill_id = await _resolve_mill_id(scope, current_user, db, mill_id)
+
+    # Pre-build department name → id map (case-insensitive, single query)
+    dept_names = list({str(r.get("department") or "").strip() for r in req.items if r.get("department")})
+    dept_map = await _build_dept_map(db, eff_mill_id, dept_names)
+
     created = 0
     skipped = 0
     errors: List[str] = []
+
     for i, row in enumerate(req.items):
         try:
             code = str(row.get("code") or "").strip()
             if not code:
-                skipped += 1
-                errors.append(f"Row {i + 1}: missing code")
-                continue
+                # Auto-generate code
+                code = f"MC{(i + 1):04d}"
+
             existing = await db.execute(
-                select(Machine).where(Machine.code == code, Machine.mill_id == mill_id)
+                select(Machine).where(Machine.code == code, Machine.mill_id == eff_mill_id)
             )
             if existing.scalar_one_or_none():
                 skipped += 1
                 continue
-            dept_id = row.get("department_id") or None
+
             dept_name = str(row.get("department") or "").strip()
-            if dept_name and not dept_id:
-                dept_result = await db.execute(
-                    select(Department).where(
-                        Department.name == dept_name,
-                        Department.mill_id == mill_id,
-                        Department.is_active == True,
-                    )
-                )
-                dept = dept_result.scalar_one_or_none()
-                if dept:
-                    dept_id = dept.id
+            dept_id = row.get("department_id") or dept_map.get(dept_name.lower()) or None
+
+            # Coerce status
+            raw_status = str(row.get("current_status") or row.get("status") or "running").lower().strip()
+            status_map = {"active": "running", "inactive": "idle", "down": "breakdown"}
+            current_status = status_map.get(raw_status, raw_status)
+            if current_status not in ("running", "idle", "breakdown", "maintenance"):
+                current_status = "running"
+
             machine = Machine(
                 code=code,
                 name=str(row.get("name") or "").strip() or None,
-                machine_type=str(row.get("machine_type") or "").strip() or None,
+                machine_type=str(row.get("machine_type") or row.get("type_no") or "").strip() or None,
                 department_id=dept_id,
                 department=dept_name or None,
                 target_kg=float(row.get("target_kg") or 0),
-                spindles=int(row.get("spindles") or 0) if row.get("spindles") else None,
-                current_status=str(row.get("current_status") or "running").strip(),
-                status=row.get("is_active", True) if isinstance(row.get("is_active"), bool) else True,
-                mill_id=mill_id,
+                spindles=int(float(row.get("spindles") or 0)) if row.get("spindles") else None,
+                current_status=current_status,
+                status=True,
+                mill_id=eff_mill_id,
             )
             db.add(machine)
             created += 1
         except Exception as e:
             skipped += 1
             errors.append(f"Row {i + 1}: {str(e)}")
-    await db.flush()
+
+    await db.commit()
     return {"created": created, "skipped": skipped, "errors": errors}
 
 
 @router.post("/masters/customers/bulk")
 async def bulk_create_customers(
     req: CustomerBulkRequest,
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
     if len(req.items) > MAX_BATCH:
         raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     scope = await get_mill_scope(current_user, db)
-    mill_id = scope.get("mill_id")
-    if not mill_id:
-        raise HTTPException(400, "mill_id is required")
+    eff_mill_id = await _resolve_mill_id(scope, current_user, db, mill_id)
+
     created = 0
     skipped = 0
     errors: List[str] = []
+
     for i, row in enumerate(req.items):
         try:
             code = str(row.get("code") or "").strip()
             name = str(row.get("name") or "").strip()
-            if not code or not name:
+            if not name:
                 skipped += 1
-                errors.append(f"Row {i + 1}: missing code or name")
+                errors.append(f"Row {i + 1}: missing name")
                 continue
+            if not code:
+                code = f"CUST{(i + 1):04d}"
+
             existing = await db.execute(
-                select(Customer).where(Customer.code == code, Customer.mill_id == mill_id)
+                select(Customer).where(Customer.code == code, Customer.mill_id == eff_mill_id)
             )
             if existing.scalar_one_or_none():
                 skipped += 1
                 continue
+
             customer = Customer(
-                mill_id=mill_id,
+                mill_id=eff_mill_id,
                 code=code,
                 name=name,
                 gstin=str(row.get("gstin") or "").strip() or None,
                 city=str(row.get("city") or "").strip() or None,
                 phone=str(row.get("phone") or "").strip() or None,
                 credit_limit=float(row.get("credit_limit") or 0),
-                is_active=row.get("is_active", True) if isinstance(row.get("is_active"), bool) else True,
+                is_active=True,
             )
             db.add(customer)
             created += 1
         except Exception as e:
             skipped += 1
             errors.append(f"Row {i + 1}: {str(e)}")
-    await db.flush()
+
+    await db.commit()
     return {"created": created, "skipped": skipped, "errors": errors}
 
 
