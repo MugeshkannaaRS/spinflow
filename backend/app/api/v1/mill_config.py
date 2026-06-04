@@ -91,19 +91,34 @@ async def get_all_masters(
     for cat, val in rows:
         out.setdefault(cat, []).append(val)
 
-    # Also inject departments from the actual departments table as fallback
+    # Also inject departments from the actual departments table
     from app.models.masters import Department
     dept_res = await db.execute(
-        select(Department.name)
+        select(Department.id, Department.name, Department.code)
         .where(Department.mill_id == mill_id, Department.is_active == True)
         .order_by(Department.name)
     )
-    db_depts = [r[0] for r in dept_res.all() if r[0]]
-    # Merge with mill_masters departments (deduplicated)
-    existing_depts = set(out.get("department", []))
+    db_depts = dept_res.all()
+
+    # Build structured department list with id/name/code
+    dept_objects = []
+    dept_names = []
+    seen_names = set()
     for d in db_depts:
-        if d not in existing_depts:
-            out.setdefault("department", []).append(d)
+        if d.name and d.name not in seen_names:
+            dept_objects.append({"id": str(d.id), "name": d.name, "code": d.code or ""})
+            dept_names.append(d.name)
+            seen_names.add(d.name)
+
+    # Merge MillMaster string values too (dedup by name)
+    for name in out.get("department", []):
+        if name and name not in seen_names:
+            dept_names.append(name)
+            dept_objects.append({"id": "", "name": name, "code": ""})
+            seen_names.add(name)
+
+    out["department"] = dept_objects
+    out["department_names"] = dept_names
 
     return out
 

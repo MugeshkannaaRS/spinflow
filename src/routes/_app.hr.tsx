@@ -237,8 +237,8 @@ function HRPage() {
   const { millId } = useActiveMill();
   const { data: millMasters } = useMillMasters();
   // Update module-level DEPARTMENTS so subcomponents pick up dynamic values
-  if (millMasters?.department?.length) {
-    DEPARTMENTS = millMasters.department;
+  if (millMasters?.department_names?.length) {
+    DEPARTMENTS = millMasters.department_names;
   }
   const GRADES_DYN = (millMasters?.grade?.length ? millMasters.grade : GRADES);
   const SHIFTS_DYN = (millMasters?.shift?.length ? millMasters.shift : SHIFTS);

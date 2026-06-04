@@ -108,8 +108,13 @@ function ShiftGrid() {
   const [date, setDate] = useState(localDate);
   const [shift, setShift] = useState<"A" | "B" | "C">("A");
   const { data: millMasters } = useMillMasters();
-  const DEPARTMENTS = (millMasters?.department?.length ? millMasters.department : DEPARTMENTS_FALLBACK);
-  const [department, setDepartment] = useState(DEPARTMENTS_FALLBACK[4] || "Ring Frame");
+  const DEPARTMENTS = (millMasters?.department_names?.length ? millMasters.department_names : DEPARTMENTS_FALLBACK);
+  const [department, setDepartment] = useState<string>("");
+  useEffect(() => {
+    if (!department && DEPARTMENTS.length > 0) {
+      setDepartment(DEPARTMENTS[0]);
+    }
+  }, [DEPARTMENTS]);
   const [count, setCount] = useState("30s");
   const config = useColumnConfig("production_entries");
 

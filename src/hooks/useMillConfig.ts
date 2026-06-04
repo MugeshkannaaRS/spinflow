@@ -2,8 +2,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 
+export interface DepartmentOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
 export interface MillMasters {
-  department: string[];
+  department: DepartmentOption[];
+  department_names: string[];
   designation: string[];
   grade: string[];
   shift: string[];
@@ -14,7 +21,7 @@ export interface MillMasters {
   employee_category: string[];
   blood_group: string[];
   section: string[];
-  [key: string]: string[];
+  [key: string]: any;
 }
 
 export interface MillSubscription {
@@ -29,7 +36,7 @@ export interface MillSubscription {
 }
 
 const EMPTY_MASTERS: MillMasters = {
-  department: [], designation: [], grade: [],
+  department: [], department_names: [], designation: [], grade: [],
   shift: [], machine_type: [], machine_brand: [],
   vehicle_type: [], inventory_category: [],
   employee_category: [], blood_group: [], section: [],

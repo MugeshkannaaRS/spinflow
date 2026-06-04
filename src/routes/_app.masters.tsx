@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { Plus, Search, Settings, Blocks, ArrowDownToLine, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { useMillMasterCategory } from "@/hooks/useMillConfig";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import type {
   Company,
@@ -67,16 +68,6 @@ const DEPARTMENT_TYPES = [
 ] as const;
 
 const VEHICLE_TYPES = ["truck", "mini_truck", "lorry", "tempo", "other"] as const;
-
-const MACHINE_TYPES = [
-  "Blowroom",
-  "Carding",
-  "Drawing",
-  "Simplex",
-  "Ring Frame",
-  "Autoconer",
-  "Winding",
-] as const;
 
 export const Route = createFileRoute("/_app/masters")({
   head: () => ({ meta: [{ title: "Masters — SpinFlow ERP" }] }),
@@ -1759,6 +1750,11 @@ function ImportCustomersDialog() {
 
 function MachineForm({ item, departments }: { item?: MasterMachine; departments: Department[] }) {
   const qc = useQueryClient();
+  const { data: machineTypes } = useMillMasterCategory("machine_type");
+  const MACHINE_TYPES = machineTypes?.length ? machineTypes : [
+    "Blowroom", "Carding", "Drawing", "Simplex", "Ring Frame",
+    "Autoconer", "Winding",
+  ];
   const requiredFields = ["code"];
   const [form, setForm] = useState({
     code: item?.code ?? "",
