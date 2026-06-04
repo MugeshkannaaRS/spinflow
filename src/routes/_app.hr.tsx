@@ -381,6 +381,8 @@ function HRPage() {
 function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdit: boolean }) {
   const empColConfig = useColumnConfig("hr_employees");
   const qc = useQueryClient();
+  const { data: millMasters } = useMillMasters();
+  const DEPT_LIST = (millMasters?.department_names?.length ? millMasters.department_names : DEPARTMENTS_FALLBACK);
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
   const [gradeFilter, setGradeFilter] = useState("all");
@@ -1001,7 +1003,7 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    {DEPARTMENTS.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+                    {DEPARTMENTS.map((d: string) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
                   </SelectContent>
                 </Select>
                 {errors.department && <p className="text-xs text-destructive">{errors.department}</p>}
@@ -1301,7 +1303,7 @@ function EditEmployeeSheet({
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    {DEPARTMENTS.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+                    {DEPARTMENTS.map((d: string) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
                   </SelectContent>
                 </Select>
                 {errors.department && <p className="text-xs text-destructive">{errors.department}</p>}

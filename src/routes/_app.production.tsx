@@ -108,21 +108,34 @@ function ShiftGrid() {
   const [date, setDate] = useState(localDate);
   const [shift, setShift] = useState<"A" | "B" | "C">("A");
   const { data: millMasters } = useMillMasters();
-  const DEPARTMENTS = (millMasters?.department_names?.length ? millMasters.department_names : DEPARTMENTS_FALLBACK);
+  const deptOptions = millMasters?.department ?? [];
+  const DEPARTMENTS = deptOptions.length > 0
+    ? deptOptions.map((d: any) => typeof d === "string" ? d : d.name)
+    : DEPARTMENTS_FALLBACK;
   const [department, setDepartment] = useState<string>("");
+  const [departmentId, setDepartmentId] = useState<string | null>(null);
+
   useEffect(() => {
-    if (!department && DEPARTMENTS.length > 0) {
-      setDepartment(DEPARTMENTS[0]);
+    if (!department && deptOptions.length > 0) {
+      const first = deptOptions[0];
+      const name = typeof first === "string" ? first : first.name;
+      const id = typeof first === "string" ? null : (first.id || null);
+      setDepartment(name);
+      setDepartmentId(id);
     }
-  }, [DEPARTMENTS]);
+  }, [deptOptions]);
+
   const [count, setCount] = useState("30s");
   const config = useColumnConfig("production_entries");
 
   const machinesQ = useQuery({
-    queryKey: ["machines", department, millId],
-    queryFn: () => productionApi.getMachines({ department, mill_id: millId }),
+    queryKey: ["machines", departmentId || department, millId],
+    queryFn: () => productionApi.getMachines({
+      ...(departmentId ? { department_id: departmentId } : { department }),
+      mill_id: millId,
+    }),
     staleTime: 60_000,
-    enabled: !!millId,
+    enabled: !!millId && !!(departmentId || department),
   });
 
   const machines = useMemo(
@@ -269,6 +282,10 @@ function ShiftGrid() {
                 value={department}
                 onValueChange={(v) => {
                   setDepartment(v);
+                  const dOpt = deptOptions.find((d: any) =>
+                    (typeof d === "string" ? d : d.name) === v
+                  );
+                  setDepartmentId(dOpt && typeof dOpt !== "string" ? (dOpt.id || null) : null);
                   setRequiredErrors((prev) => ({ ...prev, department: "" }));
                 }}
               >
@@ -280,11 +297,12 @@ function ShiftGrid() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {DEPARTMENTS.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {d}
-                    </SelectItem>
-                  ))}
+                  {deptOptions.length === 0 ? (
+                    <SelectItem value="_empty" disabled>Import machines to see departments</SelectItem>
+                  ) : deptOptions.map((d: any) => {
+                    const name = typeof d === "string" ? d : d.name;
+                    return <SelectItem key={name} value={name}>{name}</SelectItem>;
+                  })}
                 </SelectContent>
               </Select>
               {requiredErrors.department && (

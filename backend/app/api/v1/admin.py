@@ -604,3 +604,91 @@ async def update_user_restrictions(
         old_value=str(old_value), new_value=str(new_restrictions),
     )
     return {"message": "User module restrictions updated", "module_restrictions": new_restrictions}
+
+
+# ── Admin Dashboard (Vendor overview) ─────────────────────────────────────────
+
+@router.get("/admin/dashboard")
+async def admin_dashboard(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Full company overview for Super Admin vendor dashboard."""
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+
+    from sqlalchemy import and_ as _and, distinct
+    from app.models.masters import CompanyModule
+    from app.models.billing import CompanySubscription
+
+    try:
+        # One aggregation query per company
+        companies_res = await db.execute(
+            select(Company).order_by(Company.name)
+        )
+        companies = companies_res.scalars().all()
+
+        result_companies = []
+        total_mills = 0
+        total_users_all = 0
+        over_limit = 0
+
+        for co in companies:
+            mills_cnt = int((await db.execute(
+                select(func.count(Mill.id)).where(Mill.company_id == co.id)
+            )).scalar() or 0)
+
+            users_cnt = int((await db.execute(
+                select(func.count(User.id)).where(
+                    User.company_id == co.id,
+                    User.is_active == True,
+                    User.deleted_at.is_(None),
+                )
+            )).scalar() or 0)
+
+            mods_cnt = int((await db.execute(
+                select(func.count(CompanyModule.id)).where(
+                    CompanyModule.company_id == co.id,
+                    CompanyModule.is_enabled == True,
+                )
+            )).scalar() or 0)
+
+            sub_res = await db.execute(
+                select(CompanySubscription).where(CompanySubscription.company_id == co.id)
+            )
+            sub = sub_res.scalar_one_or_none()
+            plan_name = str(getattr(sub, "plan_id", None) or "starter")
+            max_u = int(getattr(sub, "max_users", 0) or 0)
+            sub_status = getattr(sub, "status", "active") or "active"
+            is_over = max_u > 0 and users_cnt > max_u
+            if is_over:
+                over_limit += 1
+
+            total_mills += mills_cnt
+            total_users_all += users_cnt
+
+            result_companies.append({
+                "id": str(co.id),
+                "name": co.name,
+                "code": co.code,
+                "status": sub_status,
+                "plan": plan_name,
+                "mills": mills_cnt,
+                "users": users_cnt,
+                "max_users": max_u,
+                "modules": mods_cnt,
+                "is_over_limit": is_over,
+            })
+
+        return {
+            "total_companies": len(companies),
+            "active_companies": sum(1 for c in result_companies if c["status"] == "active"),
+            "total_mills": total_mills,
+            "total_users": total_users_all,
+            "companies_over_limit": over_limit,
+            "companies": result_companies,
+        }
+    except Exception as e:
+        logger.error(f"admin_dashboard error: {e}", exc_info=True)
+        raise HTTPException(500, f"Dashboard error: {str(e)[:200]}")

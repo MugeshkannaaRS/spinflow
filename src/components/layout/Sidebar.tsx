@@ -174,7 +174,7 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
       items: group.items.filter((item) => {
         if (isDashboardOnly()) return item.module === "dashboard";
         // SUPER_ADMIN = vendor: only sees vendor modules
-        const SA_MODULES = new Set(["dashboard", "admin", "column_config", "users", "audit"]);
+        const SA_MODULES = new Set(["dashboard", "admin", "column_config", "users", "audit", "billing"]);
         if (isSuperAdmin) return SA_MODULES.has(item.module);
         return canAccess(item.module);
       }),

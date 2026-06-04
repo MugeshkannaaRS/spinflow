@@ -1831,7 +1831,7 @@ function MachineForm({ item, departments }: { item?: MasterMachine; departments:
             <SelectValue placeholder="Select type" />
           </SelectTrigger>
           <SelectContent>
-            {MACHINE_TYPES.map((t) => (
+            {MACHINE_TYPES.map((t: string) => (
               <SelectItem key={t} value={t}>
                 {t}
               </SelectItem>

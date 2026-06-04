@@ -75,9 +75,13 @@ function DashboardPage() {
 
   // SUPER_ADMIN → admin summary (vendor KPIs)
   const adminQ = useQuery({
-    queryKey: ["admin-summary"],
-    queryFn: () => api.get("/dashboard/admin-summary").then(r => r.data),
-    staleTime: 3 * 60 * 1000,
+    queryKey: ["admin-dashboard"],
+    queryFn: () =>
+      // Try new rich endpoint first, fallback to legacy
+      api.get("/admin/dashboard").then(r => r.data).catch(() =>
+        api.get("/dashboard/admin-summary").then(r => r.data)
+      ),
+    staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     enabled: isSuperAdmin,
   });
@@ -97,47 +101,75 @@ function DashboardPage() {
   // ── SUPER_ADMIN: vendor admin dashboard ────────────────────────────────
   if (isSuperAdmin) {
     const ad = adminQ.data ?? {};
-    const companies = ad.companies ?? [];
+    const companies: any[] = ad.companies ?? [];
 
     return (
       <div className="flex flex-col min-h-full bg-[#f8fafc]">
         <PageHeader
           title={`${greet()}, ${user?.name ?? "Admin"}`}
-          subtitle="Vendor dashboard · System-wide overview"
+          subtitle="SpinFlow ERP · Vendor dashboard · System-wide overview"
           onRefresh={() => adminQ.refetch()}
           isRefreshing={adminQ.isFetching}
         />
         <div className="p-6 space-y-6">
+          {/* KPI row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard label="Active Companies" value={fmt(ad.total_companies ?? 0)} icon={Building2} iconColor="text-blue-600" iconBg="bg-blue-50" />
-            <KpiCard label="Active Mills" value={fmt(ad.total_mills ?? 0)} icon={Factory} iconColor="text-cyan-600" iconBg="bg-cyan-50" />
+            <KpiCard label="Total Companies" value={fmt(ad.total_companies ?? 0)} icon={Building2} iconColor="text-blue-600" iconBg="bg-blue-50" />
+            <KpiCard label="Total Mills" value={fmt(ad.total_mills ?? 0)} icon={Factory} iconColor="text-cyan-600" iconBg="bg-cyan-50" />
             <KpiCard label="Total Users" value={fmt(ad.total_users ?? 0)} icon={Users} iconColor="text-green-600" iconBg="bg-green-50" />
-            <KpiCard label="Total Employees" value={fmt(ad.total_employees ?? 0)} icon={Cpu} iconColor="text-indigo-600" iconBg="bg-indigo-50" />
+            <KpiCard
+              label="Over User Limit"
+              value={fmt(ad.companies_over_limit ?? 0)}
+              icon={AlertTriangle}
+              iconColor={(ad.companies_over_limit ?? 0) > 0 ? "text-red-600" : "text-slate-400"}
+              iconBg={(ad.companies_over_limit ?? 0) > 0 ? "bg-red-50" : "bg-slate-50"}
+            />
           </div>
 
+          {/* Companies table */}
           {companies.length > 0 && (
             <div className="bg-white border border-[#e2e8f0] rounded-lg overflow-hidden">
-              <div className="px-5 py-4 border-b border-[#e2e8f0]">
-                <h3 className="text-sm font-semibold text-[#0f172a]">Recent Companies</h3>
+              <div className="px-5 py-4 border-b border-[#e2e8f0] flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-[#0f172a]">All Companies</h3>
+                <a href="/admin" className="text-xs text-blue-600 hover:underline">Manage →</a>
               </div>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-[#f1f5f9] border-b border-[#e2e8f0]">
-                    <th className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">Name</th>
-                    <th className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">Code</th>
-                    <th className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {companies.map((c: any) => (
-                    <tr key={c.id} className="border-t border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors">
-                      <td className="px-4 py-3 text-[#0f172a] font-medium">{c.name}</td>
-                      <td className="px-4 py-3 text-[#64748b]">{c.code}</td>
-                      <td className="px-4 py-3 text-[#64748b]">{c.created_at ? fmtDate(c.created_at) : "—"}</td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-[#f1f5f9] border-b border-[#e2e8f0]">
+                      {["Company","Plan","Status","Mills","Users","Modules"].map(h => (
+                        <th key={h} className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {companies.map((c: any) => (
+                      <tr key={c.id} className="border-t border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-[#0f172a]">{c.name}</div>
+                          <div className="text-[11px] text-[#94a3b8] font-mono">{c.code}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#f1f5f9] text-[#475569] font-medium uppercase">{c.plan || "starter"}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${c.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                            {c.status || "active"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-[#0f172a]">{c.mills ?? 0}</td>
+                        <td className="px-4 py-3">
+                          <span className={c.is_over_limit ? "font-semibold text-red-600" : "font-mono text-[#0f172a]"}>
+                            {c.users ?? 0}{c.max_users ? `/${c.max_users}` : ""}
+                            {c.is_over_limit && " ⚠"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-[#0f172a]">{c.modules ?? 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>

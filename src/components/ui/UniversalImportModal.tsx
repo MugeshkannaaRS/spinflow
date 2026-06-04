@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInvalidateMillMasters } from "@/hooks/useMillConfig";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import {
@@ -122,6 +123,7 @@ export function UniversalImportModal({
   } | null>(null);
   const [duplicateMode, setDuplicateMode] = useState<"skip" | "update" | "create">("update");
   const qc = useQueryClient();
+  const invalidateMillMasters = useInvalidateMillMasters();
   const [importError, setImportError] = useState<string | null>(null);
   const [showStep5Errors, setShowStep5Errors] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -724,6 +726,7 @@ export function UniversalImportModal({
       qc.invalidateQueries({ queryKey: ["employees"] });
       qc.invalidateQueries({ queryKey: ["masters"] });
       qc.invalidateQueries({ queryKey: ["hr-employees"] });
+      invalidateMillMasters();
     } catch (err: any) {
       setIsImporting(false);
       const msg = err?.message ?? String(err) ?? "Unknown error during import";

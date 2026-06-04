@@ -25,6 +25,7 @@ MAX_BATCH = 500
 @router.get("/production/machines")
 async def get_machines(
     department: Optional[str] = Query(None),
+    department_id: Optional[str] = Query(None),
     mill_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -53,8 +54,24 @@ async def get_machines(
         query = query.where(Machine.mill_id == effective_mill_id)
     elif scope["company_id"]:
         query = query.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
-    if department:
-        query = query.join(Department, Machine.department_id == Department.id).where(Department.name == department)
+    if department_id:
+        # Preferred: filter by UUID — exact, case-insensitive, no string issues
+        query = query.where(Machine.department_id == department_id)
+    elif department and department not in ("all", ""):
+        # Fallback: lookup dept by name (case-insensitive)
+        dept_res = await db.execute(
+            select(Department.id).where(
+                Machine.mill_id == effective_mill_id,
+                func.lower(func.trim(Department.name)) == func.lower(department.strip()),
+                Department.mill_id == effective_mill_id,
+            )
+        )
+        dept_id_found = dept_res.scalar_one_or_none()
+        if dept_id_found:
+            query = query.where(Machine.department_id == dept_id_found)
+        else:
+            # Partial fallback: filter by department string column
+            query = query.where(Machine.department.ilike(f"%{department.strip()}%"))
     # Order by global serial_no (cast String→Int so 1,2,3 not 1,10,11,2)
     query = query.order_by(nullslast(cast(Machine.serial_no, Integer).asc()), Machine.created_at.asc())
     try:
