@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/lib/api";
-import { useAuth } from "@/stores/auth";
+import { useAuth, type CompanyMill } from "@/stores/auth";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -17,7 +17,7 @@ import {
   XCircle, AlertTriangle, ChevronDown, ChevronUp, Loader2,
   Factory, BadgeCheck, Wrench, Banknote, ShoppingCart,
   Warehouse, Boxes, Truck, QrCode, Receipt, Settings2,
-  UserCog, SlidersHorizontal,
+  UserCog, SlidersHorizontal, Plus,
 } from "lucide-react";
 
 const MODULE_ICONS: Record<string, React.ElementType> = {
@@ -409,6 +409,36 @@ function SuperAdminBillingView() {
 
 function MillOwnerBillingView() {
   const qc = useQueryClient();
+  const { setActiveMill, setUser, user } = useAuth();
+  const [addMillOpen, setAddMillOpen] = useState(false);
+  const [millForm, setMillForm] = useState({ name: "", code: "", city: "", state: "", phone: "" });
+  const [millFormErrors, setMillFormErrors] = useState<Record<string,string>>({});
+
+  const addMillMut = useMutation({
+    mutationFn: (data: typeof millForm) => api.post("/mills", data).then(r => r.data),
+    onSuccess: (newMill: any) => {
+      toast.success(`Mill "${newMill.name}" added`);
+      qc.invalidateQueries({ queryKey: ["billing-my-plan"] });
+      // Add to companyMills in auth store and switch to it
+      const mill: CompanyMill = { id: newMill.id, name: newMill.name, code: newMill.code };
+      setUser({ companyMills: [...(user?.companyMills ?? []), mill] });
+      setActiveMill(mill);
+      setAddMillOpen(false);
+      setMillForm({ name: "", code: "", city: "", state: "", phone: "" });
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Failed to add mill"),
+  });
+
+  function handleAddMill() {
+    const errs: Record<string,string> = {};
+    if (!millForm.name.trim()) errs.name = "Mill name is required";
+    if (!millForm.code.trim()) errs.code = "Mill code is required";
+    else if (millForm.code.trim().length > 6) errs.code = "Max 6 characters";
+    setMillFormErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+    addMillMut.mutate({ ...millForm, code: millForm.code.trim().toUpperCase() });
+  }
+
   const planQ = useQuery({
     queryKey: ["billing-my-plan"],
     queryFn: () => api.get("/billing/my-plan").then(r => r.data),
@@ -514,8 +544,16 @@ function MillOwnerBillingView() {
             </div>
           </div>
           <div className="lg:col-span-2 bg-white border border-[#e2e8f0] rounded-lg p-5">
-            <h3 className="text-sm font-semibold text-[#0f172a] mb-4">Your Mills</h3>
-            <div className="space-y-2 max-h-80 overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-[#0f172a]">Your Mills</h3>
+              <button
+                onClick={() => setAddMillOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-semibold transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add Mill
+              </button>
+            </div>
+            <div className="space-y-2 max-h-72 overflow-y-auto">
               {(d?.mills ?? []).map((mill: any) => (
                 <div key={mill.id} className="flex items-center gap-3 p-3 rounded-lg border border-[#e2e8f0] hover:bg-[#f8fafc] transition-colors">
                   <span className="font-mono text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-semibold">{mill.code}</span>
@@ -526,10 +564,51 @@ function MillOwnerBillingView() {
                 </div>
               ))}
               {(d?.mills ?? []).length === 0 && (
-                <p className="text-[13px] text-[#94a3b8] text-center py-6">No mills found</p>
+                <p className="text-[13px] text-[#94a3b8] text-center py-6">No mills yet</p>
               )}
             </div>
-            <p className="text-[12px] text-[#94a3b8] mt-3">Need to add a mill? Contact your SpinFlow representative.</p>
+
+            {/* Add Mill Dialog */}
+            {addMillOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-[#e2e8f0] flex items-center justify-between">
+                    <h2 className="text-[17px] font-bold text-[#0f172a]">Add New Mill</h2>
+                    <button onClick={() => { setAddMillOpen(false); setMillFormErrors({}); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-lg leading-none">✕</button>
+                  </div>
+                  <div className="px-6 py-4 space-y-3">
+                    {[
+                      { key: "name", label: "Mill Name*", placeholder: "e.g. Ambur Spinning Mill 1" },
+                      { key: "code", label: "Mill Code*", placeholder: "e.g. AM1 (max 6 chars)" },
+                      { key: "city", label: "City", placeholder: "e.g. Ambur" },
+                      { key: "state", label: "State", placeholder: "e.g. Tamil Nadu" },
+                      { key: "phone", label: "Phone", placeholder: "e.g. 9876543210" },
+                    ].map(({ key, label, placeholder }) => (
+                      <div key={key}>
+                        <label className="block text-[13px] font-semibold text-[#374151] mb-1">{label}</label>
+                        <input
+                          value={(millForm as any)[key]}
+                          onChange={e => setMillForm(prev => ({ ...prev, [key]: key === "code" ? e.target.value.toUpperCase() : e.target.value }))}
+                          placeholder={placeholder}
+                          maxLength={key === "code" ? 6 : 200}
+                          className="w-full h-10 px-3 rounded-lg border border-[#d1d5db] text-[14px] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                        {millFormErrors[key] && <p className="text-[12px] text-red-600 mt-1">{millFormErrors[key]}</p>}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-6 py-4 border-t border-[#e2e8f0] flex justify-end gap-2">
+                    <button onClick={() => { setAddMillOpen(false); setMillFormErrors({}); }}
+                      className="px-4 py-2 rounded-lg border border-[#d1d5db] text-[13px] font-medium text-[#374151] hover:bg-gray-50">Cancel</button>
+                    <button onClick={handleAddMill} disabled={addMillMut.isPending}
+                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold disabled:opacity-50 flex items-center gap-2">
+                      {addMillMut.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      Add Mill
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

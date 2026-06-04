@@ -671,3 +671,67 @@ async def bulk_create_customers(
             errors.append(f"Row {i + 1}: {str(e)}")
     await db.flush()
     return {"created": created, "skipped": skipped, "errors": errors}
+
+
+# ── Mill Owner: Create Mill (auto-assigns company_id) ─────────────
+
+class MillOwnerCreateRequest(BaseModel):
+    name: str
+    code: str
+    city: str | None = None
+    state: str | None = None
+    phone: str | None = None
+    address: str | None = None
+
+
+@router.post("/mills")
+async def mill_owner_create_mill(
+    req: MillOwnerCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a new mill under the current user's company.
+    MILL_OWNER and SUPER_ADMIN only.
+    """
+    from app.core.deps import get_mill_scope
+    from app.services.pricing_service import PricingService
+
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(status_code=403, detail="Mill Owner or Super Admin only")
+
+    company_id = str(current_user.company_id) if current_user.company_id else None
+    if not company_id:
+        # Fallback: derive from mill_id
+        if current_user.mill_id:
+            m = await db.get(Mill, current_user.mill_id)
+            if m:
+                company_id = str(m.company_id)
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company associated with this user")
+
+    # Pricing / plan limit check
+    svc = PricingService(db)
+    ok, msg = await svc.can_create_mill(company_id)
+    if not ok:
+        raise HTTPException(status_code=403, detail=msg)
+
+    # Unique code check
+    existing = await db.execute(select(Mill).where(Mill.code == req.code.strip()))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail=f"Mill code '{req.code}' already exists")
+
+    mill = Mill(
+        company_id=company_id,
+        code=req.code.strip().upper(),
+        name=req.name.strip(),
+        city=req.city,
+        state=req.state,
+        phone=req.phone,
+        address=req.address,
+        is_active=True,
+    )
+    db.add(mill)
+    await db.commit()
+    await db.refresh(mill)
+    return MillOut.model_validate(mill).model_dump()

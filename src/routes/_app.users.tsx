@@ -367,11 +367,18 @@ function UsersPage() {
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent>
-                        {ROLES.map((role) => (
-                          <SelectItem key={role} value={role}>
-                            {ROLE_LABELS[role]}
-                          </SelectItem>
-                        ))}
+                        {ROLES
+                          .filter(role => {
+                            // MILL_OWNER can only create roles below them in hierarchy
+                            if (currentUser?.role === "SUPER_ADMIN") return true;
+                            return !["SUPER_ADMIN", "MILL_OWNER"].includes(role);
+                          })
+                          .map((role) => (
+                            <SelectItem key={role} value={role}>
+                              {ROLE_LABELS[role]}
+                            </SelectItem>
+                          ))
+                        }
                       </SelectContent>
                     </Select>
                   </div>

@@ -49,8 +49,10 @@ export const useAuth = create<AuthState>()(
     (set) => ({
       ...initialState,
       login: (user, token, refreshToken) => {
+        // Resolve the code from companyMills if available
+        const millCode = user.companyMills?.find(m => m.id === user.millId)?.code ?? "";
         const activeMill = (user.millId && user.millName)
-          ? { id: user.millId, name: user.millName, code: "" }
+          ? { id: user.millId, name: user.millName, code: millCode }
           : null;
         set({ user, token, refreshToken: refreshToken ?? null, isAuthenticated: true, activeMill });
         setAuthHeader(token);

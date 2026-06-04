@@ -66,6 +66,15 @@ async def create_user(
     current_user: User = Depends(require_module("users", write=True)),
 ):
     scope = await get_mill_scope(current_user, db)
+    creator_role = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+
+    # MILL_OWNER cannot create SUPER_ADMIN or other MILL_OWNER accounts
+    RESTRICTED_ROLES = {"SUPER_ADMIN", "MILL_OWNER"}
+    if creator_role == "MILL_OWNER" and req.role in RESTRICTED_ROLES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Mill Owner cannot create '{req.role}' users",
+        )
 
     # Require mill_id for non-owner roles
     if req.role not in ("SUPER_ADMIN", "MILL_OWNER") and not req.mill_id:
