@@ -45,13 +45,14 @@ import { toast } from "sonner";
 import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, ArrowDownToLine } from "lucide-react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useActiveMill } from "@/hooks/useActiveMill";
+import { useMillMasters } from "@/hooks/useMillConfig";
 
 export const Route = createFileRoute("/_app/production")({
   head: () => ({ meta: [{ title: "Production — SpinFlow ERP" }] }),
   component: ProductionPage,
 });
 
-const DEPARTMENTS = [
+const DEPARTMENTS_FALLBACK = [
   "Blowroom",
   "Carding",
   "Drawing",
@@ -106,7 +107,9 @@ function ShiftGrid() {
   const [requiredErrors, setRequiredErrors] = useState<Record<string, string>>({});
   const [date, setDate] = useState(localDate);
   const [shift, setShift] = useState<"A" | "B" | "C">("A");
-  const [department, setDepartment] = useState(DEPARTMENTS[4]);
+  const { data: millMasters } = useMillMasters();
+  const DEPARTMENTS = (millMasters?.department?.length ? millMasters.department : DEPARTMENTS_FALLBACK);
+  const [department, setDepartment] = useState(DEPARTMENTS_FALLBACK[4] || "Ring Frame");
   const [count, setCount] = useState("30s");
   const config = useColumnConfig("production_entries");
 

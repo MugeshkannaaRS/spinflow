@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Any, Dict
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, cast, Integer, nullslast
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,8 @@ async def get_machines(
         query = query.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
     if department:
         query = query.join(Department, Machine.department_id == Department.id).where(Department.name == department)
+    # Order by global serial_no (cast String→Int so 1,2,3 not 1,10,11,2)
+    query = query.order_by(nullslast(cast(Machine.serial_no, Integer).asc()), Machine.created_at.asc())
     try:
         count_stmt = select(func.count()).select_from(query.subquery())
         total = (await db.execute(count_stmt)).scalar() or 0

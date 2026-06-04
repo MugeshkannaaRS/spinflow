@@ -13,13 +13,31 @@ export const fmtNumber = (n: unknown, decimals = 0): string => {
 /** Alias used in dashboard: fmt(1234) → "1,234" */
 export const fmt = fmtNumber
 
-/** ₹ with Cr / L abbreviation — always uses Indian scale for ERP numbers */
+/** Dynamic currency symbol — updated from mill subscription config */
+let _currencySymbol = "₹"
+
+export function setCurrencySymbol(symbol: string): void {
+  _currencySymbol = symbol || "₹"
+  if (typeof window !== "undefined") {
+    (window as any).__spinflow_currency__ = _currencySymbol
+  }
+}
+
+export function getCurrencySymbol(): string {
+  if (typeof window !== "undefined" && (window as any).__spinflow_currency__) {
+    return (window as any).__spinflow_currency__
+  }
+  return _currencySymbol
+}
+
+/** Currency with Cr / L abbreviation — uses dynamic currency symbol */
 export const fmtLakh = (n: unknown): string => {
   const num = Number(n ?? 0)
-  if (isNaN(num)) return '₹0'
-  if (num >= 10000000) return `₹${(num / 10000000).toFixed(2)} Cr`
-  if (num >= 100000)   return `₹${(num / 100000).toFixed(2)} L`
-  return `₹${num.toLocaleString('en-IN')}`
+  const sym = getCurrencySymbol()
+  if (isNaN(num)) return `${sym}0`
+  if (num >= 10000000) return `${sym}${(num / 10000000).toFixed(2)} Cr`
+  if (num >= 100000)   return `${sym}${(num / 100000).toFixed(2)} L`
+  return `${sym}${num.toLocaleString('en-IN')}`
 }
 
 /** Alias kept for backward compat */

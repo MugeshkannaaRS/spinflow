@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useMillSubscription, useUpdateCurrency } from "@/hooks/useMillConfig";
+import { setCurrencySymbol } from "@/lib/formatters";
 import { api } from "@/lib/api";
 import { useAuth, type CompanyMill } from "@/stores/auth";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -407,9 +409,31 @@ function SuperAdminBillingView() {
   );
 }
 
+const CURRENCIES = [
+  { symbol: "₹", code: "INR", label: "Indian Rupee" },
+  { symbol: "$", code: "USD", label: "US Dollar" },
+  { symbol: "€", code: "EUR", label: "Euro" },
+  { symbol: "£", code: "GBP", label: "Pound" },
+  { symbol: "৳", code: "BDT", label: "Taka" },
+  { symbol: "₺", code: "TRY", label: "Lira" },
+];
+
 function MillOwnerBillingView() {
   const qc = useQueryClient();
   const { setActiveMill, setUser, user } = useAuth();
+  const { data: sub, refetch: refetchSub } = useMillSubscription();
+  const updateCurrencyMut = useUpdateCurrency();
+
+  // Sync currency symbol to global formatters when subscription loads
+  useEffect(() => {
+    if (sub?.currency_symbol) setCurrencySymbol(sub.currency_symbol);
+  }, [sub?.currency_symbol]);
+
+  const handleCurrencyUpdate = async (symbol: string) => {
+    await updateCurrencyMut.mutateAsync(symbol);
+    setCurrencySymbol(symbol);
+    refetchSub();
+  };
   const [addMillOpen, setAddMillOpen] = useState(false);
   const [millForm, setMillForm] = useState({ name: "", code: "", city: "", state: "", phone: "" });
   const [millFormErrors, setMillFormErrors] = useState<Record<string,string>>({});
@@ -640,6 +664,50 @@ function MillOwnerBillingView() {
             </table>
           </div>
         )}
+
+        {/* User Licenses */}
+        {sub && (
+          <div className="bg-white border border-[#e2e8f0] rounded-lg p-5">
+            <h3 className="text-sm font-semibold text-[#0f172a] mb-4">User Licenses</h3>
+            <div className="flex items-end justify-between mb-2">
+              <span className="text-[28px] font-mono font-bold text-[#0f172a]">
+                {sub.current_users} <span className="text-[18px] text-[#94a3b8]">/ {sub.max_users}</span>
+              </span>
+              <span className={"text-sm font-semibold " + (sub.is_over_limit ? "text-red-600" : "text-green-600")}>
+                {sub.is_over_limit ? sub.overage_users + " over limit" : sub.remaining_users + " remaining"}
+              </span>
+            </div>
+            <div className="h-2 bg-[#e2e8f0] rounded-full overflow-hidden">
+              <div className={"h-full rounded-full transition-all " + (sub.is_over_limit ? "bg-red-500" : "bg-blue-500")}
+                style={{ width: Math.min(100, (sub.current_users / Math.max(sub.max_users, 1)) * 100) + "%" }} />
+            </div>
+            {sub.is_over_limit && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                You have exceeded your user limit by {sub.overage_users} user(s).
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Currency Selector */}
+        <div className="bg-white border border-[#e2e8f0] rounded-lg p-5">
+          <h3 className="text-sm font-semibold text-[#0f172a] mb-1">Display Currency</h3>
+          <p className="text-xs text-[#64748b] mb-4">Changes the currency symbol shown throughout the ERP. Values are not converted.</p>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+            {CURRENCIES.map(c => (
+              <button key={c.code} onClick={() => handleCurrencyUpdate(c.symbol)}
+                disabled={updateCurrencyMut.isPending}
+                className={"p-3 rounded-lg border text-center transition-all disabled:opacity-50 " +
+                  (sub?.currency_symbol === c.symbol
+                    ? "border-blue-400 bg-blue-50 text-blue-700"
+                    : "border-[#e2e8f0] hover:border-blue-300 text-[#374151]")}>
+                <span className="text-xl block">{c.symbol}</span>
+                <span className="text-[10px] text-[#94a3b8] mt-0.5 block">{c.code}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
       </div>
     </div>
   );

@@ -22,15 +22,18 @@ class MachineResponse(BaseModel):
     code: str
     name: Optional[str] = None
     machine_type: Optional[str] = None
-    department: str
+    department: Optional[str] = None
+    department_id: Optional[str] = None
     make: Optional[str] = None
     model: Optional[str] = None
+    serial_no: Optional[str] = None
+    mill_id: Optional[str] = None
     spindles: Optional[int] = None
     installation_date: Optional[date] = None
     amc_expiry: Optional[date] = None
     status: Optional[bool] = None
     current_status: Optional[str] = None
-    target_kg: float
+    target_kg: float = 0
 
     class Config:
         from_attributes = True

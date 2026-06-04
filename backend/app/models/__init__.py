@@ -41,3 +41,4 @@ __all__ = [
     "Trip", "TripItem", "TripScanLog",
     "ColumnConfig", "ColumnDropdownOption",
 ]
+from app.models.mill_config import MillMaster, MillCustomField, MillRecordValue

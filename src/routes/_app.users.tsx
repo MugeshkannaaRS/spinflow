@@ -4,6 +4,7 @@ import { usersApi, mastersApi, adminApi } from "@/lib/api-service";
 import { ROLES, ROLE_LABELS, type Module } from "@/lib/rbac";
 import type { Role } from "@/lib/rbac";
 import { useAuth } from "@/stores/auth";
+import { useMillSubscription } from "@/hooks/useMillConfig";
 import { AccessGuard } from "@/components/AccessGuard";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -126,6 +127,8 @@ function UsersPage() {
   const qc = useQueryClient();
   const currentUser = useAuth((s) => s.user);
   const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
+  const { data: sub } = useMillSubscription();
+  const atUserLimit = !isSuperAdmin && sub ? (sub.is_over_limit || sub.remaining_users === 0) : false;
   const userColConfig = useColumnConfig("hr_employees");
 
   const usersQ = useQuery({
@@ -280,7 +283,7 @@ function UsersPage() {
             </div>
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
-                <Button onClick={openNewUser}>
+                <Button onClick={openNewUser} disabled={atUserLimit} title={atUserLimit ? "User limit reached. Upgrade plan." : ""}>
                   <Plus className="size-4 mr-2" />
                   New User
                 </Button>

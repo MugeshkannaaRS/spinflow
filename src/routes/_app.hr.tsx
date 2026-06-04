@@ -83,6 +83,7 @@ import {
   Eye,
 } from "lucide-react";
 import { useActiveMill } from "@/hooks/useActiveMill";
+import { useMillMasters } from "@/hooks/useMillConfig";
 
 export const Route = createFileRoute("/_app/hr")({
   head: () => ({ meta: [{ title: "HR — SpinFlow ERP" }] }),
@@ -183,15 +184,13 @@ interface PayrollRow {
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
-const DEPARTMENTS = [
-  "Spinning",
-  "Weaving",
-  "Processing",
-  "Packaging",
-  "Maintenance",
-  "Stores",
-  "Admin",
+// Fallback departments — replaced at runtime by mill-specific data
+const DEPARTMENTS_FALLBACK = [
+  "Spinning", "Weaving", "Processing", "Packaging",
+  "Maintenance", "Stores", "Admin",
 ];
+// Module-level alias used by subcomponents (overridden inside HRPage via dynamic data)
+let DEPARTMENTS: string[] = DEPARTMENTS_FALLBACK;
 const SHIFTS = ["A", "B", "C", "General"];
 const GRADES = ["1", "2", "3", "4", "5", "6"];
 const ATTENDANCE_STATUSES = ["P", "A", "H", "CL", "SL", "EL", "OD", "WO"];
@@ -236,6 +235,13 @@ function HRPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "hr");
   const { millId } = useActiveMill();
+  const { data: millMasters } = useMillMasters();
+  // Update module-level DEPARTMENTS so subcomponents pick up dynamic values
+  if (millMasters?.department?.length) {
+    DEPARTMENTS = millMasters.department;
+  }
+  const GRADES_DYN = (millMasters?.grade?.length ? millMasters.grade : GRADES);
+  const SHIFTS_DYN = (millMasters?.shift?.length ? millMasters.shift : SHIFTS);
   const qc = useQueryClient();
 
   const [tab, setTab] = useState("employees");

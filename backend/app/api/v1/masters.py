@@ -841,20 +841,38 @@ async def bulk_create_machines(
             # ── Department → ID (auto-create if missing) ──────────────
             dept_id: Optional[str] = dept_map.get(dept_name.lower()) if dept_name else None
             if dept_name and not dept_id:
-                dept_code = dept_name[:6].upper().replace(" ", "")
-                new_dept = Department(
-                    id=str(_uuid_mod.uuid4()),
-                    mill_id=eff_mill_id,
-                    code=dept_code,
-                    name=dept_name,
-                    department_type="general",
-                    is_active=True,
-                )
-                db.add(new_dept)
-                await db.flush()
-                dept_id = str(new_dept.id)
-                dept_map[dept_name.lower()] = dept_id
-                auto_created_depts.append(dept_name)
+                # Use a safe code: strip dots/spaces, max 50 chars, unique per mill
+                dept_code = dept_name[:6].upper().replace(" ", "").replace(".", "")
+                if not dept_code:
+                    dept_code = f"D{len(dept_map)+1:03d}"
+                try:
+                    new_dept = Department(
+                        id=str(_uuid_mod.uuid4()),
+                        mill_id=eff_mill_id,
+                        code=dept_code,
+                        name=dept_name,
+                        department_type="general",  # NOT NULL column — required default
+                        is_active=True,
+                    )
+                    db.add(new_dept)
+                    await db.flush()
+                    dept_id = str(new_dept.id)
+                    dept_map[dept_name.lower()] = dept_id
+                    auto_created_depts.append(dept_name)
+                except Exception as dept_err:
+                    # Unique constraint on code — try to find existing dept
+                    await db.rollback()
+                    logger.warning(f"Dept auto-create failed for '{dept_name}': {dept_err}")
+                    existing_dept = await db.execute(
+                        select(Department).where(
+                            Department.mill_id == eff_mill_id,
+                            func.lower(Department.name) == dept_name.lower(),
+                        )
+                    )
+                    existing_d = existing_dept.scalar_one_or_none()
+                    if existing_d:
+                        dept_id = str(existing_d.id)
+                        dept_map[dept_name.lower()] = dept_id
 
             # ── Brand / country → make field ──────────────────────────
             brand = str(
@@ -949,10 +967,31 @@ async def bulk_create_machines(
                 await db.flush()
 
         except Exception as e:
-            errors.append({"row": row.get("_serial_no", "?"), "error": str(e)})
+            logger.warning(f"Machine row error (row {row.get('_serial_no','?')}): {e}")
+            errors.append({"row": row.get("_serial_no", "?"), "error": str(e)[:200]})
             skipped += 1
+            continue  # always continue — never abort the whole batch
 
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception as commit_err:
+        await db.rollback()
+        raise HTTPException(500, f"Commit failed: {str(commit_err)[:300]}")
+
+    # ── Populate mill_masters from imported data (non-critical) ────────
+    try:
+        from app.core.mill_master_sync import sync_mill_masters, sync_custom_fields
+        co_id_str = scope.get("company_id") or str(current_user.company_id or "")
+        await sync_mill_masters(eff_mill_id, co_id_str, "machines", valid_items, db)
+        await sync_custom_fields(
+            eff_mill_id, co_id_str, "machines",
+            list(raw_items[0].keys()) if raw_items else [],
+            raw_items[:10], db,
+        )
+        await db.commit()
+    except Exception as sync_err:
+        logger.warning(f"mill_master_sync non-critical error: {sync_err}")
+
     return {
         "created": created,
         "updated": updated,
