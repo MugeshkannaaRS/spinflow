@@ -1,403 +1,574 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, CreditCard, FileText, TrendingUp, CheckCircle2, XCircle, Clock, AlertTriangle, Loader2 } from "lucide-react";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { KpiCard } from "@/components/ui/KpiCard";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { fmtLakh, fmtDate } from "@/lib/formatters";
 import { toast } from "sonner";
-import { useState } from "react";
+import { cn } from "@/lib/utils";
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Legend,
+} from "recharts";
+import {
+  TrendingUp, Building2, Users, Package, CheckCircle2,
+  XCircle, AlertTriangle, ChevronDown, ChevronUp, Loader2,
+  Factory, BadgeCheck, Wrench, Banknote, ShoppingCart,
+  Warehouse, Boxes, Truck, QrCode, Receipt, Settings2,
+  UserCog, SlidersHorizontal,
+} from "lucide-react";
 
-interface CompanyCost {
-  plan_monthly: number;
-  plan_yearly: number;
-  total_monthly: number;
-  total_yearly: number;
-  included_modules: string[];
-  addon_modules: { module_name: string; monthly_price: number }[];
-  addon_module_cost_monthly: number;
-  addon_module_cost_yearly: number;
-  included_mills: number;
-  included_users: number;
-  extra_mills: number;
-  extra_users: number;
-  extra_mill_cost_monthly: number;
-  extra_user_cost_monthly: number;
-  mill_count: number;
-  user_count: number;
+const MODULE_ICONS: Record<string, React.ElementType> = {
+  production: Factory, quality: BadgeCheck, maintenance: Wrench,
+  hr: Users, payroll: Banknote, purchase: ShoppingCart,
+  stores: Warehouse, inventory: Boxes, dispatch: Truck,
+  lotrac: QrCode, accounts: Receipt, sales: TrendingUp,
+  masters: Settings2, users: UserCog, column_config: SlidersHorizontal,
+};
+
+const PLAN_BADGE: Record<string, string> = {
+  starter:      "bg-slate-100 text-slate-600 border-slate-200",
+  professional: "bg-blue-100 text-blue-700 border-blue-200",
+  enterprise:   "bg-purple-100 text-purple-700 border-purple-200",
+};
+
+function PlanBadge({ plan }: { plan: string }) {
+  const cls = PLAN_BADGE[plan?.toLowerCase()] ?? PLAN_BADGE.starter;
+  return (
+    <span className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide", cls)}>
+      {plan}
+    </span>
+  );
 }
 
-interface SubscriptionStatus {
-  plan_id: string;
-  plan_code: string;
-  plan_name: string;
-  status: string;
-  billing_cycle: string;
-  started_at: string | null;
-  expires_at: string | null;
-  mill_count: number;
-  mill_limit: number;
-  user_count: number;
-  user_limit: number;
-  mills_exceeded: boolean;
-  users_exceeded: boolean;
-  cost: CompanyCost;
+const ALL_MODULES = [
+  "production","quality","maintenance","hr","payroll",
+  "purchase","stores","inventory","dispatch","lotrac",
+  "accounts","sales","masters","users","column_config",
+];
+const MODULE_LABELS: Record<string, string> = {
+  production:"Production", quality:"Quality", maintenance:"Maintenance",
+  hr:"Human Resources", payroll:"Payroll", purchase:"Cotton Purchase",
+  stores:"Stores", inventory:"Inventory", dispatch:"Dispatch",
+  lotrac:"LoTrac", accounts:"Accounts", sales:"Sales",
+  masters:"Masters", users:"Users & Roles", column_config:"Column Config",
+};
+
+function EditModulesDialog({
+  company, onClose,
+}: {
+  company: { id: string; name: string; enabled_modules: string[] };
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const [mods, setMods] = useState<Record<string, boolean>>(
+    Object.fromEntries(ALL_MODULES.map(m => [m, company.enabled_modules.includes(m)]))
+  );
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await Promise.all(
+        ALL_MODULES.map(m =>
+          api.post(`/admin/billing/companies/${company.id}/modules`, { module: m, enabled: mods[m] })
+        )
+      );
+      toast.success("Modules updated");
+      qc.invalidateQueries({ queryKey: ["admin-billing-companies"] });
+      onClose();
+    } catch {
+      toast.error("Failed to update modules");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+        <div className="px-6 py-4 border-b border-[#e2e8f0] flex items-center justify-between">
+          <div>
+            <h2 className="text-[17px] font-bold text-[#0f172a]">Edit Modules</h2>
+            <p className="text-[13px] text-[#64748b] mt-0.5">{company.name}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-lg leading-none">✕</button>
+        </div>
+        <div className="px-6 py-4 grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
+          {ALL_MODULES.map(m => {
+            const Icon = MODULE_ICONS[m] ?? Package;
+            return (
+              <label key={m} className={cn(
+                "flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors",
+                mods[m] ? "border-blue-200 bg-blue-50" : "border-[#e2e8f0] hover:bg-gray-50",
+              )}>
+                <input
+                  type="checkbox"
+                  className="accent-blue-600 w-4 h-4 shrink-0"
+                  checked={mods[m]}
+                  onChange={e => setMods(prev => ({ ...prev, [m]: e.target.checked }))}
+                />
+                <Icon className={cn("w-4 h-4 shrink-0", mods[m] ? "text-blue-600" : "text-[#94a3b8]")} />
+                <span className="text-[13px] font-medium text-[#374151]">{MODULE_LABELS[m]}</span>
+              </label>
+            );
+          })}
+        </div>
+        <div className="px-6 py-4 border-t border-[#e2e8f0] flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg border border-[#d1d5db] text-[13px] font-medium text-[#374151] hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button onClick={handleSave} disabled={saving}
+            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold disabled:opacity-50 flex items-center gap-2 transition-colors">
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-interface SubscriptionPlan {
-  id: string;
-  code: string;
-  name: string;
-  description: string | null;
-  monthly_price: number;
-  yearly_price: number;
-  included_mills: number;
-  included_users: number;
-  additional_mill_cost: number;
-  additional_user_cost: number;
-  is_active: boolean;
-  sort_order: number;
-  module_prices: { module_name: string; monthly_price: number; yearly_price: number; is_included: boolean }[];
+function ConfirmDialog({
+  message, onConfirm, onCancel, danger = false,
+}: {
+  message: string; onConfirm: () => void; onCancel: () => void; danger?: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6">
+        <p className="text-[15px] text-[#0f172a] font-medium mb-5">{message}</p>
+        <div className="flex justify-end gap-2">
+          <button onClick={onCancel} className="px-4 py-2 rounded-lg border border-[#d1d5db] text-[13px] font-medium text-[#374151] hover:bg-gray-50">
+            Cancel
+          </button>
+          <button onClick={onConfirm} className={cn(
+            "px-4 py-2 rounded-lg text-white text-[13px] font-semibold transition-colors",
+            danger ? "bg-red-600 hover:bg-red-700" : "bg-blue-600 hover:bg-blue-700",
+          )}>
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-interface Invoice {
-  id: string;
-  invoice_number: string;
-  amount: number;
-  currency: string;
-  status: string;
-  billing_period_start: string | null;
-  billing_period_end: string | null;
-  paid_at: string | null;
-  transaction_id: string | null;
-  gateway: string | null;
-  line_items: Record<string, any> | null;
-  created_at: string | null;
+function ModulesCell({ modules }: { modules: string[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(v => !v)}
+        className="inline-flex items-center gap-1 text-[12px] text-blue-600 hover:text-blue-800 font-medium">
+        {modules.length} modules
+        {open ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute top-full left-0 mt-1 z-20 bg-white border border-[#e2e8f0] rounded-lg shadow-lg p-2 min-w-40 max-h-48 overflow-y-auto">
+            {modules.length === 0
+              ? <p className="text-[12px] text-[#94a3b8] px-2 py-1">None enabled</p>
+              : modules.map(m => (
+                <div key={m} className="flex items-center gap-1.5 px-2 py-1 text-[12px] text-[#374151]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                  {MODULE_LABELS[m] ?? m}
+                </div>
+              ))
+            }
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
-interface ChangeRequest {
-  id: string;
-  company_id: string;
-  requested_plan_id: string;
-  change_type: string;
-  reason: string | null;
-  status: string;
-  review_notes: string | null;
-  created_at: string | null;
-}
+function SuperAdminBillingView() {
+  const qc = useQueryClient();
+  const [editCompany, setEditCompany] = useState<any>(null);
+  const [confirmAction, setConfirmAction] = useState<{ message: string; fn: () => void; danger?: boolean } | null>(null);
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
-function formatINR(n: number): string {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
-}
-
-function formatDate(d: string | null): string {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
-
-function statusBadge(status: string) {
-  switch (status) {
-    case "active": return <Badge className="bg-green-100 text-green-700 border-green-200"><CheckCircle2 className="size-3 mr-1" />Active</Badge>;
-    case "past_due": return <Badge className="bg-amber-100 text-amber-700 border-amber-200"><AlertTriangle className="size-3 mr-1" />Past Due</Badge>;
-    case "expired": return <Badge className="bg-red-100 text-red-700 border-red-200"><XCircle className="size-3 mr-1" />Expired</Badge>;
-    case "pending": return <Badge className="bg-blue-100 text-blue-700 border-blue-200"><Clock className="size-3 mr-1" />Pending</Badge>;
-    case "approved": return <Badge className="bg-green-100 text-green-700 border-green-200"><CheckCircle2 className="size-3 mr-1" />Approved</Badge>;
-    case "rejected": return <Badge className="bg-red-100 text-red-700 border-red-200"><XCircle className="size-3 mr-1" />Rejected</Badge>;
-    case "paid": return <Badge className="bg-green-100 text-green-700 border-green-200"><CheckCircle2 className="size-3 mr-1" />Paid</Badge>;
-    default: return <Badge>{status}</Badge>;
-  }
-}
-
-export function BillingPortal() {
-  const user = useAuth((s) => s.user);
-  const companyId = user?.companyId;
-  const queryClient = useQueryClient();
-  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
-
-  const { data: subscription, isLoading: subLoading } = useQuery<SubscriptionStatus>({
-    queryKey: ["company-subscription", companyId],
-    queryFn: async () => (await api.get(`/subscription/companies/${companyId}`)).data,
-    enabled: !!companyId,
-    refetchOnMount: true,
+  const overviewQ = useQuery({
+    queryKey: ["admin-billing-overview"],
+    queryFn: () => api.get("/admin/billing/overview").then(r => r.data),
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
-  const { data: plans } = useQuery<SubscriptionPlan[]>({
-    queryKey: ["subscription-plans"],
-    queryFn: async () => (await api.get("/subscription/plans")).data,
+  const companiesQ = useQuery({
+    queryKey: ["admin-billing-companies", page, search],
+    queryFn: () => api.get("/admin/billing/companies", { params: { page, per_page: 20, search: search || undefined } }).then(r => r.data),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
-  const { data: invoices } = useQuery<Invoice[]>({
-    queryKey: ["company-invoices", companyId],
-    queryFn: async () => (await api.get(`/subscription/invoices?company_id=${companyId}`)).data,
-    enabled: !!companyId,
-  });
-
-  const { data: billingHistory } = useQuery<{ invoices: Invoice[]; change_requests: ChangeRequest[] }>({
-    queryKey: ["billing-history", companyId],
-    queryFn: async () => (await api.get(`/subscription/companies/${companyId}/billing-history`)).data,
-    enabled: !!companyId,
-  });
-
-  const changeRequestMutation = useMutation({
-    mutationFn: async (data: { requested_plan_id: string; change_type: string; reason: string }) =>
-      await api.post(`/subscription/change-requests?company_id=${companyId}`, data),
+  const statusMut = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      api.post(`/admin/billing/companies/${id}/status`, { status }),
     onSuccess: () => {
-      toast.success("Change request submitted for review");
-      queryClient.invalidateQueries({ queryKey: ["billing-history", companyId] });
-      setSelectedPlanId(null);
+      toast.success("Status updated");
+      qc.invalidateQueries({ queryKey: ["admin-billing-companies"] });
+      qc.invalidateQueries({ queryKey: ["admin-billing-overview"] });
     },
-    onError: (err: any) => toast.error(err?.response?.data?.detail || "Failed to submit change request"),
+    onError: () => toast.error("Failed to update status"),
   });
 
-  if (subLoading) {
+  const ov = overviewQ.data;
+  const comps: any[] = companiesQ.data?.companies ?? [];
+  const total: number = companiesQ.data?.total ?? 0;
+  const totalPages = Math.ceil(total / 20);
+
+  return (
+    <div className="flex flex-col min-h-full bg-[#f8fafc]">
+      <PageHeader
+        title="Billing & Revenue"
+        subtitle="Manage company subscriptions and module access"
+        onRefresh={() => {
+          qc.invalidateQueries({ queryKey: ["admin-billing-overview"] });
+          qc.invalidateQueries({ queryKey: ["admin-billing-companies"] });
+        }}
+        isRefreshing={overviewQ.isFetching || companiesQ.isFetching}
+      />
+
+      <div className="p-6 space-y-6">
+        {/* KPI row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard
+            label="Monthly Recurring Revenue"
+            value={fmtLakh(ov?.mrr ?? 0)}
+            subLabel="Active subscriptions"
+            icon={TrendingUp}
+            iconColor="text-blue-600"
+            iconBg="bg-blue-50"
+          />
+          <KpiCard
+            label="Active Companies"
+            value={String(ov?.active_companies ?? 0)}
+            subLabel={`${ov?.total_companies ?? 0} total`}
+            icon={Building2}
+            iconColor="text-green-600"
+            iconBg="bg-green-50"
+          />
+          <KpiCard
+            label="Trial"
+            value={String(ov?.trial_companies ?? 0)}
+            subLabel="In trial period"
+            icon={AlertTriangle}
+            iconColor="text-amber-600"
+            iconBg="bg-amber-50"
+          />
+          <KpiCard
+            label="Overdue"
+            value={String(ov?.overdue_companies ?? 0)}
+            subLabel="Unpaid / expired"
+            icon={XCircle}
+            iconColor="text-red-600"
+            iconBg="bg-red-50"
+          />
+        </div>
+
+        {/* Revenue trend */}
+        {(ov?.revenue_trend?.length ?? 0) > 0 && (
+          <div className="bg-white border border-[#e2e8f0] rounded-lg p-5">
+            <h3 className="text-sm font-semibold text-[#0f172a] mb-4">Revenue Trend — Last 6 Months</h3>
+            <ResponsiveContainer width="100%" height={200}>
+              <AreaChart data={ov.revenue_trend}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="month" tick={{ fontSize: 12, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 12, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={(v: number) => fmtLakh(v)} />
+                <Tooltip
+                  contentStyle={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }}
+                  formatter={(v: number, name: string) =>
+                    name === "revenue" ? [fmtLakh(v), "Revenue"] : [v, "New Companies"]
+                  }
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Area dataKey="revenue" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.12} name="revenue" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Companies table */}
+        <div className="bg-white border border-[#e2e8f0] rounded-lg overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#e2e8f0] flex items-center gap-3">
+            <h3 className="text-sm font-semibold text-[#0f172a] flex-1">Companies</h3>
+            <input
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Search company…"
+              className="px-3 py-1.5 rounded-lg border border-[#d1d5db] text-[13px] w-48 focus:outline-none focus:border-blue-400"
+            />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[#f1f5f9] border-b border-[#e2e8f0]">
+                  {["Company","Plan","Status","Mills","Users","Modules","Monthly ₹","Actions"].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {companiesQ.isLoading
+                  ? [...Array(5)].map((_, i) => (
+                    <tr key={i} className="border-b border-[#f1f5f9]">
+                      {[...Array(8)].map((_, j) => (
+                        <td key={j} className="px-4 py-3">
+                          <div className="h-4 bg-[#e2e8f0] rounded animate-pulse w-20" />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
+                  : comps.length === 0
+                  ? (
+                    <tr><td colSpan={8} className="text-center py-12 text-[#94a3b8]">No companies found</td></tr>
+                  )
+                  : comps.map((co: any) => (
+                    <tr key={co.id} className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-[#0f172a] text-[13px]">{co.name}</div>
+                        <div className="text-[11px] text-[#94a3b8] font-mono">{co.code}</div>
+                      </td>
+                      <td className="px-4 py-3"><PlanBadge plan={co.plan} /></td>
+                      <td className="px-4 py-3"><StatusBadge status={co.status} size="sm" /></td>
+                      <td className="px-4 py-3 font-mono text-[#0f172a]">{co.mills_count}</td>
+                      <td className="px-4 py-3 font-mono text-[#0f172a]">{co.users_count}</td>
+                      <td className="px-4 py-3"><ModulesCell modules={co.enabled_modules} /></td>
+                      <td className="px-4 py-3 font-mono text-[#0f172a]">{fmtLakh(co.monthly_amount)}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {co.status !== "active" && (
+                            <button
+                              onClick={() => setConfirmAction({
+                                message: `Activate "${co.name}"?`,
+                                fn: () => statusMut.mutate({ id: co.id, status: "active" }),
+                              })}
+                              className="px-2 py-1 rounded text-[11px] font-semibold bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+                            >
+                              Activate
+                            </button>
+                          )}
+                          {co.status !== "suspended" && (
+                            <button
+                              onClick={() => setConfirmAction({
+                                message: `Suspend "${co.name}"? This will block all users.`,
+                                fn: () => statusMut.mutate({ id: co.id, status: "suspended" }),
+                                danger: true,
+                              })}
+                              className="px-2 py-1 rounded text-[11px] font-semibold bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+                            >
+                              Suspend
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setEditCompany(co)}
+                            className="px-2 py-1 rounded text-[11px] font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+                          >
+                            Modules
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                }
+              </tbody>
+            </table>
+          </div>
+          {totalPages > 1 && (
+            <div className="px-5 py-3 border-t border-[#e2e8f0] flex items-center justify-between text-[13px] text-[#64748b]">
+              <span>Showing {((page - 1) * 20) + 1}–{Math.min(page * 20, total)} of {total}</span>
+              <div className="flex items-center gap-2">
+                <button disabled={page === 1} onClick={() => setPage(p => p - 1)}
+                  className="px-3 py-1 rounded border border-[#d1d5db] hover:bg-gray-50 disabled:opacity-40">Prev</button>
+                <span className="font-mono">{page} / {totalPages}</span>
+                <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)}
+                  className="px-3 py-1 rounded border border-[#d1d5db] hover:bg-gray-50 disabled:opacity-40">Next</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {editCompany && <EditModulesDialog company={editCompany} onClose={() => setEditCompany(null)} />}
+      {confirmAction && (
+        <ConfirmDialog
+          message={confirmAction.message}
+          danger={confirmAction.danger}
+          onConfirm={() => { confirmAction.fn(); setConfirmAction(null); }}
+          onCancel={() => setConfirmAction(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function MillOwnerBillingView() {
+  const qc = useQueryClient();
+  const planQ = useQuery({
+    queryKey: ["billing-my-plan"],
+    queryFn: () => api.get("/billing/my-plan").then(r => r.data),
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const d = planQ.data;
+
+  if (planQ.isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      <div className="flex flex-col min-h-full bg-[#f8fafc]">
+        <PageHeader title="Billing & Plan" subtitle="Your subscription details" />
+        <div className="p-6 space-y-4 animate-pulse">
+          <div className="h-28 bg-white border border-[#e2e8f0] rounded-lg" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="h-48 bg-white border border-[#e2e8f0] rounded-lg" />
+            <div className="h-48 bg-white border border-[#e2e8f0] rounded-lg" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (planQ.isError) {
+    return (
+      <div className="flex flex-col min-h-full bg-[#f8fafc]">
+        <PageHeader title="Billing & Plan" subtitle="Your subscription details" />
+        <div className="p-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            Failed to load plan details.
+            <button onClick={() => qc.invalidateQueries({ queryKey: ["billing-my-plan"] })}
+              className="ml-auto underline text-red-600 hover:text-red-800">Retry</button>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Billing & Subscription</h1>
-          <p className="text-muted-foreground">Manage your subscription plan and billing history</p>
+    <div className="flex flex-col min-h-full bg-[#f8fafc]">
+      <PageHeader
+        title="Billing & Plan"
+        subtitle="Your subscription details and module access"
+        onRefresh={() => qc.invalidateQueries({ queryKey: ["billing-my-plan"] })}
+        isRefreshing={planQ.isFetching}
+      />
+      <div className="p-6 space-y-6">
+        {/* Plan summary */}
+        <div className="bg-white border border-[#e2e8f0] rounded-lg p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <h2 className="text-[20px] font-bold text-[#0f172a]">{d?.plan_display ?? d?.plan ?? "Starter"}</h2>
+                <PlanBadge plan={d?.plan ?? "starter"} />
+                <StatusBadge status={d?.status ?? "active"} />
+              </div>
+              <p className="text-[13px] text-[#64748b]">{d?.company_name}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[28px] font-bold font-mono text-[#0f172a]">{fmtLakh(d?.monthly_amount ?? 0)}</p>
+              <p className="text-[13px] text-[#64748b]">per month</p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-6 text-[13px] text-[#64748b]">
+            {d?.next_billing_at && (
+              <div><span className="font-medium text-[#374151]">Next billing: </span>{fmtDate(d.next_billing_at)}</div>
+            )}
+            {d?.last_payment_at && (
+              <div><span className="font-medium text-[#374151]">Last payment: </span>{fmtDate(d.last_payment_at)}</div>
+            )}
+            <div><span className="font-medium text-[#374151]">Users: </span>{d?.total_users ?? 0}</div>
+          </div>
         </div>
-      </div>
 
-      {/* Current Plan Card */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CreditCard className="size-5 text-teal-600" />
-              <CardTitle className="text-lg">Current Plan</CardTitle>
-            </div>
-            {subscription && statusBadge(subscription.status)}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {subscription ? (
-            <div className="space-y-4">
-              <div className="flex items-baseline justify-between">
-                <div>
-                  <p className="text-xl font-bold">{subscription.plan_name}</p>
-                  <p className="text-sm text-muted-foreground capitalize">{subscription.billing_cycle} billing</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-2xl font-bold text-teal-600">{formatINR(subscription.cost.total_monthly)}<span className="text-sm text-muted-foreground font-normal">/mo</span></p>
-                  <p className="text-xs text-muted-foreground">or {formatINR(subscription.cost.total_yearly)}/yr</p>
-                </div>
-              </div>
-
-              {/* Usage bars */}
-              <div className="space-y-3 pt-2">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-muted-foreground">Mills</span>
-                    <span>{subscription.mill_count} / {subscription.mill_limit}</span>
-                  </div>
-                  <Progress value={Math.min((subscription.mill_count / Math.max(subscription.mill_limit, 1)) * 100, 100)} className={subscription.mills_exceeded ? "bg-red-200 [&>div]:bg-red-500" : ""} />
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-muted-foreground">Users</span>
-                    <span>{subscription.user_count} / {subscription.user_limit}</span>
-                  </div>
-                  <Progress value={Math.min((subscription.user_count / Math.max(subscription.user_limit, 1)) * 100, 100)} className={subscription.users_exceeded ? "bg-red-200 [&>div]:bg-red-500" : ""} />
-                </div>
-              </div>
-
-              {/* Cost breakdown */}
-              <div className="border rounded-lg p-3 bg-muted/30 space-y-1 text-sm">
-                <div className="flex justify-between"><span>Plan base</span><span>{formatINR(subscription.cost.plan_monthly)}/mo</span></div>
-                {subscription.cost.addon_modules.length > 0 && (
-                  <div className="flex justify-between"><span>Addon modules ({subscription.cost.addon_modules.length})</span><span>{formatINR(subscription.cost.addon_module_cost_monthly)}/mo</span></div>
-                )}
-                {subscription.cost.extra_mills > 0 && (
-                  <div className="flex justify-between"><span>Extra mills ({subscription.cost.extra_mills})</span><span>{formatINR(subscription.cost.extra_mill_cost_monthly)}/mo</span></div>
-                )}
-                {subscription.cost.extra_users > 0 && (
-                  <div className="flex justify-between"><span>Extra users ({subscription.cost.extra_users})</span><span>{formatINR(subscription.cost.extra_user_cost_monthly)}/mo</span></div>
-                )}
-                <div className="flex justify-between font-bold border-t pt-1 mt-1"><span>Total</span><span>{formatINR(subscription.cost.total_monthly)}/mo</span></div>
-              </div>
-            </div>
-          ) : (
-            <p className="text-muted-foreground py-4 text-center">No active subscription found.</p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview"><TrendingUp className="size-4 mr-1" />Overview</TabsTrigger>
-          <TabsTrigger value="plans"><Building2 className="size-4 mr-1" />Change Plan</TabsTrigger>
-          <TabsTrigger value="invoices"><FileText className="size-4 mr-1" />Invoices</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-4 pt-4">
-          {subscription && (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <p className="text-lg font-bold mt-1">{subscription.status}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">Billing Cycle</p>
-                  <p className="text-lg font-bold mt-1 capitalize">{subscription.billing_cycle}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">Started</p>
-                  <p className="text-lg font-bold mt-1">{formatDate(subscription.started_at)}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4 text-center">
-                  <p className="text-sm text-muted-foreground">Next Billing</p>
-                  <p className="text-lg font-bold mt-1">{formatDate(subscription.expires_at)}</p>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          <Card>
-            <CardHeader><CardTitle className="text-base">Recent Invoices</CardTitle></CardHeader>
-            <CardContent>
-              {(billingHistory?.invoices?.length ?? 0) === 0 ? (
-                <p className="text-muted-foreground text-center py-4 text-sm">No invoices yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {(billingHistory?.invoices ?? []).slice(0, 5).map((inv) => (
-                    <div key={inv.id} className="flex items-center justify-between border-b pb-2 last:border-0">
-                      <div>
-                        <p className="text-sm font-medium">{inv.invoice_number}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(inv.created_at)}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{formatINR(inv.amount)}</span>
-                        {statusBadge(inv.status)}
-                      </div>
+        {/* Modules + Mills */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="lg:col-span-3 bg-white border border-[#e2e8f0] rounded-lg p-5">
+            <h3 className="text-sm font-semibold text-[#0f172a] mb-4">Active Modules</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {(d?.enabled_modules ?? []).map((mod: any) => {
+                const Icon = MODULE_ICONS[mod.name] ?? Package;
+                return (
+                  <div key={mod.name} className={cn(
+                    "flex flex-col items-center gap-1.5 p-3 rounded-lg border text-center",
+                    mod.enabled ? "border-green-200 bg-green-50" : "border-[#e2e8f0] bg-gray-50 opacity-60",
+                  )}>
+                    <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", mod.enabled ? "bg-green-100" : "bg-gray-100")}>
+                      <Icon className={cn("w-4 h-4", mod.enabled ? "text-green-600" : "text-[#94a3b8]")} />
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader><CardTitle className="text-base">Pending Change Requests</CardTitle></CardHeader>
-            <CardContent>
-              {(billingHistory?.change_requests ?? []).filter((cr) => cr.status === "pending").length === 0 ? (
-                <p className="text-muted-foreground text-center py-4 text-sm">No pending requests.</p>
-              ) : (
-                <div className="space-y-2">
-                  {(billingHistory?.change_requests ?? []).filter((cr) => cr.status === "pending").map((cr) => (
-                    <div key={cr.id} className="flex items-center justify-between border-b pb-2 last:border-0">
-                      <div>
-                        <p className="text-sm font-medium capitalize">{cr.change_type}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(cr.created_at)}</p>
-                      </div>
-                      {statusBadge(cr.status)}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="plans" className="space-y-4 pt-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            {(plans ?? []).filter((p) => p.is_active).map((plan) => {
-              const isCurrent = plan.id === subscription?.plan_id;
-              return (
-                <Card key={plan.id} className={`relative ${isCurrent ? "ring-2 ring-teal-500" : ""}`}>
-                  {isCurrent && <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-teal-500">Current</Badge>}
-                  <CardHeader>
-                    <CardTitle className="text-lg">{plan.name}</CardTitle>
-                    <CardDescription>{plan.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div>
-                      <p className="text-2xl font-bold">{formatINR(plan.monthly_price)}<span className="text-sm text-muted-foreground font-normal">/mo</span></p>
-                      <p className="text-xs text-muted-foreground">or {formatINR(plan.yearly_price)}/yr</p>
-                    </div>
-                    <div className="space-y-1 text-sm">
-                      <p className="text-muted-foreground">{plan.included_mills} mill{plan.included_mills > 1 ? "s" : ""} included</p>
-                      <p className="text-muted-foreground">{plan.included_users} users included</p>
-                      {plan.additional_mill_cost > 0 && <p className="text-muted-foreground">Extra mill: {formatINR(plan.additional_mill_cost)}/mo</p>}
-                      {plan.additional_user_cost > 0 && <p className="text-muted-foreground">Extra user: {formatINR(plan.additional_user_cost)}/mo</p>}
-                    </div>
-                    {!isCurrent && (
-                      <Button
-                        className="w-full"
-                        variant={plan.monthly_price > (subscription?.cost.plan_monthly ?? 0) ? "default" : "outline"}
-                        onClick={() => {
-                          setSelectedPlanId(plan.id);
-                          changeRequestMutation.mutate({
-                            requested_plan_id: plan.id,
-                            change_type: plan.monthly_price > (subscription?.cost.plan_monthly ?? 0) ? "upgrade" : "downgrade",
-                            reason: "",
-                          });
-                        }}
-                        disabled={changeRequestMutation.isPending}
-                      >
-                        {changeRequestMutation.isPending && selectedPlanId === plan.id ? (
-                          <><Loader2 className="size-4 mr-2 animate-spin" /> Submitting...</>
-                        ) : (
-                          plan.monthly_price > (subscription?.cost.plan_monthly ?? 0) ? "Upgrade" : "Downgrade"
-                        )}
-                      </Button>
+                    <span className="text-[12px] font-medium text-[#374151] leading-tight">{mod.label}</span>
+                    {mod.enabled ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full">
+                        <CheckCircle2 className="w-2.5 h-2.5" /> Active
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-[#94a3b8]">Contact support</span>
                     )}
-                  </CardContent>
-                </Card>
-              );
-            })}
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </TabsContent>
-
-        <TabsContent value="invoices" className="space-y-4 pt-4">
-          <Card>
-            <CardHeader><CardTitle className="text-base">Invoice History</CardTitle></CardHeader>
-            <CardContent>
-              {(invoices ?? []).length === 0 ? (
-                <p className="text-muted-foreground text-center py-8 text-sm">No invoices yet. Invoices will appear here after your first billing cycle.</p>
-              ) : (
-                <div className="space-y-3">
-                  {(invoices ?? []).map((inv) => (
-                    <div key={inv.id} className="flex items-center justify-between border rounded-lg p-3">
-                      <div className="flex items-center gap-3">
-                        <FileText className="size-8 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium">{inv.invoice_number}</p>
-                          <p className="text-xs text-muted-foreground">{formatDate(inv.created_at)}</p>
-                          {inv.billing_period_start && (
-                            <p className="text-xs text-muted-foreground">{formatDate(inv.billing_period_start)} – {formatDate(inv.billing_period_end)}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-medium">{formatINR(inv.amount)}</span>
-                        {statusBadge(inv.status)}
-                        {inv.gateway && <span className="text-xs text-muted-foreground">{inv.gateway}</span>}
-                      </div>
-                    </div>
-                  ))}
+          <div className="lg:col-span-2 bg-white border border-[#e2e8f0] rounded-lg p-5">
+            <h3 className="text-sm font-semibold text-[#0f172a] mb-4">Your Mills</h3>
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {(d?.mills ?? []).map((mill: any) => (
+                <div key={mill.id} className="flex items-center gap-3 p-3 rounded-lg border border-[#e2e8f0] hover:bg-[#f8fafc] transition-colors">
+                  <span className="font-mono text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-semibold">{mill.code}</span>
+                  <span className="flex-1 text-[13px] font-medium text-[#374151] truncate">{mill.name}</span>
+                  <span className="text-[11px] text-[#94a3b8] flex items-center gap-1 shrink-0">
+                    <Users className="w-3 h-3" /> {mill.users_count}
+                  </span>
                 </div>
+              ))}
+              {(d?.mills ?? []).length === 0 && (
+                <p className="text-[13px] text-[#94a3b8] text-center py-6">No mills found</p>
               )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+            <p className="text-[12px] text-[#94a3b8] mt-3">Need to add a mill? Contact your SpinFlow representative.</p>
+          </div>
+        </div>
+
+        {/* Payment history */}
+        {(d?.invoices ?? []).length > 0 && (
+          <div className="bg-white border border-[#e2e8f0] rounded-lg overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#e2e8f0]">
+              <h3 className="text-sm font-semibold text-[#0f172a]">Payment History</h3>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[#f1f5f9] border-b border-[#e2e8f0]">
+                  {["Month","Amount","Status","Paid On","Invoice"].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {d.invoices.map((inv: any) => (
+                  <tr key={inv.id} className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors">
+                    <td className="px-4 py-3 font-medium text-[#0f172a]">{inv.month}</td>
+                    <td className="px-4 py-3 font-mono text-[#0f172a]">{fmtLakh(inv.amount)}</td>
+                    <td className="px-4 py-3"><StatusBadge status={inv.status} size="sm" /></td>
+                    <td className="px-4 py-3 text-[#64748b]">{inv.paid_at ? fmtDate(inv.paid_at) : "—"}</td>
+                    <td className="px-4 py-3"><span className="text-[12px] text-[#94a3b8]">PDF (coming soon)</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
+}
+
+export function BillingPortal() {
+  const { user } = useAuth();
+  const role = user?.role ?? "";
+  if (role === "SUPER_ADMIN") return <SuperAdminBillingView />;
+  return <MillOwnerBillingView />;
 }

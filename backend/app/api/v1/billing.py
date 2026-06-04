@@ -672,3 +672,480 @@ async def billing_webhook(
         logger.info("Subscription charged: %s", sub_id)
 
     return {"status": "ok"}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# SUPER ADMIN: Revenue Control Panel endpoints
+# ═══════════════════════════════════════════════════════════════════
+
+from datetime import date as date_type, timedelta
+
+
+class CompanyBillingRow(BaseModel):
+    id: str
+    name: str
+    code: str
+    plan: str
+    status: str
+    mills_count: int
+    users_count: int
+    enabled_modules: List[str]
+    monthly_amount: float
+    trial_ends_at: Optional[str] = None
+    last_payment_at: Optional[str] = None
+    next_billing_at: Optional[str] = None
+
+
+class StatusUpdateBody(BaseModel):
+    status: str  # "active" | "suspended" | "trial"
+
+
+class ModuleToggleBody(BaseModel):
+    module: str
+    enabled: bool
+
+
+@router.get("/admin/billing/overview")
+async def admin_billing_overview(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Vendor revenue dashboard — SUPER_ADMIN only."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+
+    svc = PricingService(db)
+
+    companies_res = await db.execute(select(Company))
+    companies = companies_res.scalars().all()
+
+    mrr = 0.0
+    active_count = 0
+    trial_count = 0
+    overdue_count = 0
+
+    for co in companies:
+        try:
+            sub_res = await db.execute(
+                select(CompanySubscription).where(CompanySubscription.company_id == co.id)
+            )
+            sub = sub_res.scalar_one_or_none()
+            if sub:
+                status = sub.status
+                if status == "active":
+                    active_count += 1
+                elif status == "trial":
+                    trial_count += 1
+                elif status in ("overdue", "expired"):
+                    overdue_count += 1
+
+                # Get plan price
+                plan_res = await db.execute(
+                    select(SubscriptionPlan).where(SubscriptionPlan.id == sub.plan_id)
+                )
+                plan = plan_res.scalar_one_or_none()
+                if plan and status not in ("suspended", "cancelled"):
+                    mrr += float(plan.monthly_price or 0)
+        except Exception:
+            pass
+
+    # Revenue trend last 6 months (from BillingInvoice)
+    revenue_trend = []
+    today = date_type.today()
+    for i in range(5, -1, -1):
+        mn = today.replace(day=1)
+        # go back i months
+        for _ in range(i):
+            mn = (mn - timedelta(days=1)).replace(day=1)
+        me_raw = mn.replace(day=28) + timedelta(days=4)
+        me = me_raw - timedelta(days=me_raw.day)
+
+        try:
+            rev_res = await db.execute(
+                select(func.coalesce(func.sum(BillingInvoice.amount), 0)).where(
+                    BillingInvoice.status == "paid",
+                    BillingInvoice.paid_at >= mn,
+                    BillingInvoice.paid_at <= me,
+                )
+            )
+            rev = float(rev_res.scalar() or 0)
+
+            new_co_res = await db.execute(
+                select(func.count()).select_from(Company).where(
+                    Company.created_at >= mn,
+                    Company.created_at <= me,
+                )
+            )
+            new_cos = int(new_co_res.scalar() or 0)
+        except Exception:
+            rev = 0
+            new_cos = 0
+
+        revenue_trend.append({
+            "month": mn.strftime("%b %Y"),
+            "revenue": rev,
+            "new_companies": new_cos,
+        })
+
+    return {
+        "mrr": round(mrr, 2),
+        "total_companies": len(companies),
+        "active_companies": active_count,
+        "trial_companies": trial_count,
+        "overdue_companies": overdue_count,
+        "revenue_trend": revenue_trend,
+    }
+
+
+@router.get("/admin/billing/companies")
+async def admin_billing_companies(
+    page: int = 1,
+    per_page: int = 20,
+    search: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Paginated company billing list — SUPER_ADMIN only."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+
+    stmt = select(Company)
+    if search:
+        stmt = stmt.where(Company.name.ilike(f"%{search}%"))
+    stmt = stmt.order_by(Company.created_at.desc())
+
+    total_res = await db.execute(select(func.count()).select_from(stmt.subquery()))
+    total = int(total_res.scalar() or 0)
+
+    stmt = stmt.offset((page - 1) * per_page).limit(per_page)
+    cos_res = await db.execute(stmt)
+    companies = cos_res.scalars().all()
+
+    rows = []
+    for co in companies:
+        try:
+            mills_cnt = int((await db.execute(
+                select(func.count()).select_from(Mill).where(Mill.company_id == co.id)
+            )).scalar() or 0)
+
+            from app.models.user import User as UserModel
+            users_cnt = int((await db.execute(
+                select(func.count()).select_from(UserModel).where(
+                    UserModel.company_id == co.id,
+                    UserModel.is_active == True,
+                    UserModel.deleted_at.is_(None),
+                )
+            )).scalar() or 0)
+
+            modules_res = await db.execute(
+                select(CompanyModule).where(
+                    CompanyModule.company_id == co.id,
+                    CompanyModule.is_enabled == True,
+                )
+            )
+            enabled_mods = [m.module_name for m in modules_res.scalars().all()]
+
+            sub_res = await db.execute(
+                select(CompanySubscription)
+                .options(selectinload(CompanySubscription.__mapper__.relationships["plan"] if hasattr(CompanySubscription, "plan") else []))
+                .where(CompanySubscription.company_id == co.id)
+            )
+            sub = sub_res.scalar_one_or_none()
+
+            plan_name = "starter"
+            sub_status = "active"
+            monthly_amt = 0.0
+            trial_ends = None
+            last_pay = None
+            next_bill = None
+
+            if sub:
+                sub_status = sub.status
+                plan_obj_res = await db.execute(
+                    select(SubscriptionPlan).where(SubscriptionPlan.id == sub.plan_id)
+                )
+                plan_obj = plan_obj_res.scalar_one_or_none()
+                if plan_obj:
+                    plan_name = plan_obj.code
+                    monthly_amt = float(plan_obj.monthly_price or 0)
+                if sub.expires_at:
+                    trial_ends = sub.expires_at.isoformat() if sub_status == "trial" else None
+                    next_bill = sub.expires_at.isoformat() if sub_status == "active" else None
+
+            last_inv_res = await db.execute(
+                select(BillingInvoice)
+                .where(BillingInvoice.company_id == co.id, BillingInvoice.status == "paid")
+                .order_by(BillingInvoice.paid_at.desc())
+                .limit(1)
+            )
+            last_inv = last_inv_res.scalar_one_or_none()
+            if last_inv and last_inv.paid_at:
+                last_pay = last_inv.paid_at.isoformat()
+
+            rows.append({
+                "id": str(co.id),
+                "name": co.name,
+                "code": co.code,
+                "plan": plan_name,
+                "status": sub_status if sub else "active",
+                "mills_count": mills_cnt,
+                "users_count": users_cnt,
+                "enabled_modules": enabled_mods,
+                "monthly_amount": monthly_amt,
+                "trial_ends_at": trial_ends,
+                "last_payment_at": last_pay,
+                "next_billing_at": next_bill,
+            })
+        except Exception as e:
+            logger.warning(f"admin_billing_companies row error for {co.id}: {e}")
+            rows.append({
+                "id": str(co.id),
+                "name": co.name,
+                "code": co.code,
+                "plan": "starter",
+                "status": "active",
+                "mills_count": 0,
+                "users_count": 0,
+                "enabled_modules": [],
+                "monthly_amount": 0.0,
+                "trial_ends_at": None,
+                "last_payment_at": None,
+                "next_billing_at": None,
+            })
+
+    return {"companies": rows, "total": total, "page": page, "per_page": per_page}
+
+
+@router.post("/admin/billing/companies/{company_id}/status")
+async def admin_set_company_status(
+    company_id: str,
+    body: StatusUpdateBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update company subscription status — SUPER_ADMIN only."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+
+    valid = {"active", "suspended", "trial"}
+    if body.status not in valid:
+        raise HTTPException(status_code=400, detail=f"status must be one of {valid}")
+
+    sub_res = await db.execute(
+        select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+    )
+    sub = sub_res.scalar_one_or_none()
+    if not sub:
+        # Create a minimal subscription entry
+        plans_res = await db.execute(
+            select(SubscriptionPlan).where(SubscriptionPlan.is_active == True).order_by(SubscriptionPlan.sort_order).limit(1)
+        )
+        first_plan = plans_res.scalar_one_or_none()
+        if not first_plan:
+            raise HTTPException(status_code=400, detail="No subscription plans exist")
+        sub = CompanySubscription(
+            company_id=company_id,
+            plan_id=first_plan.id,
+            status=body.status,
+        )
+        db.add(sub)
+    else:
+        sub.status = body.status
+
+    await db.commit()
+    await log_audit(
+        db, current_user.id, current_user.role or "SUPER_ADMIN",
+        "status_changed", "company_subscription", company_id,
+        f"Status set to {body.status}",
+    )
+    return {"ok": True, "status": body.status}
+
+
+@router.post("/admin/billing/companies/{company_id}/modules")
+async def admin_toggle_module(
+    company_id: str,
+    body: ModuleToggleBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Enable/disable a single module for a company — SUPER_ADMIN only."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+
+    existing = await db.execute(
+        select(CompanyModule).where(
+            CompanyModule.company_id == company_id,
+            CompanyModule.module_name == body.module,
+        )
+    )
+    cm = existing.scalar_one_or_none()
+    if cm:
+        cm.is_enabled = body.enabled
+    else:
+        db.add(CompanyModule(
+            company_id=company_id,
+            module_name=body.module,
+            is_enabled=body.enabled,
+            enabled_by=current_user.id,
+        ))
+    await db.commit()
+    return {"ok": True, "module": body.module, "enabled": body.enabled}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# MILL OWNER: My Plan view
+# ═══════════════════════════════════════════════════════════════════
+
+ALL_MODULES = [
+    "production", "quality", "maintenance", "hr", "payroll",
+    "purchase", "stores", "inventory", "dispatch", "lotrac",
+    "accounts", "sales", "masters", "users", "column_config",
+]
+
+MODULE_LABELS = {
+    "production": "Production",
+    "quality": "Quality",
+    "maintenance": "Maintenance",
+    "hr": "Human Resources",
+    "payroll": "Payroll",
+    "purchase": "Cotton Purchase",
+    "stores": "Stores",
+    "inventory": "Inventory",
+    "dispatch": "Dispatch",
+    "lotrac": "LoTrac",
+    "accounts": "Accounts",
+    "sales": "Sales",
+    "masters": "Masters",
+    "users": "Users & Roles",
+    "column_config": "Column Config",
+}
+
+
+@router.get("/billing/my-plan")
+async def get_my_plan(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """MILL_OWNER's current subscription view."""
+    role = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role not in ("MILL_OWNER", "SUPER_ADMIN"):
+        raise HTTPException(status_code=403, detail="Mill Owner only")
+
+    company_id = current_user.company_id
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company associated with user")
+
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    # Subscription
+    sub_res = await db.execute(
+        select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+    )
+    sub = sub_res.scalar_one_or_none()
+
+    plan_name = "starter"
+    plan_display = "Starter"
+    sub_status = "active"
+    monthly_amt = 0.0
+    next_billing = None
+    last_payment = None
+
+    if sub:
+        sub_status = sub.status
+        plan_res = await db.execute(
+            select(SubscriptionPlan).where(SubscriptionPlan.id == sub.plan_id)
+        )
+        plan_obj = plan_res.scalar_one_or_none()
+        if plan_obj:
+            plan_name = plan_obj.code
+            plan_display = plan_obj.name
+            monthly_amt = float(plan_obj.monthly_price or 0)
+        if sub.expires_at:
+            next_billing = sub.expires_at.isoformat()
+
+    # Last invoice
+    last_inv_res = await db.execute(
+        select(BillingInvoice)
+        .where(BillingInvoice.company_id == company_id, BillingInvoice.status == "paid")
+        .order_by(BillingInvoice.paid_at.desc())
+        .limit(1)
+    )
+    last_inv = last_inv_res.scalar_one_or_none()
+    if last_inv and last_inv.paid_at:
+        last_payment = last_inv.paid_at.isoformat()
+
+    # Enabled modules
+    mods_res = await db.execute(
+        select(CompanyModule).where(CompanyModule.company_id == company_id)
+    )
+    mod_map = {m.module_name: m.is_enabled for m in mods_res.scalars().all()}
+    enabled_modules = [
+        {
+            "name": m,
+            "label": MODULE_LABELS.get(m, m.replace("_", " ").title()),
+            "enabled": mod_map.get(m, False),
+        }
+        for m in ALL_MODULES
+    ]
+
+    # Mills
+    mills_res = await db.execute(
+        select(Mill).where(Mill.company_id == company_id, Mill.is_active == True).order_by(Mill.name)
+    )
+    mills_list = mills_res.scalars().all()
+
+    from app.models.user import User as UserModel
+    mills_out = []
+    for m in mills_list:
+        uc = int((await db.execute(
+            select(func.count()).select_from(UserModel).where(
+                UserModel.mill_id == m.id,
+                UserModel.is_active == True,
+                UserModel.deleted_at.is_(None),
+            )
+        )).scalar() or 0)
+        mills_out.append({"id": str(m.id), "name": m.name, "code": m.code, "users_count": uc})
+
+    total_users = int((await db.execute(
+        select(func.count()).select_from(UserModel).where(
+            UserModel.company_id == company_id,
+            UserModel.is_active == True,
+            UserModel.deleted_at.is_(None),
+        )
+    )).scalar() or 0)
+
+    # Invoices (last 12)
+    invs_res = await db.execute(
+        select(BillingInvoice)
+        .where(BillingInvoice.company_id == company_id)
+        .order_by(BillingInvoice.created_at.desc())
+        .limit(12)
+    )
+    invoices_out = [
+        {
+            "id": str(inv.id),
+            "month": inv.billing_period_start.strftime("%b %Y") if inv.billing_period_start else (
+                inv.created_at.strftime("%b %Y") if inv.created_at else "—"
+            ),
+            "amount": float(inv.amount or 0),
+            "status": inv.status,
+            "paid_at": inv.paid_at.isoformat() if inv.paid_at else None,
+        }
+        for inv in invs_res.scalars().all()
+    ]
+
+    return {
+        "company_name": company.name,
+        "plan": plan_name,
+        "plan_display": plan_display,
+        "status": sub_status,
+        "monthly_amount": monthly_amt,
+        "enabled_modules": enabled_modules,
+        "mills": mills_out,
+        "total_users": total_users,
+        "next_billing_at": next_billing,
+        "last_payment_at": last_payment,
+        "invoices": invoices_out,
+    }
