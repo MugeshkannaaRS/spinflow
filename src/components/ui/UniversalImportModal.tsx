@@ -308,7 +308,8 @@ export function UniversalImportModal({
     }
 
     const records: PreviewRecord[] = [];
-    for (const row of rawRows) {
+    for (let rowIdx = 0; rowIdx < rawRows.length; rowIdx++) {
+      const row = rawRows[rowIdx];
       const record: Record<string, any> = {};
       record.custom_fields = {};
       const errors: string[] = [];
@@ -337,7 +338,8 @@ export function UniversalImportModal({
             value = validateDateString(value) ?? value;
           }
           if (colCfg.type === "number" && typeof value === "string" && value) {
-            value = isValidNumericString(value) ? parseFloat(value) : value;
+            const stripped = value.replace(/,/g, "");
+            value = isValidNumericString(stripped) ? parseFloat(stripped) : value;
           }
           if (colCfg.type === "boolean") {
             if (typeof value === "string") {
@@ -348,18 +350,29 @@ export function UniversalImportModal({
         record[fieldKey] = value ?? null;
       }
 
+      // Apply table-specific rules (mutates record, returns additional errors)
+      const tableRule = TABLE_RULES[tableName];
+      if (tableRule) {
+        errors.push(...tableRule(record, colConfigArr, rowIdx));
+      }
+
+      // Auto-code warning (set by TABLE_RULES)
+      if (record.__auto_code) {
+        delete record.__auto_code;
+        warnings.push(`Code auto-generated: ${record.code ?? record.employee_code}`);
+      }
+
+      // Required field check AFTER table rules (so auto-generated code doesn't error)
       for (const c of colConfigArr) {
         if (c.isRequired) {
           const val = record[c.key];
           if (val === undefined || val === null || val === "") {
-            errors.push(`${c.label} is required`);
+            // Don't double-report if TABLE_RULES already added an error
+            if (!errors.some(e => e.toLowerCase().includes(c.label.toLowerCase()))) {
+              errors.push(`${c.label} is required`);
+            }
           }
         }
-      }
-
-      const tableRule = TABLE_RULES[tableName];
-      if (tableRule) {
-        errors.push(...tableRule(record, colConfigArr));
       }
 
       records.push({ data: record, errors, warnings });
@@ -452,14 +465,67 @@ export function UniversalImportModal({
     return null;
   }
 
-  const TABLE_RULES: Record<string, (record: Record<string, any>, configs: ColumnConfig[]) => string[]> = {
-    hr_employees: (rec, cfgs) => [
-      ...validateNumericFields(rec, cfgs, ["basic", "house_rent", "medical", "conveyance", "food_allowance", "wages", "increment", "total_salary", "mobile_bill", "shift_benefit"]),
-      ...(rec.date_of_joining ? (() => {
-        const e = validateFutureDate(rec.date_of_joining, "Date of Joining");
-        return e ? [e] : [];
-      })() : []),
-    ],
+  const TABLE_RULES: Record<string, (record: Record<string, any>, configs: ColumnConfig[], rowIdx?: number) => string[]> = {
+    masters_machines: (rec, _cfgs, rowIdx) => {
+      const errors: string[] = [];
+      // Auto-generate code if missing (warning, not error)
+      if (!rec.code || String(rec.code).trim() === "") {
+        rec.code = `MC${String((rowIdx ?? 0) + 1).padStart(4, "0")}`;
+        rec.__auto_code = true;
+      }
+      if (!rec.name || String(rec.name).trim() === "") {
+        errors.push("Name is required");
+      }
+      if (rec.manufacturing_year) {
+        const yr = Number(rec.manufacturing_year);
+        if (isNaN(yr) || yr < 1900 || yr > 2035) {
+          errors.push(`Manufacturing Year '${rec.manufacturing_year}' must be between 1900–2035`);
+        }
+      }
+      if (rec.current_status) {
+        const s = String(rec.current_status).toLowerCase().trim();
+        if (!["running", "idle", "breakdown", "active", "inactive", "maintenance"].includes(s)) {
+          rec.current_status = "running"; // coerce unknown status
+        } else if (s === "active") {
+          rec.current_status = "running";
+        } else if (s === "inactive") {
+          rec.current_status = "idle";
+        }
+      }
+      return errors;
+    },
+    hr_employees: (rec, cfgs, rowIdx) => {
+      // Auto-generate employee_code if missing
+      if (!rec.employee_code || String(rec.employee_code).trim() === "") {
+        rec.employee_code = `EMP${String((rowIdx ?? 0) + 1).padStart(4, "0")}`;
+        rec.__auto_code = true;
+      }
+      // Coerce grade to string
+      if (rec.grade !== undefined && rec.grade !== null) {
+        rec.grade = String(rec.grade).trim();
+      }
+      // Normalize gender
+      if (rec.gender) {
+        const g = String(rec.gender).toLowerCase().trim();
+        if (["m", "male"].includes(g)) rec.gender = "Male";
+        else if (["f", "female"].includes(g)) rec.gender = "Female";
+        else rec.gender = "Other";
+      }
+      // Strip commas from salary fields
+      for (const f of ["basic", "wages", "total_salary", "house_rent", "medical",
+                       "conveyance", "food_allowance", "mobile_bill", "shift_benefit"]) {
+        if (rec[f] !== undefined && typeof rec[f] === "string") {
+          rec[f] = parseFloat(rec[f].replace(/,/g, "")) || 0;
+        }
+      }
+      return [
+        ...validateNumericFields(rec, cfgs, ["basic", "house_rent", "medical", "conveyance", "food_allowance", "wages", "increment", "total_salary", "mobile_bill", "shift_benefit"]),
+        ...(rec.date_of_joining ? (() => {
+          const e = validateFutureDate(rec.date_of_joining, "Date of Joining");
+          return e ? [e] : [];
+        })() : []),
+      ];
+    },
     hr_attendance: (rec, cfgs) => [
       ...(validateAttendanceStatus(rec) ? [validateAttendanceStatus(rec)!] : []),
       ...(rec.date ? (() => {
@@ -493,7 +559,7 @@ export function UniversalImportModal({
       }
       const tableRule = TABLE_RULES[tableName];
       if (tableRule) {
-        errors.push(...tableRule(record, colConfigs));
+        errors.push(...tableRule(record, colConfigs, undefined));
       }
       return { errors, warnings };
     },
@@ -531,7 +597,11 @@ export function UniversalImportModal({
   };
 
   const TABLE_KEY_FIELDS: Record<string, string[]> = {
-    hr_employees: ["name", "employee_id", "sl_no"],
+    hr_employees: ["name", "employee_id", "sl_no", "full_name", "employee_code"],
+    masters_machines: ["name", "code"],
+    masters_customers: ["name", "code"],
+    masters_departments: ["name", "code"],
+    masters_vehicles: ["vehicle_no", "name"],
   };
 
   const handleImport = useCallback(async () => {
