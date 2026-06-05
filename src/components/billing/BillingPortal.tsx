@@ -58,81 +58,6 @@ const MODULE_LABELS: Record<string, string> = {
   masters:"Masters", users:"Users & Roles", column_config:"Column Config",
 };
 
-function EditModulesDialog({
-  company, onClose,
-}: {
-  company: { id: string; name: string; enabled_modules: string[] };
-  onClose: () => void;
-}) {
-  const qc = useQueryClient();
-  const [mods, setMods] = useState<Record<string, boolean>>(
-    Object.fromEntries(ALL_MODULES.map(m => [m, company.enabled_modules.includes(m)]))
-  );
-  const [saving, setSaving] = useState(false);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await Promise.all(
-        ALL_MODULES.map(m =>
-          api.post(`/admin/billing/companies/${company.id}/modules`, { module: m, enabled: mods[m] })
-        )
-      );
-      toast.success("Modules updated");
-      qc.invalidateQueries({ queryKey: ["admin-billing-companies"] });
-      onClose();
-    } catch {
-      toast.error("Failed to update modules");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-        <div className="px-6 py-4 border-b border-[#e2e8f0] flex items-center justify-between">
-          <div>
-            <h2 className="text-[17px] font-bold text-[#0f172a]">Edit Modules</h2>
-            <p className="text-[13px] text-[#64748b] mt-0.5">{company.name}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-lg leading-none">✕</button>
-        </div>
-        <div className="px-6 py-4 grid grid-cols-2 gap-2 max-h-80 overflow-y-auto">
-          {ALL_MODULES.map(m => {
-            const Icon = MODULE_ICONS[m] ?? Package;
-            return (
-              <label key={m} className={cn(
-                "flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors",
-                mods[m] ? "border-blue-200 bg-blue-50" : "border-[#e2e8f0] hover:bg-gray-50",
-              )}>
-                <input
-                  type="checkbox"
-                  className="accent-blue-600 w-4 h-4 shrink-0"
-                  checked={mods[m]}
-                  onChange={e => setMods(prev => ({ ...prev, [m]: e.target.checked }))}
-                />
-                <Icon className={cn("w-4 h-4 shrink-0", mods[m] ? "text-blue-600" : "text-[#94a3b8]")} />
-                <span className="text-[13px] font-medium text-[#374151]">{MODULE_LABELS[m]}</span>
-              </label>
-            );
-          })}
-        </div>
-        <div className="px-6 py-4 border-t border-[#e2e8f0] flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg border border-[#d1d5db] text-[13px] font-medium text-[#374151] hover:bg-gray-50 transition-colors">
-            Cancel
-          </button>
-          <button onClick={handleSave} disabled={saving}
-            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold disabled:opacity-50 flex items-center gap-2 transition-colors">
-            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            Save Changes
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ConfirmDialog({
   message, onConfirm, onCancel, danger = false,
 }: {
@@ -189,7 +114,6 @@ function ModulesCell({ modules }: { modules: string[] }) {
 
 function SuperAdminBillingView() {
   const qc = useQueryClient();
-  const [editCompany, setEditCompany] = useState<any>(null);
   const [modulesPopover, setModulesPopover] = useState<any>(null);
   // Close modules popover on outside click
   useEffect(() => {

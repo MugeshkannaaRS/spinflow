@@ -1,4 +1,4 @@
-import { createFileRoute, useSearch, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useSearch, useNavigate, Outlet, useRouterState } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, adminApi, usersApi, auditApi } from "@/lib/api-service";
 import { api } from "@/lib/api";
@@ -110,6 +110,8 @@ function AdminPage() {
   const user = useAuth((s) => s.user);
   const qc = useQueryClient();
   const searchParams = useSearch({ from: "/_app/admin" });
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isChildRoute = pathname !== "/admin";
   const [tab, setTab] = useState(searchParams?.tab ?? "companies");
   const [localSearch, setLocalSearch] = useState("");
 
@@ -188,7 +190,7 @@ function AdminPage() {
 
   const adminUsersQ = useQuery({
     queryKey: ["admin-users", filterCompanyId],
-    queryFn: () => api.get("/admin/users", { params: { company_id: filterCompanyId || undefined, page: 1, page_size: 200 } }).then(r => {
+    queryFn: () => api.get("/admin/users", { params: { company_id: filterCompanyId || undefined, page: 1, page_size: 500 } }).then(r => {
       const d = r.data;
       // Support both {items:[]} and {data:[]} response shapes
       return { items: d?.data ?? d?.items ?? (Array.isArray(d) ? d : []) };
@@ -233,6 +235,10 @@ function AdminPage() {
         </div>
       </>
     );
+  }
+
+  if (isChildRoute) {
+    return <Outlet />;
   }
 
   return (

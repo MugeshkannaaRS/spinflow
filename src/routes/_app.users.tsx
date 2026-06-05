@@ -525,7 +525,7 @@ function UsersPage() {
           <Tabs value={userTab} onValueChange={setUserTab}>
             <TabsList>
               <TabsTrigger value="list">All Users</TabsTrigger>
-              <TabsTrigger value="modules">Module Overrides</TabsTrigger>
+              {isSuperAdmin && <TabsTrigger value="modules">Module Overrides</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="list">
@@ -624,7 +624,7 @@ function UsersPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="modules">
+            {isSuperAdmin && <TabsContent value="modules">
               <Card>
                 <CardHeader>
                   <CardTitle>User Module Overrides</CardTitle>
@@ -653,7 +653,7 @@ function UsersPage() {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
+            </TabsContent>}
           </Tabs>
         </div>
 
