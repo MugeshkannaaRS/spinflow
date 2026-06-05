@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
@@ -72,6 +73,7 @@ function DashboardPage() {
   const { millId, millName } = useActiveMill();
   const role = user?.role ?? "";
   const isSuperAdmin = role === "SUPER_ADMIN";
+  const [statusFilter, setStatusFilter] = useState<"all"|"active"|"suspended">("all");
 
   // SUPER_ADMIN → admin summary (vendor KPIs)
   const adminQ = useQuery({
@@ -101,7 +103,10 @@ function DashboardPage() {
   // ── SUPER_ADMIN: vendor admin dashboard ────────────────────────────────
   if (isSuperAdmin) {
     const ad = adminQ.data ?? {};
-    const companies: any[] = ad.companies ?? [];
+    const allCompanies: any[] = ad.companies ?? [];
+    const filteredCompanies = statusFilter === "all"
+      ? allCompanies
+      : allCompanies.filter(c => c.status === statusFilter);
 
     return (
       <div className="flex flex-col min-h-full bg-[#f8fafc]">
@@ -127,11 +132,28 @@ function DashboardPage() {
           </div>
 
           {/* Companies table */}
-          {companies.length > 0 && (
+          {allCompanies.length > 0 && (
             <div className="bg-white border border-[#e2e8f0] rounded-lg overflow-hidden">
-              <div className="px-5 py-4 border-b border-[#e2e8f0] flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-[#0f172a]">All Companies</h3>
-                <a href="/admin" className="text-xs text-blue-600 hover:underline">Manage →</a>
+              <div className="px-5 py-4 border-b border-[#e2e8f0] flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-[#0f172a]">Companies</h3>
+                  <div className="flex gap-1">
+                    {(["all", "active", "suspended"] as const).map(f => (
+                      <button
+                        key={f}
+                        onClick={() => setStatusFilter(f)}
+                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                          statusFilter === f
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                      >
+                        {f === "all" ? `All (${allCompanies.length})` : f === "active" ? `Active (${allCompanies.filter(c => c.status === "active").length})` : `Suspended (${allCompanies.filter(c => c.status !== "active").length})`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <a href="/admin" className="text-xs text-blue-600 hover:underline whitespace-nowrap">Manage →</a>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -143,8 +165,8 @@ function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {companies.map((c: any) => (
-                      <tr key={c.id} className="border-t border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors">
+                    {filteredCompanies.map((c: any) => (
+                      <tr key={c.id} className={`border-t border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors ${c.status !== "active" ? "opacity-60" : ""}`}>
                         <td className="px-4 py-3">
                           <div className="font-semibold text-[#0f172a]">{c.name}</div>
                           <div className="text-[11px] text-[#94a3b8] font-mono">{c.code}</div>

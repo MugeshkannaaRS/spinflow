@@ -343,8 +343,8 @@ export const financeApi = {
 
 // Masters
 export const mastersApi = {
-  getCompanies: (page = 1, pageSize = 20) =>
-    api.get("/masters/companies", { params: { page, page_size: pageSize } }).then((r) => extractList(r.data)),
+  getCompanies: (page = 1, pageSize = 20, includeInactive?: boolean) =>
+    api.get("/masters/companies", { params: { page, page_size: pageSize, include_inactive: includeInactive } }).then((r) => extractList(r.data)),
   getCompany: (id: string) => api.get(`/masters/companies/${id}`).then((r) => r.data),
   createCompany: (data: any) => api.post("/masters/companies", data).then((r) => r.data),
   updateCompany: (id: string, data: any) =>

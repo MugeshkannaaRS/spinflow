@@ -846,9 +846,7 @@ async def admin_billing_companies(
             enabled_mods = [m.module_name for m in modules_res.scalars().all()]
 
             sub_res = await db.execute(
-                select(CompanySubscription)
-                .options(selectinload(CompanySubscription.__mapper__.relationships["plan"] if hasattr(CompanySubscription, "plan") else []))
-                .where(CompanySubscription.company_id == co.id)
+                select(CompanySubscription).where(CompanySubscription.company_id == co.id)
             )
             sub = sub_res.scalar_one_or_none()
 
@@ -861,13 +859,16 @@ async def admin_billing_companies(
 
             if sub:
                 sub_status = sub.status
-                plan_obj_res = await db.execute(
-                    select(SubscriptionPlan).where(SubscriptionPlan.id == sub.plan_id)
-                )
-                plan_obj = plan_obj_res.scalar_one_or_none()
-                if plan_obj:
-                    plan_name = plan_obj.code
-                    monthly_amt = float(plan_obj.monthly_price or 0)
+                try:
+                    plan_res = await db.execute(
+                        select(SubscriptionPlan).where(SubscriptionPlan.id == sub.plan_id)
+                    )
+                    plan_obj = plan_res.scalar_one_or_none()
+                    if plan_obj:
+                        plan_name = plan_obj.code
+                        monthly_amt = float(plan_obj.monthly_price or 0)
+                except Exception:
+                    plan_name = str(sub.plan_id or "starter")
                 if sub.expires_at:
                     trial_ends = sub.expires_at.isoformat() if sub_status == "trial" else None
                     next_bill = sub.expires_at.isoformat() if sub_status == "active" else None

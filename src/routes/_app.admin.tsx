@@ -151,8 +151,8 @@ function AdminPage() {
   };
 
   const companiesQ = useQuery({
-    queryKey: ["masters", "companies"],
-    queryFn: () => mastersApi.getCompanies(),
+    queryKey: ["masters", "companies", "all"],
+    queryFn: () => mastersApi.getCompanies(1, 100, true),
     staleTime: 60_000,
     retry: 1,
   });
