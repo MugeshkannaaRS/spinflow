@@ -114,6 +114,7 @@ function AdminPage() {
   const [localSearch, setLocalSearch] = useState("");
 
   const [addCompanyOpen, setAddCompanyOpen] = useState(searchParams?.action === "add" ? true : false);
+  const [addMillOpen, setAddMillOpen] = useState(false);
   const [editCompany, setEditCompany] = useState<Company | null>(null);
   const [modulesCompany, setModulesCompany] = useState<Company | null>(null);
   const [suspendCompany, setSuspendCompany] = useState<Company | null>(null);
@@ -187,7 +188,11 @@ function AdminPage() {
 
   const adminUsersQ = useQuery({
     queryKey: ["admin-users", filterCompanyId],
-    queryFn: () => api.get("/admin/users", { params: { company_id: filterCompanyId || undefined } }).then(r => r.data),
+    queryFn: () => api.get("/admin/users", { params: { company_id: filterCompanyId || undefined, page: 1, page_size: 200 } }).then(r => {
+      const d = r.data;
+      // Support both {items:[]} and {data:[]} response shapes
+      return { items: d?.data ?? d?.items ?? (Array.isArray(d) ? d : []) };
+    }),
     staleTime: 30_000,
     retry: 1,
     enabled: tab === "users",
@@ -217,6 +222,7 @@ function AdminPage() {
   }, [millsData]);
 
   const totalActiveUsers = usersData.filter((u: any) => u.is_active).length;
+  const activeCompanies = companiesData.filter((c: any) => c.is_active !== false);
   const totalMills = millsData.length;
 
   if (!user || user.role !== "SUPER_ADMIN") {
@@ -248,7 +254,7 @@ function AdminPage() {
             <TabsContent value="companies">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-base">Companies ({companiesData.length})</CardTitle>
+                  <CardTitle className="text-base">Active Companies ({activeCompanies.length})</CardTitle>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => setAddCompanyOpen(true)}>
                       <Plus className="size-4 mr-1" /> Add Company
@@ -298,7 +304,7 @@ function AdminPage() {
                         ),
                       },
                     ] satisfies ColDef[]}
-                    data={companiesData}
+                    data={activeCompanies}
                     rowKey={(c: any) => c.id}
                     exportFilename="admin_companies"
                     actions={(item: any) => (
@@ -309,21 +315,7 @@ function AdminPage() {
                         <Button size="sm" variant="outline" onClick={() => setModulesCompany(item)}>
                           <Blocks className="size-3.5 mr-1" /> Modules
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className={item.is_active
-                            ? "text-red-600 hover:bg-red-50 border-red-200"
-                            : "text-green-600 hover:bg-green-50 border-green-200"
-                          }
-                          onClick={() => setSuspendCompany(item)}
-                        >
-                          {item.is_active ? (
-                            <><Ban className="size-3.5 mr-1" /> Suspend</>
-                          ) : (
-                            <><CheckCircle className="size-3.5 mr-1" /> Activate</>
-                          )}
-                        </Button>
+
                       </div>
                     )}
                   />
@@ -362,7 +354,7 @@ function AdminPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">All Mills ({millsData.length})</CardTitle>
-                  <Button size="sm" onClick={() => {}}>
+                  <Button size="sm" onClick={() => setAddMillOpen(true)}>
                     <Plus className="size-4 mr-1" /> Add Mill
                   </Button>
                 </CardHeader>
@@ -394,6 +386,7 @@ function AdminPage() {
                   />
                 </CardContent>
               </Card>
+              <AddMillDialog open={addMillOpen} onOpenChange={setAddMillOpen} companies={activeCompanies} onDone={() => { setAddMillOpen(false); qc.invalidateQueries({ queryKey: ["masters", "mills"] }); }} />
             </TabsContent>
 
             <TabsContent value="modules">
@@ -481,7 +474,7 @@ function AdminPage() {
                       ))}
                     </select>
                     <span className="text-xs text-muted-foreground">
-                      {adminUsersQ.data?.items?.length ?? 0} users
+                      {(adminUsersQ.data?.items ?? []).length} users shown{filterCompanyId ? "" : " (all companies)"}
                     </span>
                   </div>
                   <DataTable
@@ -750,6 +743,102 @@ function generateTempPassword() {
   const all = upper + lower + digits + special;
   for (let i = 0; i < 7; i++) base.push(all[Math.floor(Math.random() * all.length)]);
   return base.sort(() => Math.random() - 0.5).join('');
+}
+
+
+function AddMillDialog({
+  open,
+  onOpenChange,
+  companies,
+  onDone,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  companies: any[];
+  onDone: () => void;
+}) {
+  const [form, setForm] = useState({ company_id: "", name: "", code: "", city: "", state: "", phone: "" });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    const errs: Record<string, string> = {};
+    if (!form.company_id) errs.company_id = "Company is required";
+    if (!form.name.trim()) errs.name = "Mill name is required";
+    if (!form.code.trim()) errs.code = "Mill code is required";
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    setLoading(true);
+    try {
+      await api.post("/masters/mills", {
+        company_id: form.company_id,
+        name: form.name.trim(),
+        code: form.code.trim().toUpperCase(),
+        city: form.city.trim() || undefined,
+        state: form.state.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+      });
+      toast.success(`Mill "${form.name}" created`);
+      setForm({ company_id: "", name: "", code: "", city: "", state: "", phone: "" });
+      onDone();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? "Failed to create mill");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add New Mill</DialogTitle>
+          <DialogDescription>Create a mill under an existing company</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div>
+            <Label>Company *</Label>
+            <Select value={form.company_id} onValueChange={v => setForm(f => ({ ...f, company_id: v }))}>
+              <SelectTrigger className={errors.company_id ? "border-destructive" : ""}>
+                <SelectValue placeholder="Select company" />
+              </SelectTrigger>
+              <SelectContent>
+                {companies.map((c: any) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.company_id && <p className="text-xs text-destructive mt-1">{errors.company_id}</p>}
+          </div>
+          {[
+            { key: "name", label: "Mill Name *", placeholder: "e.g. Ambur Spinning Mill 1" },
+            { key: "code", label: "Mill Code *", placeholder: "e.g. AM1" },
+            { key: "city", label: "City", placeholder: "e.g. Ambur" },
+            { key: "state", label: "State", placeholder: "e.g. Tamil Nadu" },
+            { key: "phone", label: "Phone", placeholder: "Optional" },
+          ].map(({ key, label, placeholder }) => (
+            <div key={key}>
+              <Label>{label}</Label>
+              <Input
+                value={(form as any)[key]}
+                onChange={e => setForm(f => ({ ...f, [key]: key === "code" ? e.target.value.toUpperCase() : e.target.value }))}
+                placeholder={placeholder}
+                className={errors[key] ? "border-destructive" : ""}
+              />
+              {errors[key] && <p className="text-xs text-destructive mt-1">{errors[key]}</p>}
+            </div>
+          ))}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={loading}>
+            {loading ? "Creating…" : "Create Mill"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function AddCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {

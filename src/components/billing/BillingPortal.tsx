@@ -190,6 +190,14 @@ function ModulesCell({ modules }: { modules: string[] }) {
 function SuperAdminBillingView() {
   const qc = useQueryClient();
   const [editCompany, setEditCompany] = useState<any>(null);
+  const [modulesPopover, setModulesPopover] = useState<any>(null);
+  // Close modules popover on outside click
+  useEffect(() => {
+    if (!modulesPopover) return;
+    const h = () => setModulesPopover(null);
+    document.addEventListener("click", h);
+    return () => document.removeEventListener("click", h);
+  }, [!!modulesPopover]);
   const [confirmAction, setConfirmAction] = useState<{ message: string; fn: () => void; danger?: boolean } | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -343,7 +351,7 @@ function SuperAdminBillingView() {
                       <td className="px-4 py-3 font-mono text-[#0f172a]">{co.users_count}</td>
                       <td className="px-4 py-3"><ModulesCell modules={co.enabled_modules} /></td>
                       <td className="px-4 py-3 font-mono text-[#0f172a]">{fmtLakh(co.monthly_amount)}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 relative">
                         <div className="flex items-center gap-1 flex-wrap">
                           {co.status !== "active" && (
                             <button
@@ -369,11 +377,28 @@ function SuperAdminBillingView() {
                             </button>
                           )}
                           <button
-                            onClick={() => setEditCompany(co)}
+                            onClick={() => setModulesPopover(modulesPopover?.id === co.id ? null : co)}
                             className="px-2 py-1 rounded text-[11px] font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
                           >
                             Modules
                           </button>
+                          {modulesPopover?.id === co.id && (
+                            <div className="absolute right-0 top-full mt-1 z-30 bg-white border border-[#e2e8f0] rounded-xl shadow-lg p-3 min-w-48 max-h-52 overflow-y-auto">
+                              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94a3b8] mb-2">Enabled Modules</p>
+                              {(co.enabled_modules ?? []).length === 0
+                                ? <p className="text-[12px] text-[#94a3b8]">None enabled</p>
+                                : co.enabled_modules.map((m: string) => (
+                                  <div key={m} className="flex items-center gap-1.5 py-0.5 text-[12px] text-[#374151]">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                                    {m.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                                  </div>
+                                ))
+                              }
+                              <a href="/admin?tab=modules" className="block mt-2 text-[11px] text-blue-600 hover:underline border-t border-[#f1f5f9] pt-1.5">
+                                Edit in Admin Panel →
+                              </a>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -397,7 +422,7 @@ function SuperAdminBillingView() {
         </div>
       </div>
 
-      {editCompany && <EditModulesDialog company={editCompany} onClose={() => setEditCompany(null)} />}
+      {/* Module editing moved to Admin Panel */}
       {confirmAction && (
         <ConfirmDialog
           message={confirmAction.message}
