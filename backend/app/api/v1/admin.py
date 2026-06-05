@@ -15,6 +15,7 @@ from app.db.session import get_db
 from app.core.deps import get_current_user, get_mill_scope, log_audit
 from app.models.user import User, Role
 from app.models.masters import Company, CompanyModule, Mill, MillSettings
+from sqlalchemy import update as sa_update
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -409,35 +410,39 @@ async def update_company_limits(
         raise HTTPException(500, detail=str(e))
 
 
-@router.patch("/admin/companies/{company_id}/suspend")
-async def toggle_company_status(
+@router.post("/admin/companies/{company_id}/status")
+async def update_company_status(
     company_id: str,
+    body: dict,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    """Update company status — single source of truth is companies.is_active."""
     role_code = current_user.role_rel.code if current_user.role_rel else ""
     if role_code != "SUPER_ADMIN":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can suspend companies")
-    try:
-        result = await db.execute(
-            select(Company).where(Company.id == company_id)
-        )
-        company = result.scalar_one_or_none()
-        if not company:
-            raise HTTPException(404, "Company not found")
-        current = getattr(company, "is_active", True)
-        company.is_active = not current
-        await db.commit()
-        new_status = "activated" if company.is_active else "suspended"
-        role_code_audit = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
-        await log_audit(db, current_user.id, role_code_audit, "toggle_company_status", "company", company_id, f"Company {new_status}")
-        return {"status": new_status, "is_active": company.is_active}
-    except HTTPException:
-        raise
-    except Exception as e:
-        await db.rollback()
-        logger.error(f"admin.companies suspend error: {e}")
-        raise HTTPException(500, detail=str(e))
+        raise HTTPException(403, "Super Admin only")
+
+    new_status = body.get("status")
+    if new_status not in ("active", "suspended"):
+        raise HTTPException(422, "status must be 'active' or 'suspended'")
+
+    result = await db.execute(
+        sa_update(Company)
+        .where(Company.id == company_id)
+        .values(is_active=(new_status == "active"))
+        .returning(Company.id, Company.name, Company.is_active)
+    )
+    row = result.fetchone()
+    if not row:
+        raise HTTPException(404, "Company not found")
+
+    await db.commit()
+    await log_audit(
+        db, current_user.id, role_code,
+        "company_status_changed", "company", company_id,
+        f"Status set to {new_status}",
+    )
+    return {"id": str(row.id), "name": row.name, "status": ("active" if row.is_active else "suspended")}
 
 
 @router.get("/admin/mills/{mill_id}/settings")
@@ -660,7 +665,8 @@ async def admin_dashboard(
             sub = sub_res.scalar_one_or_none()
             plan_name = str(getattr(sub, "plan_id", None) or "starter")
             max_u = int(getattr(sub, "max_users", 0) or 0)
-            sub_status = getattr(sub, "status", "active") or "active"
+            # Single source of truth: Company.is_active
+            company_status = "active" if co.is_active else "suspended"
             is_over = max_u > 0 and users_cnt > max_u
             if is_over:
                 over_limit += 1
@@ -672,7 +678,7 @@ async def admin_dashboard(
                 "id": str(co.id),
                 "name": co.name,
                 "code": co.code,
-                "status": sub_status,
+                "status": company_status,
                 "plan": plan_name,
                 "mills": mills_cnt,
                 "users": users_cnt,

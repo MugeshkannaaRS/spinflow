@@ -498,8 +498,8 @@ export const adminApi = {
   getUserModules: (userId: string) => api.get(`/admin/users/${userId}/modules`).then((r) => r.data),
   updateUserModules: (userId: string, modules: Record<string, boolean>) =>
     api.put(`/admin/users/${userId}/modules`, { modules }).then((r) => r.data),
-  suspendCompany: (companyId: string) =>
-    api.patch(`/admin/companies/${companyId}/suspend`).then((r) => r.data),
+  suspendCompany: (companyId: string, status: "active" | "suspended") =>
+    api.post(`/admin/companies/${companyId}/status`, { status }).then((r) => r.data),
 };
 
 export const uploadApi = {

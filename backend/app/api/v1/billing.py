@@ -851,14 +851,15 @@ async def admin_billing_companies(
             sub = sub_res.scalar_one_or_none()
 
             plan_name = "starter"
-            sub_status = "active"
             monthly_amt = 0.0
             trial_ends = None
             last_pay = None
             next_bill = None
 
+            # Single source of truth: Company.is_active
+            company_status = "active" if co.is_active else "suspended"
+
             if sub:
-                sub_status = sub.status
                 try:
                     plan_res = await db.execute(
                         select(SubscriptionPlan).where(SubscriptionPlan.id == sub.plan_id)
@@ -870,8 +871,8 @@ async def admin_billing_companies(
                 except Exception:
                     plan_name = str(sub.plan_id or "starter")
                 if sub.expires_at:
-                    trial_ends = sub.expires_at.isoformat() if sub_status == "trial" else None
-                    next_bill = sub.expires_at.isoformat() if sub_status == "active" else None
+                    trial_ends = sub.expires_at.isoformat() if company_status == "trial" else None
+                    next_bill = sub.expires_at.isoformat() if company_status == "active" else None
 
             last_inv_res = await db.execute(
                 select(BillingInvoice)
@@ -888,7 +889,7 @@ async def admin_billing_companies(
                 "name": co.name,
                 "code": co.code,
                 "plan": plan_name,
-                "status": sub_status if sub else "active",
+                "status": company_status,
                 "mills_count": mills_cnt,
                 "users_count": users_cnt,
                 "enabled_modules": enabled_mods,

@@ -55,6 +55,10 @@ interface ImportError {
   field?: string;
   value?: string;
   severity?: string;
+  code?: string;
+  name?: string;
+  dept?: string;
+  error?: string;
 }
 
 function normalizeCustomFieldKey(header: string): string {
@@ -1156,9 +1160,12 @@ export function UniversalImportModal({
                 {hardErrors.map((err, i) => (
                   <div key={i} className="text-sm p-2 rounded border bg-red-50 text-red-700 border-red-200">
                     <span className="font-medium">Row {err.row}</span>
+                    {err.code ? <span className="ml-1 font-mono">[{err.code}]</span> : ''}
+                    {err.name ? <span className="ml-1 font-medium">{err.name}</span> : ''}
+                    {err.dept ? <span className="ml-1 text-slate-500">({err.dept})</span> : ''}
                     {err.field ? ` — ${err.field}` : ''}
                     {err.value ? ` ("${err.value}")` : ''}
-                    {err.message ? `: ${err.message}` : ''}
+                    <span className="ml-1">{(err.message || err.error || '')}</span>
                   </div>
                 ))}
                 {warnings.map((err, i) => (

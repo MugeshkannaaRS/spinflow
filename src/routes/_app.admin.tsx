@@ -120,12 +120,14 @@ function AdminPage() {
 
   const handleSuspend = async (company: Company) => {
     try {
-      const res = await adminApi.suspendCompany(company.id);
-      const status = res.is_active ? "activated" : "suspended";
-      toast.success(`${company.name} has been ${status}`);
+      const targetStatus = company.is_active ? "suspended" : "active";
+      const res = await adminApi.suspendCompany(company.id, targetStatus);
+      toast.success(`${company.name} has been ${res.status}`);
       setSuspendCompany(null);
       qc.invalidateQueries({ queryKey: ["masters"] });
       qc.invalidateQueries({ queryKey: ["admin-summary"] });
+      qc.invalidateQueries({ queryKey: ["admin-dashboard"] });
+      qc.invalidateQueries({ queryKey: ["admin-billing-companies"] });
     } catch {
       toast.error("Failed to update company status");
     }

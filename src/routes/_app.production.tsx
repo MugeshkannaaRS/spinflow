@@ -45,32 +45,12 @@ import { toast } from "sonner";
 import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, ArrowDownToLine } from "lucide-react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useActiveMill } from "@/hooks/useActiveMill";
-import { useMillMasters } from "@/hooks/useMillConfig";
+import { useMillMasters, useMillMasterCategory } from "@/hooks/useMillConfig";
 
 export const Route = createFileRoute("/_app/production")({
   head: () => ({ meta: [{ title: "Production — SpinFlow ERP" }] }),
   component: ProductionPage,
 });
-
-const DEPARTMENTS_FALLBACK = [
-  "Blowroom",
-  "Carding",
-  "Drawing",
-  "Simplex",
-  "Ring Frame",
-  "Winding",
-  "Quality",
-];
-
-const MACHINE_TYPES = [
-  "Ring Frame",
-  "Carding",
-  "Drawing",
-  "Simplex",
-  "Winding",
-  "Blowroom",
-  "Other",
-];
 
 type GridRow = {
   machineCode: string;
@@ -109,9 +89,7 @@ function ShiftGrid() {
   const [shift, setShift] = useState<"A" | "B" | "C">("A");
   const { data: millMasters } = useMillMasters();
   const deptOptions = millMasters?.department ?? [];
-  const DEPARTMENTS = deptOptions.length > 0
-    ? deptOptions.map((d: any) => typeof d === "string" ? d : d.name)
-    : DEPARTMENTS_FALLBACK;
+  const DEPARTMENTS = deptOptions.map((d: any) => typeof d === "string" ? d : d.name);
   const [department, setDepartment] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
 
@@ -537,6 +515,9 @@ function ProductionPage() {
     retry: 1,
     enabled: !!millId,
   });
+  const { data: machineTypes } = useMillMasterCategory("machine_type");
+  const MACHINE_TYPES = (machineTypes?.length ? machineTypes : ["Blowroom", "Carding", "Drawing", "Simplex", "Ring Frame", "Autoconer", "Winding"]);
+
   const qc = useQueryClient();
 
   // Shift entry approve/reject

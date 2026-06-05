@@ -210,11 +210,12 @@ function SuperAdminBillingView() {
 
   const statusMut = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>
-      api.post(`/admin/billing/companies/${id}/status`, { status }),
+      api.post(`/admin/companies/${id}/status`, { status }),
     onSuccess: () => {
       toast.success("Status updated");
       qc.invalidateQueries({ queryKey: ["admin-billing-companies"] });
       qc.invalidateQueries({ queryKey: ["admin-billing-overview"] });
+      qc.invalidateQueries({ queryKey: ["admin-dashboard"] });
     },
     onError: () => toast.error("Failed to update status"),
   });

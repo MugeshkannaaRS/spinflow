@@ -834,26 +834,36 @@ async def bulk_create_machines(
 
     for row in valid_items:
         try:
-            row_code = row.get("code") or row.get("mc code") or row.get("Mc Code") or row.get("mc_code") or ""
+            raw_code = str(
+                row.get("code") or row.get("mc code") or row.get("Mc Code") or
+                row.get("mc_code") or row.get("MC Code") or row.get("Machine Code") or ""
+            ).strip()
             dept_name = str(row.get("department") or "").strip()
             si_no = _safe_int(row.get("si_no") or row.get("SI No") or row.get("Sl No"))
 
             # ── Code: auto-generate if null/empty ──────────────────
-            if not str(row_code).strip():
-                dept_abbr = dept_name[:2].upper().replace(" ", "") if dept_name else "MC"
-                # Increment per-department counter
-                dept_counters[dept_name] = dept_counters.get(dept_name, 0) + 1
-                counter = si_no or dept_counters[dept_name]
-                row_code = f"{dept_abbr}{counter:03d}"
-            code = str(row_code).strip()
+            if not raw_code:
+                # Abbreviation: first letter of each word, max 5 chars
+                words = [w for w in dept_name.replace("-"," ").replace("."," ").replace("/"," ").split() if w]
+                abbr = "".join(w[0].upper() for w in words)[:5] if words else "MC"
+                counter = dept_counters.get(abbr, 1)
+                while True:
+                    candidate = f"{abbr}_{counter:03d}"
+                    if (candidate.lower() not in existing_map and
+                            candidate.lower() not in seen_in_batch):
+                        break
+                    counter += 1
+                dept_counters[abbr] = counter + 1
+                raw_code = candidate
+            code = raw_code
 
             # ── Code: deduplicate within batch ─────────────────────
             code_lower = code.lower()
-            if code_lower in seen_in_batch:
-                seen_in_batch[code_lower] += 1
-                code = f"{code}_{seen_in_batch[code_lower]:02d}"
-            else:
-                seen_in_batch[code_lower] = 1
+            seen_in_batch[code_lower] = seen_in_batch.get(code_lower, 0) + 1
+            occurrence = seen_in_batch[code_lower]
+            if occurrence > 1:
+                code = f"{code}_{occurrence:02d}"
+                code_lower = code.lower()
 
             # ── Name (required) ───────────────────────────────────
             name = str(
@@ -1000,10 +1010,12 @@ async def bulk_create_machines(
             logger.warning(f"Machine row error (row {row.get('_serial_no','?')}): {e}")
             err_code = str(row.get("code") or row.get("mc code") or row.get("Mc Code") or row.get("mc_code") or "")
             err_name = str(row.get("name") or row.get("Name Of Item") or row.get("name_of_item") or "")
+            err_dept = str(row.get("department") or "")
             errors.append({
                 "row": row.get("_serial_no", "?"),
                 "code": err_code,
                 "name": err_name,
+                "dept": err_dept,
                 "error": str(e)[:200],
             })
             skipped += 1
