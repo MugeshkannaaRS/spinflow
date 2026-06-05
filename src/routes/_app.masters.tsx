@@ -168,7 +168,18 @@ function MastersPage() {
   const custData = (custQ.data ?? []) as Customer[];
   const vehData = (vehQ.data ?? []) as MasterVehicle[];
   const routeData = (routeQ.data ?? []) as MasterRoute[];
-  const machinesData = (machinesQ.data ?? []) as MasterMachine[];
+  const machinesResponse = (machinesQ.data ?? {}) as any;
+  const machinesCustomFieldDefs = machinesResponse.custom_field_definitions ?? [];
+  const machinesData = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesResponse.data ?? []))
+    .map((m: any) => {
+      const flat = { ...m };
+      if (m.custom_fields) {
+        for (const [key, val] of Object.entries(m.custom_fields)) {
+          flat[key] = val;
+        }
+      }
+      return flat as MasterMachine;
+    });
   const shiftsData = (shiftsQ.data ?? []) as any[];
   const warehousesData = (warehousesQ.data ?? []) as any[];
 
@@ -368,22 +379,33 @@ function MastersPage() {
             </TabsContent>
 
             <TabsContent value="machines">
-              <MasterTable
-                title="Machines"
-                data={machinesData.filter((x) => matchesSearch(x, search))}
-                columns={[
+              {(() => {
+                const sysCols = [
                   { key: "code", label: machineColConfig.getLabel("code") },
                   { key: "name", label: machineColConfig.getLabel("name") },
                   { key: "machine_type", label: machineColConfig.getLabel("machine_type") },
                   { key: "department", label: machineColConfig.getLabel("department") },
                   { key: "target_kg", label: machineColConfig.getLabel("target_kg") },
-                ]}
-                activeKey="current_status"
-                canEdit={canEdit}
-                onAdd={<MachineForm departments={deptsData} />}
-                onEdit={(item) => <MachineForm item={item} departments={deptsData} />}
-                headerExtra={canEdit ? <ImportMachinesDialog /> : undefined}
-              />
+                ];
+                const customCols: { key: string; label: string }[] = (machinesCustomFieldDefs ?? []).map(
+                  (cf: { field_key: string; field_label: string }) => ({
+                    key: cf.field_key,
+                    label: cf.field_label + " *",
+                  })
+                );
+                return (
+                  <MasterTable
+                    title="Machines"
+                    data={machinesData.filter((x: any) => matchesSearch(x, search))}
+                    columns={[...sysCols, ...customCols]}
+                    activeKey="current_status"
+                    canEdit={canEdit}
+                    onAdd={<MachineForm departments={deptsData} />}
+                    onEdit={(item) => <MachineForm item={item} departments={deptsData} />}
+                    headerExtra={canEdit ? <ImportMachinesDialog /> : undefined}
+                  />
+                );
+              })()}
             </TabsContent>
 
             <TabsContent value="shifts">

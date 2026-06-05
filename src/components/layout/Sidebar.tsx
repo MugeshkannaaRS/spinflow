@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/stores/auth";
 import { useRBAC } from "@/hooks/useRBAC";
+import { useModuleAccess } from "@/hooks/useModuleAccess";
 import {
   LayoutDashboard,
   Factory,
@@ -128,7 +129,8 @@ function RoleBadge({ role, small = false }: { role: string; small?: boolean }) {
 
 function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavClick?: () => void }) {
   const { user, logout } = useAuth();
-  const { canAccess, isSuperAdmin, companyModulesLoaded, isDashboardOnly } = useRBAC();
+  const { canAccess: rbacCanAccess, isSuperAdmin, companyModulesLoaded, isDashboardOnly } = useRBAC();
+  const { canAccess: moduleCanAccess } = useModuleAccess();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
 
@@ -173,10 +175,9 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
       ...group,
       items: group.items.filter((item) => {
         if (isDashboardOnly()) return item.module === "dashboard";
-        // SUPER_ADMIN = vendor: only sees vendor modules
         const SA_MODULES = new Set(["dashboard", "admin", "column_config", "users", "audit", "billing"]);
         if (isSuperAdmin) return SA_MODULES.has(item.module);
-        return canAccess(item.module);
+        return moduleCanAccess(item.module);
       }),
     }))
     .filter((group) => group.items.length > 0);

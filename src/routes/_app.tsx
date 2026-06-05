@@ -1,13 +1,15 @@
-import { createFileRoute, Outlet, redirect, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useRouter, useLocation } from "@tanstack/react-router";
 import { useAuth } from "@/stores/auth";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/layout/SidebarContext";
 import { AlertBanner } from "@/components/common/AlertBanner";
 import { DashboardOnlyGuard } from "@/components/DashboardOnlyGuard";
 import { DASHBOARD_ONLY_ROLES } from "@/lib/access";
+import { useModuleAccess } from "@/hooks/useModuleAccess";
 import { useEffect, useState } from "react";
 import { Topbar } from "@/components/layout/Topbar";
 import { cn } from "@/lib/utils";
+import { Lock } from "lucide-react";
 
 const ALLOWED_DASHBOARD_ONLY_PATHS = ["/dashboard", "/profile", "/login"];
 
@@ -69,6 +71,37 @@ function RedirectOnMustChangePassword() {
   );
 }
 
+function ModuleAccessGuard({ children }: { children: React.ReactNode }) {
+  const user = useAuth((s) => s.user);
+  const location = useLocation();
+  const { canAccessRoute } = useModuleAccess();
+
+  if (!user || user.role === "SUPER_ADMIN") return <>{children}</>;
+
+  const bypassPaths = ["/dashboard", "/profile", "/change-password", "/login", "/company/billing"];
+  if (bypassPaths.some((p) => location.pathname === p || location.pathname.startsWith(p + "/"))) {
+    return <>{children}</>;
+  }
+
+  if (!canAccessRoute(location.pathname)) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-12 text-center">
+        <div className="size-20 rounded-full bg-[#f1f5f9] flex items-center justify-center mx-auto mb-6">
+          <Lock className="size-10 text-[#94a3b8]" />
+        </div>
+        <h2 className="text-2xl font-semibold text-[#0f172a] mb-3">Module Not Enabled</h2>
+        <p className="text-[#64748b] max-w-md mb-2">Your subscription does not include this module.</p>
+        <p className="text-[#94a3b8] text-sm mb-8">Contact your SpinFlow vendor to enable access.</p>
+        <a href="/dashboard" className="px-4 py-2 bg-[#3b82f6] text-white rounded-md text-sm font-medium hover:bg-[#2563eb]">
+          Back to Dashboard
+        </a>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 function AppShell() {
   const { open, close } = useSidebar();
   const [collapsed, setCollapsed] = useState(
@@ -96,7 +129,9 @@ function AppShell() {
         <AlertBanner />
         <main className="flex-1 overflow-y-auto bg-white lg:bg-gray-50 dark:bg-slate-900 p-4 lg:p-6">
           <DashboardOnlyGuard>
-            <Outlet />
+            <ModuleAccessGuard>
+              <Outlet />
+            </ModuleAccessGuard>
           </DashboardOnlyGuard>
         </main>
       </div>

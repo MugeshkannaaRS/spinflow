@@ -34,6 +34,7 @@ class MachineResponse(BaseModel):
     status: Optional[bool] = None
     current_status: Optional[str] = None
     target_kg: float = 0
+    custom_fields: Optional[dict] = None
 
     class Config:
         from_attributes = True

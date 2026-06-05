@@ -33,6 +33,7 @@ class UserResponse(BaseModel):
     last_login: Optional[datetime] = None
     must_change_password: bool = False
     module_restrictions: Optional[dict] = None
+    enabled_modules: list[str] = []
 
     class Config:
         from_attributes = True

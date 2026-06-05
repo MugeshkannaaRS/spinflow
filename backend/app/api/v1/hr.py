@@ -131,16 +131,50 @@ async def get_employees(
         stmt = stmt.offset((page - 1) * page_size).limit(page_size)
         result = await db.execute(stmt)
         items = result.scalars().all()
+
+        # Fetch custom field definitions for this company's employees
+        custom_field_defs: list = []
+        custom_lookup: dict = {}
+        company_id = scope.get("company_id", "")
+        if company_id:
+            cf_defs_result = await db.execute(
+                select(EmployeeCustomField)
+                .where(EmployeeCustomField.company_id == company_id)
+                .order_by(EmployeeCustomField.id)
+            )
+            cf_defs = cf_defs_result.scalars().all()
+            custom_field_defs = [
+                {"field_key": cf.field_name, "field_label": cf.field_name, "field_type": cf.field_type or "text"}
+                for cf in cf_defs
+            ]
+            if cf_defs and items:
+                emp_ids = [str(e.id) for e in items]
+                cv_result = await db.execute(
+                    select(EmployeeCustomValue)
+                    .where(EmployeeCustomValue.employee_id.in_(emp_ids))
+                )
+                fid_to_name = {cf.id: cf.field_name for cf in cf_defs}
+                for cv in cv_result.scalars().all():
+                    fname = fid_to_name.get(cv.field_id, cv.field_id)
+                    custom_lookup.setdefault(cv.employee_id, {})[fname] = cv.value or ""
+
+        data = []
+        for e in items:
+            emp_dict = EmployeeOut.model_validate(e).model_dump()
+            emp_dict["custom_fields"] = custom_lookup.get(str(e.id), {})
+            data.append(emp_dict)
+
         return {
             "total": total,
             "page": page,
             "page_size": page_size,
             "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-            "data": [EmployeeOut.model_validate(e).model_dump() for e in items],
+            "data": data,
+            "custom_field_definitions": custom_field_defs,
         }
     except Exception as e:
         logger.error(f"HR employees list error: {e}")
-        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": [], "custom_field_definitions": []}
 
 
 @router.get("/hr/employees/{employee_id}", response_model=EmployeeDetailOut)

@@ -120,6 +120,21 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
         )
         db.add(session)
         await db.flush()
+
+        # Fetch enabled modules for this company
+        enabled_modules: list[str] = []
+        if user.company_id:
+            mods_result = await db.execute(
+                select(CompanyModule.module_name)
+                .where(
+                    CompanyModule.company_id == str(user.company_id),
+                    CompanyModule.is_enabled == True,
+                )
+            )
+            enabled_modules = [r[0] for r in mods_result.all()]
+        else:
+            enabled_modules = ["all"]
+
         client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "0.0.0.0").split(",")[0].strip()
         await log_audit(db, user.id, role_code, "login", "auth", user.id, "User logged in", ip_address=client_ip)
         _set_refresh_cookie(response, refresh_token)
@@ -139,6 +154,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
                 is_active=user.is_active,
                 last_login=user.last_login,
                 must_change_password=user.must_change_password,
+                enabled_modules=enabled_modules,
             ),
         )
     except SpinFlowException:
@@ -227,6 +243,20 @@ async def get_me(db: AsyncSession = Depends(get_db), current_user: User = Depend
                 for m in mills_result.scalars().all()
             ]
 
+        # Fetch enabled modules for this company
+        enabled_modules: list[str] = []
+        if current_user.company_id:
+            mods_result = await db.execute(
+                select(CompanyModule.module_name)
+                .where(
+                    CompanyModule.company_id == str(current_user.company_id),
+                    CompanyModule.is_enabled == True,
+                )
+            )
+            enabled_modules = [r[0] for r in mods_result.all()]
+        else:
+            enabled_modules = ["all"]
+
         return {
             "id": str(current_user.id),
             "name": current_user.name,
@@ -238,6 +268,7 @@ async def get_me(db: AsyncSession = Depends(get_db), current_user: User = Depend
             "company_mills": company_mills,
             "must_change_password": current_user.must_change_password,
             "module_restrictions": current_user.get_module_restrictions(),
+            "enabled_modules": enabled_modules,
         }
 
     except Exception as e:

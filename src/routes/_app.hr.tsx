@@ -267,8 +267,18 @@ function HRPage() {
     retry: 1,
     enabled: !!millId,
   });
-
-  const employees: EmployeeRow[] = Array.isArray(empQ.data) ? empQ.data : (empQ.data?.data ?? []);
+  const empResponse = (empQ.data ?? {}) as any;
+  const empCustomFieldDefs = empResponse.custom_field_definitions ?? [];
+  const employees: EmployeeRow[] = (Array.isArray(empQ.data) ? empQ.data : (empResponse.data ?? []))
+    .map((e: any) => {
+      const flat = { ...e };
+      if (e.custom_fields) {
+        for (const [key, val] of Object.entries(e.custom_fields)) {
+          flat[key] = val;
+        }
+      }
+      return flat as EmployeeRow;
+    });
   const attendance: AttendanceRow[] = Array.isArray(attQ.data) ? attQ.data : (attQ.data?.data ?? []);
   const leaves: LeaveRow[] = Array.isArray(leaveQ.data) ? leaveQ.data : (leaveQ.data?.data ?? []);
 
@@ -353,7 +363,7 @@ function HRPage() {
             </TabsList>
 
             <TabsContent value="employees">
-              <EmployeesTab employees={employees} canEdit={canEdit} />
+              <EmployeesTab employees={employees} canEdit={canEdit} customFieldDefs={empCustomFieldDefs} />
             </TabsContent>
 
             <TabsContent value="attendance">
@@ -378,7 +388,7 @@ function HRPage() {
 // TAB 1 — EMPLOYEES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdit: boolean }) {
+function EmployeesTab({ employees, canEdit, customFieldDefs = [] }: { employees: EmployeeRow[]; canEdit: boolean; customFieldDefs?: { field_key: string; field_label: string; field_type: string }[] }) {
   const empColConfig = useColumnConfig("hr_employees");
   const qc = useQueryClient();
   const { data: millMasters } = useMillMasters();
@@ -498,7 +508,14 @@ function EmployeesTab({ employees, canEdit }: { employees: EmployeeRow[]; canEdi
     return cols;
   }, [visibleGroups]);
 
-  const dataTableColumns = useMemo(() => [...alwaysCols, ...groupColumns], [groupColumns]);
+  const customCols: ColDef<EmployeeRow>[] = useMemo(() =>
+    customFieldDefs.map((cf) => ({
+      key: cf.field_key,
+      label: cf.field_label + " *",
+      render: (e: any) => <span className="text-[#64748b] text-sm">{e[cf.field_key] || "—"}</span>,
+    })), [customFieldDefs]);
+
+  const dataTableColumns = useMemo(() => [...alwaysCols, ...groupColumns, ...customCols], [groupColumns, customCols]);
 
   const depts = useMemo(() => [...new Set(employees.map((e) => e.department).filter((d): d is string => !!d))].sort(), [employees]);
   const grades = useMemo(() => [...new Set(employees.map((e) => e.grade).filter((g): g is string => !!g))].sort(), [employees]);

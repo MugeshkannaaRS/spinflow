@@ -837,10 +837,13 @@ export function UniversalImportModal({
                       <TableCell className="font-medium">{header}</TableCell>
                       <TableCell>
                         {autoCustom ? (
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300">
-                              Custom: {normalizeCustomFieldKey(header)}
-                            </Badge>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                              Custom field
+                            </span>
+                            <span className="text-xs text-[#64748b]">
+                              Will appear as extra column in list
+                            </span>
                           </div>
                         ) : (
                           <Select
@@ -863,8 +866,8 @@ export function UniversalImportModal({
                       </TableCell>
                       <TableCell>
                         {autoCustom ? (
-                          <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300">
-                            New
+                          <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300">
+                            Custom
                           </Badge>
                         ) : mapping[header] ? (
                           getConfidenceBadge(confidence[header] ?? 0)
@@ -1143,6 +1146,30 @@ export function UniversalImportModal({
                 <div className="text-xs text-blue-600 mt-1">Review them in Masters → Departments.</div>
               </div>
             )}
+
+            {/* Custom fields detected */}
+            {(() => {
+              const cfHeaders = headers.filter((h) => {
+                const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+                const nh = norm(h);
+                return !colConfigs.some((c: any) => norm(c.key) === nh || norm(c.label) === nh);
+              });
+              if (cfHeaders.length === 0) return null;
+              const cfKeys = cfHeaders.map((h) => normalizeCustomFieldKey(h));
+              return (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md text-left">
+                  <p className="text-sm font-medium text-blue-800">Custom fields detected and saved:</p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {cfKeys.map((k) => (
+                      <span key={k} className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-mono">
+                        {k}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-blue-600 mt-1">These appear as extra columns in the {tableName.replace(/_/g, " ")} list.</p>
+                </div>
+              );
+            })()}
           </>
         )}
 

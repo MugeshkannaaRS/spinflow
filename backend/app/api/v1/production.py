@@ -11,6 +11,7 @@ from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.production import Machine, Shift, ProductionEntry, DowntimeLog
 from app.models.masters import Mill, Department, YarnCount
+from app.models.mill_config import MillCustomField, MillRecordValue
 from app.schemas.production import (
     MachineCreate, MachineResponse, ProductionEntryResponse, ProductionEntryCreate,
     DowntimeResponse, DowntimeCreate, ShiftCreate, ShiftOut,
@@ -81,16 +82,61 @@ async def get_machines(
         result = await db.execute(query)
         items = result.scalars().all()
         pages = (total + page_size - 1) // page_size if page_size > 0 else 0
+
+        # Fetch custom field definitions for this mill's machines
+        custom_field_defs: list = []
+        custom_lookup: dict = {}
+        if effective_mill_id:
+            cf_defs_result = await db.execute(
+                select(MillCustomField)
+                .where(
+                    MillCustomField.mill_id == effective_mill_id,
+                    MillCustomField.module == "machines",
+                )
+                .order_by(MillCustomField.sequence, MillCustomField.field_label)
+            )
+            cf_defs = cf_defs_result.scalars().all()
+            custom_field_defs = [
+                {
+                    "field_key": cf.field_key,
+                    "field_label": cf.field_label,
+                    "field_type": cf.field_type,
+                }
+                for cf in cf_defs
+            ]
+
+            # Fetch custom values for these machines
+            if cf_defs and items:
+                machine_ids = [str(m.id) for m in items]
+                cv_result = await db.execute(
+                    select(MillRecordValue)
+                    .where(
+                        MillRecordValue.mill_id == effective_mill_id,
+                        MillRecordValue.module == "machines",
+                        MillRecordValue.record_id.in_(machine_ids),
+                    )
+                )
+                for cv in cv_result.scalars().all():
+                    custom_lookup.setdefault(cv.record_id, {})[cv.field_key] = \
+                        cv.value_text or cv.value_number or cv.value_date
+
+        data = []
+        for item in items:
+            item_dict = MachineResponse.model_validate(item).model_dump()
+            item_dict["custom_fields"] = custom_lookup.get(str(item.id), {})
+            data.append(item_dict)
+
         return {
             "total": total,
             "page": page,
             "page_size": page_size,
             "pages": pages,
-            "data": [MachineResponse.model_validate(item).model_dump() for item in items],
+            "data": data,
+            "custom_field_definitions": custom_field_defs,
         }
     except Exception as e:
         logger.error(f"production.machines list error: {e}")
-        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": [], "custom_field_definitions": []}
 
 
 @router.post("/production/machines", response_model=MachineResponse)

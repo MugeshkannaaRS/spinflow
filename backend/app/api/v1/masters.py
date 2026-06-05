@@ -3,7 +3,7 @@ import logging
 import uuid as _uuid_mod
 from datetime import date as _date, datetime as _datetime, timedelta as _timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, update as _sa_update
+from sqlalchemy import select, func, update as _sa_update, insert as _sa_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, model_validator
@@ -27,6 +27,7 @@ from app.models.masters import (
     Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route,
 )
 from app.models.production import Machine
+from app.models.mill_config import MillRecordValue, MillCustomField
 from app.core.error_handler import SpinFlowException
 
 router = APIRouter()
@@ -831,6 +832,19 @@ async def bulk_create_machines(
     created = updated = skipped = 0
     errors: List[Dict[str, Any]] = []
     auto_created_depts: List[str] = []
+    saved_machines: List[Dict[str, Any]] = []
+
+    # Build system field set for machines (from field_aliases)
+    MACHINE_SYSTEM_ALIASES: set = set()
+    try:
+        from app.core.field_aliases import FIELD_ALIASES_BY_MODULE
+        for aliases in FIELD_ALIASES_BY_MODULE.get("machines", {}).values():
+            for a in aliases:
+                MACHINE_SYSTEM_ALIASES.add(a.lower().replace(" ", "_"))
+                MACHINE_SYSTEM_ALIASES.add(a.lower())
+    except ImportError:
+        pass
+    MACHINE_SYSTEM_ALIASES.update({"_serial_no", "_brand", "_country", "brand", "country", "make", "remarks"})
 
     for row in valid_items:
         try:
@@ -980,6 +994,7 @@ async def bulk_create_machines(
 
             # ── Upsert logic ──────────────────────────────────────
             existing_id = existing_map.get(code_lower)
+            machine_id: Optional[str] = None
             if existing_id:
                 if mode == "skip":
                     skipped += 1
@@ -990,18 +1005,43 @@ async def bulk_create_machines(
                         .where(Machine.id == existing_id)
                         .values(**field_values)
                     )
+                    machine_id = existing_id
                     updated += 1
-                    continue
                 else:  # create mode → append suffix
                     code = f"{code}_{row['_serial_no']}"
 
-            db.add(Machine(
-                id=str(_uuid_mod.uuid4()),
-                mill_id=eff_mill_id,
-                code=code,
-                **field_values,
-            ))
-            created += 1
+            if not machine_id:
+                machine_id = str(_uuid_mod.uuid4())
+                db.add(Machine(
+                    id=machine_id,
+                    mill_id=eff_mill_id,
+                    code=code,
+                    **field_values,
+                ))
+                created += 1
+
+            # Collect custom field values for this machine
+            if machine_id:
+                custom_values: list = []
+                for col_header, val in row.items():
+                    col_key = str(col_header).strip()
+                    if col_key.startswith("_"):
+                        continue
+                    col_norm = col_key.lower().replace(" ", "_").replace(".", "_")
+                    col_lower = col_key.lower()
+                    if col_norm in MACHINE_SYSTEM_ALIASES or col_lower in MACHINE_SYSTEM_ALIASES:
+                        continue
+                    if val is None or str(val).strip() == "":
+                        continue
+                    custom_values.append({
+                        "mill_id": eff_mill_id,
+                        "module": "machines",
+                        "record_id": machine_id,
+                        "field_key": col_norm,
+                        "value_text": str(val).strip(),
+                    })
+                if custom_values:
+                    saved_machines.append({"id": machine_id, "custom_values": custom_values})
 
             if (created + updated) % 50 == 0:
                 await db.flush()
@@ -1026,6 +1066,23 @@ async def bulk_create_machines(
     except Exception as commit_err:
         await db.rollback()
         raise HTTPException(500, f"Commit failed: {str(commit_err)[:300]}")
+
+    # ── Store custom field values ──────────────────────────────────────
+    try:
+        all_custom_values = []
+        for sm in saved_machines:
+            all_custom_values.extend(sm["custom_values"])
+        if all_custom_values:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            stmt = pg_insert(MillRecordValue).values(all_custom_values)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["mill_id", "module", "record_id", "field_key"],
+                set_={"value_text": stmt.excluded.value_text},
+            )
+            await db.execute(stmt)
+            await db.commit()
+    except Exception as cv_err:
+        logger.warning(f"Custom field values storage failed (non-critical): {cv_err}")
 
     # ── Populate mill_masters from imported data (non-critical) ────────
     try:
