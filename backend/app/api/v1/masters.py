@@ -60,8 +60,8 @@ async def _resolve_company_id(current_user: User, db: AsyncSession) -> Optional[
 @router.get("/masters/companies")
 async def list_companies(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    include_inactive: bool = Query(False),
+    page_size: int = Query(100, ge=1, le=500),
+    include_inactive: bool = Query(True),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):
@@ -74,7 +74,7 @@ async def list_companies(
             return {
                 "total": len(data),
                 "page": 1,
-                "page_size": 20,
+                "page_size": page_size,
                 "pages": 1,
                 "data": data,
             }
@@ -125,8 +125,8 @@ async def update_company(
 async def list_mills(
     company_id: str = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    include_inactive: bool = Query(False),
+    page_size: int = Query(500, ge=1, le=5000),
+    include_inactive: bool = Query(True),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
 ):

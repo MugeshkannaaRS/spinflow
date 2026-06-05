@@ -58,8 +58,20 @@
   - Verified: backend starts, admin login, seed user login, dashboard API all return 200
   - All 250 tests pass (177 backend + 73 frontend)
 
+- **Admin Page Redesign**: Split monolithic 1852-line `_app.admin.tsx` into 11 focused sub-routes. Clean hub page (`/admin`) shows stats + navigation cards. Each section is its own route: `/admin/companies`, `/admin/users`, `/admin/mills`, `/admin/modules`, `/admin/limits`, `/admin/audit`, `/admin/billing`, `/admin/plans`, `/admin/archive` (plus existing `/admin/column-config`). All dialogs (EditCompany, Modules, DeleteCompany, AddCompany, CreateUser, AddMill, EditLimit) live within their respective route files. 221 backend + 65 frontend tests pass (8 pre-existing dashboard failures unchanged).
+
+- **Admin Data Accuracy Sprint**:
+  - Fixed `usersQ` in admin page — was calling `GET /users` (returns `UserOut` without `company_id`, causing **all companies to show 0 users**). Changed to `GET /admin/users` which includes `company_id`.
+  - Fixed `GET /users` backend — `page_size` max raised 100→500, default 20→100.
+  - Fixed `GET /admin/users` backend — default `page_size` raised 50→500.
+  - Fixed `GET /masters/mills` backend — `page_size` max raised 100→5000, default 20→500, `include_inactive` default `False→True`.
+  - Fixed `GET /masters/companies` backend — `page_size` max raised 100→500, default 20→100, `include_inactive` default `False→True`.
+  - Fixed `mastersApi.getMills()` frontend — default `pageSize` 20→500, passes `include_inactive: true`.
+  - Fixed `usersApi.list()` frontend — default `page_size` 20→100.
+
 ### Deferred
-- *(none)*
+- Admin page: 8 dashboard test failures (pre-existing, unrelated to admin work)
+- Full admin page redesign into sub-routes (each section as own route)
 
 ## Key Decisions
 - Backend `rbac.py` is the single canonical RBAC source; `deps.py` imports from it; frontend `useRBAC.ts` matches
@@ -96,6 +108,7 @@
 - **Model drift**: The local DB has diverged from alembic migrations (missing `enabled_by` in `company_modules`, extra columns in `companies`, etc.). Migrations define authoritative schema for fresh deploys — NOT the local DB state.
 
 ## Relevant Files
+- `backend/app/services/company_deletion.py`: Orchestrates cascading hard/soft delete across all 15+ related entity types
 - `backend/app/core/rbac.py`: Canonical ACCESS_MATRIX + derived ROLE_MODULE_ACCESS
 - `backend/app/core/deps.py`: `require_module` imports from rbac.py, uses `selectinload(User.role_rel)`
 - `backend/app/api/v1/quality.py`: Paginated approvals (previously N+1, now batch-fetched LabReports)

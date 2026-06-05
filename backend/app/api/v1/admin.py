@@ -15,6 +15,8 @@ from app.db.session import get_db
 from app.core.deps import get_current_user, get_mill_scope, log_audit
 from app.models.user import User, Role
 from app.models.masters import Company, CompanyModule, Mill, MillSettings
+from app.models.deletion_log import DeletionLog
+from app.services.deletion_service import CompanyDeletionService
 from sqlalchemy import update as sa_update
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -237,7 +239,7 @@ async def create_user(
 async def list_all_users(
     company_id: Optional[str] = None,
     page: int = 1,
-    page_size: int = 50,
+    page_size: int = 500,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -700,3 +702,63 @@ async def admin_dashboard(
     except Exception as e:
         logger.error(f"admin_dashboard error: {e}", exc_info=True)
         raise HTTPException(500, f"Dashboard error: {str(e)[:200]}")
+
+
+@router.get("/admin/companies/{company_id}/deletion-count")
+async def get_deletion_count(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can view deletion counts")
+    try:
+        svc = CompanyDeletionService(db, current_user)
+        counts = await svc.count_all(company_id)
+        return {"company_id": company_id, "affected_records": counts}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"deletion count error: {e}")
+        raise HTTPException(500, "Failed to count affected records")
+
+
+@router.delete("/admin/companies/{company_id}")
+async def delete_company(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can delete companies")
+
+    company_q = await db.execute(select(Company).where(Company.id == company_id))
+    company = company_q.scalar_one_or_none()
+    if not company:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+
+    svc = CompanyDeletionService(db, current_user)
+    result = await svc.hard_delete(company_id)
+    return result
+
+
+@router.post("/admin/companies/{company_id}/archive")
+async def archive_company(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can archive companies")
+
+    company_q = await db.execute(select(Company).where(Company.id == company_id))
+    company = company_q.scalar_one_or_none()
+    if not company:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+
+    svc = CompanyDeletionService(db, current_user)
+    result = await svc.archive(company_id)
+    return result

@@ -13,6 +13,7 @@ from app.models.hr import Employee, Attendance, Leave, EmployeeShift, MonthlyPay
 from app.models.payroll import PayrollMonth, PayslipEntry
 from app.models.accounts import Invoice, Payment, GSTEntry
 from app.models.attachment import DocumentAttachment
+from app.models.deletion_log import DeletionLog
 from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician
 from app.models.masters import Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route, CompanyModule, MillSettings, DepartmentType, VehicleType
 from app.models.stock import StockLedger, StockBalance, SalesOrder, SalesOrderLine, StockTransfer
@@ -33,6 +34,7 @@ __all__ = [
     "PayrollMonth", "PayslipEntry",
     "Invoice", "Payment", "GSTEntry",
     "DocumentAttachment",
+    "DeletionLog",
     "MaintenanceLog", "MaintenanceSchedule", "Technician",
     "Company", "Mill", "Department", "YarnCount", "Customer", "MasterVehicle", "Route",
     "CompanyModule", "MillSettings",

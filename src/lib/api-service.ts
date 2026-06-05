@@ -245,7 +245,7 @@ export const qrApi = {
 
 // Users
 export const usersApi = {
-  list: () => api.get("/users").then((r) => extractList(r.data)),
+  list: (params?: any) => api.get("/users", { params: params ?? { page: 1, page_size: 100 } }).then((r) => extractList(r.data)),
   create: (data: any) => api.post("/users", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/users/${id}`, data).then((r) => r.data),
   deactivate: (id: string) => api.patch(`/users/${id}/deactivate`).then((r) => r.data),
@@ -350,9 +350,9 @@ export const mastersApi = {
   updateCompany: (id: string, data: any) =>
     api.patch(`/masters/companies/${id}`, data).then((r) => r.data),
 
-  getMills: (companyId?: string, page = 1, pageSize = 20) =>
+  getMills: (companyId?: string, page = 1, pageSize = 500) =>
     api
-      .get("/masters/mills", { params: { company_id: companyId, page, page_size: pageSize } })
+      .get("/masters/mills", { params: { company_id: companyId, page, page_size: pageSize, include_inactive: true } })
       .then((r) => extractList(r.data)),
   getMill: (id: string) => api.get(`/masters/mills/${id}`).then((r) => r.data),
   createMill: (data: any) => api.post("/masters/mills", data).then((r) => r.data),
