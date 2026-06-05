@@ -223,8 +223,7 @@ function ColumnConfigPage() {
 
   return (
     <>
-      <AccessGuard module="column_config">
-        <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           <div className="flex items-center gap-4 mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
             <div>
               <label className="text-xs font-semibold text-gray-500 mb-1 block uppercase tracking-wide">
