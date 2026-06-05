@@ -188,12 +188,13 @@ function AdminUsersPage() {
     return { companyUsers, companyActive, millCounts };
   }, [allUsers, millsData]);
 
-  const filteredMills = useMemo(() => {
-    if (!form.company_id) return [];
-    return companies
-      .filter((c: any) => c.id === form.company_id)
-      .flatMap((c: any) => c.mills ?? []);
-  }, [companies, form.company_id]);
+  const formMillsQ = useQuery({
+    queryKey: ["masters", "mills", "form", form.company_id],
+    queryFn: () => mastersApi.getMills(form.company_id),
+    enabled: !!form.company_id,
+    staleTime: 30_000,
+  });
+  const formMills: any[] = formMillsQ.data ?? [];
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.post("/admin/users", data).then((r) => r.data),
@@ -251,6 +252,15 @@ function AdminUsersPage() {
     if (!pw.passed) {
       toast.error("Password must be 8+ chars with uppercase, lowercase, digit, and special");
       return;
+    }
+    const c = companies.find((c: any) => c.id === form.company_id);
+    if (c) {
+      const current = companyStats.companyUsers[c.id] ?? 0;
+      const max = c.max_users ?? 50;
+      if (current >= max) {
+        toast.error(`User limit reached for ${c.name}. Current: ${current}/${max}. Upgrade plan or increase limit first.`);
+        return;
+      }
     }
     createMutation.mutate({
       name: form.name, email: form.email, password: form.password,
@@ -375,11 +385,58 @@ function AdminUsersPage() {
                   <Select value={form.company_id} onValueChange={(v) => setForm({ ...form, company_id: v, mill_id: "" })}>
                     <SelectTrigger id="company_id"><SelectValue placeholder="Select company" /></SelectTrigger>
                     <SelectContent>
-                      {companies.filter((c: any) => c?.id).map((c: any) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                      ))}
+                      {companies.filter((c: any) => c?.id).map((c: any) => {
+                        const cid = c.id;
+                        const current = companyStats.companyUsers[cid] ?? 0;
+                        const max = c.max_users ?? 50;
+                        const pct = max > 0 ? (current / max) * 100 : 0;
+                        const overLimit = current >= max;
+                        return (
+                          <SelectItem key={c.id} value={c.id}>
+                            <div className="flex items-center justify-between w-full gap-4">
+                              <span>{c.name}</span>
+                              <span className={cn(
+                                "text-xs whitespace-nowrap",
+                                pct >= 100 ? "text-red-500 font-semibold" : pct >= 90 ? "text-amber-500" : "text-muted-foreground"
+                              )}>
+                                {current}/{max}
+                                {pct >= 100 ? " ⛔" : pct >= 90 ? " ⚠" : ""}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
+                  {form.company_id && (() => {
+                    const c = companies.find((c: any) => c.id === form.company_id);
+                    if (!c) return null;
+                    const current = companyStats.companyUsers[c.id] ?? 0;
+                    const max = c.max_users ?? 50;
+                    const pct = max > 0 ? (current / max) * 100 : 0;
+                    const overLimit = current >= max;
+                    return (
+                      <div className={cn(
+                        "mt-1 p-2 rounded text-xs border",
+                        pct >= 100
+                          ? "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800"
+                          : pct >= 90
+                          ? "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800"
+                          : "bg-muted/30 border-transparent text-muted-foreground"
+                      )}>
+                        <div className="flex items-center justify-between">
+                          <span>User Limit</span>
+                          <span className="font-semibold">{current} / {max}</span>
+                        </div>
+                        {pct >= 100 && (
+                          <p className="text-[10px] mt-1">⛔ User limit reached. Upgrade plan or increase limit before creating more users.</p>
+                        )}
+                        {pct >= 90 && pct < 100 && (
+                          <p className="text-[10px] mt-1">⚠ Approaching user limit ({Math.round(pct)}% used).</p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="mill_id">Mill (optional)</Label>
@@ -388,7 +445,7 @@ function AdminUsersPage() {
                       <SelectValue placeholder={form.company_id ? "Select mill" : "Select company first"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {filteredMills.filter((m: any) => m?.id).map((m: any) => (
+                      {formMills.filter((m: any) => m?.id).map((m: any) => (
                         <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -463,6 +520,15 @@ function AdminUsersPage() {
                           <span className="flex justify-between">
                             <span>Plan</span>
                             <span className="font-semibold capitalize">{c.plan ?? c.subscription_plan ?? "starter"}</span>
+                          </span>
+                          <span className="flex justify-between">
+                            <span>User Limit</span>
+                            <span className={cn(
+                              "font-semibold",
+                              (() => { const pct = (c.max_users ?? 50) > 0 ? ((uCount) / (c.max_users ?? 50)) * 100 : 0; return pct >= 100 ? "text-red-500" : pct >= 90 ? "text-amber-500" : "text-muted-foreground"; })()
+                            )}>
+                              {uCount} / {c.max_users ?? 50}
+                            </span>
                           </span>
                         </div>
                       )}

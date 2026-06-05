@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Factory, Users, SlidersHorizontal, CreditCard, Receipt, Archive, FileText, Blocks } from "lucide-react";
+import { Building2, Factory, SlidersHorizontal, CreditCard, Receipt, Archive, FileText, Blocks, Shield, Users } from "lucide-react";
 
 export const Route = createFileRoute("/_app/admin")({
   head: () => ({ meta: [{ title: "Admin — SpinFlow ERP" }] }),
@@ -13,7 +13,8 @@ export const Route = createFileRoute("/_app/admin")({
 const SECTIONS = [
   { id: "companies", label: "Companies", icon: Building2, desc: "Manage companies, plans, and modules", color: "bg-blue-50 text-blue-600" },
   { id: "mills", label: "Mills", icon: Factory, desc: "View and manage mills across companies", color: "bg-indigo-50 text-indigo-600" },
-  { id: "users", label: "Users", icon: Users, desc: "Create, manage, and reset passwords", color: "bg-green-50 text-green-600" },
+  { id: "users", label: "Users", icon: Users, desc: "Provision, manage, and enforce user limits", color: "bg-green-50 text-green-600" },
+  { id: "organizations", label: "Organizations", icon: Shield, desc: "Company overview, usage, and limits", color: "bg-teal-50 text-teal-600" },
   { id: "modules", label: "Module Manager", icon: Blocks, desc: "Toggle module access per company", color: "bg-purple-50 text-purple-600" },
   { id: "limits", label: "User Limits", icon: SlidersHorizontal, desc: "Monitor and adjust user limits", color: "bg-amber-50 text-amber-600" },
   { id: "audit", label: "Audit Logs", icon: FileText, desc: "View audit trail across all companies", color: "bg-rose-50 text-rose-600" },

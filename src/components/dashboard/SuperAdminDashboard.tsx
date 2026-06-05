@@ -77,7 +77,7 @@ export function SuperAdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <button onClick={() => navigate({ to: "/admin", search: { tab: "companies", action: "add" } as any })}
+        <button onClick={() => navigate({ to: "/admin/companies" })}
           className="flex items-center gap-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-4 transition-colors w-full text-left">
           <Plus className="w-5 h-5 shrink-0" />
           <div>
@@ -85,7 +85,7 @@ export function SuperAdminDashboard() {
             <div className="text-xs text-blue-200">Onboard a new mill customer</div>
           </div>
         </button>
-        <button onClick={() => navigate({ to: "/admin", search: { tab: "modules" } as any })}
+        <button onClick={() => navigate({ to: "/admin/modules" })}
           className="flex items-center gap-3 bg-white dark:bg-slate-800 hover:bg-gray-50 border border-gray-200 dark:border-slate-700 rounded-xl px-5 py-4 transition-colors w-full text-left">
           <Settings className="w-5 h-5 text-gray-500 shrink-0" />
           <div>
@@ -93,7 +93,7 @@ export function SuperAdminDashboard() {
             <div className="text-xs text-gray-500">Configure company access</div>
           </div>
         </button>
-        <button onClick={() => navigate({ to: "/admin", search: { tab: "users" } as any })}
+        <button onClick={() => navigate({ to: "/admin/users" })}
           className="flex items-center gap-3 bg-white dark:bg-slate-800 hover:bg-gray-50 border border-gray-200 dark:border-slate-700 rounded-xl px-5 py-4 transition-colors w-full text-left">
           <Users className="w-5 h-5 text-gray-500 shrink-0" />
           <div>
@@ -106,7 +106,7 @@ export function SuperAdminDashboard() {
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-slate-300">Active Companies</h3>
-          <button onClick={() => navigate({ to: "/admin", search: { tab: "companies" } as any })}
+          <button onClick={() => navigate({ to: "/admin/companies" })}
             className="text-xs text-blue-600 hover:underline">
             View all →
           </button>
@@ -130,7 +130,7 @@ export function SuperAdminDashboard() {
                   <div className="text-xs text-gray-400 mt-0.5">Code: {company.code}</div>
                 </div>
                 <button
-                  onClick={() => navigate({ to: "/admin", search: { tab: "companies", company: company.id } as any })}
+                  onClick={() => navigate({ to: "/admin/companies" })}
                   className="text-xs text-blue-600 hover:underline font-medium"
                 >
                   Manage →

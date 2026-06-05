@@ -318,7 +318,7 @@ function SuperAdminBillingView() {
                                   </div>
                                 ))
                               }
-                              <a href="/admin?tab=modules" className="block mt-2 text-[11px] text-blue-600 hover:underline border-t border-[#f1f5f9] pt-1.5">
+                              <a href="/admin/modules" className="block mt-2 text-[11px] text-blue-600 hover:underline border-t border-[#f1f5f9] pt-1.5">
                                 Edit in Admin Panel →
                               </a>
                             </div>

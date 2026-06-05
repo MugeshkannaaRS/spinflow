@@ -36,6 +36,7 @@ import { Route as AppAccountsRouteImport } from './routes/_app.accounts'
 import { Route as AppCompanyBillingRouteImport } from './routes/_app.company.billing'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
 import { Route as AppAdminPlansRouteImport } from './routes/_app.admin.plans'
+import { Route as AppAdminOrganizationsRouteImport } from './routes/_app.admin.organizations'
 import { Route as AppAdminModulesRouteImport } from './routes/_app.admin.modules'
 import { Route as AppAdminMillsRouteImport } from './routes/_app.admin.mills'
 import { Route as AppAdminLimitsRouteImport } from './routes/_app.admin.limits'
@@ -179,6 +180,11 @@ const AppAdminPlansRoute = AppAdminPlansRouteImport.update({
   path: '/plans',
   getParentRoute: () => AppAdminRoute,
 } as any)
+const AppAdminOrganizationsRoute = AppAdminOrganizationsRouteImport.update({
+  id: '/organizations',
+  path: '/organizations',
+  getParentRoute: () => AppAdminRoute,
+} as any)
 const AppAdminModulesRoute = AppAdminModulesRouteImport.update({
   id: '/modules',
   path: '/modules',
@@ -252,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/admin/limits': typeof AppAdminLimitsRoute
   '/admin/mills': typeof AppAdminMillsRoute
   '/admin/modules': typeof AppAdminModulesRoute
+  '/admin/organizations': typeof AppAdminOrganizationsRoute
   '/admin/plans': typeof AppAdminPlansRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/company/billing': typeof AppCompanyBillingRoute
@@ -288,6 +295,7 @@ export interface FileRoutesByTo {
   '/admin/limits': typeof AppAdminLimitsRoute
   '/admin/mills': typeof AppAdminMillsRoute
   '/admin/modules': typeof AppAdminModulesRoute
+  '/admin/organizations': typeof AppAdminOrganizationsRoute
   '/admin/plans': typeof AppAdminPlansRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/company/billing': typeof AppCompanyBillingRoute
@@ -326,6 +334,7 @@ export interface FileRoutesById {
   '/_app/admin/limits': typeof AppAdminLimitsRoute
   '/_app/admin/mills': typeof AppAdminMillsRoute
   '/_app/admin/modules': typeof AppAdminModulesRoute
+  '/_app/admin/organizations': typeof AppAdminOrganizationsRoute
   '/_app/admin/plans': typeof AppAdminPlansRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/company/billing': typeof AppCompanyBillingRoute
@@ -364,6 +373,7 @@ export interface FileRouteTypes {
     | '/admin/limits'
     | '/admin/mills'
     | '/admin/modules'
+    | '/admin/organizations'
     | '/admin/plans'
     | '/admin/users'
     | '/company/billing'
@@ -400,6 +410,7 @@ export interface FileRouteTypes {
     | '/admin/limits'
     | '/admin/mills'
     | '/admin/modules'
+    | '/admin/organizations'
     | '/admin/plans'
     | '/admin/users'
     | '/company/billing'
@@ -437,6 +448,7 @@ export interface FileRouteTypes {
     | '/_app/admin/limits'
     | '/_app/admin/mills'
     | '/_app/admin/modules'
+    | '/_app/admin/organizations'
     | '/_app/admin/plans'
     | '/_app/admin/users'
     | '/_app/company/billing'
@@ -640,6 +652,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminPlansRouteImport
       parentRoute: typeof AppAdminRoute
     }
+    '/_app/admin/organizations': {
+      id: '/_app/admin/organizations'
+      path: '/organizations'
+      fullPath: '/admin/organizations'
+      preLoaderRoute: typeof AppAdminOrganizationsRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
     '/_app/admin/modules': {
       id: '/_app/admin/modules'
       path: '/modules'
@@ -708,6 +727,7 @@ interface AppAdminRouteChildren {
   AppAdminLimitsRoute: typeof AppAdminLimitsRoute
   AppAdminMillsRoute: typeof AppAdminMillsRoute
   AppAdminModulesRoute: typeof AppAdminModulesRoute
+  AppAdminOrganizationsRoute: typeof AppAdminOrganizationsRoute
   AppAdminPlansRoute: typeof AppAdminPlansRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
 }
@@ -721,6 +741,7 @@ const AppAdminRouteChildren: AppAdminRouteChildren = {
   AppAdminLimitsRoute: AppAdminLimitsRoute,
   AppAdminMillsRoute: AppAdminMillsRoute,
   AppAdminModulesRoute: AppAdminModulesRoute,
+  AppAdminOrganizationsRoute: AppAdminOrganizationsRoute,
   AppAdminPlansRoute: AppAdminPlansRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
 }
