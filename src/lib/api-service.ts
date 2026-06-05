@@ -500,6 +500,20 @@ export const adminApi = {
     api.put(`/admin/users/${userId}/modules`, { modules }).then((r) => r.data),
   suspendCompany: (companyId: string, status: "active" | "suspended") =>
     api.post(`/admin/companies/${companyId}/status`, { status }).then((r) => r.data),
+  getCompanyStats: () =>
+    api.get("/admin/company-stats").then(r => r.data),
+  getGlobalStats: () =>
+    api.get("/admin/company-stats").then(r => {
+      const stats: any[] = r.data ?? [];
+      return {
+        total_companies: stats.length,
+        active_companies: stats.filter((s: any) => true).length,
+        total_mills: stats.reduce((a: number, s: any) => a + (s.mill_count ?? 0), 0),
+        total_users: stats.reduce((a: number, s: any) => a + (s.user_count ?? 0), 0),
+        active_users: stats.reduce((a: number, s: any) => a + (s.active_user_count ?? 0), 0),
+        company_stats: stats,
+      };
+    }),
 };
 
 export const uploadApi = {

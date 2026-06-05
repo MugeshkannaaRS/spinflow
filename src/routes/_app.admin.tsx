@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { mastersApi } from "@/lib/api-service";
+import { adminApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Factory, Users, SlidersHorizontal, CreditCard, Receipt, Archive, FileText, Blocks } from "lucide-react";
@@ -29,16 +29,10 @@ function AdminPage() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isChildRoute = pathname !== "/admin";
 
-  const { data: companiesData } = useQuery({
-    queryKey: ["masters", "companies", "all"],
-    queryFn: () => mastersApi.getCompanies(1, 100, true),
-    staleTime: 60_000,
-  });
-
-  const { data: millsData } = useQuery({
-    queryKey: ["masters", "mills"],
-    queryFn: () => mastersApi.getMills(),
-    staleTime: 60_000,
+  const statsQ = useQuery({
+    queryKey: ["admin-global-stats"],
+    queryFn: () => adminApi.getGlobalStats(),
+    staleTime: 30_000,
   });
 
   if (!user || user.role !== "SUPER_ADMIN") {
@@ -53,9 +47,7 @@ function AdminPage() {
     return <Outlet />;
   }
 
-  const companies = (companiesData ?? []) as any[];
-  const mills = (millsData ?? []) as any[];
-  const activeCompanies = companies.filter((c: any) => c.is_active !== false);
+  const stats = statsQ.data;
 
   return (
     <div className="p-6 space-y-6">
@@ -67,18 +59,10 @@ function AdminPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Active Companies</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{activeCompanies.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
             <CardTitle className="text-sm text-muted-foreground">Total Companies</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{companies.length}</div>
+            <div className="text-2xl font-bold">{stats?.total_companies ?? "..."}</div>
           </CardContent>
         </Card>
         <Card>
@@ -86,7 +70,15 @@ function AdminPage() {
             <CardTitle className="text-sm text-muted-foreground">Total Mills</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mills.length}</div>
+            <div className="text-2xl font-bold">{stats?.total_mills ?? "..."}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-muted-foreground">Total Users</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats?.total_users ?? "..."}</div>
           </CardContent>
         </Card>
       </div>

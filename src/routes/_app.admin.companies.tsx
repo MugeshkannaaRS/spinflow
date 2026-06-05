@@ -171,43 +171,31 @@ function CompaniesPage() {
     staleTime: 60_000,
     retry: 1,
   });
-  const usersQ = useQuery({
-    queryKey: ["admin-system-users"],
-    queryFn: () => api.get("/admin/users", { params: { page: 1, page_size: 500 } }).then(r => {
-      const d = r.data;
-      return d?.items ?? d?.data ?? (Array.isArray(d) ? d : []);
-    }),
-    staleTime: 60_000,
-    retry: 1,
-  });
-  const millsQ = useQuery({
-    queryKey: ["masters", "mills"],
-    queryFn: () => mastersApi.getMills(),
-    staleTime: 60_000,
+  const statsQ = useQuery({
+    queryKey: ["admin-company-stats"],
+    queryFn: () => adminApi.getCompanyStats(),
+    staleTime: 30_000,
     retry: 1,
   });
 
   const companiesData = (companiesQ.data ?? []) as Company[];
-  const usersData = (usersQ.data ?? []) as any[];
-  const millsData = (millsQ.data ?? []) as any[];
+  const companyStats: any[] = statsQ.data ?? [];
 
   const companyUserCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const u of usersData) {
-      const id = u.company_id ?? "";
-      counts[id] = (counts[id] ?? 0) + 1;
+    for (const s of companyStats) {
+      counts[s.company_id] = (s.user_count ?? 0);
     }
     return counts;
-  }, [usersData]);
+  }, [companyStats]);
 
   const companyMillCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const m of millsData) {
-      const id = m.company_id ?? "";
-      counts[id] = (counts[id] ?? 0) + 1;
+    for (const s of companyStats) {
+      counts[s.company_id] = (s.mill_count ?? 0);
     }
     return counts;
-  }, [millsData]);
+  }, [companyStats]);
 
   const activeCompanies = companiesData.filter((c: any) => c.is_active !== false);
 

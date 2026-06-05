@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { mastersApi } from "@/lib/api-service";
+import { mastersApi, adminApi } from "@/lib/api-service";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DataTable } from "@/components/ui/DataTable";
@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Pencil } from "lucide-react";
 import { toast } from "sonner";
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Company } from "@/lib/types";
 
@@ -53,9 +53,7 @@ function EditLimitDialog({ company, onDone }: { company: Company | null; onDone:
       await api.patch(`/admin/companies/${company.id}/limits`, { max_users: newLimit });
       toast.success(`Limit updated to ${newLimit} for ${company.name}`);
       qc.invalidateQueries({ queryKey: ["masters", "companies", "all"] });
-      qc.invalidateQueries({ queryKey: ["admin-system-users"] });
-      qc.invalidateQueries({ queryKey: ["admin-users"] });
-      qc.invalidateQueries({ queryKey: ["masters", "mills"] });
+      qc.invalidateQueries({ queryKey: ["admin-company-stats"] });
       setOpen(false);
       onDone();
     } catch (err: any) {
@@ -77,43 +75,28 @@ function EditLimitDialog({ company, onDone }: { company: Company | null; onDone:
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Edit User Limit — {company?.name}</DialogTitle>
-          <DialogDescription>
-            Set the maximum number of users allowed for this company.
-          </DialogDescription>
+          <DialogDescription>Set the maximum number of users allowed for this company.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Current Limit
-            </label>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Current Limit</label>
             <p className="text-lg font-bold mt-1">{company?.max_users ?? 10}</p>
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              New Limit
-            </label>
-            <input
-              type="number"
-              min={1}
-              max={500}
-              value={newLimit}
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">New Limit</label>
+            <input type="number" min={1} max={500} value={newLimit}
               onChange={(e) => setNewLimit(parseInt(e.target.value) || 1)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white dark:bg-slate-800 dark:border-slate-700"
-            />
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white dark:bg-slate-800 dark:border-slate-700" />
             <p className="text-xs text-muted-foreground">1–500 users</p>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">Plan tier:</span>
-            <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold", tier.color)}>
-              {tier.label}
-            </span>
+            <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold", tier.color)}>{tier.label}</span>
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "Save"}
-          </Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -129,31 +112,19 @@ function LimitsPage() {
     queryFn: () => mastersApi.getCompanies(1, 100, true),
     staleTime: 60_000,
   });
-  const usersQ = useQuery({
-    queryKey: ["admin-users"],
-    queryFn: () => api.get("/admin/users", { params: { page: 1, page_size: 500 } }).then((r) => r.data),
-    staleTime: 60_000,
-  });
-  const millsQ = useQuery({
-    queryKey: ["masters", "mills"],
-    queryFn: () => mastersApi.getMills(),
-    staleTime: 60_000,
+  const statsQ = useQuery({
+    queryKey: ["admin-company-stats"],
+    queryFn: () => adminApi.getCompanyStats(),
+    staleTime: 30_000,
   });
 
   const companies = (companiesQ.data ?? []) as Company[];
-  const users = (usersQ.data?.items ?? []) as any[];
-  const mills = (millsQ.data ?? []) as any[];
+  const companyStats: any[] = statsQ.data ?? [];
 
-  const companyUserCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const u of users) {
-      const id = u.company_id ?? "";
-      counts[id] = (counts[id] ?? 0) + 1;
-    }
-    return counts;
-  }, [users]);
-
+  const statsMap = new Map(companyStats.map((s: any) => [s.company_id, s]));
   const activeCompanies = companies.filter((c: any) => c.is_active !== false);
+  const totalActiveUsers = companyStats.reduce((a: number, s: any) => a + (s.active_user_count ?? 0), 0);
+  const totalMills = companyStats.reduce((a: number, s: any) => a + (s.mill_count ?? 0), 0);
 
   return (
     <div className="p-6 space-y-6">
@@ -176,7 +147,7 @@ function LimitsPage() {
             <CardTitle className="text-sm text-muted-foreground">Total Active Users</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{users.filter((u: any) => u.is_active).length}</div>
+            <div className="text-2xl font-bold">{totalActiveUsers}</div>
           </CardContent>
         </Card>
         <Card>
@@ -184,7 +155,7 @@ function LimitsPage() {
             <CardTitle className="text-sm text-muted-foreground">Total Mills</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{mills.length}</div>
+            <div className="text-2xl font-bold">{totalMills}</div>
           </CardContent>
         </Card>
       </div>
@@ -198,24 +169,19 @@ function LimitsPage() {
             tableId="admin_limits"
             columns={[
               { key: "name", label: "Company Name", render: (c: any) => <span className="font-medium">{c.name}</span> },
-              { key: "_current_users", label: "Current Users", render: (c: any) => companyUserCounts[c.id] ?? 0 },
+              { key: "_current_users", label: "Current Users", render: (c: any) => statsMap.get(c.id)?.user_count ?? 0 },
               { key: "max_users", label: "Max Users", render: (c: any) => c.max_users ?? 10 },
               {
                 key: "_usage",
                 label: "Usage",
                 render: (c: any) => {
-                  const current = companyUserCounts[c.id] ?? 0;
+                  const current = statsMap.get(c.id)?.user_count ?? 0;
                   const max = c.max_users ?? 10;
                   const pct = max > 0 ? Math.min(Math.round((current / max) * 100), 100) : 0;
                   return (
                     <div className="flex items-center gap-2 min-w-[140px]">
                       <Progress value={pct} className={cn("h-2", getUsageColor(pct))} />
-                      <span className={cn(
-                        "text-xs font-semibold whitespace-nowrap min-w-[3ch]",
-                        pct >= 90 ? "text-red-600" : pct >= 70 ? "text-amber-600" : "text-emerald-600"
-                      )}>
-                        {pct}%
-                      </span>
+                      <span className={cn("text-xs font-semibold whitespace-nowrap min-w-[3ch]", pct >= 90 ? "text-red-600" : pct >= 70 ? "text-amber-600" : "text-emerald-600")}>{pct}%</span>
                     </div>
                   );
                 },
@@ -227,8 +193,7 @@ function LimitsPage() {
             actions={(item: any) => (
               <EditLimitDialog company={item} onDone={() => {
                 qc.invalidateQueries({ queryKey: ["masters", "companies", "all"] });
-                qc.invalidateQueries({ queryKey: ["admin-users"] });
-                qc.invalidateQueries({ queryKey: ["masters", "mills"] });
+                qc.invalidateQueries({ queryKey: ["admin-company-stats"] });
                 setEditCompany(null);
               }} />
             )}

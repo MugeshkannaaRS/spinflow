@@ -17,6 +17,7 @@ from app.models.user import User, Role
 from app.models.masters import Company, CompanyModule, Mill, MillSettings
 from app.models.deletion_log import DeletionLog
 from app.services.deletion_service import CompanyDeletionService
+from app.services.company_stats import CompanyStatsService
 from sqlalchemy import update as sa_update
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -742,6 +743,26 @@ async def delete_company(
     svc = CompanyDeletionService(db, current_user)
     result = await svc.hard_delete(company_id)
     return result
+
+
+@router.get("/admin/company-stats")
+async def get_company_stats(
+    company_id: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can view company stats")
+    try:
+        svc = CompanyStatsService(db)
+        if company_id:
+            stats = await svc.get_company_stats(company_id)
+            return stats[0] if stats else None
+        return await svc.get_company_stats()
+    except Exception as e:
+        logger.error(f"company stats error: {e}")
+        return []
 
 
 @router.post("/admin/companies/{company_id}/archive")
