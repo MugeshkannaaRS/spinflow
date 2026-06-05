@@ -48,6 +48,11 @@ import {
   EyeOff,
   CreditCard,
   Receipt,
+  Factory,
+  Archive,
+  Building2,
+  Search,
+  SlidersHorizontal,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { fmtDate } from "@/lib/format";
@@ -121,6 +126,7 @@ function AdminPage() {
   const handleSuspend = async (company: Company) => {
     try {
       const targetStatus = company.is_active ? "suspended" : "active";
+      console.log("[suspend] company.id:", company.id, "targetStatus:", targetStatus);
       const res = await adminApi.suspendCompany(company.id, targetStatus);
       toast.success(`${company.name} has been ${res.status}`);
       setSuspendCompany(null);
@@ -228,10 +234,12 @@ function AdminPage() {
       <div className="p-6">
           <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="flex-wrap h-auto">
-              <TabsTrigger value="companies">Companies</TabsTrigger>
-              <TabsTrigger value="modules">Module Manager</TabsTrigger>
+              <TabsTrigger value="companies"><Building2 className="size-3.5 mr-1 inline" />Companies</TabsTrigger>
+              <TabsTrigger value="mills"><Factory className="size-3.5 mr-1 inline" />Mills</TabsTrigger>
+              <TabsTrigger value="modules"><SlidersHorizontal className="size-3.5 mr-1 inline" />Module Manager</TabsTrigger>
               <TabsTrigger value="limits">User Limits</TabsTrigger>
               <TabsTrigger value="users">Users</TabsTrigger>
+              <TabsTrigger value="archive"><Archive className="size-3.5 mr-1 inline" />Archive</TabsTrigger>
               <TabsTrigger value="audit">Audit</TabsTrigger>
               <TabsTrigger value="billing"><CreditCard className="size-3.5 mr-1 inline" />Billing</TabsTrigger>
               <TabsTrigger value="plans"><Receipt className="size-3.5 mr-1 inline" />Plans</TabsTrigger>
@@ -347,6 +355,44 @@ function AdminPage() {
                   </AlertDialogContent>
                 </AlertDialog>
                 <AddCompanyDialog open={addCompanyOpen} onOpenChange={setAddCompanyOpen} />
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="mills">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">All Mills ({millsData.length})</CardTitle>
+                  <Button size="sm" onClick={() => {}}>
+                    <Plus className="size-4 mr-1" /> Add Mill
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <DataTable
+                    tableId="admin_mills"
+                    columns={[
+                      { key: "name", label: "Mill Name", render: (m: any) => <span className="font-medium">{m.name}</span> },
+                      { key: "code", label: "Code" },
+                      { key: "_company", label: "Company", render: (m: any) => companiesData.find((c: any) => c.id === m.company_id)?.name ?? "—" },
+                      { key: "city", label: "City" },
+                      { key: "state", label: "State" },
+                      {
+                        key: "is_active",
+                        label: "Status",
+                        render: (m: any) => (
+                          <span className={m.is_active
+                            ? "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700"
+                            : "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700"
+                          }>
+                            {m.is_active ? "Active" : "Inactive"}
+                          </span>
+                        ),
+                      },
+                    ] satisfies ColDef[]}
+                    data={millsData}
+                    rowKey={(m: any) => m.id}
+                    exportFilename="admin_mills"
+                  />
+                </CardContent>
               </Card>
             </TabsContent>
 
@@ -523,6 +569,51 @@ function AdminPage() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+            </TabsContent>
+
+            <TabsContent value="archive">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">Archived Companies ({companiesData.filter((c: any) => !c.is_active).length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {companiesData.filter((c: any) => !c.is_active).length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Archive className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p className="font-medium">No archived companies</p>
+                      <p className="text-sm mt-1">Suspended companies will appear here.</p>
+                    </div>
+                  ) : (
+                    <DataTable
+                      tableId="admin_archive"
+                      columns={[
+                        { key: "name", label: "Company Name", render: (c: any) => <span className="font-medium">{c.name}</span> },
+                        { key: "code", label: "Code" },
+                        { key: "gstin", label: "GSTIN", render: (c: any) => c.gstin || "—" },
+                        { key: "_mills", label: "Mills", render: (c: any) => companyMillCounts[c.id] ?? 0 },
+                        {
+                          key: "suspended_at",
+                          label: "Suspended Since",
+                          render: (c: any) => c.updated_at ? new Date(c.updated_at).toLocaleDateString() : "—",
+                        },
+                      ] satisfies ColDef[]}
+                      data={companiesData.filter((c: any) => !c.is_active)}
+                      rowKey={(c: any) => c.id}
+                      exportFilename="archived_companies"
+                      actions={(item: any) => (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-green-600 hover:bg-green-50 border-green-200"
+                          onClick={() => setSuspendCompany(item)}
+                        >
+                          <CheckCircle className="size-3.5 mr-1" /> Activate
+                        </Button>
+                      )}
+                    />
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="audit">
@@ -1254,7 +1345,11 @@ function CreateUserDialog({ open, onOpenChange, companies, onDone }: {
   companies: any[]; onDone: () => void;
 }) {
   const qc = useQueryClient();
-  const [form, setForm] = useState({ company_id: "", mill_id: "", role_code: "MILL_OWNER", full_name: "", email: "", password: "", phone: "" });
+  const currentUser = useAuth((s) => s.user);
+  const availableRoles = currentUser?.role === "MILL_OWNER"
+    ? ROLES_FOR_CREATE.filter((r) => r !== "MILL_OWNER" && r !== "SUPER_ADMIN")
+    : ROLES_FOR_CREATE;
+  const [form, setForm] = useState({ company_id: "", mill_id: "", role_code: availableRoles[0] ?? "MILL_OWNER", full_name: "", email: "", password: "", phone: "" });
   const [loading, setLoading] = useState(false);
   const [showCredentials, setShowCredentials] = useState(false);
   const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string; role: string; mill?: string } | null>(null);
@@ -1361,7 +1456,7 @@ function CreateUserDialog({ open, onOpenChange, companies, onDone }: {
                 onChange={e => setForm({ ...form, role_code: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white dark:bg-slate-800"
               >
-                {ROLES_FOR_CREATE.map(r => (
+                {availableRoles.map(r => (
                   <option key={r} value={r}>{r.replace(/_/g, " ")}</option>
                 ))}
               </select>

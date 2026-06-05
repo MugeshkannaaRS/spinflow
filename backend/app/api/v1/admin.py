@@ -418,6 +418,7 @@ async def update_company_status(
     current_user: User = Depends(get_current_user),
 ):
     """Update company status — single source of truth is companies.is_active."""
+    print(f"DEBUG [update_company_status] company_id={company_id} body={body}")
     role_code = current_user.role_rel.code if current_user.role_rel else ""
     if role_code != "SUPER_ADMIN":
         raise HTTPException(403, "Super Admin only")
@@ -433,6 +434,7 @@ async def update_company_status(
         .returning(Company.id, Company.name, Company.is_active)
     )
     row = result.fetchone()
+    print(f"DEBUG [update_company_status] row={row}")
     if not row:
         raise HTTPException(404, "Company not found")
 
