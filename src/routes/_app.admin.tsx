@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Factory, SlidersHorizontal, CreditCard, Receipt, Archive, FileText, Blocks, Shield, Users } from "lucide-react";
+import { Building2, Factory, SlidersHorizontal, CreditCard, Archive, FileText, Blocks, Shield, Users } from "lucide-react";
 
 export const Route = createFileRoute("/_app/admin")({
   head: () => ({ meta: [{ title: "Admin — SpinFlow ERP" }] }),
@@ -18,8 +18,7 @@ const SECTIONS = [
   { id: "modules", label: "Module Manager", icon: Blocks, desc: "Toggle module access per company", color: "bg-purple-50 text-purple-600" },
   { id: "limits", label: "User Limits", icon: SlidersHorizontal, desc: "Monitor and adjust user limits", color: "bg-amber-50 text-amber-600" },
   { id: "audit", label: "Audit Logs", icon: FileText, desc: "View audit trail across all companies", color: "bg-rose-50 text-rose-600" },
-  { id: "billing", label: "Billing", icon: CreditCard, desc: "Revenue metrics and subscription data", color: "bg-teal-50 text-teal-600" },
-  { id: "plans", label: "Plans", icon: Receipt, desc: "Manage subscription plans and pricing", color: "bg-cyan-50 text-cyan-600" },
+  { id: "billing", label: "Billing", icon: CreditCard, desc: "Subscriptions, invoicing, plans, and revenue analytics", color: "bg-teal-50 text-teal-600" },
   { id: "archive", label: "Archive", icon: Archive, desc: "View and restore suspended companies", color: "bg-gray-50 text-gray-600" },
   { id: "column-config", label: "Column Config", icon: SlidersHorizontal, desc: "Configure table column visibility", color: "bg-orange-50 text-orange-600" },
 ];

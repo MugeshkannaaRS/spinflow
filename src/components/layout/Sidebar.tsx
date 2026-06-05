@@ -89,6 +89,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
       { to: "/audit",             label: "Audit Logs",    icon: ClipboardList,   module: "audit" },
       { to: "/admin",             label: "Admin Panel",   icon: Shield,          module: "admin" },
       { to: "/admin/column-config", label: "Column Config", icon: SlidersHorizontal, module: "column_config" },
+      { to: "/admin/billing",       label: "Billing",       icon: CreditCard,       module: "billing" },
     ],
   },
 ];

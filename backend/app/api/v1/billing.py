@@ -1,10 +1,9 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from typing import List, Dict, Optional
-from pydantic import BaseModel, Field
 
 from datetime import datetime, timezone
 
@@ -14,174 +13,18 @@ from app.models.user import User
 from app.models.masters import Company, CompanyModule, Mill
 from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest
 from app.services.pricing_service import PricingService
+from app.services.billing_service import BillingService
+from app.schemas.billing import (
+    ModulePricingOut, SubscriptionPlanOut, PlanCreate, PlanUpdate,
+    CompanyCostOut, CompanySubscriptionOut, UpdateSubscriptionRequest, SetCompanyPlanRequest,
+    InvoiceLineItem, InvoiceOut, ChangeRequestOut, ChangeRequestCreate, ChangeRequestReview,
+    CompanyBillingRow, StatusUpdateBody, ModuleToggleBody,
+    BillingSummaryOut, SubscriptionRowOut, InvoiceRowOut, PaymentRowOut, AnalyticsOut,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 pricing_service = PricingService
-
-
-# ── Schemas ─────────────────────────────────────────────────
-
-
-class ModulePricingOut(BaseModel):
-    module_name: str
-    monthly_price: float
-    yearly_price: float
-    is_included: bool
-
-
-class SubscriptionPlanOut(BaseModel):
-    id: str
-    code: str
-    name: str
-    description: Optional[str] = None
-    monthly_price: float
-    yearly_price: float
-    included_mills: int
-    included_users: int
-    additional_mill_cost: float
-    additional_user_cost: float
-    is_active: bool
-    sort_order: int
-    module_prices: List[ModulePricingOut]
-
-    class Config:
-        from_attributes = True
-
-
-class PlanCreate(BaseModel):
-    code: str = Field(..., min_length=1, max_length=50)
-    name: str = Field(..., min_length=1, max_length=200)
-    description: Optional[str] = None
-    monthly_price: float = 0
-    yearly_price: float = 0
-    included_mills: int = 1
-    included_users: int = 25
-    additional_mill_cost: float = 0
-    additional_user_cost: float = 0
-    sort_order: int = 0
-    module_prices: Optional[List[Dict]] = None
-
-
-class PlanUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    monthly_price: Optional[float] = None
-    yearly_price: Optional[float] = None
-    included_mills: Optional[int] = None
-    included_users: Optional[int] = None
-    additional_mill_cost: Optional[float] = None
-    additional_user_cost: Optional[float] = None
-    is_active: Optional[bool] = None
-    sort_order: Optional[int] = None
-
-
-class CompanyCostOut(BaseModel):
-    plan_monthly: float
-    plan_yearly: float
-    included_modules: List[str]
-    addon_modules: List[Dict]
-    addon_module_cost_monthly: float
-    addon_module_cost_yearly: float
-    included_mills: int
-    included_users: int
-    extra_mills: int
-    extra_users: int
-    extra_mill_cost_monthly: float
-    extra_user_cost_monthly: float
-    total_monthly: float
-    total_yearly: float
-    mill_count: int
-    user_count: int
-
-
-class CompanySubscriptionOut(BaseModel):
-    plan_id: str
-    plan_code: str
-    plan_name: str
-    status: str
-    billing_cycle: str
-    started_at: Optional[str] = None
-    expires_at: Optional[str] = None
-    mill_count: int
-    mill_limit: int
-    user_count: int
-    user_limit: int
-    mills_exceeded: bool
-    users_exceeded: bool
-    cost: CompanyCostOut
-
-
-class UpdateSubscriptionRequest(BaseModel):
-    plan_id: str
-    billing_cycle: Optional[str] = "monthly"
-    addon_modules: Optional[Dict[str, bool]] = None
-    extra_mills: Optional[int] = 0
-    extra_users: Optional[int] = 0
-
-
-class SetCompanyPlanRequest(BaseModel):
-    plan_id: str
-    billing_cycle: str = "monthly"
-    addon_modules: Optional[Dict[str, bool]] = None
-    extra_mills: int = 0
-    extra_users: int = 0
-
-
-# ── BillingInvoice & Change Request Schemas ─────────────────────
-
-
-class InvoiceLineItem(BaseModel):
-    description: str
-    amount: float
-    quantity: int = 1
-
-
-class InvoiceOut(BaseModel):
-    id: str
-    invoice_number: str
-    amount: float
-    currency: str
-    status: str
-    billing_period_start: Optional[str] = None
-    billing_period_end: Optional[str] = None
-    paid_at: Optional[str] = None
-    transaction_id: Optional[str] = None
-    gateway: Optional[str] = None
-    line_items: Optional[dict] = None
-    created_at: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-
-
-class ChangeRequestOut(BaseModel):
-    id: str
-    company_id: str
-    requested_by: str
-    current_plan_id: str
-    requested_plan_id: str
-    change_type: str
-    reason: Optional[str] = None
-    status: str
-    reviewed_by: Optional[str] = None
-    reviewed_at: Optional[str] = None
-    review_notes: Optional[str] = None
-    created_at: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-
-
-class ChangeRequestCreate(BaseModel):
-    requested_plan_id: str
-    change_type: str = "upgrade"
-    reason: Optional[str] = None
-
-
-class ChangeRequestReview(BaseModel):
-    status: str
-    review_notes: Optional[str] = None
 
 
 # ── Plan Endpoints ────────────────────────────────────────
@@ -681,28 +524,89 @@ async def billing_webhook(
 from datetime import date as date_type, timedelta
 
 
-class CompanyBillingRow(BaseModel):
-    id: str
-    name: str
-    code: str
-    plan: str
-    status: str
-    mills_count: int
-    users_count: int
-    enabled_modules: List[str]
-    monthly_amount: float
-    trial_ends_at: Optional[str] = None
-    last_payment_at: Optional[str] = None
-    next_billing_at: Optional[str] = None
+@router.get("/admin/billing/summary", response_model=BillingSummaryOut)
+async def admin_billing_summary(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = BillingService(db)
+    return await svc.get_billing_summary()
 
 
-class StatusUpdateBody(BaseModel):
-    status: str  # "active" | "suspended" | "trial"
+@router.get("/admin/billing/subscriptions")
+async def admin_billing_subscriptions(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status_filter: Optional[str] = None,
+    plan_filter: Optional[str] = None,
+    search: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = BillingService(db)
+    rows, total = await svc.get_subscriptions_list(page, page_size, status_filter, plan_filter, search)
+    return {"items": rows, "total": total, "page": page, "page_size": page_size}
 
 
-class ModuleToggleBody(BaseModel):
-    module: str
-    enabled: bool
+@router.get("/admin/billing/subscriptions/{company_id}")
+async def admin_billing_company_detail(
+    company_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = BillingService(db)
+    detail = await svc.get_company_billing_detail(company_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Company not found")
+    return detail
+
+
+@router.get("/admin/billing/invoices")
+async def admin_billing_invoices(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status_filter: Optional[str] = None,
+    company_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = BillingService(db)
+    rows, total = await svc.get_invoices(page, page_size, status_filter, company_id)
+    return {"items": rows, "total": total, "page": page, "page_size": page_size}
+
+
+@router.get("/admin/billing/payments")
+async def admin_billing_payments(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    company_id: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = BillingService(db)
+    rows, total = await svc.get_payments(page, page_size, company_id)
+    return {"items": rows, "total": total, "page": page, "page_size": page_size}
+
+
+@router.get("/admin/billing/analytics")
+async def admin_billing_analytics(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = BillingService(db)
+    return await svc.get_analytics()
 
 
 @router.get("/admin/billing/overview")

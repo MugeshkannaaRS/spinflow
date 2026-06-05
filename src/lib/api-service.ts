@@ -514,6 +514,18 @@ export const adminApi = {
         company_stats: stats,
       };
     }),
+  getBillingSummary: () =>
+    api.get("/admin/billing/summary").then((r) => r.data),
+  getSubscriptions: (params?: any) =>
+    api.get("/admin/billing/subscriptions", { params }).then((r) => r.data),
+  getCompanyBillingDetail: (companyId: string) =>
+    api.get(`/admin/billing/subscriptions/${companyId}`).then((r) => r.data),
+  getBillingInvoices: (params?: any) =>
+    api.get("/admin/billing/invoices", { params }).then((r) => r.data),
+  getBillingPayments: (params?: any) =>
+    api.get("/admin/billing/payments", { params }).then((r) => r.data),
+  getBillingAnalytics: () =>
+    api.get("/admin/billing/analytics").then((r) => r.data),
 };
 
 export const uploadApi = {

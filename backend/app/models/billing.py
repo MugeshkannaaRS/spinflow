@@ -51,6 +51,11 @@ class CompanySubscription(TimestampMixin, Base):
     addon_modules: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
     extra_mills: Mapped[int] = mapped_column(Integer, default=0)
     extra_users: Mapped[int] = mapped_column(Integer, default=0)
+    currency_symbol: Mapped[str] = mapped_column(String(10), default="₹")
+    currency_code: Mapped[str] = mapped_column(String(3), default="INR")
+    max_users: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    overdue_status: Mapped[str] = mapped_column(String(20), default="active")
+    overdue_since: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 class BillingInvoice(TimestampMixin, Base):
     __tablename__ = "billing_invoices"

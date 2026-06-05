@@ -45,6 +45,11 @@ import { Route as AppAdminColumnConfigRouteImport } from './routes/_app.admin.co
 import { Route as AppAdminBillingRouteImport } from './routes/_app.admin.billing'
 import { Route as AppAdminAuditRouteImport } from './routes/_app.admin.audit'
 import { Route as AppAdminArchiveRouteImport } from './routes/_app.admin.archive'
+import { Route as AppAdminBillingSubscriptionsRouteImport } from './routes/_app.admin.billing.subscriptions'
+import { Route as AppAdminBillingPlansRouteImport } from './routes/_app.admin.billing.plans'
+import { Route as AppAdminBillingPaymentsRouteImport } from './routes/_app.admin.billing.payments'
+import { Route as AppAdminBillingInvoicesRouteImport } from './routes/_app.admin.billing.invoices'
+import { Route as AppAdminBillingAnalyticsRouteImport } from './routes/_app.admin.billing.analytics'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -225,6 +230,33 @@ const AppAdminArchiveRoute = AppAdminArchiveRouteImport.update({
   path: '/archive',
   getParentRoute: () => AppAdminRoute,
 } as any)
+const AppAdminBillingSubscriptionsRoute =
+  AppAdminBillingSubscriptionsRouteImport.update({
+    id: '/subscriptions',
+    path: '/subscriptions',
+    getParentRoute: () => AppAdminBillingRoute,
+  } as any)
+const AppAdminBillingPlansRoute = AppAdminBillingPlansRouteImport.update({
+  id: '/plans',
+  path: '/plans',
+  getParentRoute: () => AppAdminBillingRoute,
+} as any)
+const AppAdminBillingPaymentsRoute = AppAdminBillingPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => AppAdminBillingRoute,
+} as any)
+const AppAdminBillingInvoicesRoute = AppAdminBillingInvoicesRouteImport.update({
+  id: '/invoices',
+  path: '/invoices',
+  getParentRoute: () => AppAdminBillingRoute,
+} as any)
+const AppAdminBillingAnalyticsRoute =
+  AppAdminBillingAnalyticsRouteImport.update({
+    id: '/analytics',
+    path: '/analytics',
+    getParentRoute: () => AppAdminBillingRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -252,7 +284,7 @@ export interface FileRoutesByFullPath {
   '/users': typeof AppUsersRoute
   '/admin/archive': typeof AppAdminArchiveRoute
   '/admin/audit': typeof AppAdminAuditRoute
-  '/admin/billing': typeof AppAdminBillingRoute
+  '/admin/billing': typeof AppAdminBillingRouteWithChildren
   '/admin/column-config': typeof AppAdminColumnConfigRoute
   '/admin/companies': typeof AppAdminCompaniesRoute
   '/admin/limits': typeof AppAdminLimitsRoute
@@ -262,6 +294,11 @@ export interface FileRoutesByFullPath {
   '/admin/plans': typeof AppAdminPlansRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/company/billing': typeof AppCompanyBillingRoute
+  '/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
+  '/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
+  '/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
+  '/admin/billing/plans': typeof AppAdminBillingPlansRoute
+  '/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -289,7 +326,7 @@ export interface FileRoutesByTo {
   '/users': typeof AppUsersRoute
   '/admin/archive': typeof AppAdminArchiveRoute
   '/admin/audit': typeof AppAdminAuditRoute
-  '/admin/billing': typeof AppAdminBillingRoute
+  '/admin/billing': typeof AppAdminBillingRouteWithChildren
   '/admin/column-config': typeof AppAdminColumnConfigRoute
   '/admin/companies': typeof AppAdminCompaniesRoute
   '/admin/limits': typeof AppAdminLimitsRoute
@@ -299,6 +336,11 @@ export interface FileRoutesByTo {
   '/admin/plans': typeof AppAdminPlansRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/company/billing': typeof AppCompanyBillingRoute
+  '/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
+  '/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
+  '/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
+  '/admin/billing/plans': typeof AppAdminBillingPlansRoute
+  '/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -328,7 +370,7 @@ export interface FileRoutesById {
   '/_app/users': typeof AppUsersRoute
   '/_app/admin/archive': typeof AppAdminArchiveRoute
   '/_app/admin/audit': typeof AppAdminAuditRoute
-  '/_app/admin/billing': typeof AppAdminBillingRoute
+  '/_app/admin/billing': typeof AppAdminBillingRouteWithChildren
   '/_app/admin/column-config': typeof AppAdminColumnConfigRoute
   '/_app/admin/companies': typeof AppAdminCompaniesRoute
   '/_app/admin/limits': typeof AppAdminLimitsRoute
@@ -338,6 +380,11 @@ export interface FileRoutesById {
   '/_app/admin/plans': typeof AppAdminPlansRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/company/billing': typeof AppCompanyBillingRoute
+  '/_app/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
+  '/_app/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
+  '/_app/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
+  '/_app/admin/billing/plans': typeof AppAdminBillingPlansRoute
+  '/_app/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -377,6 +424,11 @@ export interface FileRouteTypes {
     | '/admin/plans'
     | '/admin/users'
     | '/company/billing'
+    | '/admin/billing/analytics'
+    | '/admin/billing/invoices'
+    | '/admin/billing/payments'
+    | '/admin/billing/plans'
+    | '/admin/billing/subscriptions'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -414,6 +466,11 @@ export interface FileRouteTypes {
     | '/admin/plans'
     | '/admin/users'
     | '/company/billing'
+    | '/admin/billing/analytics'
+    | '/admin/billing/invoices'
+    | '/admin/billing/payments'
+    | '/admin/billing/plans'
+    | '/admin/billing/subscriptions'
   id:
     | '__root__'
     | '/'
@@ -452,6 +509,11 @@ export interface FileRouteTypes {
     | '/_app/admin/plans'
     | '/_app/admin/users'
     | '/_app/company/billing'
+    | '/_app/admin/billing/analytics'
+    | '/_app/admin/billing/invoices'
+    | '/_app/admin/billing/payments'
+    | '/_app/admin/billing/plans'
+    | '/_app/admin/billing/subscriptions'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -715,13 +777,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminArchiveRouteImport
       parentRoute: typeof AppAdminRoute
     }
+    '/_app/admin/billing/subscriptions': {
+      id: '/_app/admin/billing/subscriptions'
+      path: '/subscriptions'
+      fullPath: '/admin/billing/subscriptions'
+      preLoaderRoute: typeof AppAdminBillingSubscriptionsRouteImport
+      parentRoute: typeof AppAdminBillingRoute
+    }
+    '/_app/admin/billing/plans': {
+      id: '/_app/admin/billing/plans'
+      path: '/plans'
+      fullPath: '/admin/billing/plans'
+      preLoaderRoute: typeof AppAdminBillingPlansRouteImport
+      parentRoute: typeof AppAdminBillingRoute
+    }
+    '/_app/admin/billing/payments': {
+      id: '/_app/admin/billing/payments'
+      path: '/payments'
+      fullPath: '/admin/billing/payments'
+      preLoaderRoute: typeof AppAdminBillingPaymentsRouteImport
+      parentRoute: typeof AppAdminBillingRoute
+    }
+    '/_app/admin/billing/invoices': {
+      id: '/_app/admin/billing/invoices'
+      path: '/invoices'
+      fullPath: '/admin/billing/invoices'
+      preLoaderRoute: typeof AppAdminBillingInvoicesRouteImport
+      parentRoute: typeof AppAdminBillingRoute
+    }
+    '/_app/admin/billing/analytics': {
+      id: '/_app/admin/billing/analytics'
+      path: '/analytics'
+      fullPath: '/admin/billing/analytics'
+      preLoaderRoute: typeof AppAdminBillingAnalyticsRouteImport
+      parentRoute: typeof AppAdminBillingRoute
+    }
   }
 }
+
+interface AppAdminBillingRouteChildren {
+  AppAdminBillingAnalyticsRoute: typeof AppAdminBillingAnalyticsRoute
+  AppAdminBillingInvoicesRoute: typeof AppAdminBillingInvoicesRoute
+  AppAdminBillingPaymentsRoute: typeof AppAdminBillingPaymentsRoute
+  AppAdminBillingPlansRoute: typeof AppAdminBillingPlansRoute
+  AppAdminBillingSubscriptionsRoute: typeof AppAdminBillingSubscriptionsRoute
+}
+
+const AppAdminBillingRouteChildren: AppAdminBillingRouteChildren = {
+  AppAdminBillingAnalyticsRoute: AppAdminBillingAnalyticsRoute,
+  AppAdminBillingInvoicesRoute: AppAdminBillingInvoicesRoute,
+  AppAdminBillingPaymentsRoute: AppAdminBillingPaymentsRoute,
+  AppAdminBillingPlansRoute: AppAdminBillingPlansRoute,
+  AppAdminBillingSubscriptionsRoute: AppAdminBillingSubscriptionsRoute,
+}
+
+const AppAdminBillingRouteWithChildren = AppAdminBillingRoute._addFileChildren(
+  AppAdminBillingRouteChildren,
+)
 
 interface AppAdminRouteChildren {
   AppAdminArchiveRoute: typeof AppAdminArchiveRoute
   AppAdminAuditRoute: typeof AppAdminAuditRoute
-  AppAdminBillingRoute: typeof AppAdminBillingRoute
+  AppAdminBillingRoute: typeof AppAdminBillingRouteWithChildren
   AppAdminColumnConfigRoute: typeof AppAdminColumnConfigRoute
   AppAdminCompaniesRoute: typeof AppAdminCompaniesRoute
   AppAdminLimitsRoute: typeof AppAdminLimitsRoute
@@ -735,7 +852,7 @@ interface AppAdminRouteChildren {
 const AppAdminRouteChildren: AppAdminRouteChildren = {
   AppAdminArchiveRoute: AppAdminArchiveRoute,
   AppAdminAuditRoute: AppAdminAuditRoute,
-  AppAdminBillingRoute: AppAdminBillingRoute,
+  AppAdminBillingRoute: AppAdminBillingRouteWithChildren,
   AppAdminColumnConfigRoute: AppAdminColumnConfigRoute,
   AppAdminCompaniesRoute: AppAdminCompaniesRoute,
   AppAdminLimitsRoute: AppAdminLimitsRoute,
