@@ -117,6 +117,10 @@ function AdminUsersPage() {
     staleTime: 60_000,
   });
   const companies: any[] = (companiesQ.data as any[]) ?? [];
+  const activeCompanies = useMemo(
+    () => companies.filter((c: any) => c?.id && c.is_active !== false),
+    [companies]
+  );
 
   const selectedCompany = useMemo(
     () => companies.find((c: any) => c.id === selectedCompanyId),
@@ -385,7 +389,7 @@ function AdminUsersPage() {
                   <Select value={form.company_id} onValueChange={(v) => setForm({ ...form, company_id: v, mill_id: "" })}>
                     <SelectTrigger id="company_id"><SelectValue placeholder="Select company" /></SelectTrigger>
                     <SelectContent>
-                      {companies.filter((c: any) => c?.id).map((c: any) => {
+                      {activeCompanies.filter((c: any) => c?.id).map((c: any) => {
                         const cid = c.id;
                         const current = companyStats.companyUsers[cid] ?? 0;
                         const max = c.max_users ?? 50;
@@ -490,11 +494,11 @@ function AdminUsersPage() {
             </h3>
           </div>
           <ScrollArea className="h-[500px]">
-            {companies.length === 0 ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">No companies found.</div>
+            {activeCompanies.length === 0 ? (
+              <div className="p-6 text-center text-sm text-muted-foreground">No active companies found.</div>
             ) : (
               <div className="divide-y">
-                {companies.map((c: any) => {
+                {activeCompanies.map((c: any) => {
                   const isSelected = selectedCompanyId === c.id;
                   const uCount = companyStats.companyUsers[c.id] ?? 0;
                   return (

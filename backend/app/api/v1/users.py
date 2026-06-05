@@ -128,6 +128,8 @@ async def create_user(
         # Fall back to company.max_users
         company_result = await db.execute(select(Company).where(Company.id == company_id))
         company = company_result.scalar_one_or_none()
+        if company and company.is_active is False:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot create users for an inactive or suspended company")
         company_max = company.max_users if company else None
 
         effective_max = sub_max or company_max

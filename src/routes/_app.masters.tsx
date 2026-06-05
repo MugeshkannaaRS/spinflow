@@ -30,7 +30,7 @@ import {
   SheetTrigger,
   SheetFooter,
 } from "@/components/ui/sheet";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { Plus, Search, Settings, Blocks, ArrowDownToLine, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -162,6 +162,10 @@ function MastersPage() {
   });
 
   const companiesData = (companiesQ.data ?? []) as Company[];
+  const activeCompaniesData = useMemo(
+    () => companiesData.filter((c: any) => c?.id && c.is_active !== false),
+    [companiesData]
+  );
   const millsData = (millsQ.data ?? []) as Mill[];
   const deptsData = (deptsQ.data ?? []) as Department[];
   const yarnData = (yarnQ.data ?? []) as YarnCount[];
@@ -273,8 +277,8 @@ function MastersPage() {
                 ]}
                 activeKey="is_active"
                 canEdit={canEdit && user?.role !== "MILL_OWNER"}
-                onAdd={user?.role !== "MILL_OWNER" ? <MillForm companies={companiesData} /> : (<></>)}
-                onEdit={(item) => <MillForm item={item} companies={companiesData} />}
+                onAdd={user?.role !== "MILL_OWNER" ? <MillForm companies={activeCompaniesData} /> : (<></>)}
+                onEdit={(item) => <MillForm item={item} companies={activeCompaniesData} />}
                 headerExtra={user?.role === "MILL_OWNER" ? (
                   <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
                     <span>Need another mill?</span>

@@ -179,6 +179,10 @@ async def create_user(
         count = user_count.scalar() or 0
         company_result = await db.execute(select(Company).where(Company.id == company_id))
         company = company_result.scalar_one_or_none()
+        if not company:
+            raise HTTPException(404, "Company not found")
+        if company.is_active is False:
+            raise HTTPException(403, "Cannot create users for an inactive or suspended company")
         max_users = getattr(company, 'max_users', 50) or 50
         if count >= max_users:
             raise HTTPException(403, f"User limit reached ({count}/{max_users}). Upgrade plan first.")

@@ -151,6 +151,10 @@ function UsersPage() {
   });
   const users: any[] = usersQ.data ?? [];
   const companies: any[] = companiesQ.data ?? [];
+  const activeCompanies = useMemo(
+    () => companies.filter((c: any) => c?.id && c.is_active !== false),
+    [companies]
+  );
   const mills: any[] = millsQ.data ?? [];
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -411,7 +415,7 @@ function UsersPage() {
                         <SelectValue placeholder="Select company" />
                       </SelectTrigger>
                       <SelectContent>
-                        {companies.filter((c: any) => c?.id).map((c: any) => (
+                        {activeCompanies.filter((c: any) => c?.id).map((c: any) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.name}
                           </SelectItem>
