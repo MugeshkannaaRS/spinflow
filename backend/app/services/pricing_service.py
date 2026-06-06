@@ -249,7 +249,7 @@ class PricingService:
         return result.scalar_one_or_none()
 
     async def seed_default_plans(self):
-        """Seed starter/professional/enterprise plans if they don't exist."""
+        """Seed starter/growth/business/enterprise/custom plans if they don't exist."""
         existing = await self.db.execute(select(SubscriptionPlan).limit(1))
         if existing.scalar_one_or_none():
             return
@@ -269,8 +269,8 @@ class PricingService:
                 sort_order=1,
             ),
             SubscriptionPlan(
-                code="professional",
-                name="Professional",
+                code="growth",
+                name="Growth",
                 description="For growing mills with multiple units.",
                 monthly_price=14999,
                 yearly_price=149990,
@@ -280,6 +280,19 @@ class PricingService:
                 additional_user_cost=149,
                 is_active=True,
                 sort_order=2,
+            ),
+            SubscriptionPlan(
+                code="business",
+                name="Business",
+                description="For established operations with up to 5 mills.",
+                monthly_price=29999,
+                yearly_price=299990,
+                included_mills=5,
+                included_users=250,
+                additional_mill_cost=999,
+                additional_user_cost=99,
+                is_active=True,
+                sort_order=3,
             ),
             SubscriptionPlan(
                 code="enterprise",
@@ -292,7 +305,20 @@ class PricingService:
                 additional_mill_cost=0,
                 additional_user_cost=0,
                 is_active=True,
-                sort_order=3,
+                sort_order=4,
+            ),
+            SubscriptionPlan(
+                code="custom",
+                name="Custom",
+                description="Custom plan with manual module selection.",
+                monthly_price=99999,
+                yearly_price=999990,
+                included_mills=999,
+                included_users=9999,
+                additional_mill_cost=0,
+                additional_user_cost=0,
+                is_active=True,
+                sort_order=5,
             ),
         ]
         self.db.add_all(plans)
@@ -304,22 +330,35 @@ class PricingService:
             "lotrac", "reports",
         ]
         for plan in plans:
-            for i, mod in enumerate(MODULES):
-                is_included = plan.code == "enterprise" or (
-                    plan.code == "professional" and mod in (
-                        "production", "quality", "inventory", "dispatch",
-                        "purchase", "stores", "hr", "accounts", "maintenance",
+            for mod in MODULES:
+                if plan.code == "custom":
+                    is_included = False
+                    monthly = 0
+                    yearly = 0
+                else:
+                    is_included = plan.code == "enterprise" or (
+                        plan.code == "business" and mod in (
+                            "production", "quality", "inventory", "dispatch",
+                            "purchase", "stores", "hr", "accounts", "maintenance",
+                            "payroll", "sales", "lotrac",
+                        )
+                    ) or (
+                        plan.code == "growth" and mod in (
+                            "production", "quality", "inventory", "dispatch",
+                            "purchase", "stores", "hr", "accounts", "maintenance",
+                        )
+                    ) or (
+                        plan.code == "starter" and mod in (
+                            "production", "quality", "inventory", "dispatch",
+                        )
                     )
-                ) or (
-                    plan.code == "starter" and mod in (
-                        "production", "quality", "inventory", "dispatch",
-                    )
-                )
+                    monthly = 0 if is_included else 999
+                    yearly = 0 if is_included else 9990
                 mp = ModulePricing(
                     plan_id=plan.id,
                     module_name=mod,
-                    monthly_price=0 if is_included else 999,
-                    yearly_price=0 if is_included else 9990,
+                    monthly_price=monthly,
+                    yearly_price=yearly,
                     is_included=is_included,
                 )
                 self.db.add(mp)

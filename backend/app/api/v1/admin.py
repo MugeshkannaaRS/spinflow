@@ -13,8 +13,10 @@ logger = logging.getLogger(__name__)
 
 from app.db.session import get_db
 from app.core.deps import get_current_user, get_mill_scope, log_audit
-from app.models.user import User, Role
+from app.models.user import User, Role, UserSession
 from app.models.masters import Company, CompanyModule, Mill, MillSettings
+from app.models.billing import CompanySubscription, SubscriptionPlan
+from app.models.audit import AuditLog
 from app.models.deletion_log import DeletionLog
 from app.services.deletion_service import CompanyDeletionService
 from app.services.company_stats import CompanyStatsService
@@ -417,6 +419,101 @@ async def update_company_limits(
         raise HTTPException(500, detail=str(e))
 
 
+@router.post("/admin/companies/{company_id}/suspend")
+async def suspend_company(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Suspend a company and cascade to mills, users, and sessions."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(403, "Super Admin only")
+
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(404, "Company not found")
+    if company.status == "suspended":
+        raise HTTPException(409, "Company is already suspended")
+
+    now = datetime.utcnow()
+    company.is_active = False
+    company.status = "suspended"
+    company.suspended_at = now
+
+    await db.execute(
+        sa_update(Mill).where(Mill.company_id == company_id).values(is_active=False)
+    )
+    await db.execute(
+        sa_update(User).where(User.company_id == company_id).values(is_active=False)
+    )
+    await db.execute(
+        sa_update(UserSession)
+        .where(UserSession.user_id.in_(
+            select(User.id).where(User.company_id == company_id)
+        ))
+        .values(is_active=False)
+    )
+    sub_result = await db.execute(
+        select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+    )
+    sub = sub_result.scalar_one_or_none()
+    if sub:
+        sub.status = "suspended"
+
+    await db.commit()
+    await log_audit(
+        db, current_user.id, role_code,
+        "company_suspended", "company", company_id,
+        f"Company suspended with cascade: mills, users, sessions disabled",
+    )
+    return {"id": company_id, "status": "suspended", "suspended_at": str(now)}
+
+
+@router.post("/admin/companies/{company_id}/reactivate")
+async def reactivate_company(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reactivate a suspended company and restore mills and users."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(403, "Super Admin only")
+
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(404, "Company not found")
+    if company.status != "suspended":
+        raise HTTPException(409, "Company is not suspended")
+
+    company.is_active = True
+    company.status = "active"
+    company.suspended_at = None
+
+    await db.execute(
+        sa_update(Mill).where(Mill.company_id == company_id).values(is_active=True)
+    )
+    await db.execute(
+        sa_update(User).where(User.company_id == company_id).values(is_active=True)
+    )
+    sub_result = await db.execute(
+        select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+    )
+    sub = sub_result.scalar_one_or_none()
+    if sub:
+        sub.status = "active"
+
+    await db.commit()
+    await log_audit(
+        db, current_user.id, role_code,
+        "company_reactivated", "company", company_id,
+        f"Company reactivated: mills and users restored",
+    )
+    return {"id": company_id, "status": "active"}
+
+
+# Keep old status endpoint for backward compatibility
 @router.post("/admin/companies/{company_id}/status")
 async def update_company_status(
     company_id: str,
@@ -424,34 +521,107 @@ async def update_company_status(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update company status — single source of truth is companies.is_active."""
-    print(f"DEBUG [update_company_status] company_id={company_id} body={body}")
+    """Update company status — delegates to suspend/reactivate."""
     role_code = current_user.role_rel.code if current_user.role_rel else ""
     if role_code != "SUPER_ADMIN":
         raise HTTPException(403, "Super Admin only")
 
     new_status = body.get("status")
-    if new_status not in ("active", "suspended"):
+    if new_status == "suspended":
+        return await suspend_company(company_id, db, current_user)
+    elif new_status == "active":
+        return await reactivate_company(company_id, db, current_user)
+    else:
         raise HTTPException(422, "status must be 'active' or 'suspended'")
 
-    result = await db.execute(
-        sa_update(Company)
-        .where(Company.id == company_id)
-        .values(is_active=(new_status == "active"))
-        .returning(Company.id, Company.name, Company.is_active)
-    )
-    row = result.fetchone()
-    print(f"DEBUG [update_company_status] row={row}")
-    if not row:
+
+@router.get("/admin/companies/{company_id}/detail")
+async def get_company_detail(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return full company detail with stats, subscription, and recent audit."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(403, "Super Admin only")
+
+    company = await db.get(Company, company_id)
+    if not company:
         raise HTTPException(404, "Company not found")
 
-    await db.commit()
-    await log_audit(
-        db, current_user.id, role_code,
-        "company_status_changed", "company", company_id,
-        f"Status set to {new_status}",
+    mill_count = (
+        await db.execute(select(func.count()).select_from(Mill).where(Mill.company_id == company_id))
+    ).scalar() or 0
+
+    user_count = (
+        await db.execute(select(func.count()).select_from(User).where(User.company_id == company_id, User.is_active == True))
+    ).scalar() or 0
+
+    module_result = await db.execute(
+        select(CompanyModule).where(CompanyModule.company_id == company_id)
     )
-    return {"id": str(row.id), "name": row.name, "status": ("active" if row.is_active else "suspended")}
+    modules = module_result.scalars().all()
+    enabled_modules = [m.module_name for m in modules if m.is_enabled]
+
+    sub_result = await db.execute(
+        select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+    )
+    sub = sub_result.scalar_one_or_none()
+    subscription = None
+    if sub:
+        plan = await db.get(SubscriptionPlan, sub.plan_id)
+        subscription = {
+            "plan_id": sub.plan_id,
+            "plan_code": plan.code if plan else None,
+            "plan_name": plan.name if plan else None,
+            "status": sub.status,
+            "billing_cycle": sub.billing_cycle,
+            "started_at": str(sub.started_at) if sub.started_at else None,
+            "expires_at": str(sub.expires_at) if sub.expires_at else None,
+        }
+
+    audit_result = await db.execute(
+        select(AuditLog)
+        .where(AuditLog.entity_id == company_id)
+        .order_by(AuditLog.created_at.desc())
+        .limit(20)
+    )
+    recent_audit = [
+        {
+            "action": a.action,
+            "user_name": a.user_name,
+            "details": a.details,
+            "created_at": str(a.created_at) if a.created_at else None,
+        }
+        for a in audit_result.scalars().all()
+    ]
+
+    return {
+        "id": company.id,
+        "code": company.code,
+        "name": company.name,
+        "gstin": company.gstin,
+        "address": company.address,
+        "phone": company.phone,
+        "email": company.email,
+        "is_active": company.is_active,
+        "status": company.status,
+        "suspended_at": str(company.suspended_at) if company.suspended_at else None,
+        "archived_at": str(company.archived_at) if company.archived_at else None,
+        "max_users": company.max_users,
+        "plan": company.plan,
+        "max_employees": company.max_employees,
+        "created_at": str(company.created_at) if company.created_at else None,
+        "stats": {
+            "mill_count": mill_count,
+            "user_count": user_count,
+            "enabled_modules_count": len(enabled_modules),
+            "enabled_modules": enabled_modules,
+        },
+        "subscription": subscription,
+        "recent_audit": recent_audit,
+    }
 
 
 @router.get("/admin/mills/{mill_id}/settings")

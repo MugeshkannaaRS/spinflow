@@ -500,11 +500,11 @@ export const adminApi = {
     api.put(`/admin/users/${userId}/modules`, { modules }).then((r) => r.data),
   suspendCompany: (companyId: string, status: "active" | "suspended") =>
     api.post(`/admin/companies/${companyId}/status`, { status }).then((r) => r.data),
+  getCompanyDetail: (companyId: string) =>
+    api.get(`/admin/companies/${companyId}/detail`).then((r) => r.data),
   getCompanyStats: () =>
-    api.get("/admin/company-stats").then(r => r.data),
-  getGlobalStats: () =>
-    api.get("/admin/company-stats").then(r => {
-      const stats: any[] = r.data ?? [];
+    api.get("/admin/company-stats").then((r) => {
+      const stats: any[] = Array.isArray(r.data) ? r.data : [];
       return {
         total_companies: stats.length,
         active_companies: stats.filter((s: any) => true).length,

@@ -103,6 +103,15 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
                 message="Account is inactive",
             )
 
+        if user.company_id:
+            company = await db.get(Company, user.company_id)
+            if company and company.status == "suspended":
+                raise SpinFlowException(
+                    status_code=423,
+                    code=ErrorCode.ACCOUNT_LOCKED,
+                    message="Company account is suspended. Contact SpinFlow support.",
+                )
+
         user.failed_login_attempts = 0
         user.locked_until = None
         user.last_login = datetime.now(timezone.utc)

@@ -12,6 +12,9 @@ class CompanyCreate(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     logo_url: Optional[str] = None
+    plan: Optional[str] = Field(default="starter", max_length=50)
+    max_users: Optional[int] = Field(default=25, ge=1, le=99999)
+    max_employees: Optional[int] = Field(default=100, ge=1, le=999999)
 
     @field_validator("gstin", mode="before")
     @classmethod
@@ -36,6 +39,9 @@ class CompanyUpdate(BaseModel):
     max_users: Optional[int] = None
     plan: Optional[str] = None
     max_employees: Optional[int] = None
+    status: Optional[str] = None
+    suspended_at: Optional[datetime] = None
+    archived_at: Optional[datetime] = None
 
     @field_validator("gstin", mode="before")
     @classmethod
@@ -61,6 +67,9 @@ class CompanyOut(BaseModel):
     max_users: int = 50
     plan: str = "starter"
     max_employees: int = 100
+    status: str = "active"
+    suspended_at: Optional[datetime] = None
+    archived_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

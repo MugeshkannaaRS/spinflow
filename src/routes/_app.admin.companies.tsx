@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, adminApi } from "@/lib/api-service";
 import { api } from "@/lib/api";
@@ -126,6 +126,7 @@ function generateTempPassword() {
 function CompaniesPage() {
   const user = useAuth((s) => s.user);
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const [addCompanyOpen, setAddCompanyOpen] = useState(false);
   const [editCompany, setEditCompany] = useState<Company | null>(null);
@@ -267,6 +268,7 @@ function CompaniesPage() {
             ] satisfies ColDef[]}
             data={activeCompanies}
             rowKey={(c: any) => c.id}
+            onRowClick={(c: any) => navigate({ to: "/admin/companies/$companyId", params: { companyId: c.id } })}
             exportFilename="admin_companies"
             actions={(item: any) => (
               <div className="flex gap-1">

@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel
 from sqlalchemy import select, func
@@ -22,6 +23,7 @@ from app.models.masters import (
     Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route,
     CompanyModule, MillSettings,
 )
+from app.models.billing import SubscriptionPlan, CompanySubscription
 from app.models.audit import AuditLog
 
 
@@ -73,7 +75,7 @@ class MastersService(BaseService):
         return await self.get_or_404(Company, id)
 
     async def create_company(self, dto: CompanyCreate, created_by: Optional[str] = None):
-        logger.info("Creating company: name=%s code=%s", dto.name, dto.code)
+        logger.info("Creating company: name=%s code=%s plan=%s", dto.name, dto.code, dto.plan)
         try:
             record = Company(**dto.model_dump())
             self.db.add(record)
@@ -92,6 +94,21 @@ class MastersService(BaseService):
             self.db.add(cm)
         await self.db.flush()
 
+        plan = await self.db.execute(
+            select(SubscriptionPlan).where(SubscriptionPlan.code == dto.plan, SubscriptionPlan.is_active == True)
+        )
+        plan_record = plan.scalar_one_or_none()
+        if plan_record:
+            company_sub = CompanySubscription(
+                company_id=record.id,
+                plan_id=plan_record.id,
+                billing_cycle="monthly",
+                status="active",
+                started_at=datetime.now(),
+            )
+            self.db.add(company_sub)
+            await self.db.flush()
+
         log = AuditLog(
             user_id=self.current_user.id if self.current_user else "SYSTEM",
             user_name=self.current_user.name if self.current_user else "System",
@@ -99,7 +116,7 @@ class MastersService(BaseService):
             action="COMPANY_CREATED",
             entity="Company",
             entity_id=record.id,
-            details=f"Created company: {record.name}",
+            details=f"Created company: {record.name} (plan: {dto.plan})",
         )
         self.db.add(log)
         await self.db.flush()

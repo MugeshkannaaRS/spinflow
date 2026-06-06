@@ -45,6 +45,7 @@ import { Route as AppAdminColumnConfigRouteImport } from './routes/_app.admin.co
 import { Route as AppAdminBillingRouteImport } from './routes/_app.admin.billing'
 import { Route as AppAdminAuditRouteImport } from './routes/_app.admin.audit'
 import { Route as AppAdminArchiveRouteImport } from './routes/_app.admin.archive'
+import { Route as AppAdminCompaniesCompanyIdRouteImport } from './routes/_app.admin.companies.$companyId'
 import { Route as AppAdminBillingSubscriptionsRouteImport } from './routes/_app.admin.billing.subscriptions'
 import { Route as AppAdminBillingPlansRouteImport } from './routes/_app.admin.billing.plans'
 import { Route as AppAdminBillingPaymentsRouteImport } from './routes/_app.admin.billing.payments'
@@ -230,6 +231,12 @@ const AppAdminArchiveRoute = AppAdminArchiveRouteImport.update({
   path: '/archive',
   getParentRoute: () => AppAdminRoute,
 } as any)
+const AppAdminCompaniesCompanyIdRoute =
+  AppAdminCompaniesCompanyIdRouteImport.update({
+    id: '/$companyId',
+    path: '/$companyId',
+    getParentRoute: () => AppAdminCompaniesRoute,
+  } as any)
 const AppAdminBillingSubscriptionsRoute =
   AppAdminBillingSubscriptionsRouteImport.update({
     id: '/subscriptions',
@@ -286,7 +293,7 @@ export interface FileRoutesByFullPath {
   '/admin/audit': typeof AppAdminAuditRoute
   '/admin/billing': typeof AppAdminBillingRouteWithChildren
   '/admin/column-config': typeof AppAdminColumnConfigRoute
-  '/admin/companies': typeof AppAdminCompaniesRoute
+  '/admin/companies': typeof AppAdminCompaniesRouteWithChildren
   '/admin/limits': typeof AppAdminLimitsRoute
   '/admin/mills': typeof AppAdminMillsRoute
   '/admin/modules': typeof AppAdminModulesRoute
@@ -299,6 +306,7 @@ export interface FileRoutesByFullPath {
   '/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
   '/admin/billing/plans': typeof AppAdminBillingPlansRoute
   '/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
+  '/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -328,7 +336,7 @@ export interface FileRoutesByTo {
   '/admin/audit': typeof AppAdminAuditRoute
   '/admin/billing': typeof AppAdminBillingRouteWithChildren
   '/admin/column-config': typeof AppAdminColumnConfigRoute
-  '/admin/companies': typeof AppAdminCompaniesRoute
+  '/admin/companies': typeof AppAdminCompaniesRouteWithChildren
   '/admin/limits': typeof AppAdminLimitsRoute
   '/admin/mills': typeof AppAdminMillsRoute
   '/admin/modules': typeof AppAdminModulesRoute
@@ -341,6 +349,7 @@ export interface FileRoutesByTo {
   '/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
   '/admin/billing/plans': typeof AppAdminBillingPlansRoute
   '/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
+  '/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -372,7 +381,7 @@ export interface FileRoutesById {
   '/_app/admin/audit': typeof AppAdminAuditRoute
   '/_app/admin/billing': typeof AppAdminBillingRouteWithChildren
   '/_app/admin/column-config': typeof AppAdminColumnConfigRoute
-  '/_app/admin/companies': typeof AppAdminCompaniesRoute
+  '/_app/admin/companies': typeof AppAdminCompaniesRouteWithChildren
   '/_app/admin/limits': typeof AppAdminLimitsRoute
   '/_app/admin/mills': typeof AppAdminMillsRoute
   '/_app/admin/modules': typeof AppAdminModulesRoute
@@ -385,6 +394,7 @@ export interface FileRoutesById {
   '/_app/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
   '/_app/admin/billing/plans': typeof AppAdminBillingPlansRoute
   '/_app/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
+  '/_app/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -429,6 +439,7 @@ export interface FileRouteTypes {
     | '/admin/billing/payments'
     | '/admin/billing/plans'
     | '/admin/billing/subscriptions'
+    | '/admin/companies/$companyId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -471,6 +482,7 @@ export interface FileRouteTypes {
     | '/admin/billing/payments'
     | '/admin/billing/plans'
     | '/admin/billing/subscriptions'
+    | '/admin/companies/$companyId'
   id:
     | '__root__'
     | '/'
@@ -514,6 +526,7 @@ export interface FileRouteTypes {
     | '/_app/admin/billing/payments'
     | '/_app/admin/billing/plans'
     | '/_app/admin/billing/subscriptions'
+    | '/_app/admin/companies/$companyId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -777,6 +790,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminArchiveRouteImport
       parentRoute: typeof AppAdminRoute
     }
+    '/_app/admin/companies/$companyId': {
+      id: '/_app/admin/companies/$companyId'
+      path: '/$companyId'
+      fullPath: '/admin/companies/$companyId'
+      preLoaderRoute: typeof AppAdminCompaniesCompanyIdRouteImport
+      parentRoute: typeof AppAdminCompaniesRoute
+    }
     '/_app/admin/billing/subscriptions': {
       id: '/_app/admin/billing/subscriptions'
       path: '/subscriptions'
@@ -835,12 +855,23 @@ const AppAdminBillingRouteWithChildren = AppAdminBillingRoute._addFileChildren(
   AppAdminBillingRouteChildren,
 )
 
+interface AppAdminCompaniesRouteChildren {
+  AppAdminCompaniesCompanyIdRoute: typeof AppAdminCompaniesCompanyIdRoute
+}
+
+const AppAdminCompaniesRouteChildren: AppAdminCompaniesRouteChildren = {
+  AppAdminCompaniesCompanyIdRoute: AppAdminCompaniesCompanyIdRoute,
+}
+
+const AppAdminCompaniesRouteWithChildren =
+  AppAdminCompaniesRoute._addFileChildren(AppAdminCompaniesRouteChildren)
+
 interface AppAdminRouteChildren {
   AppAdminArchiveRoute: typeof AppAdminArchiveRoute
   AppAdminAuditRoute: typeof AppAdminAuditRoute
   AppAdminBillingRoute: typeof AppAdminBillingRouteWithChildren
   AppAdminColumnConfigRoute: typeof AppAdminColumnConfigRoute
-  AppAdminCompaniesRoute: typeof AppAdminCompaniesRoute
+  AppAdminCompaniesRoute: typeof AppAdminCompaniesRouteWithChildren
   AppAdminLimitsRoute: typeof AppAdminLimitsRoute
   AppAdminMillsRoute: typeof AppAdminMillsRoute
   AppAdminModulesRoute: typeof AppAdminModulesRoute
@@ -854,7 +885,7 @@ const AppAdminRouteChildren: AppAdminRouteChildren = {
   AppAdminAuditRoute: AppAdminAuditRoute,
   AppAdminBillingRoute: AppAdminBillingRouteWithChildren,
   AppAdminColumnConfigRoute: AppAdminColumnConfigRoute,
-  AppAdminCompaniesRoute: AppAdminCompaniesRoute,
+  AppAdminCompaniesRoute: AppAdminCompaniesRouteWithChildren,
   AppAdminLimitsRoute: AppAdminLimitsRoute,
   AppAdminMillsRoute: AppAdminMillsRoute,
   AppAdminModulesRoute: AppAdminModulesRoute,

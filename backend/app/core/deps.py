@@ -5,7 +5,7 @@ from app.db.session import get_db
 from app.core.security import decode_token
 from app.models.user import User
 from app.models.audit import AuditLog
-from app.models.masters import Mill
+from app.models.masters import Company, Mill
 from app.core.access import resolve_access
 from app.core.rbac import SYSTEM_MODULES, is_dashboard_only
 from sqlalchemy import select
@@ -40,6 +40,11 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
+
+    if user.company_id:
+        company = await db.get(Company, user.company_id)
+        if company and company.status == "suspended":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Company account is suspended")
 
     allowed_paths = ("/auth/change-password", "/auth/me", "/auth/logout")
     if user.must_change_password and not any(request.url.path.endswith(p) for p in allowed_paths):
