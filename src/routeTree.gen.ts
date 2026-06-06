@@ -45,6 +45,7 @@ import { Route as AppAdminColumnConfigRouteImport } from './routes/_app.admin.co
 import { Route as AppAdminBillingRouteImport } from './routes/_app.admin.billing'
 import { Route as AppAdminAuditRouteImport } from './routes/_app.admin.audit'
 import { Route as AppAdminArchiveRouteImport } from './routes/_app.admin.archive'
+import { Route as AppAdminCompaniesOnboardRouteImport } from './routes/_app.admin.companies.onboard'
 import { Route as AppAdminCompaniesCompanyIdRouteImport } from './routes/_app.admin.companies.$companyId'
 import { Route as AppAdminBillingSubscriptionsRouteImport } from './routes/_app.admin.billing.subscriptions'
 import { Route as AppAdminBillingPlansRouteImport } from './routes/_app.admin.billing.plans'
@@ -231,6 +232,12 @@ const AppAdminArchiveRoute = AppAdminArchiveRouteImport.update({
   path: '/archive',
   getParentRoute: () => AppAdminRoute,
 } as any)
+const AppAdminCompaniesOnboardRoute =
+  AppAdminCompaniesOnboardRouteImport.update({
+    id: '/onboard',
+    path: '/onboard',
+    getParentRoute: () => AppAdminCompaniesRoute,
+  } as any)
 const AppAdminCompaniesCompanyIdRoute =
   AppAdminCompaniesCompanyIdRouteImport.update({
     id: '/$companyId',
@@ -307,6 +314,7 @@ export interface FileRoutesByFullPath {
   '/admin/billing/plans': typeof AppAdminBillingPlansRoute
   '/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
   '/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
+  '/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -350,6 +358,7 @@ export interface FileRoutesByTo {
   '/admin/billing/plans': typeof AppAdminBillingPlansRoute
   '/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
   '/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
+  '/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -395,6 +404,7 @@ export interface FileRoutesById {
   '/_app/admin/billing/plans': typeof AppAdminBillingPlansRoute
   '/_app/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
   '/_app/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
+  '/_app/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -440,6 +450,7 @@ export interface FileRouteTypes {
     | '/admin/billing/plans'
     | '/admin/billing/subscriptions'
     | '/admin/companies/$companyId'
+    | '/admin/companies/onboard'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -483,6 +494,7 @@ export interface FileRouteTypes {
     | '/admin/billing/plans'
     | '/admin/billing/subscriptions'
     | '/admin/companies/$companyId'
+    | '/admin/companies/onboard'
   id:
     | '__root__'
     | '/'
@@ -527,6 +539,7 @@ export interface FileRouteTypes {
     | '/_app/admin/billing/plans'
     | '/_app/admin/billing/subscriptions'
     | '/_app/admin/companies/$companyId'
+    | '/_app/admin/companies/onboard'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -790,6 +803,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminArchiveRouteImport
       parentRoute: typeof AppAdminRoute
     }
+    '/_app/admin/companies/onboard': {
+      id: '/_app/admin/companies/onboard'
+      path: '/onboard'
+      fullPath: '/admin/companies/onboard'
+      preLoaderRoute: typeof AppAdminCompaniesOnboardRouteImport
+      parentRoute: typeof AppAdminCompaniesRoute
+    }
     '/_app/admin/companies/$companyId': {
       id: '/_app/admin/companies/$companyId'
       path: '/$companyId'
@@ -857,10 +877,12 @@ const AppAdminBillingRouteWithChildren = AppAdminBillingRoute._addFileChildren(
 
 interface AppAdminCompaniesRouteChildren {
   AppAdminCompaniesCompanyIdRoute: typeof AppAdminCompaniesCompanyIdRoute
+  AppAdminCompaniesOnboardRoute: typeof AppAdminCompaniesOnboardRoute
 }
 
 const AppAdminCompaniesRouteChildren: AppAdminCompaniesRouteChildren = {
   AppAdminCompaniesCompanyIdRoute: AppAdminCompaniesCompanyIdRoute,
+  AppAdminCompaniesOnboardRoute: AppAdminCompaniesOnboardRoute,
 }
 
 const AppAdminCompaniesRouteWithChildren =

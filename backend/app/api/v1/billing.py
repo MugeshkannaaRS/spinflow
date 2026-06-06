@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from app.db.session import get_db
 from app.core.deps import get_current_user, log_audit
+from app.core.module_registry import ALL_MODULE_CODES as ALL_MODULES, get_module_label
 from app.models.user import User
 from app.models.masters import Company, CompanyModule, Mill
 from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest
@@ -902,31 +903,6 @@ async def admin_toggle_module(
 # MILL OWNER: My Plan view
 # ═══════════════════════════════════════════════════════════════════
 
-ALL_MODULES = [
-    "production", "quality", "maintenance", "hr", "payroll",
-    "purchase", "stores", "inventory", "dispatch", "lotrac",
-    "accounts", "sales", "masters", "users", "column_config",
-]
-
-MODULE_LABELS = {
-    "production": "Production",
-    "quality": "Quality",
-    "maintenance": "Maintenance",
-    "hr": "Human Resources",
-    "payroll": "Payroll",
-    "purchase": "Cotton Purchase",
-    "stores": "Stores",
-    "inventory": "Inventory",
-    "dispatch": "Dispatch",
-    "lotrac": "LoTrac",
-    "accounts": "Accounts",
-    "sales": "Sales",
-    "masters": "Masters",
-    "users": "Users & Roles",
-    "column_config": "Column Config",
-}
-
-
 @router.get("/billing/my-plan")
 async def get_my_plan(
     current_user: User = Depends(get_current_user),
@@ -990,7 +966,7 @@ async def get_my_plan(
     enabled_modules = [
         {
             "name": m,
-            "label": MODULE_LABELS.get(m, m.replace("_", " ").title()),
+            "label": get_module_label(m),
             "enabled": mod_map.get(m, False),
         }
         for m in ALL_MODULES

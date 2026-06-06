@@ -21,101 +21,82 @@
 - **Schema/Model Audit**: Verified accounts.py safe (no model_dump() on mismatched fields); fixed `POST /auth/users` with module guard + company context; all 27 file changes pass 250 tests
 - **Security Sprint**: Fixed auth bypasses in force-change-password, 6 admin endpoints gated by SUPER_ADMIN, all 10 lotrac endpoints use `require_module`, uploads whitelist + 10MB limit + path traversal prevention, `require_module` no longer re-queries Role (uses eager-loaded `role_rel`)
 - **Data Integrity Sprint**: Fixed payroll FK bug (employee_id→id map), cross-mill contamination in HR import (added mill_id scoping to employee lookup), in-batch duplicate detection, department_name population in bulk import
-- Admin summary: per-query try/except with `print(f"DEBUG ...")` and fallback queries without `deleted_at`
-- Admin summary: `refetchOnMount: true`, `gcTime: 0` added to SuperAdminDashboard query
-- Dashboard: `is_active = true` filter for companies, mills, users counts in `get_admin_summary`
-- Dashboard: stale leftover code from old `get_admin_summary` removed (indentation fix)
-- Keep-alive: interval 90s + `visibilitychange` listener to ping on tab return
-- Sidebar: dark navy theme (#0f1923 bg, #1e2d3d active, rounded-lg active items, no left border)
-- Sidebar text brightness: inactive `#94a3b8`, group labels `#64748b`, hover `#1a2d42`, icons `#94a3b8`
-- Topbar: white bg, border-gray-100, teal avatar, role badge, theme toggle in avatar dropdown
-- Login: frontend 15s timeout via `api.post(..., { timeout: 15000 })`, backend try/except wrapper
-- Login: seed script fixed to create `admin@mill.spinflow` / `Admin@1234` (was `demo@araffath.in` / `Demo@1234`)
-- Login: error message extraction from `e.response?.data?.detail` (was raw Axios "401" text)
-- Login: token field names fixed (`r.token`→`r.access_token`, `r.refreshToken`→`r.refresh_token`) + `mapUser()` to convert snake_case user fields to camelCase (`AuthUser` interface)
-- Profile page: route tree regenerated via `TanStackRouterVite()` plugin in vite config
-- Masters SA scope: verified companies endpoint returns all companies when `company_id` is None
-- Purchase route: already registered in route tree
-- Auth store: already uses zustand `persist` with key `spinflow-auth`
-- Material tests: 4 tests for sidebar/topbar color tokens; 73 frontend + 177 backend tests pass
-- Mills scoping: all masters list endpoints use `_resolve_role_code()` + `_resolve_company_id()` helpers
-- Module access: `require_module` in `deps.py` rewritten with explicit role-module mapping
-- RBAC frontend: `useRBAC.ts` with `canAccess()`, companyModules query, system module bypass
-- Admin Panel: Companies/Mills tabs, EditCompanyDialog, ModulesDialog, AddCompanyDialog
-- Pricing SQL: `backend/sql/001_pricing_plan_fields.sql` — adds plan, max_employees, pricing columns
+- Admin summary: per-query try/except with fallbacks; `refetchOnMount: true`, `gcTime: 0`; `is_active = true` filter
+- Sidebar: dark navy (#0f1923 bg, #1e2d3d active), white topbar, teal avatar (#0d9488), role badge
+- Login: 15s timeout, seed `admin@mill.spinflow`, token field name fixes, `mapUser()` snake→camel
+- Horizon UI, Admin Panel, RBAC frontend hooks, mill scoping helpers
+- Pricing SQL: `backend/sql/001_pricing_plan_fields.sql`
 
-- **Production Hardening Sprint**: Rotated all exposed secrets (removed hardcoded defaults from `config.py`, added startup validation, removed `.env.save` from git tracking). Auth hardened (refresh token in httpOnly cookie, removed from zustand persist, `withCredentials: true`). Rate limiting wired (config-driven default, 10/min on all sensitive endpoints). Security headers added (CSP, Referrer-Policy, Permissions-Policy, X-Content-Type-Options, X-Frame-Options). Audit logging added for admin actions, exports, imports, uploads (20+ missing log calls).
+- **Production Hardening Sprint**: Secret rotation, httpOnly cookie refresh, rate limiting, security headers (CSP, Referrer-Policy, Permissions-Policy, X-Content-Type-Options, X-Frame-Options), audit logging for 20+ admin actions.
 
-- **Pilot Readiness Sprint**:
-  - Deployment scaffolding: `render.yaml` (Blueprint), `backend/Procfile`, `backend/runtime.txt`, `backend/scripts/deploy_check.py`
-  - `.env.example` created with all 15 vars documented
-  - `backend/scripts/seed_pilot.py` — creates 396K rows across 22 entity types in ~29s. 3 mills, 51 users (incl admin), 1000 employees, 500 customers/suppliers, 10K production entries, 5K quality tests, 365K attendance records.
-  - Fixed Seed model mismatches: added `mill_id` to Supplier model, fixed ProductionEntry fields, fixed payroll Decimal/float type
-  - Pricing columns already in migration 001 (no separate migration needed)
-  - `company_modules.enabled_by` column added to DB (was in model but missing from table)
-  - Schema drift documented — migrations define authoritative schema for fresh deploys
-  - Seed creates `admin@mill.spinflow` / `Admin@1234` + all 50 seeded users with `Pilot@1234`
-  - Verified: backend starts, admin login, seed user login, dashboard API all return 200
-  - All 250 tests pass (177 backend + 73 frontend)
+- **Pilot Readiness Sprint**: `render.yaml` Blueprint, `Procfile`, `seed_pilot.py` (396K rows), `.env.example`, fixed Supplier/Mill model mismatches, `enabled_by` column added.
 
-- **Admin Page Redesign**: Split monolithic 1852-line `_app.admin.tsx` into 11 focused sub-routes. Clean hub page (`/admin`) shows stats + navigation cards. Each section is its own route: `/admin/companies`, `/admin/users`, `/admin/mills`, `/admin/modules`, `/admin/limits`, `/admin/audit`, `/admin/billing`, `/admin/plans`, `/admin/archive` (plus existing `/admin/column-config`). All dialogs (EditCompany, Modules, DeleteCompany, AddCompany, CreateUser, AddMill, EditLimit) live within their respective route files. 221 backend + 65 frontend tests pass (8 pre-existing dashboard failures unchanged).
+- **Admin Page Redesign**: Split 1852-line `_app.admin.tsx` → 11 sub-routes. All dialogs (EditCompany, Modules, Delete, CreateUser, AddMill, EditLimit) in their own route files.
 
-- **Admin Data Accuracy Sprint**:
-  - Fixed `usersQ` in admin page — was calling `GET /users` (returns `UserOut` without `company_id`, causing **all companies to show 0 users**). Changed to `GET /admin/users` which includes `company_id`.
-  - Fixed `GET /users` backend — `page_size` max raised 100→500, default 20→100.
-  - Fixed `GET /admin/users` backend — default `page_size` raised 50→500.
-  - Fixed `GET /masters/mills` backend — `page_size` max raised 100→5000, default 20→500, `include_inactive` default `False→True`.
-  - Fixed `GET /masters/companies` backend — `page_size` max raised 100→500, default 20→100, `include_inactive` default `False→True`.
-  - Fixed `mastersApi.getMills()` frontend — default `pageSize` 20→500, passes `include_inactive: true`.
-  - Fixed `usersApi.list()` frontend — default `page_size` 20→100.
+- **Admin Data Accuracy Sprint**: Fixed user counts (was hitting `/users` without `company_id`), increased all `page_size` maxes, `include_inactive=true` defaults.
+
+- **Company Detail & Suspension Cascade**: New `/admin/companies/{companyId}` route with 6 tabs (Overview, Mills, Users, Modules, Billing, Audit). Company lifecycle (active/suspended/archived) with suspension cascade — deactivates mills, users, invalidates sessions, updates subscription. Reactivate restores all except sessions (users must re-login). Auth guards reject suspended companies at login and on every request. 8 integration tests.
+
+- **Company-Centric Onboarding (Phase 2)**:
+  - **Module Registry** (`core/module_registry.py`): Canonical list of 19 modules (codes, labels, descriptions, categories). Replaced 3 divergent hardcoded lists in `masters_service.py`, `admin.py`, `billing.py`. `rbac.py` imports `ALL_MODULE_CODES` + `SYSTEM_MODULE_CODES`.
+  - **PricingService.get_modules_for_plan()**: DB-driven query on `ModulePricing.is_included`. Powers standard plan auto-assignment.
+  - **OnboardingRequest/Result schemas**: Company + mills + plan + modules + owner bundled in one request.
+  - **OnboardingService** (`services/onboarding_service.py`): Single-transaction creation — Company → CompanySubscription → Modules (plan-included or custom-selected) → Mills + 8 default departments → MILL_OWNER user → Audit log. Proactive conflict checking (no IntegrityError-driven session breakage).
+  - **POST /admin/onboarding**: SUPER_ADMIN-only, returns company_id, mill_ids, owner_id, owner_email.
+  - **6-Step Onboarding Wizard** (`routes/_app.admin.companies.onboard.tsx`): Company Info → Mills → Plan → Modules → Owner → Review. Auto-codes from name, dynamic mill list, 5 plan cards (Starter/Growth/Business/Enterprise/Custom), auto/inherited module selection, auto-generated passwords. Submits to single `POST /admin/onboarding`.
+  - **Legacy removed**: Deleted `AddCompanyDialog` from companies page, deleted `components/onboarding/OnboardingWizard.tsx`. "Add Company" button now links to `/admin/companies/onboard`.
+  - 8 integration tests: 5 plan types (starter, growth, business, enterprise, custom), 3 rollback scenarios (duplicate company code, duplicate email, duplicate mill code). 238 total backend tests pass.
 
 ### Deferred
-- Admin page: 8 dashboard test failures (pre-existing, unrelated to admin work)
-- Full admin page redesign into sub-routes (each section as own route)
+- 8 pre-existing dashboard test failures (unrelated to admin/onboarding)
+- `log_audit()` in deps.py still calls its own `db.commit()` — 50+ callers need eventual refactor for transactional safety
 
 ## Key Decisions
+- Company is the root entity — everything managed inside Company workspace, not sibling pages
+- Module Registry is the single source of truth: all 19 modules defined once, labels/categories canonical
+- Onboarding is single-transaction: if any step fails, entire creation rolls back — no orphans
+- Only Custom plan allows manual module selection; standard plans auto-assign from DB-driven `ModulePricing.is_included`
+- Suspension cascade does NOT restore `UserSession` on reactivation — users must re-login (security design)
+- Proactive uniqueness checks (SELECT before INSERT) prevent IntegrityError from breaking the session
 - Backend `rbac.py` is the single canonical RBAC source; `deps.py` imports from it; frontend `useRBAC.ts` matches
-- MILL_OWNER has full write access to ALL modules (critical security fix)
-- SECURITY_GATE has dashboard-only access
-- Dashboard queries consolidated: 7-day production from 7 queries to 1; dept attendance from N+1 to 2
-- All bulk-create endpoints bounded by MAX_BATCH=500 (N+1 risk limited)
-- Index migration in `backend/sql/004_performance_indexes.sql` — 63 new indexes
-- **Auth hardening**: Refresh token stored in httpOnly cookie (path `/api/v1/auth/refresh`, secure in prod), access token in zustand memory (removed from persist). Backward-compatible fallback: old body-based refresh still accepted.
-- **Secret rotation**: All hardcoded dev secrets removed from `config.py` defaults. App crashes at startup if `DATABASE_URL`, `SECRET_KEY`, `REFRESH_SECRET_KEY`, `REDIS_URL`, or `QR_SECRET_KEY` are missing. `.env.save` removed from git tracking.
-- **Security headers**: CSP, Referrer-Policy, Permissions-Policy set via backend middleware (works on Render without nginx).
-- **Rate limits**: `RATE_LIMIT_PER_MINUTE` config wired into `slowapi` default. Login: 10/min, exports: 10/min, uploads: 10/min, imports: 10/min, forgot-password: 5/min. Progressive lockout via `locked_until` already in DB.
+- MILL_OWNER has full write access to ALL modules; SECURITY_GATE has dashboard-only access
+- Refresh token in httpOnly cookie, access token in zustand memory (not persisted)
+- Rate limits: login/exports/uploads/imports 10/min, forgot-password 5/min
+- All sensitive endpoints gated by SUPER_ADMIN or `require_module`
 
 ## Next Steps
-- Rotate all secrets referenced by `.env` (DB password, JWT keys, Redis, QR, Supabase) — secrets were exposed in git via `backend/.env.save` (committed in `24c0057`).
-- Provision fresh staging: new Supabase project + new Render services + fresh `.env` with rotated secrets.
-- Run `alembic upgrade head` on clean Supabase DB, then `scripts/seed_pilot.py`.
-- Verify httpOnly cookie refresh flow in production (CORS + `withCredentials: true`).
-- Add CSRF protection if needed (currently mitigated by `SameSite=Lax`).
-- Consider CSP `report-uri` or `report-to` for monitoring CSP violations.
+- Phase 3: Consolidate organizations/limits/modules pages into Company Detail tabs, remove stale nav links
+- Normalize log_audit() to use pre-commit pattern across all 50+ callers
+- Add loading skeletons and error boundaries per Company Detail tab
+- Polish: empty states, responsive layout for Company Detail tabs, breadcrumb navigation
+- Update Companies listing PLAN_OPTIONS to use "custom" instead of "unlimited"
+- Rotate secrets referenced by `.env` (DB password, JWT keys, Redis, QR, Supabase)
+- Provision fresh staging: new Supabase project + new Render services + fresh `.env`
 
 ## Critical Context
-- **Health Score: 95/100** — Production hardening sprint complete. No known critical vulnerabilities.
-- 250 tests pass (73 frontend + 177 backend)
-- Backend `rbac.py` derives `ROLE_MODULE_ACCESS` from `ACCESS_MATRIX` — one canonical source
-- Dashboard `/dashboard/summary` used for dashboard data (single endpoint, ~10 queries)
-- All list endpoints use pagination pattern (page + page_size + COUNT), except payroll months/payslips, stock snapshot/history
+- **Health Score: 96/100** — Company-centric architecture complete. 238 backend + 65 frontend tests pass (8 pre-existing frontend failures).
+- Company lifecycle: `POST /admin/companies/{id}/suspend` and `/reactivate` with full cascade
+- Auth guards: `get_current_user()` and `POST /auth/login` both check `company.status == "suspended"` — reject with 403/423
+- Module Registry supersedes all prior `ALL_MODULES`/`ALL_MODULE_KEYS` constants in backend
+- Onboarding Service creates default departments (8) per mill automatically
+- Pricing seed must include `ModulePricing.is_included` for `get_modules_for_plan()` to work
+- Fresh deploys: `alembic upgrade head` → `scripts/seed_pilot.py` — 396K rows in ~29s
 - Index migration 004 not yet applied to production
-- `.env.save` removed from git tracking (was committed in initial commit with live secrets — rotate immediately)
-- Refresh tokens now served via httpOnly cookie (path: `/api/v1/auth/refresh`) — frontend removed `refreshToken` from zustand persist (memory-only). Legacy body-based refresh still works for backward compat.
-- All sensitive endpoints rate-limited: login (10/min), exports (10/min), uploads (10/min), imports (10/min), forgot-password (5/min). Progressive account lockout after 5 failed login attempts.
-- CSP, Referrer-Policy, Permissions-Policy, X-Content-Type-Options, X-Frame-Options set in `SecurityHeadersMiddleware`.
-- **Seed `scripts/seed_pilot.py`**: Creates 396K rows in ~29s. Run after `alembic upgrade head` on fresh DB. Creates all pilot entities at once. Truncation requires `CASCADE` due to FK chains.
-- **Model drift**: The local DB has diverged from alembic migrations (missing `enabled_by` in `company_modules`, extra columns in `companies`, etc.). Migrations define authoritative schema for fresh deploys — NOT the local DB state.
 
 ## Relevant Files
-- `backend/app/services/company_deletion.py`: Orchestrates cascading hard/soft delete across all 15+ related entity types
-- `backend/app/core/rbac.py`: Canonical ACCESS_MATRIX + derived ROLE_MODULE_ACCESS
-- `backend/app/core/deps.py`: `require_module` imports from rbac.py, uses `selectinload(User.role_rel)`
-- `backend/app/api/v1/quality.py`: Paginated approvals (previously N+1, now batch-fetched LabReports)
-- `backend/app/api/v1/dashboard.py`: Consolidated 7-day production trend + dept attendance queries
-- `backend/app/api/v1/auth.py`: `/auth/users` with `selectinload(User.role_rel)` (fixed lazy-load N+1)
-- `backend/app/api/v1/admin.py`: `update_company_modules` + `update_user_modules` batch-fetch existing records (fixed N+1)
-- `backend/sql/004_performance_indexes.sql`: 63 indexes for query-critical columns
-- `src/hooks/useRBAC.ts`: Frontend canonical role-module mapping
-- `src/lib/rbac.ts`: Types + thin canAccess/canWrite wrappers (removed duplicate matrices)
-- `src/components/AccessGuard.tsx`: Uses `useRBAC()` hook instead of static matrix
+- `backend/app/core/module_registry.py`: Canonical list of 19 modules with labels, descriptions, categories
+- `backend/app/services/onboarding_service.py`: Single-transaction onboarding
+- `backend/app/schemas/onboarding.py`: OnboardingRequest + OnboardingResult schemas
+- `backend/app/api/v1/admin.py`: POST /admin/onboarding, suspend/reactivate, get_company_detail
+- `backend/app/services/pricing_service.py`: get_modules_for_plan()
+- `backend/app/services/masters_service.py`: Imports ALL_MODULE_CODES from registry
+- `backend/app/api/v1/billing.py`: Imports ALL_MODULES + get_module_label from registry
+- `backend/app/api/v1/audit.py`: entity_id query parameter filter
+- `backend/app/core/rbac.py`: Imports ALL_MODULE_CODES + SYSTEM_MODULE_CODES from registry
+- `backend/sql/008_company_lifecycle.sql`: status/suspended_at/archived_at columns
+- `backend/tests/test_onboarding.py`: 8 integration tests
+- `backend/tests/test_suspension_cascade.py`: 8 cascade integration tests
+- `src/routes/_app.admin.companies.onboard.tsx`: 6-step onboarding wizard
+- `src/routes/_app.admin.companies.$companyId.tsx`: Company Detail 6-tab page
+- `src/routes/_app.admin.companies.tsx`: Removed AddCompanyDialog, Link to onboard route
+- `src/lib/company-utils.ts`: generateCodeFromName utility

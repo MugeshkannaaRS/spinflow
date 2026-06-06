@@ -80,6 +80,13 @@ class PricingService:
         )
         return result.scalar_one_or_none()
 
+    async def get_modules_for_plan(self, plan_code: str) -> List[str]:
+        """Return list of module codes that are included in the given plan."""
+        plan = await self.get_plan_by_code(plan_code)
+        if not plan:
+            return []
+        return [mp.module_name for mp in (plan.module_prices or []) if mp.is_included]
+
     async def calculate_company_cost(
         self, company: Company,
         plan: Optional[SubscriptionPlan] = None,

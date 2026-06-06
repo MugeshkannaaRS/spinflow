@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, adminApi } from "@/lib/api-service";
 import { api } from "@/lib/api";
@@ -30,7 +30,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Plus,
@@ -39,10 +39,6 @@ import {
   Pencil,
   Download,
   CheckCircle,
-  Check,
-  ChevronRight,
-  CheckCircle2,
-  Copy,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { cn } from "@/lib/utils";
@@ -128,7 +124,6 @@ function CompaniesPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
 
-  const [addCompanyOpen, setAddCompanyOpen] = useState(false);
   const [editCompany, setEditCompany] = useState<Company | null>(null);
   const [modulesCompany, setModulesCompany] = useState<Company | null>(null);
   const [suspendCompany, setSuspendCompany] = useState<Company | null>(null);
@@ -218,8 +213,10 @@ function CompaniesPage() {
             <Button size="sm" variant="outline" onClick={handleExport}>
               <Download className="size-4 mr-1" /> Export
             </Button>
-            <Button size="sm" onClick={() => setAddCompanyOpen(true)}>
-              <Plus className="size-4 mr-1" /> Add Company
+            <Button size="sm" asChild>
+              <Link to="/admin/companies/onboard">
+                <Plus className="size-4 mr-1" /> Add Company
+              </Link>
             </Button>
           </div>
         </CardHeader>
@@ -294,8 +291,6 @@ function CompaniesPage() {
 
         <EditCompanyDialog company={editCompany} onClose={() => setEditCompany(null)} onDone={() => { qc.invalidateQueries({ queryKey: ["masters"] }); qc.invalidateQueries({ queryKey: ["admin-summary"] }); setEditCompany(null); }} />
         <ModulesDialog company={modulesCompany} onClose={() => setModulesCompany(null)} onDone={() => { qc.invalidateQueries({ queryKey: ["masters"] }); qc.invalidateQueries({ queryKey: ["admin-summary"] }); if (modulesCompany?.id) qc.invalidateQueries({ queryKey: ["company-modules", modulesCompany.id] }); setModulesCompany(null); }} />
-        <AddCompanyDialog open={addCompanyOpen} onOpenChange={setAddCompanyOpen} />
-
         <AlertDialog open={!!suspendCompany} onOpenChange={() => setSuspendCompany(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -322,328 +317,6 @@ function CompaniesPage() {
         </AlertDialog>
       </Card>
     </div>
-  );
-}
-
-function AddCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
-  const qc = useQueryClient();
-  const [step, setStep] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [createdUser, setCreatedUser] = useState<{ email: string } | null>(null);
-  const [tempPassword, setTempPassword] = useState("");
-
-  const [company, setCompany] = useState({ name: "", code: "", gstin: "", phone: "", email: "" });
-  const [mill, setMill] = useState({ name: "", code: "", city: "", state: "" });
-  const [plan, setPlan] = useState({ plan: "starter", max_users: 10, max_employees: 100 });
-  const [modules, setModules] = useState<Record<string, boolean>>(
-    Object.fromEntries(ALL_MODULES.map(m => [m, true]))
-  );
-  const [owner, setOwner] = useState({ name: "", email: "" });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const PLANS = [
-    { value: "starter", label: "Starter", price: "\u20B93,50,000", maxEmp: 100, maxUsers: 10, desc: "Up to 100 employees" },
-    { value: "growth", label: "Growth", price: "\u20B97,50,000", maxEmp: 300, maxUsers: 25, desc: "Up to 300 employees" },
-    { value: "business", label: "Business", price: "\u20B915,00,000", maxEmp: 600, maxUsers: 50, desc: "Up to 600 employees" },
-    { value: "enterprise", label: "Enterprise", price: "\u20B928,00,000", maxEmp: 1500, maxUsers: 100, desc: "Up to 1500 employees" },
-    { value: "unlimited", label: "Unlimited", price: "\u20B945,00,000", maxEmp: 99999, maxUsers: 250, desc: "Unlimited employees" },
-  ];
-
-  const handlePlanChange = (planValue: string) => {
-    const p = PLANS.find(x => x.value === planValue);
-    if (p) setPlan({ plan: planValue, max_users: p.maxUsers, max_employees: p.maxEmp });
-  };
-
-  const resetAll = () => {
-    setStep(0); setLoading(false); setCreatedUser(null);
-    setCompany({ name: "", code: "", gstin: "", phone: "", email: "" });
-    setMill({ name: "", code: "", city: "", state: "" });
-    setPlan({ plan: "starter", max_users: 10, max_employees: 100 });
-    setModules(Object.fromEntries(ALL_MODULES.map(m => [m, true])));
-    setOwner({ name: "", email: "" });
-    setErrors({});
-  };
-
-  const handleNext = () => {
-    const errs: Record<string, string> = {};
-    if (step === 0) {
-      if (!company.name.trim()) errs.name = "Company name is required";
-      if (!company.code.trim()) errs.code = "Company code is required";
-      const g = company.gstin.trim();
-      if (g && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(g.toUpperCase())) {
-        errs.gstin = "Invalid GSTIN format";
-      }
-    } else if (step === 1) {
-      if (!mill.name.trim()) errs.millName = "Mill name is required";
-      if (!mill.code.trim()) errs.millCode = "Mill code is required";
-    }
-    setErrors(errs);
-    if (Object.keys(errs).length > 0) return;
-    setStep(s => s + 1);
-  };
-
-  const handleSubmit = async () => {
-    if (!owner.name.trim() || !owner.email.trim()) {
-      setErrors({ owner: "Mill owner name and email are required" });
-      return;
-    }
-    setLoading(true);
-    try {
-      const comp = await mastersApi.createCompany({
-        code: company.code.trim(), name: company.name.trim(),
-        gstin: company.gstin.trim() || undefined,
-        phone: company.phone.trim() || undefined,
-        email: company.email.trim() || undefined,
-      });
-      const companyId = comp.id ?? comp._id;
-
-      await mastersApi.createMill({
-        company_id: companyId,
-        code: mill.code.trim(),
-        name: mill.name.trim(),
-        city: mill.city.trim() || undefined,
-        state: mill.state.trim() || undefined,
-      });
-
-      const enabledMods = Object.entries(modules).filter(([, v]) => v).map(([k]) => k);
-      if (enabledMods.length > 0) {
-        await adminApi.createCompanyModules(companyId, enabledMods);
-      }
-
-      await api.patch(`/admin/companies/${companyId}/limits`, {
-        max_users: plan.max_users,
-        max_employees: plan.max_employees,
-        plan: plan.plan,
-      });
-
-      const pw = generateTempPassword();
-      setTempPassword(pw);
-      const user = await api.post("/users", {
-        full_name: owner.name.trim(),
-        email: owner.email.trim(),
-        password: pw,
-        role: "MILL_OWNER",
-        company_id: companyId,
-        mill_id: null,
-      }).then(r => r.data);
-
-      setCreatedUser({ email: user.email });
-      setStep(3);
-      qc.invalidateQueries({ queryKey: ["masters"] });
-      qc.invalidateQueries({ queryKey: ["system-users"] });
-      qc.invalidateQueries({ queryKey: ["admin-summary"] });
-    } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? "Onboarding failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const copyCredentials = async () => {
-    const text = `Login: https://spinflow-f.onrender.com\nEmail: ${createdUser?.email}\nPassword: ${tempPassword}`;
-    try { await navigator.clipboard.writeText(text); toast.success("Credentials copied"); }
-    catch { toast.error("Failed to copy"); }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) { resetAll(); onOpenChange(false); } }}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Onboard New Company</DialogTitle>
-          <DialogDescription>3-step wizard to create company, mill, and first user.</DialogDescription>
-        </DialogHeader>
-
-        {step < 3 && (
-          <div className="flex items-center gap-2 mb-4">
-            {["Company", "Mill", "Plan & Access"].map((s, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className={cn(
-                  "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors",
-                  step > i ? "bg-blue-600 text-white" :
-                  step === i ? "bg-blue-100 text-blue-700 ring-2 ring-blue-500" :
-                  "bg-gray-100 text-gray-400"
-                )}>
-                  {step > i ? <Check className="w-3 h-3" /> : i + 1}
-                </div>
-                <span className={cn(
-                  "text-sm font-medium",
-                  step === i ? "text-blue-700" : "text-gray-400"
-                )}>
-                  {s}
-                </span>
-                {i < 2 && <ChevronRight className="w-4 h-4 text-gray-300" />}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {step === 0 && (
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>Company Name <span className="text-destructive">*</span></Label>
-              <Input value={company.name} onChange={e => { setCompany({ ...company, name: e.target.value }); if (!company.code) setCompany(c => ({ ...c, code: generateCodeFromName(e.target.value) })); }} placeholder="e.g. AA Yarn Mills Pvt Ltd" />
-              {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Company Code <span className="text-destructive">*</span></Label>
-              <Input value={company.code} onChange={e => setCompany({ ...company, code: e.target.value.toUpperCase() })} placeholder="e.g. AAY" />
-              {errors.code && <p className="text-xs text-destructive">{errors.code}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label>GSTIN</Label>
-              <Input value={company.gstin} onChange={e => setCompany({ ...company, gstin: e.target.value })} placeholder="15 alphanumeric chars" />
-              {errors.gstin && <p className="text-xs text-destructive">{errors.gstin}</p>}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Phone</Label>
-                <Input value={company.phone} onChange={e => setCompany({ ...company, phone: e.target.value })} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Email</Label>
-                <Input type="email" value={company.email} onChange={e => setCompany({ ...company, email: e.target.value })} />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button onClick={handleNext}>Next: Mill Setup</Button>
-            </div>
-          </div>
-        )}
-
-        {step === 1 && (
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>Mill Name <span className="text-destructive">*</span></Label>
-              <Input value={mill.name} onChange={e => { setMill({ ...mill, name: e.target.value }); if (!mill.code) setMill(c => ({ ...c, code: generateCodeFromName(e.target.value) })); }} placeholder="e.g. AA Yarn Unit 1" />
-              {errors.millName && <p className="text-xs text-destructive">{errors.millName}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Mill Code <span className="text-destructive">*</span></Label>
-              <Input value={mill.code} onChange={e => setMill({ ...mill, code: e.target.value.toUpperCase() })} placeholder="e.g. AYU1" />
-              {errors.millCode && <p className="text-xs text-destructive">{errors.millCode}</p>}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>City</Label>
-                <Input value={mill.city} onChange={e => setMill({ ...mill, city: e.target.value })} placeholder="e.g. Coimbatore" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>State</Label>
-                <Input value={mill.state} onChange={e => setMill({ ...mill, state: e.target.value })} placeholder="e.g. Tamil Nadu" />
-              </div>
-            </div>
-            <div className="flex justify-between gap-2 pt-2">
-              <Button variant="outline" onClick={() => setStep(0)}>Back</Button>
-              <Button onClick={handleNext}>Next: Plan & User</Button>
-            </div>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Plan</label>
-              <div className="grid grid-cols-1 gap-2">
-                {PLANS.map(p => (
-                  <label key={p.value}
-                    className={cn(
-                      "flex items-center justify-between p-3 rounded-xl border-2 cursor-pointer",
-                      "transition-all duration-150",
-                      plan.plan === p.value
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                        : "border-gray-200 dark:border-slate-700 hover:border-blue-300"
-                    )}>
-                    <input type="radio" name="plan" value={p.value}
-                      checked={plan.plan === p.value}
-                      onChange={() => handlePlanChange(p.value)}
-                      className="sr-only" />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm text-gray-900 dark:text-white">{p.label}</span>
-                        <span className="text-xs text-gray-500">{p.desc}</span>
-                      </div>
-                      <div className="text-xs text-gray-400 mt-0.5">{p.maxUsers} users max</div>
-                    </div>
-                    <span className={cn("font-bold text-sm", plan.plan === p.value ? "text-blue-600" : "text-gray-500")}>
-                      {p.price}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <Label className="text-sm font-semibold">Modules</Label>
-              <p className="text-xs text-gray-400 mb-2">Select modules to enable for this company</p>
-              <div className="grid grid-cols-2 gap-2">
-                {ALL_MODULES.map(mod => (
-                  <div key={mod} className="flex items-center justify-between p-2 rounded-md border border-gray-100">
-                    <span className="text-xs font-medium">{MODULE_LABELS[mod]}</span>
-                    <Switch checked={modules[mod]} onCheckedChange={v => setModules(p => ({ ...p, [mod]: v }))} />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="border-t pt-3">
-              <Label className="text-sm font-semibold">Mill Owner Account</Label>
-              <div className="space-y-2 mt-2">
-                <Input value={owner.name} onChange={e => setOwner({ ...owner, name: e.target.value })} placeholder="Owner name" />
-                <Input type="email" value={owner.email} onChange={e => setOwner({ ...owner, email: e.target.value })} placeholder="Owner email" />
-              </div>
-              {errors.owner && <p className="text-xs text-destructive mt-1">{errors.owner}</p>}
-            </div>
-
-            <div className="flex justify-between gap-2 pt-2">
-              <Button variant="outline" onClick={() => setStep(1)}>Back</Button>
-              <Button onClick={handleSubmit} disabled={loading}>
-                {loading ? "Onboarding\u2026" : "Complete Onboarding"}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {step === 3 && (
-          <div className="text-center space-y-4 py-4">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-              <CheckCircle2 className="w-8 h-8 text-green-600" />
-            </div>
-            <h3 className="text-lg font-semibold">Company onboarded successfully!</h3>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-left">
-              <p className="text-sm font-semibold text-blue-800 mb-3">
-                Share these credentials with the mill owner:
-              </p>
-              <div className="space-y-2 font-mono text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Login URL:</span>
-                  <span className="text-blue-700">https://spinflow-f.onrender.com</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Email:</span>
-                  <span className="font-semibold">{createdUser?.email}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Password:</span>
-                  <span className="font-semibold text-green-700">{tempPassword}</span>
-                </div>
-              </div>
-              <p className="text-xs text-blue-600 mt-3">
-                \u26A0\uFE0F User will be asked to change password on first login
-              </p>
-            </div>
-
-            <div className="flex gap-3 justify-center">
-              <Button onClick={copyCredentials} variant="outline">
-                <Copy className="w-4 h-4 mr-2" /> Copy Credentials
-              </Button>
-              <Button onClick={() => { resetAll(); onOpenChange(false); }}>Done</Button>
-            </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
   );
 }
 

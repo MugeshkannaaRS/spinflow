@@ -13,24 +13,22 @@ logger = logging.getLogger(__name__)
 
 from app.db.session import get_db
 from app.core.deps import get_current_user, get_mill_scope, log_audit
+from app.core.module_registry import ALL_MODULE_CODES as ALL_MODULE_KEYS
 from app.models.user import User, Role, UserSession
 from app.models.masters import Company, CompanyModule, Mill, MillSettings
 from app.models.billing import CompanySubscription, SubscriptionPlan
 from app.models.audit import AuditLog
 from app.models.deletion_log import DeletionLog
+from app.core.error_handler import SpinFlowException
 from app.services.deletion_service import CompanyDeletionService
 from app.services.company_stats import CompanyStatsService
+from app.services.onboarding_service import OnboardingService
+from app.schemas.onboarding import OnboardingRequest, OnboardingResult
 from sqlalchemy import update as sa_update
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 router = APIRouter()
-
-ALL_MODULE_KEYS = [
-    "dashboard", "production", "quality", "maintenance", "hr",
-    "payroll", "purchase", "stores", "inventory", "dispatch",
-    "lotrac", "accounts", "sales", "masters", "users", "reports",
-]
 
 
 @router.get("/admin/companies/{company_id}/modules")
@@ -630,6 +628,27 @@ async def get_company_detail(
         "subscription": subscription,
         "recent_audit": recent_audit,
     }
+
+
+@router.post("/admin/onboarding", response_model=OnboardingResult)
+async def admin_onboarding(
+    dto: OnboardingRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Onboard a new company with mills + owner in a single transaction."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(403, "Super Admin only")
+
+    svc = OnboardingService(db, current_user)
+    try:
+        return await svc.onboard(dto)
+    except SpinFlowException:
+        raise
+    except Exception:
+        logger.exception("Onboarding failed unexpectedly")
+        raise HTTPException(500, "Internal server error during onboarding")
 
 
 @router.get("/admin/mills/{mill_id}/settings")

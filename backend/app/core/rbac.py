@@ -9,6 +9,7 @@ All three layers are enforced at the API level via access.py:
 """
 
 from typing import Union, Literal
+from app.core.module_registry import ALL_MODULE_CODES, SYSTEM_MODULE_CODES
 
 ROLES = [
     "SUPER_ADMIN", "MILL_OWNER", "GENERAL_MANAGER",
@@ -18,15 +19,9 @@ ROLES = [
     "SECURITY_GATE", "AUDITOR",
 ]
 
-MODULES = [
-    "dashboard", "production", "quality", "inventory", "dispatch",
-    "purchase", "stores", "hr", "accounts", "maintenance",
-    "users", "audit", "reports", "masters", "stock", "sales", "lotrac",
-    "payroll",
-    "column_config", "whatsapp", "lc_tracking", "analytics", "uploads",
-]
+MODULES = ALL_MODULE_CODES + ["whatsapp", "lc_tracking", "analytics"]
 
-SYSTEM_MODULES = frozenset({"dashboard", "masters", "users", "column_config", "audit"})
+SYSTEM_MODULES = frozenset(SYSTEM_MODULE_CODES)
 
 DASHBOARD_ONLY_ROLES = frozenset({"MACHINE_OPERATOR", "SECURITY_GATE"})
 

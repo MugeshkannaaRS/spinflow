@@ -10,6 +10,7 @@ logger = logging.getLogger("spinflow")
 
 from app.services.base import BaseService
 from app.core.error_handler import SpinFlowException
+from app.core.module_registry import ALL_MODULE_CODES as ALL_MODULES
 from app.schemas.masters import (
     CompanyCreate, CompanyUpdate, CompanyOut,
     MillCreate, MillUpdate, MillOut,
@@ -26,13 +27,6 @@ from app.models.masters import (
 from app.models.billing import SubscriptionPlan, CompanySubscription
 from app.models.audit import AuditLog
 
-
-ALL_MODULES = [
-    "dashboard", "production", "quality", "inventory", "dispatch",
-    "purchase", "stores", "hr", "accounts", "maintenance",
-    "users", "audit", "reports", "masters", "stock", "sales", "lotrac",
-    "payroll",
-]
 
 DEFAULT_DEPARTMENTS = [
     ("blowroom", "Blowroom"),
