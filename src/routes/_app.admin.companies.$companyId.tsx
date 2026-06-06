@@ -139,7 +139,7 @@ function CompanyDetailPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Users</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Users</CardTitle>
             <Users className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -424,7 +424,7 @@ function BillingTab({ companyId, company }: { companyId: string; company: any })
 function AuditTab({ companyId }: { companyId: string }) {
   const { data: audit } = useQuery({
     queryKey: ["company-audit", companyId],
-    queryFn: () => api.get(`/admin/audit?entity_id=${companyId}&page_size=50`).then((r: any) => r.data?.data ?? r.data ?? []),
+    queryFn: () => api.get(`/audit/logs?entity_id=${companyId}&page_size=50`).then((r: any) => r.data?.data ?? []),
   });
 
   const entries = Array.isArray(audit) ? audit : [];

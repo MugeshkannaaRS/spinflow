@@ -39,6 +39,7 @@ async def get_audit_logs(
     page_size: int = Query(50, ge=1, le=100),
     action: Optional[str] = None,
     entity: Optional[str] = None,
+    entity_id: Optional[str] = None,
 ):
     try:
         scope = await get_mill_scope(current_user, db)
@@ -56,6 +57,8 @@ async def get_audit_logs(
             query = query.where(AuditLog.action == action)
         if entity:
             query = query.where(AuditLog.entity == entity)
+        if entity_id:
+            query = query.where(AuditLog.entity_id == entity_id)
         count_stmt = select(func.count()).select_from(query.subquery())
         total = (await db.execute(count_stmt)).scalar() or 0
         query = query.offset((page - 1) * page_size).limit(page_size)

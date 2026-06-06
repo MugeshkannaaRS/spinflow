@@ -461,12 +461,16 @@ async def suspend_company(
     if sub:
         sub.status = "suspended"
 
+    db.add(AuditLog(
+        user_id=current_user.id,
+        user_name=current_user.name,
+        role=role_code,
+        action="company_suspended",
+        entity="company",
+        entity_id=company_id,
+        details="Company suspended with cascade: mills, users, sessions disabled",
+    ))
     await db.commit()
-    await log_audit(
-        db, current_user.id, role_code,
-        "company_suspended", "company", company_id,
-        f"Company suspended with cascade: mills, users, sessions disabled",
-    )
     return {"id": company_id, "status": "suspended", "suspended_at": str(now)}
 
 
@@ -504,12 +508,16 @@ async def reactivate_company(
     if sub:
         sub.status = "active"
 
+    db.add(AuditLog(
+        user_id=current_user.id,
+        user_name=current_user.name,
+        role=role_code,
+        action="company_reactivated",
+        entity="company",
+        entity_id=company_id,
+        details="Company reactivated: mills and users restored",
+    ))
     await db.commit()
-    await log_audit(
-        db, current_user.id, role_code,
-        "company_reactivated", "company", company_id,
-        f"Company reactivated: mills and users restored",
-    )
     return {"id": company_id, "status": "active"}
 
 
@@ -555,7 +563,7 @@ async def get_company_detail(
     ).scalar() or 0
 
     user_count = (
-        await db.execute(select(func.count()).select_from(User).where(User.company_id == company_id, User.is_active == True))
+        await db.execute(select(func.count()).select_from(User).where(User.company_id == company_id, User.is_active == True, User.deleted_at.is_(None)))
     ).scalar() or 0
 
     module_result = await db.execute(
