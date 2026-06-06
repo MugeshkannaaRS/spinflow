@@ -1,8 +1,11 @@
+import logging
 from typing import Optional
 from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError
+
+logger = logging.getLogger("spinflow")
 
 from app.services.base import BaseService
 from app.core.error_handler import SpinFlowException
@@ -70,11 +73,13 @@ class MastersService(BaseService):
         return await self.get_or_404(Company, id)
 
     async def create_company(self, dto: CompanyCreate, created_by: Optional[str] = None):
+        logger.info("Creating company: name=%s code=%s", dto.name, dto.code)
         try:
             record = Company(**dto.model_dump())
             self.db.add(record)
             await self.db.flush()
         except IntegrityError:
+            logger.warning("Company creation failed: code '%s' already exists (name=%s)", dto.code, dto.name)
             raise SpinFlowException.conflict(f"Company with code '{dto.code}' already exists")
 
         for module_name in ALL_MODULES:

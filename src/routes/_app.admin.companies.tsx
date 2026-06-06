@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { cn } from "@/lib/utils";
+import { generateCodeFromName } from "@/lib/company-utils";
 import type { Company } from "@/lib/types";
 
 export const Route = createFileRoute("/_app/admin/companies")({
@@ -478,7 +479,7 @@ function AddCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label>Company Name <span className="text-destructive">*</span></Label>
-              <Input value={company.name} onChange={e => { setCompany({ ...company, name: e.target.value }); if (!company.code) setCompany(c => ({ ...c, code: e.target.value.slice(0, 3).toUpperCase() })); }} placeholder="e.g. AA Yarn Mills Pvt Ltd" />
+              <Input value={company.name} onChange={e => { setCompany({ ...company, name: e.target.value }); if (!company.code) setCompany(c => ({ ...c, code: generateCodeFromName(e.target.value) })); }} placeholder="e.g. AA Yarn Mills Pvt Ltd" />
               {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
             </div>
             <div className="space-y-1.5">
@@ -512,7 +513,7 @@ function AddCompanyDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label>Mill Name <span className="text-destructive">*</span></Label>
-              <Input value={mill.name} onChange={e => { setMill({ ...mill, name: e.target.value }); if (!mill.code) setMill(c => ({ ...c, code: e.target.value.slice(0, 3).toUpperCase() })); }} placeholder="e.g. AA Yarn Unit 1" />
+              <Input value={mill.name} onChange={e => { setMill({ ...mill, name: e.target.value }); if (!mill.code) setMill(c => ({ ...c, code: generateCodeFromName(e.target.value) })); }} placeholder="e.g. AA Yarn Unit 1" />
               {errors.millName && <p className="text-xs text-destructive">{errors.millName}</p>}
             </div>
             <div className="space-y-1.5">

@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { generateCodeFromName } from "@/lib/company-utils";
 import {
   ChevronLeft,
   ChevronRight,
@@ -255,7 +256,8 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
       qc.invalidateQueries({ queryKey: ["system-users"] });
       setSuccess({ email: user.email ?? ownerForm.email, password: ownerForm.password });
     } catch (err: any) {
-      toast.error(err?.response?.data?.detail ?? err.message ?? "Onboarding failed");
+      const errMsg = err?.response?.data?.message ?? err?.response?.data?.detail ?? err?.message ?? "Onboarding failed";
+      toast.error(errMsg);
       setProgress(null);
     }
   };
@@ -346,11 +348,11 @@ export function OnboardingWizard({ open, onClose }: OnboardingWizardProps) {
                 <p className="text-sm text-muted-foreground">Enter the basic details of the new company.</p>
                 <div className="space-y-1.5">
                   <Label>Company Name <span className="text-destructive">*</span></Label>
-                  <Input value={companyForm.name} onChange={(e) => setCompanyForm({ ...companyForm, name: e.target.value })} placeholder="e.g. SpinFlow Textiles Pvt Ltd" />
+                  <Input value={companyForm.name} onChange={(e) => setCompanyForm(f => ({ ...f, name: e.target.value, code: f.code || generateCodeFromName(e.target.value) }))} placeholder="e.g. SpinFlow Textiles Pvt Ltd" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Code <span className="text-destructive">*</span></Label>
-                  <Input value={companyForm.code} onChange={(e) => setCompanyForm({ ...companyForm, code: e.target.value })} placeholder="e.g. SPIN001" />
+                  <Input value={companyForm.code} onChange={(e) => setCompanyForm({ ...companyForm, code: e.target.value.toUpperCase() })} placeholder="e.g. SPINFLOW_TEXTILES" />
                 </div>
                 <div className="space-y-1.5">
                   <Label>GSTIN</Label>
