@@ -10,7 +10,8 @@ from sqlalchemy.orm import selectinload
 
 from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription
 from app.models.masters import Company, CompanyModule, Mill
-from app.models.user import User
+from app.models.user import User, UserSession
+from app.core.module_registry import ALL_MODULE_CODES, SYSTEM_MODULE_CODES
 
 
 @dataclass
@@ -331,36 +332,30 @@ class PricingService:
         self.db.add_all(plans)
         await self.db.flush()
 
-        MODULES = [
-            "production", "quality", "inventory", "dispatch", "purchase",
-            "stores", "hr", "accounts", "maintenance", "payroll", "sales",
-            "lotrac", "reports",
-        ]
+        CORE = {"production", "quality", "inventory", "dispatch", "purchase",
+                "stores", "hr", "accounts", "maintenance"}
+        ADDONS = {"payroll", "sales", "lotrac", "reports", "stock", "whatsapp",
+                  "lc_tracking", "analytics", "uploads"}
         for plan in plans:
-            for mod in MODULES:
+            for mod in ALL_MODULE_CODES:
                 if plan.code == "custom":
                     is_included = False
-                    monthly = 0
-                    yearly = 0
+                elif plan.code == "enterprise":
+                    is_included = True
+                elif plan.code == "business":
+                    is_included = mod in CORE or mod in ADDONS
+                elif plan.code == "growth":
+                    is_included = mod in CORE or mod in {"payroll", "lotrac"}
+                elif plan.code == "starter":
+                    is_included = mod in CORE
                 else:
-                    is_included = plan.code == "enterprise" or (
-                        plan.code == "business" and mod in (
-                            "production", "quality", "inventory", "dispatch",
-                            "purchase", "stores", "hr", "accounts", "maintenance",
-                            "payroll", "sales", "lotrac",
-                        )
-                    ) or (
-                        plan.code == "growth" and mod in (
-                            "production", "quality", "inventory", "dispatch",
-                            "purchase", "stores", "hr", "accounts", "maintenance",
-                        )
-                    ) or (
-                        plan.code == "starter" and mod in (
-                            "production", "quality", "inventory", "dispatch",
-                        )
-                    )
-                    monthly = 0 if is_included else 999
-                    yearly = 0 if is_included else 9990
+                    is_included = False
+
+                if mod in SYSTEM_MODULE_CODES:
+                    is_included = True
+
+                monthly = 0 if is_included else 999
+                yearly = 0 if is_included else 9990
                 mp = ModulePricing(
                     plan_id=plan.id,
                     module_name=mod,
@@ -399,5 +394,23 @@ class PricingService:
         )
         for sub in expired_subs.scalars().all():
             sub.status = "suspended"
+            # Cascade: suspend company, mills, users, and invalidate sessions
+            company = await self.db.get(Company, sub.company_id)
+            if company:
+                company.is_active = False
+                company.status = "suspended"
+                company.suspended_at = now
+            await self.db.execute(
+                select(Mill).where(Mill.company_id == sub.company_id)
+            )
+            await self.db.execute(
+                update(Mill).where(Mill.company_id == sub.company_id).values(is_active=False)
+            )
+            await self.db.execute(
+                update(User).where(User.company_id == sub.company_id).values(is_active=False)
+            )
+            await self.db.execute(
+                update(UserSession).where(UserSession.company_id == sub.company_id).values(is_active=False)
+            )
 
         await self.db.flush()

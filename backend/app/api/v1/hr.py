@@ -235,6 +235,20 @@ async def create_employee(
     if total_sal is None:
         total_sal = (req.basic or 0) + (req.house_rent or 0) + (req.medical or 0) + (req.conveyance or 0) + (req.food_allowance or 0) + (req.wages or 0) + (req.increment or 0) + (req.mobile_bill or 0) + (req.shift_benefit or 0)
 
+    # Enforce max_employees limit
+    mill = await db.get(Mill, mill_id)
+    if mill:
+        company = await db.get(Company, mill.company_id)
+        if company and company.max_employees:
+            emp_count = await db.scalar(
+                select(func.count()).select_from(Employee)
+                .where(Employee.mill_id.in_(
+                    select(Mill.id).where(Mill.company_id == company.id)
+                ), Employee.is_active == True)
+            )
+            if emp_count is not None and emp_count >= company.max_employees:
+                raise HTTPException(403, f"Employee limit reached ({emp_count}/{company.max_employees}). Upgrade plan.")
+
     emp = Employee(
         code=req.employee_code,
         name=req.full_name,
@@ -361,6 +375,20 @@ async def bulk_create_employees(
     # SUPER_ADMIN / MILL_OWNER can import into any mill in their company
     if mill_id != scope.get("mill_id") and scope.get("role") not in ("SUPER_ADMIN", "MILL_OWNER"):
         raise HTTPException(403, "Cannot import employees into a different mill")
+
+    # Enforce max_employees limit
+    mill_row = (await db.execute(select(Mill).where(Mill.id == mill_id))).scalar_one_or_none()
+    if mill_row:
+        company = await db.get(Company, mill_row.company_id)
+        if company and company.max_employees:
+            total_emp = await db.scalar(
+                select(func.count()).select_from(Employee)
+                .where(Employee.mill_id.in_(
+                    select(Mill.id).where(Mill.company_id == company.id)
+                ), Employee.is_active == True)
+            )
+            if total_emp is not None and total_emp + len(req.items) > company.max_employees:
+                raise HTTPException(403, f"Employee limit reached ({total_emp}/{company.max_employees}). Cannot add {len(req.items)} more.")
 
     # Resolve company_id for custom fields
     resolved_company_id = scope.get("company_id")

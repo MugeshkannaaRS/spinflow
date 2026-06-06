@@ -169,6 +169,16 @@ async def create_user(
         if not ok:
             raise HTTPException(status_code=403, detail=msg)
 
+        # Use SELECT FOR UPDATE to prevent race condition on user limit check
+        company_result = await db.execute(
+            select(Company).where(Company.id == company_id).with_for_update()
+        )
+        company = company_result.scalar_one_or_none()
+        if not company:
+            raise HTTPException(404, "Company not found")
+        if company.is_active is False:
+            raise HTTPException(403, "Cannot create users for an inactive or suspended company")
+
         user_count = await db.execute(
             select(func.count(User.id)).where(
                 User.company_id == company_id,
@@ -177,12 +187,6 @@ async def create_user(
             )
         )
         count = user_count.scalar() or 0
-        company_result = await db.execute(select(Company).where(Company.id == company_id))
-        company = company_result.scalar_one_or_none()
-        if not company:
-            raise HTTPException(404, "Company not found")
-        if company.is_active is False:
-            raise HTTPException(403, "Cannot create users for an inactive or suspended company")
         max_users = getattr(company, 'max_users', 50) or 50
         if count >= max_users:
             raise HTTPException(403, f"User limit reached ({count}/{max_users}). Upgrade plan first.")
@@ -834,11 +838,52 @@ async def admin_dashboard(
     from app.models.billing import CompanySubscription
 
     try:
-        # One aggregation query per company
+        # Batch aggregate queries — 4 queries total regardless of company count
         companies_res = await db.execute(
             select(Company).order_by(Company.name)
         )
         companies = companies_res.scalars().all()
+        company_ids = [c.id for c in companies]
+
+        # Single query: mill counts per company
+        mill_counts = {
+            row[0]: row[1] for row in (
+                await db.execute(
+                    select(Mill.company_id, func.count(Mill.id))
+                    .where(Mill.company_id.in_(company_ids))
+                    .group_by(Mill.company_id)
+                )
+            ).all()
+        }
+
+        # Single query: user counts per company
+        user_counts = {
+            row[0]: row[1] for row in (
+                await db.execute(
+                    select(User.company_id, func.count(User.id))
+                    .where(
+                        User.company_id.in_(company_ids),
+                        User.is_active == True,
+                        User.deleted_at.is_(None),
+                    )
+                    .group_by(User.company_id)
+                )
+            ).all()
+        }
+
+        # Single query: enabled module counts per company
+        mod_counts = {
+            row[0]: row[1] for row in (
+                await db.execute(
+                    select(CompanyModule.company_id, func.count(CompanyModule.id))
+                    .where(
+                        CompanyModule.company_id.in_(company_ids),
+                        CompanyModule.is_enabled == True,
+                    )
+                    .group_by(CompanyModule.company_id)
+                )
+            ).all()
+        }
 
         result_companies = []
         total_mills = 0
@@ -846,32 +891,11 @@ async def admin_dashboard(
         over_limit = 0
 
         for co in companies:
-            mills_cnt = int((await db.execute(
-                select(func.count(Mill.id)).where(Mill.company_id == co.id)
-            )).scalar() or 0)
+            mills_cnt = mill_counts.get(co.id, 0)
+            users_cnt = user_counts.get(co.id, 0)
+            mods_cnt = mod_counts.get(co.id, 0)
 
-            users_cnt = int((await db.execute(
-                select(func.count(User.id)).where(
-                    User.company_id == co.id,
-                    User.is_active == True,
-                    User.deleted_at.is_(None),
-                )
-            )).scalar() or 0)
-
-            mods_cnt = int((await db.execute(
-                select(func.count(CompanyModule.id)).where(
-                    CompanyModule.company_id == co.id,
-                    CompanyModule.is_enabled == True,
-                )
-            )).scalar() or 0)
-
-            sub_res = await db.execute(
-                select(CompanySubscription).where(CompanySubscription.company_id == co.id)
-            )
-            sub = sub_res.scalar_one_or_none()
-            plan_name = str(getattr(sub, "plan_id", None) or "starter")
-            max_u = int(getattr(sub, "max_users", 0) or 0)
-            # Single source of truth: Company.is_active
+            max_u = co.max_users or 0
             company_status = "active" if co.is_active else "suspended"
             is_over = max_u > 0 and users_cnt > max_u
             if is_over:
@@ -885,7 +909,7 @@ async def admin_dashboard(
                 "name": co.name,
                 "code": co.code,
                 "status": company_status,
-                "plan": plan_name,
+                "plan": co.plan or "starter",
                 "mills": mills_cnt,
                 "users": users_cnt,
                 "max_users": max_u,
@@ -940,6 +964,8 @@ async def delete_company(
     company = company_q.scalar_one_or_none()
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+    if company.status != "archived":
+        raise HTTPException(status_code=409, detail="Company must be archived before deletion. Archive it first.")
 
     svc = CompanyDeletionService(db, current_user)
     result = await svc.hard_delete(company_id)
@@ -980,6 +1006,8 @@ async def archive_company(
     company = company_q.scalar_one_or_none()
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+    if company.status != "suspended":
+        raise HTTPException(status_code=409, detail="Company must be suspended before archiving. Suspend it first.")
 
     svc = CompanyDeletionService(db, current_user)
     result = await svc.archive(company_id)

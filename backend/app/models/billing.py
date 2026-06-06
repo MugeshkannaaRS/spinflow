@@ -74,7 +74,7 @@ class BillingInvoice(TimestampMixin, Base):
     gateway: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     pdf_content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     line_items: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
-    invoice_metadata: Mapped[Optional[dict]] = mapped_column("metadata", JSON, default=dict)
+    invoice_metadata: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
 
 
 class SubscriptionChangeRequest(TimestampMixin, Base):
@@ -91,4 +91,4 @@ class SubscriptionChangeRequest(TimestampMixin, Base):
     reviewed_by: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     review_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    request_metadata: Mapped[Optional[dict]] = mapped_column("metadata", JSON, default=dict)
+    request_metadata: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)

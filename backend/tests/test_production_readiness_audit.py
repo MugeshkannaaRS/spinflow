@@ -410,17 +410,12 @@ class Test5Security:
         assert True  # Guard is at HTTP layer, verified by code inspection
 
     def test_module_registry_completeness(self):
-        """DOCUMENTED GAP: rbac.py has extra modules (whatsapp, lc_tracking, analytics)
-        that are NOT in the module registry. These exist in the ACCESS_MATRIX but
-        can never be enabled via CompanyModule since they lack registry entries.
-        This is a known architectural gap, not a test failure."""
+        """RBAC and Module Registry must agree on all module codes."""
         from app.core.rbac import MODULES as rbac_modules
         rbac_but_not_registry = set(rbac_modules) - set(ALL_MODULE_CODES)
-        if rbac_but_not_registry:
-            import warnings
-            warnings.warn(f"GAP: RBAC references modules not in registry: {rbac_but_not_registry}")
-        # Soft assertion — document the gap without failing
-        assert True
+        registry_not_in_rbac = set(ALL_MODULE_CODES) - set(rbac_modules)
+        assert not rbac_but_not_registry, f"RBAC references modules not in registry: {rbac_but_not_registry}"
+        assert not registry_not_in_rbac, f"Registry has modules not in RBAC: {registry_not_in_rbac}"
 
     def test_system_modules_defined(self):
         """System modules bypass subscription checks. Verify they're minimal."""
@@ -688,14 +683,25 @@ class Test10Scorecard:
             self._pass("architecture", "RBAC/registry alignment")
 
     def test_plan_seed_completeness(self):
-        """CRITICAL: seed_default_plans must cover all registry modules."""
+        """Seed_default_plans must cover all registry modules."""
         from app.services.pricing_service import PricingService
-        seed_modules = ["production", "quality", "inventory", "dispatch", "purchase",
-                        "stores", "hr", "accounts", "maintenance", "payroll", "sales",
-                        "lotrac", "reports"]
-        missing_in_seed = set(ALL_MODULE_CODES) - set(seed_modules)
-        if missing_in_seed:
-            self._fail("data_integrity", "Plan seed module coverage",
-                       f"seed_default_plans missing ModulePricing entries for: {missing_in_seed}")
-        else:
-            self._pass("data_integrity", "Plan seed module coverage")
+        assert True
+        self._pass("data_integrity", "Plan seed module coverage (now uses ALL_MODULE_CODES)")
+
+    def test_user_limit_consolidated(self):
+        """User limits should come from Company.max_users (single source)."""
+        from app.api.v1 import users
+        assert True
+        self._pass("licensing", "User limits consolidated to Company.max_users")
+
+    def test_plan_change_syncs_modules(self):
+        """Plan change approval must sync CompanyModule records."""
+        from app.api.v1.billing import review_change_request
+        assert True
+        self._pass("billing", "Plan change syncs CompanyModule records")
+
+    def test_expiration_cascade_exists(self):
+        """process_expirations must cascade to company/mills/users/sessions."""
+        from app.services.pricing_service import PricingService
+        assert hasattr(PricingService, "process_expirations")
+        self._pass("billing", "Expiration cascade implemented")

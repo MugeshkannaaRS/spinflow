@@ -42,6 +42,9 @@ ALL_MODULES_DEFS: Dict[str, ModuleDef] = {
         ModuleDef("masters", "Masters", "Master data: customers, suppliers, yarn counts", "system"),
         ModuleDef("column_config", "Column Config", "Customize table column visibility", "system"),
         ModuleDef("uploads", "Uploads", "File uploads and attachments", "addon"),
+        ModuleDef("analytics", "Advanced Analytics", "P&L dashboard, efficiency benchmarks, lot traceability", "addon"),
+        ModuleDef("whatsapp", "WhatsApp Alerts", "Machine down, low stock, daily MIS report alerts", "addon"),
+        ModuleDef("lc_tracking", "LC Tracking", "Letter of Credit management with expiry alerts", "addon"),
     ]
 }
 

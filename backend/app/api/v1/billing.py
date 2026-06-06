@@ -433,6 +433,30 @@ async def review_change_request(
             sub.plan_id = change_request.requested_plan_id
             sub.status = "active"
 
+        # Sync CompanyModule records to match the new plan
+        from app.models.masters import CompanyModule
+        mp_result = await db.execute(
+            select(ModulePricing).where(ModulePricing.plan_id == change_request.requested_plan_id)
+        )
+        module_prices = mp_result.scalars().all()
+        for mp in module_prices:
+            existing_cm = await db.execute(
+                select(CompanyModule).where(
+                    CompanyModule.company_id == change_request.company_id,
+                    CompanyModule.module_name == mp.module_name,
+                )
+            )
+            cm = existing_cm.scalar_one_or_none()
+            if cm:
+                cm.is_enabled = mp.is_included
+            else:
+                db.add(CompanyModule(
+                    company_id=change_request.company_id,
+                    module_name=mp.module_name,
+                    is_enabled=mp.is_included,
+                    enabled_by=current_user.id,
+                ))
+
     await db.commit()
     await db.refresh(change_request)
     await log_audit(db, current_user.id, current_user.role or "UNKNOWN", "change_request_reviewed", "subscription_change_request", request_id, f"{req.status} plan change {request_id}")

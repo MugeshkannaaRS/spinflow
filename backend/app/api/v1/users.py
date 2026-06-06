@@ -106,9 +106,8 @@ async def create_user(
     else:
         mill_name = None
 
-    # Check user limit — check both Company.max_users and CompanySubscription.max_users
+    # Check user limit — single source: Company.max_users
     if company_id:
-        from app.models.billing import CompanySubscription
         count_result = await db.execute(
             select(func.count(User.id)).where(
                 User.company_id == company_id,
@@ -118,25 +117,18 @@ async def create_user(
         )
         active_count = int(count_result.scalar() or 0)
 
-        # Try subscription limit first (more accurate)
-        sub_res = await db.execute(
-            select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+        company_result = await db.execute(
+            select(Company).where(Company.id == company_id).with_for_update()
         )
-        sub = sub_res.scalar_one_or_none()
-        sub_max = getattr(sub, "max_users", None) if sub else None
-
-        # Fall back to company.max_users
-        company_result = await db.execute(select(Company).where(Company.id == company_id))
         company = company_result.scalar_one_or_none()
         if company and company.is_active is False:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot create users for an inactive or suspended company")
-        company_max = company.max_users if company else None
 
-        effective_max = sub_max or company_max
-        if effective_max and active_count >= effective_max:
+        max_users = getattr(company, 'max_users', 50) or 50
+        if active_count >= max_users:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"User limit reached ({active_count}/{effective_max}). Upgrade your plan to add more users.",
+                detail=f"User limit reached ({active_count}/{max_users}). Upgrade your plan to add more users.",
             )
 
     user = User(
