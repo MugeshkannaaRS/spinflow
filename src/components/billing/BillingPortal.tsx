@@ -4,6 +4,7 @@ import { useMillSubscription, useUpdateCurrency } from "@/hooks/useMillConfig";
 import { setCurrencySymbol } from "@/lib/formatters";
 import { api } from "@/lib/api";
 import { useAuth, type CompanyMill } from "@/stores/auth";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -241,6 +242,7 @@ function SuperAdminBillingView() {
             />
           </div>
           <div className="overflow-x-auto">
+            <div className="min-w-[640px]">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[#f1f5f9] border-b border-[#e2e8f0]">
@@ -331,6 +333,7 @@ function SuperAdminBillingView() {
                 }
               </tbody>
             </table>
+            </div>
           </div>
           {totalPages > 1 && (
             <div className="px-5 py-3 border-t border-[#e2e8f0] flex items-center justify-between text-[13px] text-[#64748b]">
@@ -899,31 +902,33 @@ function MillOwnerBillingView() {
             <div className="px-5 py-4 border-b border-[#e2e8f0]">
               <h3 className="text-sm font-semibold text-[#0f172a]">Payment History</h3>
             </div>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-[#f1f5f9] border-b border-[#e2e8f0]">
-                  {["Month","Amount","Status","Paid On","Invoice"].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {d.invoices.map((inv: any) => (
-                  <tr key={inv.id} className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors">
-                    <td className="px-4 py-3 font-medium text-[#0f172a]">{inv.month}</td>
-                    <td className="px-4 py-3 font-mono text-[#0f172a]">{fmtLakh(inv.amount)}</td>
-                    <td className="px-4 py-3"><StatusBadge status={inv.status} size="sm" /></td>
-                    <td className="px-4 py-3 text-[#64748b]">{inv.paid_at ? fmtDate(inv.paid_at) : "—"}</td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => handleDownloadInvoice(inv.id)}
-                        className="inline-flex items-center gap-1 text-[12px] font-medium text-blue-600 hover:text-blue-800 transition-colors">
-                        <Download className="w-3.5 h-3.5" /> PDF
-                      </button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#f1f5f9] border-b border-[#e2e8f0]">
+                    {["Month","Amount","Status","Paid On","Invoice"].map(h => (
+                      <th key={h} className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide whitespace-nowrap">{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {d.invoices.map((inv: any) => (
+                    <tr key={inv.id} className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors">
+                      <td className="px-4 py-3 font-medium text-[#0f172a] whitespace-nowrap">{inv.month}</td>
+                      <td className="px-4 py-3 font-mono text-[#0f172a] whitespace-nowrap">{fmtLakh(inv.amount)}</td>
+                      <td className="px-4 py-3"><StatusBadge status={inv.status} size="sm" /></td>
+                      <td className="px-4 py-3 text-[#64748b] whitespace-nowrap">{inv.paid_at ? fmtDate(inv.paid_at) : "—"}</td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => handleDownloadInvoice(inv.id)}
+                          className="inline-flex items-center gap-1 text-[12px] font-medium text-blue-600 hover:text-blue-800 transition-colors">
+                          <Download className="w-3.5 h-3.5 shrink-0" /> PDF
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -967,6 +972,9 @@ function MillOwnerBillingView() {
 export function BillingPortal() {
   const { user } = useAuth();
   const role = user?.role ?? "";
-  if (role === "SUPER_ADMIN") return <SuperAdminBillingView />;
-  return <MillOwnerBillingView />;
+  return (
+    <ErrorBoundary>
+      {role === "SUPER_ADMIN" ? <SuperAdminBillingView /> : <MillOwnerBillingView />}
+    </ErrorBoundary>
+  );
 }

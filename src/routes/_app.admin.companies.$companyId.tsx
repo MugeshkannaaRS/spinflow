@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, adminApi } from "@/lib/api-service";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,7 +14,7 @@ import {
   ClipboardList, Activity, Shield, Zap,
   DollarSign, BarChart3, ExternalLink,
   Download, Receipt, Store, UserPlus,
-  RefreshCw, AlertTriangle,
+  RefreshCw, AlertTriangle, Bell, CalendarDays, CircleAlert,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -171,6 +172,18 @@ function CompanyDetailPage() {
                   <AlertTriangle className="size-3" /> Overdue
                 </Badge>
               )}
+              {company.subscription?.expires_at && !company.subscription?.overdue_status && (
+                (() => {
+                  const daysLeft = Math.ceil((new Date(company.subscription.expires_at).getTime() - Date.now()) / 86400000);
+                  if (daysLeft > 30) return null;
+                  return (
+                    <Badge className={daysLeft > 0 ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800"}>
+                      <CalendarDays className="size-3 mr-1" />
+                      {daysLeft > 0 ? `${daysLeft}d remaining` : "Expired"}
+                    </Badge>
+                  );
+                })()
+              )}
             </div>
             <p className="text-sm text-muted-foreground mt-0.5">
               Code: {company.code}
@@ -300,6 +313,49 @@ function CompanyDetailPage() {
         </Card>
       </div>
 
+      {/* Open Alerts */}
+      <Card className="border-amber-200 bg-amber-50/30">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Bell className="size-4" /> Open Alerts
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const alerts: { label: string; type: "critical" | "warning" | "info" }[] = [];
+            if (company.status === "suspended") alerts.push({ label: "Company is suspended", type: "critical" });
+            if (company.subscription?.overdue_status === "overdue") alerts.push({ label: "Payment is overdue", type: "critical" });
+            if (userCount > userLimit) alerts.push({ label: `User limit exceeded (${userCount}/${userLimit})`, type: "warning" });
+            if (millCount > millLimit) alerts.push({ label: `Mill limit exceeded (${millCount}/${millLimit})`, type: "warning" });
+            if (employeeCount > employeeLimit) alerts.push({ label: `Employee limit exceeded (${employeeCount}/${employeeLimit})`, type: "warning" });
+            if (company.subscription?.expires_at) {
+              const daysLeft = Math.ceil((new Date(company.subscription.expires_at).getTime() - Date.now()) / 86400000);
+              if (daysLeft > 0 && daysLeft <= 30) alerts.push({ label: `Subscription renews in ${daysLeft} days`, type: "warning" });
+              if (daysLeft <= 0) alerts.push({ label: "Subscription has expired", type: "critical" });
+            }
+            if (alerts.length === 0) alerts.push({ label: "No active alerts — all systems nominal", type: "info" });
+            return (
+              <div className="space-y-1.5">
+                {alerts.map((a, i) => (
+                  <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${
+                    a.type === "critical" ? "bg-red-50 text-red-700" :
+                    a.type === "warning" ? "bg-amber-50 text-amber-700" :
+                    "bg-blue-50 text-blue-700"
+                  }`}>
+                    <CircleAlert className={`size-4 shrink-0 ${
+                      a.type === "critical" ? "text-red-500" :
+                      a.type === "warning" ? "text-amber-500" :
+                      "text-blue-500"
+                    }`} />
+                    {a.label}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </CardContent>
+      </Card>
+
       {/* Tabs */}
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <div className="overflow-x-auto">
@@ -354,23 +410,23 @@ function CompanyDetailPage() {
         </TabsContent>
 
         <TabsContent value="mills">
-          <MillsTab companyId={companyId} />
+          <ErrorBoundary><MillsTab companyId={companyId} /></ErrorBoundary>
         </TabsContent>
 
         <TabsContent value="users">
-          <UsersTab companyId={companyId} company={company} />
+          <ErrorBoundary><UsersTab companyId={companyId} company={company} /></ErrorBoundary>
         </TabsContent>
 
         <TabsContent value="modules">
-          <ModulesTab companyId={companyId} />
+          <ErrorBoundary><ModulesTab companyId={companyId} /></ErrorBoundary>
         </TabsContent>
 
         <TabsContent value="billing">
-          <BillingTab companyId={companyId} company={company} />
+          <ErrorBoundary><BillingTab companyId={companyId} company={company} /></ErrorBoundary>
         </TabsContent>
 
         <TabsContent value="audit">
-          <AuditTab companyId={companyId} />
+          <ErrorBoundary><AuditTab companyId={companyId} /></ErrorBoundary>
         </TabsContent>
       </Tabs>
     </div>
