@@ -12,15 +12,20 @@ from app.core.deps import get_current_user, log_audit
 from app.core.module_registry import ALL_MODULE_CODES as ALL_MODULES, get_module_label
 from app.models.user import User
 from app.models.masters import Company, CompanyModule, Mill
-from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest
+from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest, BillingPayment, OveragePricing
 from app.services.pricing_service import PricingService
 from app.services.billing_service import BillingService
+from app.services.billing_invoice_service import InvoiceService
+from app.services.payment_service import PaymentService
+from app.services.overdue_service import OverdueService
 from app.schemas.billing import (
     ModulePricingOut, SubscriptionPlanOut, PlanCreate, PlanUpdate,
     CompanyCostOut, CompanySubscriptionOut, UpdateSubscriptionRequest, SetCompanyPlanRequest,
     InvoiceLineItem, InvoiceOut, ChangeRequestOut, ChangeRequestCreate, ChangeRequestReview,
     CompanyBillingRow, StatusUpdateBody, ModuleToggleBody,
     BillingSummaryOut, SubscriptionRowOut, InvoiceRowOut, PaymentRowOut, AnalyticsOut,
+    PaymentCreate, PaymentOut, InvoiceDetailOut, PurchaseOverageRequest, PurchaseOverageResult,
+    AutoInvoiceResult, OverdueWorkflowResult, BillingDashboardOut, SubscriptionRowEnriched,
 )
 
 logger = logging.getLogger(__name__)
@@ -153,6 +158,7 @@ async def set_company_plan(
         sub.addon_modules = req.addon_modules or {}
         sub.extra_mills = req.extra_mills or 0
         sub.extra_users = req.extra_users or 0
+        sub.extra_employees = req.extra_employees or 0
         sub.status = "active"
     else:
         sub = CompanySubscription(
@@ -164,6 +170,7 @@ async def set_company_plan(
             addon_modules=req.addon_modules or {},
             extra_mills=req.extra_mills or 0,
             extra_users=req.extra_users or 0,
+            extra_employees=req.extra_employees or 0,
         )
         db.add(sub)
 
@@ -1055,3 +1062,529 @@ async def get_my_plan(
         "last_payment_at": last_payment,
         "invoices": invoices_out,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# BILLING COMMERCE — Payment, Invoice Engine, Overage, Overdue
+# ═══════════════════════════════════════════════════════════════════
+
+
+# ── Payment Endpoints ────────────────────────────────────
+
+
+@router.post("/admin/billing/payments", response_model=PaymentOut)
+async def record_payment(
+    body: PaymentCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Record a payment (manual or gateway). SUPER_ADMIN only."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = PaymentService(db, current_user)
+    try:
+        payment = await svc.record_payment(
+            company_id=body.company_id,
+            amount=body.amount,
+            method=body.method,
+            reference_number=body.reference_number,
+            invoice_id=body.invoice_id,
+            notes=body.notes,
+        )
+        co = await db.get(Company, body.company_id)
+        inv = None
+        inv_number = None
+        if body.invoice_id:
+            inv = await db.get(BillingInvoice, body.invoice_id)
+            if inv:
+                inv_number = inv.invoice_number
+        return {
+            "id": payment.id,
+            "company_id": body.company_id,
+            "company_name": co.name if co else None,
+            "invoice_id": body.invoice_id,
+            "invoice_number": inv_number,
+            "amount": float(payment.amount),
+            "currency": payment.currency,
+            "method": payment.method,
+            "reference_number": payment.reference_number,
+            "gateway": payment.gateway,
+            "status": payment.status,
+            "paid_at": payment.paid_at.isoformat() if payment.paid_at else None,
+            "notes": payment.notes,
+            "created_at": payment.created_at.isoformat() if payment.created_at else None,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/admin/billing/payments-list")
+async def list_payments(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    company_id: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all payments (from billing_payments table). SUPER_ADMIN only."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = PaymentService(db, current_user)
+    rows, total = await svc.get_payments(page, page_size, company_id, status_filter)
+    return {"items": rows, "total": total, "page": page, "page_size": page_size}
+
+
+@router.get("/admin/billing/company-payments/{company_id}")
+async def company_payments(
+    company_id: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List payments for a specific company."""
+    if current_user.role not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(status_code=403, detail="Super Admin or Mill Owner only")
+    svc = PaymentService(db, current_user)
+    rows, total = await svc.get_company_payments(company_id, page, page_size)
+    return {"items": rows, "total": total, "page": page, "page_size": page_size}
+
+
+@router.post("/admin/billing/payments/{payment_id}/reconcile")
+async def reconcile_payment(
+    payment_id: str,
+    invoice_id: str = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reconcile a payment to an invoice."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = PaymentService(db, current_user)
+    try:
+        result = await svc.reconcile_payment(payment_id, invoice_id)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/admin/billing/payments/{payment_id}/refund")
+async def refund_payment(
+    payment_id: str,
+    reason: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Refund a payment."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = PaymentService(db, current_user)
+    try:
+        refund = await svc.refund_payment(payment_id, reason)
+        return {
+            "id": refund.id,
+            "amount": float(refund.amount),
+            "status": refund.status,
+            "notes": refund.notes,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── Invoice Engine Endpoints ────────────────────────────
+
+
+@router.post("/admin/billing/invoices/generate-subscription", response_model=InvoiceDetailOut)
+async def generate_subscription_invoice(
+    company_id: str = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate a subscription invoice for a company. SUPER_ADMIN only."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = InvoiceService(db)
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    period_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+    if now.month == 12:
+        period_end = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc) - timedelta(seconds=1)
+    else:
+        period_end = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc) - timedelta(seconds=1)
+    try:
+        invoice = await svc.generate_subscription_invoice(company_id, period_start, period_end)
+        await db.commit()
+        co = await db.get(Company, company_id)
+        return {
+            "id": invoice.id,
+            "invoice_number": invoice.invoice_number,
+            "company_id": company_id,
+            "company_name": co.name if co else None,
+            "amount": float(invoice.amount),
+            "subtotal": float(invoice.subtotal),
+            "tax_amount": float(invoice.tax_amount),
+            "currency": invoice.currency,
+            "status": invoice.status,
+            "invoice_type": invoice.invoice_type,
+            "billing_period_start": invoice.billing_period_start.isoformat() if invoice.billing_period_start else None,
+            "billing_period_end": invoice.billing_period_end.isoformat() if invoice.billing_period_end else None,
+            "due_date": invoice.due_date.isoformat() if invoice.due_date else None,
+            "paid_at": invoice.paid_at.isoformat() if invoice.paid_at else None,
+            "line_items": invoice.line_items,
+            "notes": invoice.notes,
+            "is_auto_generated": invoice.is_auto_generated,
+            "created_at": invoice.created_at.isoformat() if invoice.created_at else None,
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/admin/billing/invoices/generate-monthly", response_model=AutoInvoiceResult)
+async def generate_monthly_invoices(
+    year_month: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}$"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate subscription invoices for all active companies. SUPER_ADMIN only."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = InvoiceService(db)
+    result = await svc.generate_all_monthly_invoices(year_month)
+    await db.commit()
+    return result
+
+
+@router.post("/admin/billing/invoices/generate-renewals")
+async def generate_renewal_invoices(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate renewal invoices for subscriptions expiring soon. SUPER_ADMIN only."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = InvoiceService(db)
+    invoices = await svc.generate_past_due_invoices()
+    await db.commit()
+    return {"generated": len(invoices), "invoice_ids": [inv.id for inv in invoices]}
+
+
+@router.get("/admin/billing/invoices/{invoice_id}", response_model=InvoiceDetailOut)
+async def get_invoice_detail(
+    invoice_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get full invoice detail."""
+    if current_user.role not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(status_code=403, detail="Super Admin or Mill Owner only")
+    invoice = await db.get(BillingInvoice, invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    co = await db.get(Company, invoice.company_id)
+    return {
+        "id": invoice.id,
+        "invoice_number": invoice.invoice_number,
+        "company_id": invoice.company_id,
+        "company_name": co.name if co else None,
+        "amount": float(invoice.amount),
+        "subtotal": float(invoice.subtotal),
+        "tax_amount": float(invoice.tax_amount),
+        "currency": invoice.currency,
+        "status": invoice.status,
+        "invoice_type": invoice.invoice_type,
+        "billing_period_start": invoice.billing_period_start.isoformat() if invoice.billing_period_start else None,
+        "billing_period_end": invoice.billing_period_end.isoformat() if invoice.billing_period_end else None,
+        "due_date": invoice.due_date.isoformat() if invoice.due_date else None,
+        "paid_at": invoice.paid_at.isoformat() if invoice.paid_at else None,
+        "transaction_id": invoice.transaction_id,
+        "gateway": invoice.gateway,
+        "line_items": invoice.line_items,
+        "notes": invoice.notes,
+        "is_auto_generated": invoice.is_auto_generated,
+        "created_at": invoice.created_at.isoformat() if invoice.created_at else None,
+    }
+
+
+# ── Overage Purchase Endpoint ────────────────────────────
+
+
+@router.post("/admin/billing/companies/{company_id}/purchase-overage", response_model=PurchaseOverageResult)
+async def purchase_overage(
+    company_id: str,
+    body: PurchaseOverageRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Purchase additional resource capacity (extra users/mills/employees). SUPER_ADMIN only."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    sub_res = await db.execute(
+        select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+    )
+    sub = sub_res.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=400, detail="Company has no subscription")
+    plan = await db.get(SubscriptionPlan, sub.plan_id)
+    if not plan:
+        raise HTTPException(status_code=400, detail="Plan not found")
+
+    # Determine unit price
+    if body.resource_type == "extra_users":
+        unit_price = float(plan.additional_user_cost or 0)
+        sub.extra_users = (sub.extra_users or 0) + body.quantity
+        label = "users"
+    elif body.resource_type == "extra_mills":
+        unit_price = float(plan.additional_mill_cost or 0)
+        sub.extra_mills = (sub.extra_mills or 0) + body.quantity
+        label = "mills"
+    elif body.resource_type == "extra_employees":
+        unit_price = float(plan.additional_employee_cost or 0)
+        sub.extra_employees = (sub.extra_employees or 0) + body.quantity
+        label = "employees"
+    else:
+        raise HTTPException(status_code=400, detail="Invalid resource type")
+
+    if unit_price <= 0:
+        raise HTTPException(status_code=400, detail=f"This plan includes unlimited {label} — no purchase needed")
+
+    # Generate overage invoice
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    period_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+    if now.month == 12:
+        period_end = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc) - timedelta(seconds=1)
+    else:
+        period_end = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc) - timedelta(seconds=1)
+
+    svc = InvoiceService(db)
+    invoice = await svc.generate_overage_invoice(
+        company_id=company_id,
+        resource_type=body.resource_type,
+        quantity=body.quantity,
+        unit_price=unit_price,
+        period_start=period_start,
+        period_end=period_end,
+    )
+    await db.commit()
+    return PurchaseOverageResult(
+        success=True,
+        invoice_id=invoice.id,
+        invoice_number=invoice.invoice_number,
+        amount=float(invoice.amount),
+        resource_type=body.resource_type,
+        quantity=body.quantity,
+        message=f"Added {body.quantity} {label} at {unit_price:.2f} each. Invoice {invoice.invoice_number} generated.",
+    )
+
+
+# ── Overdue Workflow Endpoint ────────────────────────────
+
+
+@router.post("/admin/billing/overdue/process", response_model=OverdueWorkflowResult)
+async def run_overdue_workflow(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Run the overdue management workflow. SUPER_ADMIN only."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = OverdueService(db)
+    result = await svc.process_overdue_workflow()
+    await db.commit()
+    return result
+
+
+@router.post("/admin/billing/companies/{company_id}/restore-overdue")
+async def restore_overdue_company(
+    company_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Restore a company from overdue status after payment. SUPER_ADMIN only."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = OverdueService(db)
+    result = await svc.restore_from_overdue(company_id)
+    await db.commit()
+    return result
+
+
+# ── Enriched Billing Dashboard ──────────────────────────
+
+
+@router.get("/admin/billing/dashboard", response_model=BillingDashboardOut)
+async def billing_dashboard(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Enriched billing dashboard with comprehensive KPIs."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = BillingService(db)
+    summary = await svc.get_billing_summary()
+    analytics = await svc.get_analytics()
+
+    # Count new customers this month
+    from datetime import date as date_type
+    today = date_type.today()
+    first_of_month = datetime(today.year, today.month, 1, tzinfo=timezone.utc)
+    new_res = await db.execute(
+        select(func.count()).select_from(Company).where(Company.created_at >= first_of_month)
+    )
+    new_customers_this_month = int(new_res.scalar() or 0)
+
+    # Count companies over limit
+    over_limit = 0
+    companies_res = await db.execute(select(Company))
+    for co in companies_res.scalars().all():
+        sub_res = await db.execute(
+            select(CompanySubscription).where(CompanySubscription.company_id == co.id)
+        )
+        sub = sub_res.scalar_one_or_none()
+        if sub:
+            plan = await db.get(SubscriptionPlan, sub.plan_id)
+            if plan:
+                limit = (plan.included_users or 0) + (sub.extra_users or 0)
+                user_cnt = int((await db.execute(
+                    select(func.count()).select_from(User).where(
+                        User.company_id == co.id,
+                        User.is_active == True,
+                        User.deleted_at.is_(None),
+                    )
+                )).scalar() or 0)
+                if limit > 0 and user_cnt > limit:
+                    over_limit += 1
+
+    return {
+        "mrr": summary["mrr"],
+        "arr": summary["arr"],
+        "active_subscriptions": summary["active_subscriptions"],
+        "trial_companies": summary["trial_count"],
+        "overdue_companies": summary["overdue_count"],
+        "suspended_companies": summary["suspended_count"],
+        "collection_rate": summary["collection_rate"],
+        "revenue_growth": summary["revenue_growth"],
+        "new_customers": new_customers_this_month,
+        "churn_rate": analytics.get("churn_rate", 0),
+        "total_companies": summary["total_companies"],
+        "new_customers_this_month": new_customers_this_month,
+        "companies_over_limit": over_limit,
+        "revenue_trend": summary["revenue_trend"],
+    }
+
+
+# ── Enriched Subscription Listing ────────────────────────
+
+
+@router.get("/admin/billing/subscriptions-enriched")
+async def enriched_subscriptions(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status_filter: Optional[str] = None,
+    plan_filter: Optional[str] = None,
+    search: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Enriched subscription listing with employee counts and module names."""
+    if current_user.role != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+    svc = BillingService(db)
+    rows, total = await svc.get_subscriptions_list(page, page_size, status_filter, plan_filter, search)
+
+    # Enrich with employee counts and module lists
+    enriched = []
+    for row in rows:
+        emp_res = await db.execute(
+            select(func.count()).select_from(Employee).where(
+                Employee.company_id == row["company_id"],
+                Employee.is_active == True,
+            )
+        )
+        emp_count = int(emp_res.scalar() or 0)
+
+        # Get employee limit from plan + extras
+        sub_res = await db.execute(
+            select(CompanySubscription).where(CompanySubscription.company_id == row["company_id"])
+        )
+        sub = sub_res.scalar_one_or_none()
+        emp_limit = 100  # default
+        if sub:
+            plan = await db.get(SubscriptionPlan, sub.plan_id)
+            if plan:
+                emp_limit = (plan.included_users or 0) * 20 + (sub.extra_employees or 0)
+
+        # Get module names
+        mods_res = await db.execute(
+            select(CompanyModule).where(
+                CompanyModule.company_id == row["company_id"],
+                CompanyModule.is_enabled == True,
+            )
+        )
+        modules_list = [m.module_name for m in mods_res.scalars().all()]
+
+        enriched.append({
+            **row,
+            "employee_count": emp_count,
+            "employee_limit": emp_limit,
+            "modules_list": modules_list,
+            "subscription_type": sub.billing_cycle if sub else "monthly",
+            "monthly_value": row["monthly_amount"],
+        })
+
+    return {"items": enriched, "total": total, "page": page, "page_size": page_size}
+
+
+# ── Company billing detail enriched with employee data ──
+
+
+@router.get("/admin/billing/company-detail/{company_id}")
+async def company_billing_detail_enriched(
+    company_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Company billing detail with employee counts and payment history."""
+    if current_user.role not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(status_code=403, detail="Super Admin or Mill Owner only")
+    svc = BillingService(db)
+    detail = await svc.get_company_billing_detail(company_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    # Add employee info
+    emp_res = await db.execute(
+        select(func.count()).select_from(Employee).where(
+            Employee.company_id == company_id,
+            Employee.is_active == True,
+        )
+    )
+    detail["employee_count"] = int(emp_res.scalar() or 0)
+
+    # Add payment history
+    pay_svc = PaymentService(db)
+    payments, pay_total = await pay_svc.get_company_payments(company_id, 1, 10)
+    detail["payments"] = payments
+
+    # Subscription changes
+    changes_res = await db.execute(
+        select(SubscriptionChangeRequest)
+        .where(SubscriptionChangeRequest.company_id == company_id)
+        .order_by(SubscriptionChangeRequest.created_at.desc())
+        .limit(10)
+    )
+    detail["change_requests"] = [
+        {
+            "id": cr.id,
+            "change_type": cr.change_type,
+            "status": cr.status,
+            "created_at": cr.created_at.isoformat() if cr.created_at else None,
+        }
+        for cr in changes_res.scalars().all()
+    ]
+
+    return detail

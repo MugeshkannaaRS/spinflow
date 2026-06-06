@@ -18,6 +18,7 @@ class SubscriptionPlan(TimestampMixin, Base):
     included_users: Mapped[int] = mapped_column(Integer, default=25)
     additional_mill_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     additional_user_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    additional_employee_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -56,6 +57,10 @@ class CompanySubscription(TimestampMixin, Base):
     max_users: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     overdue_status: Mapped[str] = mapped_column(String(20), default="active")
     overdue_since: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    extra_employees: Mapped[int] = mapped_column(Integer, default=0)
+    overdue_day: Mapped[int] = mapped_column(Integer, default=0)
+    trial_ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_billing_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 class BillingInvoice(TimestampMixin, Base):
     __tablename__ = "billing_invoices"
@@ -75,6 +80,42 @@ class BillingInvoice(TimestampMixin, Base):
     pdf_content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     line_items: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
     invoice_metadata: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    tax_amount: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    subtotal: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_auto_generated: Mapped[bool] = mapped_column(Boolean, default=False)
+    invoice_type: Mapped[str] = mapped_column(String(20), default="subscription")
+
+
+class BillingPayment(TimestampMixin, Base):
+    __tablename__ = "billing_payments"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    company_id: Mapped[str] = mapped_column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    invoice_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("billing_invoices.id"), nullable=True)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), default="INR")
+    method: Mapped[str] = mapped_column(String(50), default="bank_transfer")
+    reference_number: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    gateway: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    gateway_response: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(20), default="completed")
+    paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    entered_by: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+
+
+class OveragePricing(TimestampMixin, Base):
+    __tablename__ = "overage_pricing"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    company_id: Mapped[str] = mapped_column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    resource_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    unit_price: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    unit_label: Mapped[str] = mapped_column(String(100), nullable=False)
+    min_quantity: Mapped[int] = mapped_column(Integer, default=1)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class SubscriptionChangeRequest(TimestampMixin, Base):
