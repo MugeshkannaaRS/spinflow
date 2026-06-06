@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from app.db.session import get_db
 from app.core.deps import get_current_user, log_audit
 from app.core.module_registry import ALL_MODULE_CODES as ALL_MODULES, get_module_label
+from app.core.limiter import limiter
 from app.models.user import User
 from app.models.masters import Company, CompanyModule, Mill
 from app.models.hr import Employee
@@ -33,6 +34,19 @@ from app.schemas.billing import (
 logger = logging.getLogger(__name__)
 router = APIRouter()
 pricing_service = PricingService
+
+
+# ── Company Scope Guard ──────────────────────────────────
+
+
+async def check_company_scope(current_user: User, company_id: str):
+    """Ensure non-SUPER_ADMIN users can only access their own company's data."""
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(status_code=403, detail="Super Admin or Mill Owner only")
+    if role_code != "SUPER_ADMIN":
+        if str(current_user.company_id) != str(company_id):
+            raise HTTPException(status_code=403, detail="You can only access your own company's data")
 
 
 # ── Plan Endpoints ────────────────────────────────────────
@@ -121,8 +135,7 @@ async def get_company_subscription(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if current_user.role not in ("SUPER_ADMIN", "MILL_OWNER"):
-        raise HTTPException(status_code=403, detail="Super Admin or Mill Owner only")
+    await check_company_scope(current_user, company_id)
     company = await db.get(Company, company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -134,9 +147,11 @@ async def get_company_subscription(
 
 
 @router.post("/subscription/companies/{company_id}/plan")
+@limiter.limit("10/minute")
 async def set_company_plan(
     company_id: str,
     req: SetCompanyPlanRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -217,8 +232,7 @@ async def update_company_modules(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if current_user.role not in ("SUPER_ADMIN", "MILL_OWNER"):
-        raise HTTPException(status_code=403, detail="Super Admin or Mill Owner only")
+    await check_company_scope(current_user, company_id)
     for module_name, is_enabled in body.items():
         existing = await db.execute(
             select(CompanyModule).where(
@@ -295,8 +309,7 @@ async def generate_invoice(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if current_user.role not in ("SUPER_ADMIN", "MILL_OWNER"):
-        raise HTTPException(status_code=403, detail="Super Admin or Mill Owner only")
+    await check_company_scope(current_user, company_id)
     company = await db.get(Company, company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -321,20 +334,28 @@ async def generate_invoice(
     return invoice
 
 
-@router.get("/subscription/invoices", response_model=list[InvoiceOut])
+@router.get("/subscription/invoices")
 async def list_invoices(
     company_id: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if current_user.role not in ("SUPER_ADMIN", "MILL_OWNER"):
-        raise HTTPException(status_code=403, detail="Super Admin or Mill Owner only")
+    await check_company_scope(current_user, company_id)
+    total = await db.scalar(
+        select(func.count(BillingInvoice.id))
+        .where(BillingInvoice.company_id == company_id)
+    )
+    offset = (page - 1) * page_size
     result = await db.execute(
         select(BillingInvoice)
         .where(BillingInvoice.company_id == company_id)
         .order_by(BillingInvoice.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
     )
-    return result.scalars().all()
+    return {"items": result.scalars().all(), "total": total or 0, "page": page, "page_size": page_size}
 
 
 @router.get("/subscription/invoices/{invoice_id}", response_model=InvoiceOut)
@@ -346,8 +367,7 @@ async def get_invoice(
     invoice = await db.get(BillingInvoice, invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="BillingInvoice not found")
-    if current_user.role not in ("SUPER_ADMIN", "MILL_OWNER"):
-        raise HTTPException(status_code=403, detail="Super Admin or Mill Owner only")
+    await check_company_scope(current_user, invoice.company_id)
     return invoice
 
 
@@ -361,8 +381,11 @@ async def create_change_request(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if current_user.role != "MILL_OWNER":
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code != "MILL_OWNER":
         raise HTTPException(status_code=403, detail="Only Mill Owner can request plan changes")
+    if str(current_user.company_id) != str(company_id):
+        raise HTTPException(status_code=403, detail="You can only request changes for your own company")
     company = await db.get(Company, company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
@@ -391,32 +414,44 @@ async def create_change_request(
     return change_request
 
 
-@router.get("/subscription/change-requests", response_model=list[ChangeRequestOut])
+@router.get("/subscription/change-requests")
 async def list_change_requests(
     company_id: Optional[str] = None,
     status: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if current_user.role not in ("SUPER_ADMIN", "MILL_OWNER"):
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
         raise HTTPException(status_code=403, detail="Super Admin or Mill Owner only")
     conditions = []
     if company_id:
+        if role_code != "SUPER_ADMIN" and str(current_user.company_id) != str(company_id):
+            raise HTTPException(status_code=403, detail="You can only view your own company's change requests")
         conditions.append(SubscriptionChangeRequest.company_id == company_id)
-    if status:
-        conditions.append(SubscriptionChangeRequest.status == status)
+    elif role_code != "SUPER_ADMIN":
+        conditions.append(SubscriptionChangeRequest.company_id == current_user.company_id)
+    total_q = select(func.count(SubscriptionChangeRequest.id)).where(*conditions)
+    total = await db.scalar(total_q)
+    offset = (page - 1) * page_size
     result = await db.execute(
         select(SubscriptionChangeRequest)
         .where(*conditions)
         .order_by(SubscriptionChangeRequest.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
     )
-    return result.scalars().all()
+    return {"items": result.scalars().all(), "total": total or 0, "page": page, "page_size": page_size}
 
 
 @router.put("/subscription/change-requests/{request_id}/review", response_model=ChangeRequestOut)
+@limiter.limit("10/minute")
 async def review_change_request(
     request_id: str,
     req: ChangeRequestReview,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -481,8 +516,7 @@ async def get_company_billing_history(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if current_user.role not in ("SUPER_ADMIN", "MILL_OWNER"):
-        raise HTTPException(status_code=403, detail="Super Admin or Mill Owner only")
+    await check_company_scope(current_user, company_id)
     invoices_result = await db.execute(
         select(BillingInvoice)
         .where(BillingInvoice.company_id == company_id)
@@ -654,6 +688,19 @@ async def admin_billing_overview(
 
     svc = PricingService(db)
 
+    # Single query: subscription statuses + plan prices via JOIN
+    sub_plan_res = await db.execute(
+        select(
+            CompanySubscription.company_id,
+            CompanySubscription.status,
+            SubscriptionPlan.monthly_price,
+        )
+        .outerjoin(SubscriptionPlan, CompanySubscription.plan_id == SubscriptionPlan.id)
+    )
+    sub_rows = sub_plan_res.all()
+    company_ids_with_subs = {r[0] for r in sub_rows}
+
+    # All companies
     companies_res = await db.execute(select(Company))
     companies = companies_res.scalars().all()
 
@@ -663,36 +710,23 @@ async def admin_billing_overview(
     overdue_count = 0
 
     for co in companies:
-        try:
-            sub_res = await db.execute(
-                select(CompanySubscription).where(CompanySubscription.company_id == co.id)
-            )
-            sub = sub_res.scalar_one_or_none()
-            if sub:
-                status = sub.status
-                if status == "active":
-                    active_count += 1
-                elif status == "trial":
-                    trial_count += 1
-                elif status in ("overdue", "expired"):
-                    overdue_count += 1
-
-                # Get plan price
-                plan_res = await db.execute(
-                    select(SubscriptionPlan).where(SubscriptionPlan.id == sub.plan_id)
-                )
-                plan = plan_res.scalar_one_or_none()
-                if plan and status not in ("suspended", "cancelled"):
-                    mrr += float(plan.monthly_price or 0)
-        except Exception:
-            pass
+        sub_info = [r for r in sub_rows if r[0] == co.id]
+        if sub_info:
+            status = sub_info[0][1]
+            if status == "active":
+                active_count += 1
+            elif status == "trial":
+                trial_count += 1
+            elif status in ("overdue", "expired"):
+                overdue_count += 1
+            if status not in ("suspended", "cancelled"):
+                mrr += float(sub_info[0][2] or 0)
 
     # Revenue trend last 6 months (from BillingInvoice)
     revenue_trend = []
     today = date_type.today()
     for i in range(5, -1, -1):
         mn = today.replace(day=1)
-        # go back i months
         for _ in range(i):
             mn = (mn - timedelta(days=1)).replace(day=1)
         me_raw = mn.replace(day=28) + timedelta(days=4)
@@ -758,69 +792,115 @@ async def admin_billing_companies(
     stmt = stmt.offset((page - 1) * per_page).limit(per_page)
     cos_res = await db.execute(stmt)
     companies = cos_res.scalars().all()
+    company_ids = [c.id for c in companies]
+
+    from app.models.user import User as UserModel
+
+    # Batch: mill counts per company
+    mill_cnt_map = {}
+    if company_ids:
+        for r in (await db.execute(
+            select(Mill.company_id, func.count(Mill.id))
+            .where(Mill.company_id.in_(company_ids))
+            .group_by(Mill.company_id)
+        )).all():
+            mill_cnt_map[r[0]] = int(r[1])
+
+    # Batch: user counts per company
+    user_cnt_map = {}
+    if company_ids:
+        for r in (await db.execute(
+            select(UserModel.company_id, func.count(UserModel.id))
+            .where(
+                UserModel.company_id.in_(company_ids),
+                UserModel.is_active == True,
+                UserModel.deleted_at.is_(None),
+            )
+            .group_by(UserModel.company_id)
+        )).all():
+            user_cnt_map[r[0]] = int(r[1])
+
+    # Batch: enabled modules per company
+    mods_map: dict[str, list[str]] = {}
+    if company_ids:
+        mod_rows = await db.execute(
+            select(CompanyModule.company_id, CompanyModule.module_name)
+            .where(
+                CompanyModule.company_id.in_(company_ids),
+                CompanyModule.is_enabled == True,
+            )
+        )
+        for co_id, mod_name in mod_rows.all():
+            mods_map.setdefault(co_id, []).append(mod_name)
+
+    # Batch: subscriptions per company
+    sub_map: dict[str, tuple] = {}
+    plan_ids = set()
+    if company_ids:
+        sub_rows = await db.execute(
+            select(CompanySubscription).where(CompanySubscription.company_id.in_(company_ids))
+        )
+        for sub in sub_rows.scalars().all():
+            sub_map[sub.company_id] = sub
+            if sub.plan_id:
+                plan_ids.add(sub.plan_id)
+
+    # Batch: plan names/prices
+    plan_map: dict[str, SubscriptionPlan] = {}
+    if plan_ids:
+        plan_rows = await db.execute(
+            select(SubscriptionPlan).where(SubscriptionPlan.id.in_(list(plan_ids)))
+        )
+        for p in plan_rows.scalars().all():
+            plan_map[p.id] = p
+
+    # Batch: last paid invoice per company
+    last_pay_map: dict[str, str] = {}
+    if company_ids:
+        # Subquery to get max paid_at per company
+        subq = (
+            select(
+                BillingInvoice.company_id,
+                func.max(BillingInvoice.paid_at).label("max_paid_at"),
+            )
+            .where(
+                BillingInvoice.company_id.in_(company_ids),
+                BillingInvoice.status == "paid",
+                BillingInvoice.paid_at.isnot(None),
+            )
+            .group_by(BillingInvoice.company_id)
+        ).subquery()
+        pay_rows = await db.execute(
+            select(BillingInvoice.company_id, BillingInvoice.paid_at)
+            .join(subq, (BillingInvoice.company_id == subq.c.company_id) & (BillingInvoice.paid_at == subq.c.max_paid_at))
+        )
+        for r in pay_rows.all():
+            last_pay_map[r[0]] = r[1].isoformat()
 
     rows = []
     for co in companies:
         try:
-            mills_cnt = int((await db.execute(
-                select(func.count()).select_from(Mill).where(Mill.company_id == co.id)
-            )).scalar() or 0)
-
-            from app.models.user import User as UserModel
-            users_cnt = int((await db.execute(
-                select(func.count()).select_from(UserModel).where(
-                    UserModel.company_id == co.id,
-                    UserModel.is_active == True,
-                    UserModel.deleted_at.is_(None),
-                )
-            )).scalar() or 0)
-
-            modules_res = await db.execute(
-                select(CompanyModule).where(
-                    CompanyModule.company_id == co.id,
-                    CompanyModule.is_enabled == True,
-                )
-            )
-            enabled_mods = [m.module_name for m in modules_res.scalars().all()]
-
-            sub_res = await db.execute(
-                select(CompanySubscription).where(CompanySubscription.company_id == co.id)
-            )
-            sub = sub_res.scalar_one_or_none()
+            company_status = "active" if co.is_active else "suspended"
+            mills_cnt = mill_cnt_map.get(co.id, 0)
+            users_cnt = user_cnt_map.get(co.id, 0)
+            enabled_mods = mods_map.get(co.id, [])
 
             plan_name = "starter"
             monthly_amt = 0.0
             trial_ends = None
-            last_pay = None
             next_bill = None
 
-            # Single source of truth: Company.is_active
-            company_status = "active" if co.is_active else "suspended"
-
+            sub = sub_map.get(co.id)
             if sub:
-                try:
-                    plan_res = await db.execute(
-                        select(SubscriptionPlan).where(SubscriptionPlan.id == sub.plan_id)
-                    )
-                    plan_obj = plan_res.scalar_one_or_none()
-                    if plan_obj:
-                        plan_name = plan_obj.code
-                        monthly_amt = float(plan_obj.monthly_price or 0)
-                except Exception:
-                    plan_name = str(sub.plan_id or "starter")
+                plan_obj = plan_map.get(sub.plan_id)
+                if plan_obj:
+                    plan_name = plan_obj.code
+                    monthly_amt = float(plan_obj.monthly_price or 0)
                 if sub.expires_at:
-                    trial_ends = sub.expires_at.isoformat() if company_status == "trial" else None
-                    next_bill = sub.expires_at.isoformat() if company_status == "active" else None
+                    trial_ends = sub.expires_at.isoformat() if sub.status == "trial" else None
+                    next_bill = sub.expires_at.isoformat() if sub.status == "active" else None
 
-            last_inv_res = await db.execute(
-                select(BillingInvoice)
-                .where(BillingInvoice.company_id == co.id, BillingInvoice.status == "paid")
-                .order_by(BillingInvoice.paid_at.desc())
-                .limit(1)
-            )
-            last_inv = last_inv_res.scalar_one_or_none()
-            if last_inv and last_inv.paid_at:
-                last_pay = last_inv.paid_at.isoformat()
+            last_pay = last_pay_map.get(co.id)
 
             rows.append({
                 "id": str(co.id),
@@ -857,9 +937,11 @@ async def admin_billing_companies(
 
 
 @router.post("/admin/billing/companies/{company_id}/status")
+@limiter.limit("10/minute")
 async def admin_set_company_status(
     company_id: str,
     body: StatusUpdateBody,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1304,8 +1386,7 @@ async def company_payments(
     db: AsyncSession = Depends(get_db),
 ):
     """List payments for a specific company."""
-    if current_user.role not in ("SUPER_ADMIN", "MILL_OWNER"):
-        raise HTTPException(status_code=403, detail="Super Admin or Mill Owner only")
+    await check_company_scope(current_user, company_id)
     svc = PaymentService(db, current_user)
     rows, total = await svc.get_company_payments(company_id, page, page_size)
     return {"items": rows, "total": total, "page": page, "page_size": page_size}
@@ -1441,6 +1522,7 @@ async def get_invoice_detail(
     invoice = await db.get(BillingInvoice, invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
+    await check_company_scope(current_user, invoice.company_id)
     co = await db.get(Company, invoice.company_id)
     return {
         "id": invoice.id,
@@ -1470,9 +1552,11 @@ async def get_invoice_detail(
 
 
 @router.post("/admin/billing/companies/{company_id}/purchase-overage", response_model=PurchaseOverageResult)
+@limiter.limit("10/minute")
 async def purchase_overage(
     company_id: str,
     body: PurchaseOverageRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1545,7 +1629,9 @@ async def purchase_overage(
 
 
 @router.post("/admin/billing/overdue/process", response_model=OverdueWorkflowResult)
+@limiter.limit("10/minute")
 async def run_overdue_workflow(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1597,25 +1683,50 @@ async def billing_dashboard(
     )
     new_customers_this_month = int(new_res.scalar() or 0)
 
-    # Count companies over limit
+    # Count companies over limit — batch queries
     over_limit = 0
     companies_res = await db.execute(select(Company))
-    for co in companies_res.scalars().all():
-        sub_res = await db.execute(
-            select(CompanySubscription).where(CompanySubscription.company_id == co.id)
+    all_companies = companies_res.scalars().all()
+    company_ids = [c.id for c in all_companies]
+
+    sub_map = {}
+    plan_ids = set()
+    if company_ids:
+        sub_rows = await db.execute(
+            select(CompanySubscription).where(CompanySubscription.company_id.in_(company_ids))
         )
-        sub = sub_res.scalar_one_or_none()
+        for sub in sub_rows.scalars().all():
+            sub_map[sub.company_id] = sub
+            if sub.plan_id:
+                plan_ids.add(sub.plan_id)
+
+    plan_map = {}
+    if plan_ids:
+        for p in (await db.execute(
+            select(SubscriptionPlan).where(SubscriptionPlan.id.in_(list(plan_ids)))
+        )).scalars().all():
+            plan_map[p.id] = p
+
+    user_cnt_map = {}
+    if company_ids:
+        for r in (await db.execute(
+            select(User.company_id, func.count(User.id))
+            .where(
+                User.company_id.in_(company_ids),
+                User.is_active == True,
+                User.deleted_at.is_(None),
+            )
+            .group_by(User.company_id)
+        )).all():
+            user_cnt_map[r[0]] = int(r[1])
+
+    for co in all_companies:
+        sub = sub_map.get(co.id)
         if sub:
-            plan = await db.get(SubscriptionPlan, sub.plan_id)
+            plan = plan_map.get(sub.plan_id)
             if plan:
                 limit = (plan.included_users or 0) + (sub.extra_users or 0)
-                user_cnt = int((await db.execute(
-                    select(func.count()).select_from(User).where(
-                        User.company_id == co.id,
-                        User.is_active == True,
-                        User.deleted_at.is_(None),
-                    )
-                )).scalar() or 0)
+                user_cnt = user_cnt_map.get(co.id, 0)
                 if limit > 0 and user_cnt > limit:
                     over_limit += 1
 
@@ -1656,36 +1767,62 @@ async def enriched_subscriptions(
     svc = BillingService(db)
     rows, total = await svc.get_subscriptions_list(page, page_size, status_filter, plan_filter, search)
 
-    # Enrich with employee counts and module lists
+    # Enrich with employee counts and module lists — batch queries
     enriched = []
-    for row in rows:
-        emp_res = await db.execute(
-            select(func.count()).select_from(Employee).where(
-                Employee.company_id == row["company_id"],
+    company_ids = [row["company_id"] for row in rows]
+
+    emp_cnt_map = {}
+    if company_ids:
+        for r in (await db.execute(
+            select(Employee.company_id, func.count(Employee.id))
+            .where(
+                Employee.company_id.in_(company_ids),
                 Employee.is_active == True,
             )
-        )
-        emp_count = int(emp_res.scalar() or 0)
+            .group_by(Employee.company_id)
+        )).all():
+            emp_cnt_map[r[0]] = int(r[1])
 
-        # Get employee limit from plan + extras
-        sub_res = await db.execute(
-            select(CompanySubscription).where(CompanySubscription.company_id == row["company_id"])
+    sub_map = {}
+    plan_ids = set()
+    if company_ids:
+        sub_rows = await db.execute(
+            select(CompanySubscription).where(CompanySubscription.company_id.in_(company_ids))
         )
-        sub = sub_res.scalar_one_or_none()
-        emp_limit = 100  # default
-        if sub:
-            plan = await db.get(SubscriptionPlan, sub.plan_id)
-            if plan:
-                emp_limit = (plan.included_users or 0) * 20 + (sub.extra_employees or 0)
+        for sub in sub_rows.scalars().all():
+            sub_map[sub.company_id] = sub
+            if sub.plan_id:
+                plan_ids.add(sub.plan_id)
 
-        # Get module names
-        mods_res = await db.execute(
-            select(CompanyModule).where(
-                CompanyModule.company_id == row["company_id"],
+    plan_map = {}
+    if plan_ids:
+        for p in (await db.execute(
+            select(SubscriptionPlan).where(SubscriptionPlan.id.in_(list(plan_ids)))
+        )).scalars().all():
+            plan_map[p.id] = p
+
+    mods_map: dict[str, list[str]] = {}
+    if company_ids:
+        mod_rows = await db.execute(
+            select(CompanyModule.company_id, CompanyModule.module_name)
+            .where(
+                CompanyModule.company_id.in_(company_ids),
                 CompanyModule.is_enabled == True,
             )
         )
-        modules_list = [m.module_name for m in mods_res.scalars().all()]
+        for co_id, mod_name in mod_rows.all():
+            mods_map.setdefault(co_id, []).append(mod_name)
+
+    for row in rows:
+        cid = row["company_id"]
+        emp_count = emp_cnt_map.get(cid, 0)
+        sub = sub_map.get(cid)
+        emp_limit = 100
+        if sub:
+            plan = plan_map.get(sub.plan_id)
+            if plan:
+                emp_limit = (plan.included_users or 0) * 20 + (sub.extra_employees or 0)
+        modules_list = mods_map.get(cid, [])
 
         enriched.append({
             **row,
@@ -1709,8 +1846,7 @@ async def company_billing_detail_enriched(
     db: AsyncSession = Depends(get_db),
 ):
     """Company billing detail with employee counts and payment history."""
-    if current_user.role not in ("SUPER_ADMIN", "MILL_OWNER"):
-        raise HTTPException(status_code=403, detail="Super Admin or Mill Owner only")
+    await check_company_scope(current_user, company_id)
     svc = BillingService(db)
     detail = await svc.get_company_billing_detail(company_id)
     if not detail:

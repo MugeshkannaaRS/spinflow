@@ -457,7 +457,7 @@ async def force_change_password(
     current_user: User = Depends(get_current_user),
 ):
     role_code = current_user.role_rel.code if current_user.role_rel else ""
-    if role_code not in ("SUPER_ADMIN", "MILL_ADMIN"):
+    if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
         raise SpinFlowException.forbidden("Only admins can force change passwords", ErrorCode.ACCESS_DENIED)
     if len(req.new_password) < 8:
         raise SpinFlowException.bad_request("Password must be at least 8 characters", ErrorCode.INVALID_VALUE)

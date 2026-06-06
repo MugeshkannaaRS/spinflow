@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
@@ -12,7 +12,7 @@ class CompanyStatsService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_company_stats(self, company_id: str | None = None) -> List[Dict]:
+    async def get_company_stats(self, company_id: Optional[str] = None) -> List[Dict]:
         """Get accurate user and mill counts for every company (or one company).
 
         Returns list of dicts with:

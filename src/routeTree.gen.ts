@@ -45,6 +45,7 @@ import { Route as AppAdminColumnConfigRouteImport } from './routes/_app.admin.co
 import { Route as AppAdminBillingRouteImport } from './routes/_app.admin.billing'
 import { Route as AppAdminAuditRouteImport } from './routes/_app.admin.audit'
 import { Route as AppAdminArchiveRouteImport } from './routes/_app.admin.archive'
+import { Route as AppAdminAlertsRouteImport } from './routes/_app.admin.alerts'
 import { Route as AppAdminCompaniesOnboardRouteImport } from './routes/_app.admin.companies.onboard'
 import { Route as AppAdminCompaniesCompanyIdRouteImport } from './routes/_app.admin.companies.$companyId'
 import { Route as AppAdminBillingSubscriptionsRouteImport } from './routes/_app.admin.billing.subscriptions'
@@ -232,6 +233,11 @@ const AppAdminArchiveRoute = AppAdminArchiveRouteImport.update({
   path: '/archive',
   getParentRoute: () => AppAdminRoute,
 } as any)
+const AppAdminAlertsRoute = AppAdminAlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
+  getParentRoute: () => AppAdminRoute,
+} as any)
 const AppAdminCompaniesOnboardRoute =
   AppAdminCompaniesOnboardRouteImport.update({
     id: '/onboard',
@@ -296,6 +302,7 @@ export interface FileRoutesByFullPath {
   '/stock': typeof AppStockRoute
   '/stores': typeof AppStoresRoute
   '/users': typeof AppUsersRoute
+  '/admin/alerts': typeof AppAdminAlertsRoute
   '/admin/archive': typeof AppAdminArchiveRoute
   '/admin/audit': typeof AppAdminAuditRoute
   '/admin/billing': typeof AppAdminBillingRouteWithChildren
@@ -340,6 +347,7 @@ export interface FileRoutesByTo {
   '/stock': typeof AppStockRoute
   '/stores': typeof AppStoresRoute
   '/users': typeof AppUsersRoute
+  '/admin/alerts': typeof AppAdminAlertsRoute
   '/admin/archive': typeof AppAdminArchiveRoute
   '/admin/audit': typeof AppAdminAuditRoute
   '/admin/billing': typeof AppAdminBillingRouteWithChildren
@@ -386,6 +394,7 @@ export interface FileRoutesById {
   '/_app/stock': typeof AppStockRoute
   '/_app/stores': typeof AppStoresRoute
   '/_app/users': typeof AppUsersRoute
+  '/_app/admin/alerts': typeof AppAdminAlertsRoute
   '/_app/admin/archive': typeof AppAdminArchiveRoute
   '/_app/admin/audit': typeof AppAdminAuditRoute
   '/_app/admin/billing': typeof AppAdminBillingRouteWithChildren
@@ -432,6 +441,7 @@ export interface FileRouteTypes {
     | '/stock'
     | '/stores'
     | '/users'
+    | '/admin/alerts'
     | '/admin/archive'
     | '/admin/audit'
     | '/admin/billing'
@@ -476,6 +486,7 @@ export interface FileRouteTypes {
     | '/stock'
     | '/stores'
     | '/users'
+    | '/admin/alerts'
     | '/admin/archive'
     | '/admin/audit'
     | '/admin/billing'
@@ -521,6 +532,7 @@ export interface FileRouteTypes {
     | '/_app/stock'
     | '/_app/stores'
     | '/_app/users'
+    | '/_app/admin/alerts'
     | '/_app/admin/archive'
     | '/_app/admin/audit'
     | '/_app/admin/billing'
@@ -803,6 +815,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminArchiveRouteImport
       parentRoute: typeof AppAdminRoute
     }
+    '/_app/admin/alerts': {
+      id: '/_app/admin/alerts'
+      path: '/alerts'
+      fullPath: '/admin/alerts'
+      preLoaderRoute: typeof AppAdminAlertsRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
     '/_app/admin/companies/onboard': {
       id: '/_app/admin/companies/onboard'
       path: '/onboard'
@@ -889,6 +908,7 @@ const AppAdminCompaniesRouteWithChildren =
   AppAdminCompaniesRoute._addFileChildren(AppAdminCompaniesRouteChildren)
 
 interface AppAdminRouteChildren {
+  AppAdminAlertsRoute: typeof AppAdminAlertsRoute
   AppAdminArchiveRoute: typeof AppAdminArchiveRoute
   AppAdminAuditRoute: typeof AppAdminAuditRoute
   AppAdminBillingRoute: typeof AppAdminBillingRouteWithChildren
@@ -903,6 +923,7 @@ interface AppAdminRouteChildren {
 }
 
 const AppAdminRouteChildren: AppAdminRouteChildren = {
+  AppAdminAlertsRoute: AppAdminAlertsRoute,
   AppAdminArchiveRoute: AppAdminArchiveRoute,
   AppAdminAuditRoute: AppAdminAuditRoute,
   AppAdminBillingRoute: AppAdminBillingRouteWithChildren,

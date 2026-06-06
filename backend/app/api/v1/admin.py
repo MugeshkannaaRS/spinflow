@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 from app.db.session import get_db
 from app.core.deps import get_current_user, get_mill_scope, log_audit
+from app.core.limiter import limiter
 from app.core.module_registry import ALL_MODULE_CODES as ALL_MODULE_KEYS
 from app.models.user import User, Role, UserSession
 from app.models.masters import Company, CompanyModule, Mill, MillSettings
@@ -131,6 +132,7 @@ async def get_user_modules(
 
 
 @router.post("/admin/users")
+@limiter.limit("10/minute")
 async def create_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -422,8 +424,10 @@ async def update_company_limits(
 
 
 @router.post("/admin/companies/{company_id}/suspend")
+@limiter.limit("10/minute")
 async def suspend_company(
     company_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -477,8 +481,10 @@ async def suspend_company(
 
 
 @router.post("/admin/companies/{company_id}/reactivate")
+@limiter.limit("10/minute")
 async def reactivate_company(
     company_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -993,8 +999,10 @@ async def get_company_stats(
 
 
 @router.post("/admin/companies/{company_id}/archive")
+@limiter.limit("10/minute")
 async def archive_company(
     company_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -1012,3 +1020,50 @@ async def archive_company(
     svc = CompanyDeletionService(db, current_user)
     result = await svc.archive(company_id)
     return result
+
+
+@router.post("/admin/companies/{company_id}/restore")
+@limiter.limit("10/minute")
+async def restore_company(
+    company_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Restore an archived company back to suspended state with full lifecycle validation."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can restore companies")
+
+    company_q = await db.execute(select(Company).where(Company.id == company_id))
+    company = company_q.scalar_one_or_none()
+    if not company:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+    if company.status != "archived":
+        raise HTTPException(status_code=409, detail="Company must be archived before restoring. Only archived companies can be restored.")
+
+    # Restore to suspended — admin must explicitly reactivate
+    company.is_active = False
+    company.status = "suspended"
+    company.suspended_at = datetime.utcnow()
+    company.archived_at = None
+
+    # Restore subscription to suspended
+    sub_result = await db.execute(
+        select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+    )
+    sub = sub_result.scalar_one_or_none()
+    if sub:
+        sub.status = "suspended"
+
+    db.add(AuditLog(
+        user_id=current_user.id,
+        user_name=current_user.name,
+        role=role_code,
+        action="company_restored",
+        entity="company",
+        entity_id=company_id,
+        details="Company restored from archive to suspended state",
+    ))
+    await db.commit()
+    return {"id": company_id, "status": "suspended", "message": "Company restored from archive. Use reactivate to fully enable."}

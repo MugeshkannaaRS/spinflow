@@ -20,7 +20,7 @@ from sqlalchemy import select
 router = APIRouter()
 
 
-SCANNER_ROLES = {"loader", "dispatch_clerk", "shift_supervisor", "warehouse_manager", "SUPER_ADMIN", "MILL_ADMIN"}
+SCANNER_ROLES = {"loader", "dispatch_clerk", "shift_supervisor", "warehouse_manager", "SUPER_ADMIN", "MILL_OWNER"}
 
 
 @router.get("/trips", response_model=TripListResponse)
