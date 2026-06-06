@@ -37,6 +37,14 @@
 
 - **Company Detail & Suspension Cascade**: New `/admin/companies/{companyId}` route with 6 tabs (Overview, Mills, Users, Modules, Billing, Audit). Company lifecycle (active/suspended/archived) with suspension cascade — deactivates mills, users, invalidates sessions, updates subscription. Reactivate restores all except sessions (users must re-login). Auth guards reject suspended companies at login and on every request. 8 integration tests.
 
+- **Phase 3A — Billing Foundation**: `BillingPayment`/`OveragePricing` models, new columns on invoices/subscriptions/plans (due_date, tax, extra_employees, trial_ends_at, etc.). Alembic 017 + SQL 009. InvoiceService (subscription/prorated/overage/renewal invoices, INV-YYYYMM-NNNN numbering). PaymentService (manual/razorpay/reconciliation/refund). Plan change with daily proration. 26 integration tests.
+
+- **Phase 3B/C/E — Billing Commerce**: Overage purchase (extra users/mills/employees via unit pricing from plan). Overdue management (Day 0/7/15/30/60/90 workflow with restrict/suspend/terminate). Revenue analytics (MRR, ARR, collection rate, churn, revenue_trend). Enriched dashboard + subscription listing. `OverdueService`, 10 new admin billing routes. 295 backend tests pass.
+
+- **Phase 4A — Company workspace UX**: Full rewrite of `_app.admin.companies.$companyId.tsx` with Health Score (SVG gauge 0–100), Usage Summary (progress bars), Quick Actions grid, License/Subscription Health cards, breadcrumbs, loading skeleton, empty states, responsive tables.
+
+- **Phase 4B — Customer billing portal**: `BillingPortal.tsx` enhanced with overage purchase dialog (Buy More for users/mills/employees with unit pricing from plan), plan upgrade dialog (browse plans, submit change request for admin approval), invoice PDF download (ReportLab, `GET /billing/invoices/{id}/download`), 3 usage progress bars (users, mills, employees) with over-limit warnings. New `POST /billing/purchase-overage` (MILL_OWNER-facing). `GET /billing/my-plan` enriched with `max_users/mills/employees`, `current_mills/employees`, `extra_*`, `additional_*_cost`.
+
 - **Company-Centric Onboarding (Phase 2)**:
   - **Module Registry** (`core/module_registry.py`): Canonical list of 19 modules (codes, labels, descriptions, categories). Replaced 3 divergent hardcoded lists in `masters_service.py`, `admin.py`, `billing.py`. `rbac.py` imports `ALL_MODULE_CODES` + `SYSTEM_MODULE_CODES`.
   - **PricingService.get_modules_for_plan()**: DB-driven query on `ModulePricing.is_included`. Powers standard plan auto-assignment.
@@ -65,16 +73,18 @@
 - All sensitive endpoints gated by SUPER_ADMIN or `require_module`
 
 ## Next Steps
-- Phase 3: Consolidate organizations/limits/modules pages into Company Detail tabs, remove stale nav links
+- **Phase 4C — Executive dashboard**: Admin dashboard needs full SaaS ops cards (MRR, ARR, near-limits, overdue revenue, top customers).
+- **Phase 4D — Alert center**: New component needed for invoice due/overdue, limits reached, subscription expiring, company suspended, failed payment alerts.
+- **Phase 4E — Mobile & responsiveness audit**: Audit all workspace pages for mobile — fix overflow-x, stack cards vertically, show less columns on small screens.
+- **Phase 4F — Final polish**: Error boundaries to each tab component, breadcrumbs to all admin pages, consistent card border-radius/spacing.
+- Consolidate organizations/limits/modules pages into Company Detail tabs, remove stale nav links
 - Normalize log_audit() to use pre-commit pattern across all 50+ callers
-- Add loading skeletons and error boundaries per Company Detail tab
-- Polish: empty states, responsive layout for Company Detail tabs, breadcrumb navigation
 - Update Companies listing PLAN_OPTIONS to use "custom" instead of "unlimited"
 - Rotate secrets referenced by `.env` (DB password, JWT keys, Redis, QR, Supabase)
 - Provision fresh staging: new Supabase project + new Render services + fresh `.env`
 
 ## Critical Context
-- **Health Score: 96/100** — Company-centric architecture complete. 238 backend + 65 frontend tests pass (8 pre-existing frontend failures).
+- **Health Score: 96/100** — Company-centric architecture complete. 295 backend + 65 frontend tests pass (8 pre-existing frontend failures).
 - Company lifecycle: `POST /admin/companies/{id}/suspend` and `/reactivate` with full cascade
 - Auth guards: `get_current_user()` and `POST /auth/login` both check `company.status == "suspended"` — reject with 403/423
 - Module Registry supersedes all prior `ALL_MODULES`/`ALL_MODULE_KEYS` constants in backend
@@ -100,3 +110,6 @@
 - `src/routes/_app.admin.companies.$companyId.tsx`: Company Detail 6-tab page
 - `src/routes/_app.admin.companies.tsx`: Removed AddCompanyDialog, Link to onboard route
 - `src/lib/company-utils.ts`: generateCodeFromName utility
+- `src/components/billing/BillingPortal.tsx`: Enhanced with overage purchase, upgrade dialog, usage bars, invoice download
+- `backend/app/api/v1/billing.py`: POST /billing/purchase-overage, GET /billing/invoices/{id}/download, enriched GET /billing/my-plan
+- `backend/app/services/pdf_export.py`: invoice_pdf() function for PDF generation

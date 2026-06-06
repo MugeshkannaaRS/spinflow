@@ -19,7 +19,8 @@ import {
   XCircle, AlertTriangle, ChevronDown, ChevronUp, Loader2,
   Factory, BadgeCheck, Wrench, Banknote, ShoppingCart,
   Warehouse, Boxes, Truck, QrCode, Receipt, Settings2,
-  UserCog, SlidersHorizontal, Plus,
+  UserCog, SlidersHorizontal, Plus, ArrowUp, Download,
+  ShoppingBag,
 } from "lucide-react";
 
 const MODULE_ICONS: Record<string, React.ElementType> = {
@@ -368,6 +369,236 @@ const CURRENCIES = [
   { symbol: "₺", code: "TRY", label: "Lira" },
 ];
 
+function OveragePurchaseDialog({
+  open, onClose, planData,
+}: {
+  open: boolean; onClose: () => void; planData: any;
+}) {
+  const qc = useQueryClient();
+  const [resource, setResource] = useState<"extra_users" | "extra_mills" | "extra_employees">("extra_users");
+  const [qty, setQty] = useState(1);
+
+  const unitPrice = resource === "extra_users"
+    ? (planData?.additional_user_cost ?? 0)
+    : resource === "extra_mills"
+    ? (planData?.additional_mill_cost ?? 0)
+    : (planData?.additional_employee_cost ?? 0);
+
+  const total = unitPrice * qty;
+
+  const purchaseMut = useMutation({
+    mutationFn: (body: { resource_type: string; quantity: number }) =>
+      api.post("/billing/purchase-overage", body).then(r => r.data),
+    onSuccess: (res: any) => {
+      toast.success(res.message);
+      qc.invalidateQueries({ queryKey: ["billing-my-plan"] });
+      qc.invalidateQueries({ queryKey: ["mill-subscription"] });
+      onClose();
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Purchase failed"),
+  });
+
+  if (!open) return null;
+
+  const labels: Record<string, string> = {
+    extra_users: "Additional Users",
+    extra_mills: "Additional Mills",
+    extra_employees: "Additional Employees",
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+        <div className="px-6 py-4 border-b border-[#e2e8f0] flex items-center justify-between">
+          <h2 className="text-[17px] font-bold text-[#0f172a]">Purchase Extra Capacity</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-lg leading-none">✕</button>
+        </div>
+        <div className="px-6 py-4 space-y-4">
+          <div>
+            <label className="block text-[13px] font-semibold text-[#374151] mb-1.5">Resource Type</label>
+            <div className="grid grid-cols-3 gap-2">
+              {(["extra_users", "extra_mills", "extra_employees"] as const).map(r => (
+                <button key={r} onClick={() => { setResource(r); setQty(1); }}
+                  className={cn("px-3 py-2 rounded-lg border text-[12px] font-medium text-center transition-all",
+                    resource === r
+                      ? "border-blue-400 bg-blue-50 text-blue-700"
+                      : "border-[#e2e8f0] hover:border-blue-300 text-[#374151]")}
+                >
+                  {labels[r]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-[13px] font-semibold text-[#374151] mb-1">Quantity</label>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setQty(Math.max(1, qty - 1))}
+                className="w-8 h-8 rounded-lg border border-[#d1d5db] flex items-center justify-center text-lg font-medium hover:bg-gray-50">−</button>
+              <input type="number" min={1} max={999} value={qty}
+                onChange={e => setQty(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-20 h-10 text-center rounded-lg border border-[#d1d5db] text-[14px] font-mono focus:outline-none focus:border-blue-500" />
+              <button onClick={() => setQty(Math.min(999, qty + 1))}
+                className="w-8 h-8 rounded-lg border border-[#d1d5db] flex items-center justify-center text-lg font-medium hover:bg-gray-50">+</button>
+              <span className="text-[13px] text-[#64748b] ml-2">× ₹{unitPrice.toLocaleString("en-IN")}</span>
+            </div>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3 text-center">
+            <p className="text-[12px] text-[#64748b]">Total</p>
+            <p className="text-[24px] font-bold font-mono text-[#0f172a]">₹{total.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</p>
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-[#e2e8f0] flex justify-end gap-2">
+          <button onClick={onClose}
+            className="px-4 py-2 rounded-lg border border-[#d1d5db] text-[13px] font-medium text-[#374151] hover:bg-gray-50">Cancel</button>
+          <button onClick={() => purchaseMut.mutate({ resource_type: resource, quantity: qty })}
+            disabled={purchaseMut.isPending || unitPrice <= 0}
+            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold disabled:opacity-50 flex items-center gap-2">
+            {purchaseMut.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Purchase ₹{total.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UpgradeDialog({
+  open, onClose, currentPlanId, companyName,
+}: {
+  open: boolean; onClose: () => void; currentPlanId?: string; companyName?: string;
+}) {
+  const qc = useQueryClient();
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
+  const [reason, setReason] = useState("");
+
+  const plansQ = useQuery({
+    queryKey: ["subscription-plans"],
+    queryFn: () => api.get("/subscription/plans").then(r => r.data),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const changeReqMut = useMutation({
+    mutationFn: (body: { company_id: string; requested_plan_id: string; reason?: string }) => {
+      const params = new URLSearchParams({ company_id: body.company_id });
+      return api.post(`/subscription/change-requests?${params.toString()}`, {
+        requested_plan_id: body.requested_plan_id,
+        change_type: "upgrade",
+        reason: body.reason,
+      }).then(r => r.data);
+    },
+    onSuccess: () => {
+      toast.success("Upgrade request submitted. Admin will review it.");
+      qc.invalidateQueries({ queryKey: ["billing-my-plan"] });
+      onClose();
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Failed to submit request"),
+  });
+
+  const { user } = useAuth();
+  const companyId = user?.companyId;
+
+  if (!open) return null;
+
+  const plans = (plansQ.data ?? []).filter((p: any) => p.is_active && p.id !== currentPlanId);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-[#e2e8f0] flex items-center justify-between shrink-0">
+          <h2 className="text-[17px] font-bold text-[#0f172a]">Request Plan Upgrade</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-lg leading-none">✕</button>
+        </div>
+        <div className="px-6 py-4 space-y-4 overflow-y-auto flex-1">
+          <p className="text-[13px] text-[#64748b]">{companyName || "Your company"}</p>
+          {plansQ.isLoading ? (
+            <div className="space-y-3">
+              {[1,2,3].map(i => <div key={i} className="h-20 bg-[#e2e8f0] rounded-lg animate-pulse" />)}
+            </div>
+          ) : plans.length === 0 ? (
+            <p className="text-[13px] text-[#94a3b8] text-center py-6">No other plans available</p>
+          ) : (
+            <div className="space-y-2">
+              {plans.map((p: any) => (
+                <button key={p.id} onClick={() => setSelectedPlanId(p.id)}
+                  className={cn("w-full text-left p-4 rounded-lg border transition-all",
+                    selectedPlanId === p.id
+                      ? "border-blue-400 bg-blue-50 ring-2 ring-blue-100"
+                      : "border-[#e2e8f0] hover:border-blue-300")}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-[14px] text-[#0f172a]">{p.name}</span>
+                    <span className="font-mono font-bold text-[#0f172a]">₹{p.monthly_price.toLocaleString("en-IN")}/mo</span>
+                  </div>
+                  <p className="text-[12px] text-[#64748b] mt-1">
+                    {p.included_users} users · {p.included_mills} mills · {p.description || ""}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+          <div>
+            <label className="block text-[13px] font-semibold text-[#374151] mb-1">Reason (optional)</label>
+            <textarea value={reason} onChange={e => setReason(e.target.value)}
+              placeholder="Why are you upgrading?"
+              className="w-full h-20 px-3 py-2 rounded-lg border border-[#d1d5db] text-[14px] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none" />
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-[#e2e8f0] flex justify-end gap-2 shrink-0">
+          <button onClick={onClose}
+            className="px-4 py-2 rounded-lg border border-[#d1d5db] text-[13px] font-medium text-[#374151] hover:bg-gray-50">Cancel</button>
+          <button onClick={() => companyId && changeReqMut.mutate({ company_id: companyId, requested_plan_id: selectedPlanId, reason: reason || undefined })}
+            disabled={!selectedPlanId || changeReqMut.isPending}
+            className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold disabled:opacity-50 flex items-center gap-2">
+            {changeReqMut.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Submit Request
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UsageBarCard({
+  label, current, max, unitPrice, overageCostLabel, onPurchase,
+}: {
+  label: string; current: number; max: number; unitPrice: number; overageCostLabel?: string; onPurchase: () => void;
+}) {
+  const pct = Math.min(100, (current / Math.max(max, 1)) * 100);
+  const isOver = current > max;
+  const overage = Math.max(0, current - max);
+  const remaining = Math.max(0, max - current);
+
+  return (
+    <div className="bg-white border border-[#e2e8f0] rounded-lg p-5">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-sm font-semibold text-[#0f172a]">{label}</h3>
+        {unitPrice > 0 && (
+          <button onClick={onPurchase}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-semibold transition-colors">
+            <ShoppingBag className="w-3 h-3" /> Buy More
+          </button>
+        )}
+      </div>
+      <div className="flex items-end justify-between mb-2">
+        <span className="text-[28px] font-mono font-bold text-[#0f172a]">
+          {current} <span className="text-[18px] text-[#94a3b8]">/ {max}</span>
+        </span>
+        <span className={cn("text-sm font-semibold", isOver ? "text-red-600" : "text-green-600")}>
+          {isOver ? `${overage} over limit` : `${remaining} remaining`}
+        </span>
+      </div>
+      <div className="h-2 bg-[#e2e8f0] rounded-full overflow-hidden">
+        <div className={cn("h-full rounded-full transition-all", isOver ? "bg-red-500" : "bg-blue-500")}
+          style={{ width: pct + "%" }} />
+      </div>
+      {isOver && (
+        <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+          You have exceeded your {label.toLowerCase()} limit by {overage}. {overageCostLabel && `Purchase more at ${overageCostLabel}.`}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MillOwnerBillingView() {
   const qc = useQueryClient();
   const { setActiveMill, setUser, user } = useAuth();
@@ -384,16 +615,20 @@ function MillOwnerBillingView() {
     setCurrencySymbol(symbol);
     refetchSub();
   };
+
   const [addMillOpen, setAddMillOpen] = useState(false);
   const [millForm, setMillForm] = useState({ name: "", code: "", city: "", state: "", phone: "" });
   const [millFormErrors, setMillFormErrors] = useState<Record<string,string>>({});
+
+  const [overageOpen, setOverageOpen] = useState(false);
+  const [overageResource, setOverageResource] = useState<"extra_users" | "extra_mills" | "extra_employees">("extra_users");
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const addMillMut = useMutation({
     mutationFn: (data: typeof millForm) => api.post("/mills", data).then(r => r.data),
     onSuccess: (newMill: any) => {
       toast.success(`Mill "${newMill.name}" added`);
       qc.invalidateQueries({ queryKey: ["billing-my-plan"] });
-      // Add to companyMills in auth store and switch to it
       const mill: CompanyMill = { id: newMill.id, name: newMill.name, code: newMill.code };
       setUser({ companyMills: [...(user?.companyMills ?? []), mill] });
       setActiveMill(mill);
@@ -422,16 +657,45 @@ function MillOwnerBillingView() {
 
   const d = planQ.data;
 
+  function handleDownloadInvoice(invoiceId: string) {
+    const token = localStorage.getItem("spinflow-auth");
+    if (!token) return;
+    const parsed = JSON.parse(token);
+    const accessToken = parsed?.state?.accessToken || parsed?.accessToken;
+    if (!accessToken) { toast.error("Not authenticated"); return; }
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", `/api/v1/billing/invoices/${invoiceId}/download`);
+    xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+    xhr.responseType = "blob";
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        const url = URL.createObjectURL(xhr.response);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `invoice-${invoiceId}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        toast.error("Failed to download invoice");
+      }
+    };
+    xhr.onerror = () => toast.error("Network error downloading invoice");
+    xhr.send();
+  }
+
   if (planQ.isLoading) {
     return (
       <div className="flex flex-col min-h-full bg-[#f8fafc]">
         <PageHeader title="Billing & Plan" subtitle="Your subscription details" />
         <div className="p-6 space-y-4 animate-pulse">
           <div className="h-28 bg-white border border-[#e2e8f0] rounded-lg" />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="h-48 bg-white border border-[#e2e8f0] rounded-lg" />
-            <div className="h-48 bg-white border border-[#e2e8f0] rounded-lg" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="h-32 bg-white border border-[#e2e8f0] rounded-lg" />
+            <div className="h-32 bg-white border border-[#e2e8f0] rounded-lg" />
+            <div className="h-32 bg-white border border-[#e2e8f0] rounded-lg" />
           </div>
+          <div className="h-48 bg-white border border-[#e2e8f0] rounded-lg" />
+          <div className="h-48 bg-white border border-[#e2e8f0] rounded-lg" />
         </div>
       </div>
     );
@@ -453,6 +717,12 @@ function MillOwnerBillingView() {
     );
   }
 
+  const overageLabels: Record<string, string> = {
+    extra_users: "₹" + (d?.additional_user_cost ?? 0).toLocaleString("en-IN") + "/user/mo",
+    extra_mills: "₹" + (d?.additional_mill_cost ?? 0).toLocaleString("en-IN") + "/mill/mo",
+    extra_employees: "₹" + (d?.additional_employee_cost ?? 0).toLocaleString("en-IN") + "/emp/mo",
+  };
+
   return (
     <div className="flex flex-col min-h-full bg-[#f8fafc]">
       <PageHeader
@@ -462,6 +732,7 @@ function MillOwnerBillingView() {
         isRefreshing={planQ.isFetching}
       />
       <div className="p-6 space-y-6">
+
         {/* Plan summary */}
         <div className="bg-white border border-[#e2e8f0] rounded-lg p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -473,9 +744,15 @@ function MillOwnerBillingView() {
               </div>
               <p className="text-[13px] text-[#64748b]">{d?.company_name}</p>
             </div>
-            <div className="text-right">
-              <p className="text-[28px] font-bold font-mono text-[#0f172a]">{fmtLakh(d?.monthly_amount ?? 0)}</p>
-              <p className="text-[13px] text-[#64748b]">per month</p>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setUpgradeOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[12px] font-semibold transition-colors">
+                <ArrowUp className="w-3.5 h-3.5" /> Upgrade Plan
+              </button>
+              <div className="text-right">
+                <p className="text-[28px] font-bold font-mono text-[#0f172a]">{fmtLakh(d?.monthly_amount ?? 0)}</p>
+                <p className="text-[13px] text-[#64748b]">per month</p>
+              </div>
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-6 text-[13px] text-[#64748b]">
@@ -486,7 +763,37 @@ function MillOwnerBillingView() {
               <div><span className="font-medium text-[#374151]">Last payment: </span>{fmtDate(d.last_payment_at)}</div>
             )}
             <div><span className="font-medium text-[#374151]">Users: </span>{d?.total_users ?? 0}</div>
+            <div><span className="font-medium text-[#374151]">Mills: </span>{d?.current_mills ?? 0}</div>
+            <div><span className="font-medium text-[#374151]">Employees: </span>{d?.current_employees ?? 0}</div>
           </div>
+        </div>
+
+        {/* Usage bars */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <UsageBarCard
+            label="User Licenses"
+            current={d?.total_users ?? 0}
+            max={d?.max_users ?? 0}
+            unitPrice={d?.additional_user_cost ?? 0}
+            overageCostLabel={overageLabels.extra_users}
+            onPurchase={() => { setOverageResource("extra_users"); setOverageOpen(true); }}
+          />
+          <UsageBarCard
+            label="Mill Licenses"
+            current={d?.current_mills ?? 0}
+            max={d?.max_mills ?? 0}
+            unitPrice={d?.additional_mill_cost ?? 0}
+            overageCostLabel={overageLabels.extra_mills}
+            onPurchase={() => { setOverageResource("extra_mills"); setOverageOpen(true); }}
+          />
+          <UsageBarCard
+            label="Employee Licenses"
+            current={d?.current_employees ?? 0}
+            max={d?.max_employees ?? 0}
+            unitPrice={d?.additional_employee_cost ?? 0}
+            overageCostLabel={overageLabels.extra_employees}
+            onPurchase={() => { setOverageResource("extra_employees"); setOverageOpen(true); }}
+          />
         </div>
 
         {/* Modules + Mills */}
@@ -607,35 +914,16 @@ function MillOwnerBillingView() {
                     <td className="px-4 py-3 font-mono text-[#0f172a]">{fmtLakh(inv.amount)}</td>
                     <td className="px-4 py-3"><StatusBadge status={inv.status} size="sm" /></td>
                     <td className="px-4 py-3 text-[#64748b]">{inv.paid_at ? fmtDate(inv.paid_at) : "—"}</td>
-                    <td className="px-4 py-3"><span className="text-[12px] text-[#94a3b8]">PDF (coming soon)</span></td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => handleDownloadInvoice(inv.id)}
+                        className="inline-flex items-center gap-1 text-[12px] font-medium text-blue-600 hover:text-blue-800 transition-colors">
+                        <Download className="w-3.5 h-3.5" /> PDF
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
-
-        {/* User Licenses */}
-        {sub && (
-          <div className="bg-white border border-[#e2e8f0] rounded-lg p-5">
-            <h3 className="text-sm font-semibold text-[#0f172a] mb-4">User Licenses</h3>
-            <div className="flex items-end justify-between mb-2">
-              <span className="text-[28px] font-mono font-bold text-[#0f172a]">
-                {sub.current_users} <span className="text-[18px] text-[#94a3b8]">/ {sub.max_users}</span>
-              </span>
-              <span className={"text-sm font-semibold " + (sub.is_over_limit ? "text-red-600" : "text-green-600")}>
-                {sub.is_over_limit ? sub.overage_users + " over limit" : sub.remaining_users + " remaining"}
-              </span>
-            </div>
-            <div className="h-2 bg-[#e2e8f0] rounded-full overflow-hidden">
-              <div className={"h-full rounded-full transition-all " + (sub.is_over_limit ? "bg-red-500" : "bg-blue-500")}
-                style={{ width: Math.min(100, (sub.current_users / Math.max(sub.max_users, 1)) * 100) + "%" }} />
-            </div>
-            {sub.is_over_limit && (
-              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                You have exceeded your user limit by {sub.overage_users} user(s).
-              </div>
-            )}
           </div>
         )}
 
@@ -659,6 +947,19 @@ function MillOwnerBillingView() {
         </div>
 
       </div>
+
+      {/* Dialogs */}
+      <OveragePurchaseDialog
+        open={overageOpen}
+        onClose={() => setOverageOpen(false)}
+        planData={{ ...d, resourceType: overageResource }}
+      />
+      <UpgradeDialog
+        open={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        currentPlanId={d?.plan_id}
+        companyName={d?.company_name}
+      />
     </div>
   );
 }

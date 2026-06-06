@@ -156,3 +156,93 @@ def payslip(
 
 def dispatch_summary(data: list[dict], title: str = "Dispatch Summary") -> bytes:
     return production_report(data, title)
+
+
+def invoice_pdf(invoice, company_name: str) -> bytes:
+    from io import BytesIO
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_RIGHT
+    from datetime import datetime
+
+    buf = BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=15*mm, bottomMargin=15*mm, leftMargin=15*mm, rightMargin=15*mm)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    elements.append(Paragraph(f"Invoice — {invoice.invoice_number or 'N/A'}", styles["Title"]))
+    elements.append(Spacer(1, 3*mm))
+    elements.append(HRFlowable(width="100%", color=colors.grey, thickness=0.5))
+    elements.append(Spacer(1, 3*mm))
+
+    info_style = ParagraphStyle("Info", parent=styles["Normal"], fontSize=9, leading=13)
+    elements.append(Paragraph(f"<b>Company:</b> {company_name}", info_style))
+    elements.append(Paragraph(f"<b>Invoice #:</b> {invoice.invoice_number or 'N/A'}", info_style))
+    elements.append(Paragraph(f"<b>Status:</b> {invoice.status or 'pending'}", info_style))
+    elements.append(Paragraph(f"<b>Issued:</b> {invoice.created_at.strftime('%d %b %Y') if invoice.created_at else '—'}", info_style))
+    if invoice.due_date:
+        elements.append(Paragraph(f"<b>Due Date:</b> {invoice.due_date.strftime('%d %b %Y')}", info_style))
+    if invoice.paid_at:
+        elements.append(Paragraph(f"<b>Paid On:</b> {invoice.paid_at.strftime('%d %b %Y')}", info_style))
+    if invoice.billing_period_start and invoice.billing_period_end:
+        elements.append(Paragraph(
+            f"<b>Period:</b> {invoice.billing_period_start.strftime('%d %b %Y')} — {invoice.billing_period_end.strftime('%d %b %Y')}",
+            info_style,
+        ))
+    elements.append(Spacer(1, 4*mm))
+
+    # Line items table
+    line_items = invoice.line_items or {}
+    items_list = line_items.get("items", []) if isinstance(line_items, dict) else []
+    if items_list:
+        table_data = [["#", "Description", "Qty", "Amount"]]
+        for i, item in enumerate(items_list, 1):
+            desc = item.get("description", item.get("label", ""))
+            qty = item.get("quantity", 1)
+            amt = float(item.get("amount", item.get("price", 0)))
+            table_data.append([str(i), desc, str(qty), f"₹{amt:,.2f}"])
+        col_w = doc.width * 0.5
+        t = Table(table_data, colWidths=[15*mm, col_w, 20*mm, 30*mm])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2563EB")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ALIGN", (0, 0), (0, -1), "CENTER"),
+            ("ALIGN", (2, 0), (3, -1), "RIGHT"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F3F4F6")]),
+        ]))
+        elements.append(t)
+        elements.append(Spacer(1, 3*mm))
+
+    # Summary
+    summary_data = [
+        ["Subtotal", f"₹{float(invoice.subtotal or 0):,.2f}"],
+        ["Tax", f"₹{float(invoice.tax_amount or 0):,.2f}"],
+        ["Total", f"₹{float(invoice.amount or 0):,.2f}"],
+    ]
+    if invoice.notes:
+        summary_data.append(["Notes", invoice.notes])
+    summary_table = Table(summary_data, colWidths=[doc.width * 0.3, doc.width * 0.7])
+    summary_table.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -2), 0.5, colors.grey),
+        ("BACKGROUND", (0, -2), (-1, -1), colors.HexColor("#F0FDF4")),
+        ("FONTNAME", (0, -2), (-1, -1), "Helvetica-Bold"),
+    ]))
+    elements.append(summary_table)
+
+    def _hf(canvas, doc_obj):
+        canvas.saveState()
+        canvas.setFont("Helvetica", 7)
+        canvas.drawCentredString(doc_obj.width / 2 + doc_obj.leftMargin, 10*mm,
+                                  f"SpinFlow ERP — Invoice {invoice.invoice_number}")
+        canvas.restoreState()
+
+    doc.build(elements, onFirstPage=_hf, onLaterPages=_hf)
+    return buf.getvalue()

@@ -1,5 +1,6 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -12,6 +13,7 @@ from app.core.deps import get_current_user, log_audit
 from app.core.module_registry import ALL_MODULE_CODES as ALL_MODULES, get_module_label
 from app.models.user import User
 from app.models.masters import Company, CompanyModule, Mill
+from app.models.hr import Employee
 from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest, BillingPayment, OveragePricing
 from app.services.pricing_service import PricingService
 from app.services.billing_service import BillingService
@@ -1049,19 +1051,177 @@ async def get_my_plan(
         for inv in invs_res.scalars().all()
     ]
 
+    # Compute usage limits from plan + subscription extras
+    plan_incl_users = int(plan_obj.included_users) if plan_obj else 25
+    plan_incl_mills = int(plan_obj.included_mills) if plan_obj else 1
+    extra_users = int(sub.extra_users) if sub and sub.extra_users else 0
+    extra_mills = int(sub.extra_mills) if sub and sub.extra_mills else 0
+    extra_employees = int(sub.extra_employees) if sub and sub.extra_employees else 0
+    max_users = plan_incl_users + extra_users
+    max_mills = plan_incl_mills + extra_mills
+    max_employees = (plan_incl_users * 20) + extra_employees  # 20 employees per included user
+    current_mills = len(mills_list)
+    current_employees = int((await db.execute(
+        select(func.count()).select_from(Employee).where(
+            Employee.company_id == company_id,
+            Employee.is_active == True,
+        )
+    )).scalar() or 0)
+
+    additional_user_cost = float(plan_obj.additional_user_cost) if plan_obj and plan_obj.additional_user_cost else 0
+    additional_mill_cost = float(plan_obj.additional_mill_cost) if plan_obj and plan_obj.additional_mill_cost else 0
+    additional_employee_cost = float(plan_obj.additional_employee_cost) if plan_obj and plan_obj.additional_employee_cost else 0
+    plan_id = str(plan_obj.id) if plan_obj else None
+
     return {
         "company_name": company.name,
         "plan": plan_name,
+        "plan_id": plan_id,
         "plan_display": plan_display,
         "status": sub_status,
         "monthly_amount": monthly_amt,
         "enabled_modules": enabled_modules,
         "mills": mills_out,
         "total_users": total_users,
+        "max_users": max_users,
+        "max_mills": max_mills,
+        "max_employees": max_employees,
+        "current_mills": current_mills,
+        "current_employees": current_employees,
+        "extra_users": extra_users,
+        "extra_mills": extra_mills,
+        "extra_employees": extra_employees,
+        "included_users": plan_incl_users,
+        "included_mills": plan_incl_mills,
+        "additional_user_cost": additional_user_cost,
+        "additional_mill_cost": additional_mill_cost,
+        "additional_employee_cost": additional_employee_cost,
         "next_billing_at": next_billing,
         "last_payment_at": last_payment,
         "invoices": invoices_out,
     }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# MILL OWNER: Purchase Overage
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.post("/billing/purchase-overage", response_model=PurchaseOverageResult)
+async def company_purchase_overage(
+    body: PurchaseOverageRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Purchase additional resource capacity (extra users/mills/employees). MILL_OWNER or SUPER_ADMIN only."""
+    role = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role not in ("MILL_OWNER", "SUPER_ADMIN"):
+        raise HTTPException(status_code=403, detail="Mill Owner or Super Admin only")
+
+    company_id = current_user.company_id
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company associated with user")
+
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    sub_res = await db.execute(
+        select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+    )
+    sub = sub_res.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=400, detail="Company has no subscription")
+    plan = await db.get(SubscriptionPlan, sub.plan_id)
+    if not plan:
+        raise HTTPException(status_code=400, detail="Plan not found")
+
+    if body.resource_type == "extra_users":
+        unit_price = float(plan.additional_user_cost or 0)
+        sub.extra_users = (sub.extra_users or 0) + body.quantity
+        label = "users"
+    elif body.resource_type == "extra_mills":
+        unit_price = float(plan.additional_mill_cost or 0)
+        sub.extra_mills = (sub.extra_mills or 0) + body.quantity
+        label = "mills"
+    elif body.resource_type == "extra_employees":
+        unit_price = float(plan.additional_employee_cost or 0)
+        sub.extra_employees = (sub.extra_employees or 0) + body.quantity
+        label = "employees"
+    else:
+        raise HTTPException(status_code=400, detail="Invalid resource type")
+
+    if unit_price <= 0:
+        raise HTTPException(status_code=400, detail=f"This plan includes unlimited {label} — no purchase needed")
+
+    from datetime import datetime, timezone, timedelta
+    now = datetime.now(timezone.utc)
+    period_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+    if now.month == 12:
+        period_end = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc) - timedelta(seconds=1)
+    else:
+        period_end = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc) - timedelta(seconds=1)
+
+    svc = InvoiceService(db)
+    invoice = await svc.generate_overage_invoice(
+        company_id=company_id,
+        resource_type=body.resource_type,
+        quantity=body.quantity,
+        unit_price=unit_price,
+        period_start=period_start,
+        period_end=period_end,
+    )
+    await db.commit()
+    await log_audit(db, current_user.id, role, "overage_purchased", "billing", company_id,
+                    f"Purchased {body.quantity} {label} at {unit_price:.2f} each. Invoice {invoice.invoice_number}")
+    return PurchaseOverageResult(
+        success=True,
+        invoice_id=invoice.id,
+        invoice_number=invoice.invoice_number,
+        amount=float(invoice.amount),
+        resource_type=body.resource_type,
+        quantity=body.quantity,
+        message=f"Added {body.quantity} {label} at ₹{unit_price:.2f} each. Invoice {invoice.invoice_number} generated.",
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# MILL OWNER / ADMIN: Invoice PDF Download
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.get("/billing/invoices/{invoice_id}/download")
+async def download_invoice_pdf(
+    invoice_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Download a PDF of the invoice."""
+    from app.services.pdf_export import invoice_pdf
+
+    invoice = await db.get(BillingInvoice, invoice_id)
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    role = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(status_code=403, detail="Super Admin or Mill Owner only")
+
+    if role == "MILL_OWNER" and current_user.company_id != invoice.company_id:
+        raise HTTPException(status_code=403, detail="You can only download your own company invoices")
+
+    company = await db.get(Company, invoice.company_id)
+    company_name = company.name if company else "Unknown"
+
+    pdf_bytes = invoice_pdf(invoice, company_name)
+    return StreamingResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="invoice-{invoice.invoice_number}.pdf"',
+            "Content-Length": str(len(pdf_bytes)),
+        },
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════
