@@ -395,6 +395,21 @@ class CompanyDeletionService:
             if cnt:
                 counts["subscription_change_requests"] = cnt
 
+            # Delete billing_payments/invoices BEFORE users
+            # (billing_payments.entered_by FK to users.id)
+            cnt = await self._delete_from("billing_payments", "company_id = :p", company_id)
+            if cnt:
+                counts["billing_payments"] = cnt
+            cnt = await self._delete_from("billing_invoices", "company_id = :p", company_id)
+            if cnt:
+                counts["billing_invoices"] = cnt
+
+            # Delete company_modules BEFORE users
+            # (company_modules.enabled_by FK to users.id)
+            cnt = await self._delete_from("company_modules", "company_id = :p", company_id)
+            if cnt:
+                counts["company_modules"] = cnt
+
             if user_ids:
                 up = ",".join(f"'{u}'" for u in user_ids)
                 for table, cond in [
@@ -409,12 +424,7 @@ class CompanyDeletionService:
                 if cnt:
                     counts["users"] = cnt
 
-            for table in ["billing_payments", "billing_invoices"]:
-                cnt = await self._delete_from(table, "company_id = :p", company_id)
-                if cnt:
-                    counts[table] = cnt
-
-            for table in ["overage_pricing", "company_modules", "company_subscriptions", "employee_custom_fields"]:
+            for table in ["overage_pricing", "company_subscriptions", "employee_custom_fields"]:
                 cnt = await self._delete_from(table, "company_id = :p", company_id)
                 if cnt:
                     counts[table] = cnt

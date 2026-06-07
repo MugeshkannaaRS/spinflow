@@ -10,18 +10,20 @@ Verifies:
 """
 
 import uuid
+import os
 from decimal import Decimal
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy import select, text, event
 
+from app.db.base import Base
 from app.models.billing import (
     SubscriptionPlan, CompanySubscription, BillingInvoice, BillingPayment,
     OveragePricing, SubscriptionChangeRequest,
 )
-from app.models.masters import Company, Mill
+from app.models.masters import Company, Mill, CompanyModule
 from app.models.user import User, Role
 from app.services.deletion_service import CompanyDeletionService
 from app.services.stats_service import StatsService
@@ -177,6 +179,98 @@ async def test_deletion_cascade_covers_billing_tables(session: AsyncSession):
     # Verify company itself is gone (raw query bypasses identity map)
     co_cnt = (await session.execute(text("SELECT COUNT(*) FROM companies WHERE id = :p"), {"p": company.id})).scalar() or 0
     assert co_cnt == 0, "Company not deleted"
+
+
+@pytest.mark.asyncio
+async def test_deletion_cascade_fk_enforced():
+    """Verify hard_delete respects FK constraints when company_modules.enabled_by
+    and billing_payments.entered_by reference users.id (both nullable FKs)."""
+    fk_url = "sqlite+aiosqlite:///./test_fk_cascade.db"
+    fk_engine = create_async_engine(fk_url, echo=False)
+    async with fk_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with async_sessionmaker(fk_engine, expire_on_commit=False)() as session:
+            # Enable FK enforcement on this dedicated connection/engine
+            await session.execute(text("PRAGMA foreign_keys = ON"))
+
+            role = await _make_role(session)
+            user = await _make_user(session, role)
+            plan = await _make_plan(session)
+            company = await _make_company(session)
+            mill = await _make_mill(session, company.id)
+
+            u2 = User(
+                id=str(uuid.uuid4()), name="Emp", email=f"emp-{uuid.uuid4().hex[:6]}@test.com",
+                password_hash="x", role_id=role.id, company_id=company.id,
+                is_active=True, deleted_at=None,
+            )
+            session.add(u2)
+            await session.flush()
+
+            # CompanyModule WITH enabled_by = u2.id (FK to users.id — MUST be deleted before users)
+            cm = CompanyModule(
+                id=str(uuid.uuid4()), company_id=company.id, module_name="MILL_ERP",
+                is_enabled=True, enabled_by=u2.id,
+            )
+            session.add(cm)
+
+            sub = CompanySubscription(
+                id=str(uuid.uuid4()), company_id=company.id, plan_id=plan.id,
+                status="active", billing_cycle="monthly",
+                started_at=datetime.now(timezone.utc),
+                expires_at=datetime.now(timezone.utc) + timedelta(days=30),
+                extra_users=0, extra_mills=0, extra_employees=0,
+            )
+            session.add(sub)
+            await session.flush()
+
+            inv = BillingInvoice(
+                id=str(uuid.uuid4()), company_id=company.id, company_subscription_id=sub.id,
+                invoice_number=f"INV-{uuid.uuid4().hex[:8]}",
+                amount=Decimal("999"), status="paid", invoice_type="subscription",
+                created_at=datetime.now(timezone.utc),
+                billing_period_start=datetime.now(timezone.utc),
+                billing_period_end=datetime.now(timezone.utc) + timedelta(days=30),
+            )
+            session.add(inv)
+            await session.flush()
+
+            # BillingPayment WITH entered_by = u2.id (FK to users.id — MUST be deleted before users)
+            pay = BillingPayment(
+                id=str(uuid.uuid4()), company_id=company.id, invoice_id=inv.id,
+                amount=Decimal("999"), method="manual", status="completed",
+                paid_at=datetime.now(timezone.utc), entered_by=u2.id,
+            )
+            session.add(pay)
+
+            scr = SubscriptionChangeRequest(
+                id=str(uuid.uuid4()), company_id=company.id, requested_by=u2.id,
+                current_plan_id=plan.id, requested_plan_id=plan.id,
+                change_type="upgrade", reason="test", status="pending",
+            )
+            session.add(scr)
+            await session.flush()
+
+            svc = CompanyDeletionService(session, user)
+            result = await svc.hard_delete(company.id)
+            assert result["success"] is True
+
+            co_cnt = (await session.execute(
+                text("SELECT COUNT(*) FROM companies WHERE id = :p"), {"p": company.id})).scalar() or 0
+            assert co_cnt == 0, "Company not deleted"
+
+            for table in ["billing_payments", "billing_invoices", "company_modules",
+                          "company_subscriptions", "subscription_change_requests",
+                          "mills", "users"]:
+                cnt = (await session.execute(
+                    text(f"SELECT COUNT(*) FROM {table} WHERE company_id = :p"),
+                    {"p": company.id})).scalar() or 0
+                assert cnt == 0, f"Orphaned {table} after FK-enforced deletion: {cnt}"
+    finally:
+        await fk_engine.dispose()
+        if os.path.exists("test_fk_cascade.db"):
+            os.remove("test_fk_cascade.db")
 
 
 # ── Test 2: StatsService returns consistent, filtered counts ────────
