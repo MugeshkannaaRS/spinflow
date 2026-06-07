@@ -165,6 +165,8 @@ async def set_company_plan(
         raise HTTPException(status_code=404, detail="Plan not found")
 
     company.plan = plan.code
+    company.max_users = (plan.included_users or 25) + (req.extra_users or 0)
+    company.max_employees = ((plan.included_users or 25) * 20) + (req.extra_employees or 0)
     existing_sub = await db.execute(
         select(CompanySubscription).where(CompanySubscription.company_id == company_id)
     )

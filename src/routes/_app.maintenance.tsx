@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { maintenanceApi } from "@/lib/api-service";
+import { mastersApi, maintenanceApi, productionApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { canWrite } from "@/lib/rbac";
@@ -26,9 +26,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import {
   Select,
   SelectContent,
@@ -46,11 +48,16 @@ import {
   Download,
   FileSpreadsheet,
   X,
+  Plus,
+  Pencil,
+  ArrowDownToLine,
 } from "lucide-react";
-import type { MaintenanceTask } from "@/lib/types";
+import type { MaintenanceTask, MasterMachine } from "@/lib/types";
 import * as XLSX from "xlsx";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { useMillMasterCategory } from "@/hooks/useMillConfig";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/maintenance")({
   head: () => ({ meta: [{ title: "Maintenance — SpinFlow ERP" }] }),
@@ -317,9 +324,26 @@ function MaintenancePage() {
     enabled: !!millId,
   });
 
+  const machinesQ = useQuery({
+    queryKey: ["maintenance", "machines"],
+    queryFn: () => productionApi.getMachines(),
+    staleTime: 60_000,
+    retry: 1,
+  });
+  const deptsQ = useQuery({
+    queryKey: ["maintenance", "departments"],
+    queryFn: () => mastersApi.getDepartments(),
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  const machineColConfig = useColumnConfig("maintenance_machines");
+
   const tasks: any[] = maintQ.data ?? [];
   const schedules: any[] = schedulesQ.data ?? [];
   const parameters: any[] = paramsQ.data ?? [];
+  const machinesData = (machinesQ.data ?? []) as MasterMachine[];
+  const deptsData = (deptsQ.data ?? []) as any[];
 
   const [paramImportOpen, setParamImportOpen] = useState(false);
 
@@ -434,6 +458,14 @@ function MaintenancePage() {
                   </Badge>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="machines">
+                Machines
+                {machinesData.length > 0 && (
+                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5">
+                    {machinesData.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
             </TabsList>
 
             {/* ── Tasks tab ── */}
@@ -525,6 +557,44 @@ function MaintenancePage() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            {/* ── Machines tab ── */}
+            <TabsContent value="machines">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">Machines ({machinesData.length})</CardTitle>
+                  <div className="flex gap-2">
+                    {canEdit && <ImportMachinesDialog />}
+                    {canEdit && <MachineDialog departments={deptsData} />}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <DataTable
+                    tableId="maintenance_machines"
+                    columns={[
+                      { key: "code", label: machineColConfig.getLabel("code"), className: "font-mono text-xs" },
+                      { key: "name", label: machineColConfig.getLabel("name") },
+                      { key: "machine_type", label: machineColConfig.getLabel("machine_type") },
+                      { key: "department", label: machineColConfig.getLabel("department") },
+                      { key: "target_kg", label: machineColConfig.getLabel("target_kg") },
+                      { key: "current_status", label: "Status", render: (m: any) => (
+                        <Badge variant={m.current_status === "running" ? "default" : m.current_status === "idle" ? "secondary" : "outline"}>
+                          {m.current_status ?? "unknown"}
+                        </Badge>
+                      )},
+                    ] satisfies ColDef[]}
+                    data={machinesData}
+                    loading={machinesQ.isLoading}
+                    rowKey={(m: any) => m.id}
+                    exportFilename="machines"
+                    actions={canEdit ? (m: any) => (
+                      <MachineDialog item={m as MasterMachine} departments={deptsData} />
+                    ) : undefined}
+                    emptyMessage="No machines registered yet."
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         </div>
 
@@ -569,6 +639,204 @@ function ImportScheduleDialog() {
         title="Import PM Schedules"
       />
     </>
+  );
+}
+
+function ImportMachinesDialog() {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <ArrowDownToLine className="size-4 mr-1" />
+        Import Excel
+      </Button>
+      <UniversalImportModal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        tableName="maintenance_machines"
+        endpoint="/masters/machines/bulk"
+        onSuccess={() => qc.invalidateQueries({ queryKey: ["maintenance", "machines"] })}
+        title="Import Machines"
+      />
+    </>
+  );
+}
+
+function MachineDialog({ item, departments }: { item?: MasterMachine; departments: any[] }) {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  const { data: machineTypes } = useMillMasterCategory("machine_type");
+  const MACHINE_TYPES = (machineTypes?.length ? machineTypes : [
+    "Blowroom", "Carding", "Drawing", "Simplex", "Ring Frame",
+    "Autoconer", "Winding",
+  ]) as string[];
+  const requiredFields = ["code"];
+  const [form, setForm] = useState({
+    code: item?.code ?? "",
+    name: item?.name ?? "",
+    machine_type: item?.machine_type ?? "",
+    department: item?.department ?? "",
+    make: item?.make ?? "",
+    model: item?.model ?? "",
+    spindles: item?.spindles ?? undefined as number | undefined,
+    installation_date: item?.installation_date ?? "",
+    amc_expiry: item?.amc_expiry ?? "",
+    target_kg: item?.target_kg ?? 0,
+  });
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const isComplete = requiredFields.every((f) => {
+    const v = form[f as keyof typeof form];
+    return v !== "" && v !== undefined && v !== null;
+  });
+  const err = (f: string) => {
+    if (!touched[f]) return undefined;
+    const v = form[f as keyof typeof form];
+    if (v === "" || v === undefined || v === null) return "This field is required";
+    return undefined;
+  };
+
+  const createM = useMutation({
+    mutationFn: () => productionApi.createMachine(form),
+    onSuccess: () => {
+      toast.success("Machine created");
+      qc.invalidateQueries({ queryKey: ["maintenance", "machines"] });
+      setOpen(false);
+    },
+  });
+  const updateM = useMutation({
+    mutationFn: () => productionApi.updateMachine(item!.id, form),
+    onSuccess: () => {
+      toast.success("Machine updated");
+      qc.invalidateQueries({ queryKey: ["maintenance", "machines"] });
+      setOpen(false);
+    },
+    onError: () => toast.error("Failed to update machine"),
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+    if (!isComplete) return;
+    (item ? updateM : createM).mutate();
+  };
+
+  const trigger = item ? (
+    <Button size="sm" variant="outline" onClick={() => setOpen(true)}><Pencil className="size-3.5 mr-1" /> Edit</Button>
+  ) : (
+    <Button size="sm" onClick={() => setOpen(true)}><Plus className="size-4 mr-1" /> Add Machine</Button>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      {trigger}
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{item ? "Edit Machine" : "Add Machine"}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className={cn(err("code") && "text-destructive")}>
+              Machine Code <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              value={form.code}
+              onChange={(e) => setForm({ ...form, code: e.target.value })}
+              className={cn(err("code") && "border-destructive")}
+            />
+            {err("code") && <p className="text-xs text-destructive">{err("code")}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Machine Name</Label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Machine Type</Label>
+            <Select
+              value={form.machine_type}
+              onValueChange={(v) => setForm({ ...form, machine_type: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select type" />
+              </SelectTrigger>
+              <SelectContent>
+                {MACHINE_TYPES.map((t: string) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Department</Label>
+            <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select department" />
+              </SelectTrigger>
+              <SelectContent>
+                {departments.filter((d: any) => d?.code).map((d: any) => (
+                  <SelectItem key={d.id} value={d.code}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Make</Label>
+              <Input value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Model</Label>
+              <Input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
+            </div>
+          </div>
+          {form.machine_type === "Ring Frame" && (
+            <div className="space-y-1.5">
+              <Label>Spindles</Label>
+              <Input
+                type="number"
+                value={form.spindles ?? ""}
+                onChange={(e) =>
+                  setForm({ ...form, spindles: e.target.value ? parseInt(e.target.value) : undefined })
+                }
+              />
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label>Target (kg)</Label>
+            <Input
+              type="number"
+              step="any"
+              value={form.target_kg}
+              onChange={(e) => setForm({ ...form, target_kg: parseFloat(e.target.value) })}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Installation Date</Label>
+              <Input
+                type="date"
+                value={form.installation_date}
+                onChange={(e) => setForm({ ...form, installation_date: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>AMC Expiry</Label>
+              <Input
+                type="date"
+                value={form.amc_expiry}
+                onChange={(e) => setForm({ ...form, amc_expiry: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
+              {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 

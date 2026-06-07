@@ -72,7 +72,7 @@ const ALL_TABLES = [
   { key: "accounts_invoices", label: "Accounts Invoices" },
   { key: "accounts_gst", label: "Accounts GST" },
   { key: "masters_departments", label: "Masters Departments" },
-  { key: "masters_machines", label: "Masters Machines" },
+  { key: "maintenance_machines", label: "Maintenance Machines" },
   { key: "masters_customers", label: "Masters Customers" },
   { key: "masters_vehicles", label: "Masters Vehicles" },
   { key: "masters_shifts", label: "Masters Shifts" },

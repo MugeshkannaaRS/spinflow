@@ -35,6 +35,20 @@ class PlanCostBreakdown:
 
 
 @dataclass
+class EffectiveLimits:
+    user_limit: int
+    mill_limit: int
+    employee_limit: int
+    included_users: int
+    included_mills: int
+    extra_users: int
+    extra_mills: int
+    extra_employees: int
+    plan_code: str
+    plan_name: str
+
+
+@dataclass
 class SubscriptionStatus:
     plan_id: str
     plan_code: str
@@ -226,6 +240,28 @@ class PricingService:
             mills_exceeded=mill_count > mill_limit,
             users_exceeded=user_count > user_limit,
             cost=cost,
+        )
+
+    async def get_effective_limits(self, company: Company) -> EffectiveLimits:
+        """Single source of truth for all limits — SubscriptionPlan + CompanySubscription extras."""
+        plan = await self.get_plan_by_code(company.plan or "starter")
+        sub = await self._get_company_subscription(company.id)
+        plan_incl_users = plan.included_users if plan else 25
+        plan_incl_mills = plan.included_mills if plan else 1
+        extra_users = sub.extra_users if sub and sub.extra_users else 0
+        extra_mills = sub.extra_mills if sub and sub.extra_mills else 0
+        extra_employees = sub.extra_employees if sub and sub.extra_employees else 0
+        return EffectiveLimits(
+            user_limit=plan_incl_users + extra_users,
+            mill_limit=plan_incl_mills + extra_mills,
+            employee_limit=(plan_incl_users * 20) + extra_employees,
+            included_users=plan_incl_users,
+            included_mills=plan_incl_mills,
+            extra_users=extra_users,
+            extra_mills=extra_mills,
+            extra_employees=extra_employees,
+            plan_code=plan.code if plan else "starter",
+            plan_name=plan.name if plan else "Starter",
         )
 
     async def can_create_mill(self, company_id: str) -> Tuple[bool, str]:

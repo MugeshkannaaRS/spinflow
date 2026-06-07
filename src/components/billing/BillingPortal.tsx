@@ -502,7 +502,7 @@ function UpgradeDialog({
 
   if (!open) return null;
 
-  const plans = (plansQ.data ?? []).filter((p: any) => p.is_active && p.id !== currentPlanId);
+  const plans = (Array.isArray(plansQ.data) ? plansQ.data : []).filter((p: any) => p.is_active && p.id !== currentPlanId);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -529,7 +529,7 @@ function UpgradeDialog({
                       : "border-[#e2e8f0] hover:border-blue-300")}>
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-[14px] text-[#0f172a]">{p.name}</span>
-                    <span className="font-mono font-bold text-[#0f172a]">₹{p.monthly_price.toLocaleString("en-IN")}/mo</span>
+                    <span className="font-mono font-bold text-[#0f172a]">₹{(p.monthly_price ?? 0).toLocaleString("en-IN")}/mo</span>
                   </div>
                   <p className="text-[12px] text-[#64748b] mt-1">
                     {p.included_users} users · {p.included_mills} mills · {p.description || ""}

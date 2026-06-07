@@ -149,12 +149,12 @@ function CompanyDetailPage() {
     return null;
   }
 
-  const userLimit = company.max_users || company.stats?.user_limit || 50;
+  const userLimit = company.stats?.user_limit ?? company.max_users ?? 50;
   const userCount = company.stats?.user_count || 0;
   const millCount = company.stats?.mill_count || 0;
-  const millLimit = company.stats?.mill_limit || company.stats?.included_mills || 5;
+  const millLimit = company.stats?.mill_limit ?? company.stats?.included_mills ?? 5;
   const employeeCount = company.stats?.employee_count || 0;
-  const employeeLimit = company.stats?.employee_limit || company.max_employees || 500;
+  const employeeLimit = company.stats?.employee_limit ?? company.max_employees ?? 500;
   const modCount = company.stats?.enabled_modules_count || 0;
   const modTotal = company.stats?.total_modules || 22;
 
@@ -522,7 +522,7 @@ function UsersTab({ companyId, company }: { companyId: string; company: any }) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Users ({company.stats?.user_count ?? 0} / {company.max_users})</CardTitle>
+        <CardTitle>Users ({company.stats?.user_count ?? 0} / {company.stats?.user_limit ?? company.max_users})</CardTitle>
       </CardHeader>
       <CardContent>
         {(!users || users.length === 0) ? (

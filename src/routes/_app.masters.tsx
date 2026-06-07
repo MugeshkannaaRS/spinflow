@@ -45,7 +45,6 @@ import type {
   Customer,
   MasterVehicle,
   Route as MasterRoute,
-  MasterMachine,
   Shift,
   Warehouse,
   ListResponse,
@@ -78,7 +77,6 @@ function MastersPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "masters");
   const deptColConfig = useColumnConfig("masters_departments");
-  const machineColConfig = useColumnConfig("masters_machines");
   const custColConfig = useColumnConfig("masters_customers");
   const vehColConfig = useColumnConfig("masters_vehicles");
   const shiftColConfig = useColumnConfig("masters_shifts");
@@ -142,12 +140,6 @@ function MastersPage() {
     retry: 1,
   });
 
-  const machinesQ = useQuery({
-    queryKey: ["masters", "machines"],
-    queryFn: () => productionApi.getMachines(),
-    staleTime: 60_000,
-    retry: 1,
-  });
   const shiftsQ = useQuery({
     queryKey: ["masters", "shifts"],
     queryFn: () => productionApi.getShifts(),
@@ -172,18 +164,6 @@ function MastersPage() {
   const custData = (custQ.data ?? []) as Customer[];
   const vehData = (vehQ.data ?? []) as MasterVehicle[];
   const routeData = (routeQ.data ?? []) as MasterRoute[];
-  const machinesResponse = (machinesQ.data ?? {}) as any;
-  const machinesCustomFieldDefs = machinesResponse.custom_field_definitions ?? [];
-  const machinesData = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesResponse.data ?? []))
-    .map((m: any) => {
-      const flat = { ...m };
-      if (m.custom_fields) {
-        for (const [key, val] of Object.entries(m.custom_fields)) {
-          flat[key] = val;
-        }
-      }
-      return flat as MasterMachine;
-    });
   const shiftsData = (shiftsQ.data ?? []) as any[];
   const warehousesData = (warehousesQ.data ?? []) as any[];
 
@@ -224,7 +204,6 @@ function MastersPage() {
                   { key: "customers", label: "Customers" },
                   { key: "vehicles", label: "Vehicles" },
                   { key: "routes", label: "Routes" },
-                  { key: "machines", label: "Machines" },
                   { key: "shifts", label: "Shifts" },
                   { key: "warehouses", label: "Warehouses" },
                 ];
@@ -380,36 +359,6 @@ function MastersPage() {
                 onAdd={<RouteForm mills={millsData} />}
                 onEdit={(item) => <RouteForm item={item} mills={millsData} />}
               />
-            </TabsContent>
-
-            <TabsContent value="machines">
-              {(() => {
-                const sysCols = [
-                  { key: "code", label: machineColConfig.getLabel("code") },
-                  { key: "name", label: machineColConfig.getLabel("name") },
-                  { key: "machine_type", label: machineColConfig.getLabel("machine_type") },
-                  { key: "department", label: machineColConfig.getLabel("department") },
-                  { key: "target_kg", label: machineColConfig.getLabel("target_kg") },
-                ];
-                const customCols: { key: string; label: string }[] = (machinesCustomFieldDefs ?? []).map(
-                  (cf: { field_key: string; field_label: string }) => ({
-                    key: cf.field_key,
-                    label: cf.field_label + " *",
-                  })
-                );
-                return (
-                  <MasterTable
-                    title="Machines"
-                    data={machinesData.filter((x: any) => matchesSearch(x, search))}
-                    columns={[...sysCols, ...customCols]}
-                    activeKey="current_status"
-                    canEdit={canEdit}
-                    onAdd={<MachineForm departments={deptsData} />}
-                    onEdit={(item) => <MachineForm item={item} departments={deptsData} />}
-                    headerExtra={canEdit ? <ImportMachinesDialog /> : undefined}
-                  />
-                );
-              })()}
             </TabsContent>
 
             <TabsContent value="shifts">
@@ -1732,27 +1681,6 @@ function RouteForm({ item }: { item?: MasterRoute; mills: Mill[] }) {
   );
 }
 
-function ImportMachinesDialog() {
-  const [open, setOpen] = useState(false);
-  const qc = useQueryClient();
-  return (
-    <>
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <ArrowDownToLine className="size-4 mr-1" />
-        Import Excel
-      </Button>
-      <UniversalImportModal
-        isOpen={open}
-        onClose={() => setOpen(false)}
-        tableName="masters_machines"
-        endpoint="/masters/machines/bulk"
-        onSuccess={() => qc.invalidateQueries({ queryKey: ["masters", "machines"] })}
-        title="Import Machines"
-      />
-    </>
-  );
-}
-
 function ImportCustomersDialog() {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
@@ -1771,170 +1699,6 @@ function ImportCustomersDialog() {
         title="Import Customers"
       />
     </>
-  );
-}
-
-function MachineForm({ item, departments }: { item?: MasterMachine; departments: Department[] }) {
-  const qc = useQueryClient();
-  const { data: machineTypes } = useMillMasterCategory("machine_type");
-  const MACHINE_TYPES = machineTypes?.length ? machineTypes : [
-    "Blowroom", "Carding", "Drawing", "Simplex", "Ring Frame",
-    "Autoconer", "Winding",
-  ];
-  const requiredFields = ["code"];
-  const [form, setForm] = useState({
-    code: item?.code ?? "",
-    name: item?.name ?? "",
-    machine_type: item?.machine_type ?? "",
-    department: item?.department ?? "",
-    make: item?.make ?? "",
-    model: item?.model ?? "",
-    spindles: item?.spindles ?? undefined,
-    installation_date: item?.installation_date ?? "",
-    amc_expiry: item?.amc_expiry ?? "",
-    target_kg: item?.target_kg ?? 0,
-  });
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-
-  const isComplete = requiredFields.every((f) => {
-    const v = form[f as keyof typeof form];
-    return v !== "" && v !== undefined && v !== null;
-  });
-  const err = (f: string) => {
-    if (!touched[f]) return undefined;
-    const v = form[f as keyof typeof form];
-    if (v === "" || v === undefined || v === null) return "This field is required";
-    return undefined;
-  };
-
-  const createM = useMutation({
-    mutationFn: () => productionApi.createMachine(form),
-    onSuccess: () => {
-      toast.success("Machine created");
-      qc.invalidateQueries({ queryKey: ["masters", "machines"] });
-    },
-  });
-  const updateM = useMutation({
-    mutationFn: () => productionApi.updateMachine(item!.id, form),
-    onSuccess: () => {
-      toast.success("Machine updated");
-      qc.invalidateQueries({ queryKey: ["masters", "machines"] });
-    },
-    onError: () => toast.error("Failed to update machine"),
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
-    if (!isComplete) return;
-    (item ? updateM : createM).mutate();
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="space-y-1.5">
-        <Label className={cn(err("code") && "text-destructive")}>
-          Machine Code <span className="text-destructive">*</span>
-        </Label>
-        <Input
-          value={form.code}
-          onChange={(e) => setForm({ ...form, code: e.target.value })}
-          className={cn(err("code") && "border-destructive")}
-        />
-        {err("code") && <p className="text-xs text-destructive">{err("code")}</p>}
-      </div>
-      <div className="space-y-1.5">
-        <Label>Machine Name</Label>
-        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-      </div>
-      <div className="space-y-1.5">
-        <Label>Machine Type</Label>
-        <Select
-          value={form.machine_type}
-          onValueChange={(v) => setForm({ ...form, machine_type: v })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select type" />
-          </SelectTrigger>
-          <SelectContent>
-            {MACHINE_TYPES.map((t: string) => (
-              <SelectItem key={t} value={t}>
-                {t}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-1.5">
-        <Label>Department</Label>
-        <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select department" />
-          </SelectTrigger>
-          <SelectContent>
-            {departments.filter((d) => d?.code).map((d) => (
-              <SelectItem key={d.id} value={d.code}>
-                {d.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label>Make</Label>
-          <Input value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Model</Label>
-          <Input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
-        </div>
-      </div>
-      {form.machine_type === "Ring Frame" && (
-        <div className="space-y-1.5">
-          <Label>Spindles</Label>
-          <Input
-            type="number"
-            value={form.spindles ?? ""}
-            onChange={(e) =>
-              setForm({ ...form, spindles: e.target.value ? parseInt(e.target.value) : undefined })
-            }
-          />
-        </div>
-      )}
-      <div className="space-y-1.5">
-        <Label>Target (kg)</Label>
-        <Input
-          type="number"
-          step="any"
-          value={form.target_kg}
-          onChange={(e) => setForm({ ...form, target_kg: parseFloat(e.target.value) })}
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label>Installation Date</Label>
-          <Input
-            type="date"
-            value={form.installation_date}
-            onChange={(e) => setForm({ ...form, installation_date: e.target.value })}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label>AMC Expiry</Label>
-          <Input
-            type="date"
-            value={form.amc_expiry}
-            onChange={(e) => setForm({ ...form, amc_expiry: e.target.value })}
-          />
-        </div>
-      </div>
-      <SheetFooter>
-        <Button type="submit" disabled={createM.isPending || !isComplete}>
-          {createM.isPending ? "Saving…" : "Save"}
-        </Button>
-      </SheetFooter>
-    </form>
   );
 }
 

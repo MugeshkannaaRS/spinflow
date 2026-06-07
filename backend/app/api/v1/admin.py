@@ -17,6 +17,7 @@ from app.core.limiter import limiter
 from app.core.module_registry import ALL_MODULE_CODES as ALL_MODULE_KEYS
 from app.models.user import User, Role, UserSession
 from app.models.masters import Company, CompanyModule, Mill, MillSettings
+from app.models.hr import Employee
 from app.models.billing import CompanySubscription, SubscriptionPlan
 from app.models.audit import AuditLog
 from app.models.deletion_log import DeletionLog
@@ -574,6 +575,10 @@ async def get_company_detail(
         await db.execute(select(func.count()).select_from(User).where(User.company_id == company_id, User.is_active == True, User.deleted_at.is_(None)))
     ).scalar() or 0
 
+    employee_count = (
+        await db.execute(select(func.count()).select_from(Employee).where(Employee.company_id == company_id, Employee.is_active == True))
+    ).scalar() or 0
+
     module_result = await db.execute(
         select(CompanyModule).where(CompanyModule.company_id == company_id)
     )
@@ -596,6 +601,10 @@ async def get_company_detail(
             "started_at": str(sub.started_at) if sub.started_at else None,
             "expires_at": str(sub.expires_at) if sub.expires_at else None,
         }
+
+    from app.services.pricing_service import PricingService
+    svc = PricingService(db)
+    effective = await svc.get_effective_limits(company)
 
     audit_result = await db.execute(
         select(AuditLog)
@@ -632,8 +641,14 @@ async def get_company_detail(
         "stats": {
             "mill_count": mill_count,
             "user_count": user_count,
+            "employee_count": employee_count,
             "enabled_modules_count": len(enabled_modules),
             "enabled_modules": enabled_modules,
+            "user_limit": effective.user_limit,
+            "mill_limit": effective.mill_limit,
+            "employee_limit": effective.employee_limit,
+            "included_users": effective.included_users,
+            "included_mills": effective.included_mills,
         },
         "subscription": subscription,
         "recent_audit": recent_audit,

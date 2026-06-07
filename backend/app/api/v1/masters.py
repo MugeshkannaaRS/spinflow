@@ -753,7 +753,7 @@ async def bulk_create_machines(
     mode: str = Query("update", regex="^(skip|update|create)$"),
     mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_module("masters", write=True)),
+    current_user: User = Depends(require_module("maintenance", write=True)),
 ):
     """
     Bulk upsert machines.
