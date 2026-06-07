@@ -1,22 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { usersApi, mastersApi, adminApi } from "@/lib/api-service";
-import { ROLES, ROLE_LABELS, type Module } from "@/lib/rbac";
+import { usersApi, mastersApi } from "@/lib/api-service";
+import { ROLES, ROLE_LABELS } from "@/lib/rbac";
 import type { Role } from "@/lib/rbac";
 import { useAuth } from "@/stores/auth";
 import { useMillSubscription } from "@/hooks/useMillConfig";
 import { AccessGuard } from "@/components/AccessGuard";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+
 import {
   Sheet,
   SheetTrigger,
@@ -45,9 +43,6 @@ import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import {
   ShieldCheck,
-  Users,
-  Activity,
-  UserCheck,
   Plus,
   Pencil,
   ToggleLeft,
@@ -57,12 +52,9 @@ import {
   Eye,
   EyeOff,
   Check,
-  X,
-  Blocks,
   AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/users")({
   head: () => ({ meta: [{ title: "Users & Roles — SpinFlow ERP" }] }),
@@ -165,11 +157,6 @@ function UsersPage() {
   const [successDialog, setSuccessDialog] = useState<{ user: any; password: string } | null>(null);
   const [resetDialog, setResetDialog] = useState<{ user: any; password: string } | null>(null);
   const [copied, setCopied] = useState(false);
-  const [userTab, setUserTab] = useState("list");
-  const [modulesUser, setModulesUser] = useState<any | null>(null);
-
-  const activeUsers = users.filter((u: any) => u.is_active).length;
-  const roleCount = new Set(users.map((u: any) => u.role)).size;
 
   const filteredMills = useMemo(
     () => mills.filter((m: any) => m.company_id === form.company_id),
@@ -484,181 +471,76 @@ function UsersPage() {
               </SheetContent>
             </Sheet>
           </div>
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Users</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {activeUsers} / {users.length}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">active / total</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Active Users
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{activeUsers}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Roles</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{roleCount}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Inactive
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{users.length - activeUsers}</div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Tabs value={userTab} onValueChange={setUserTab}>
-            <TabsList>
-              <TabsTrigger value="list">All Users</TabsTrigger>
-              {isSuperAdmin && <TabsTrigger value="modules">Module Overrides</TabsTrigger>}
-            </TabsList>
-
-            <TabsContent value="list">
-              <Card>
-                <CardHeader>
-                  <CardTitle>All Users</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <DataTable
-                    tableId="users_list"
-                    columns={[
-                      { key: "full_name", label: userColConfig.getLabel("name"), render: (u: any) => <span className="font-medium">{u.full_name}</span> },
-                      { key: "email", label: userColConfig.getLabel("email") },
-                      {
-                        key: "role",
-                        label: userColConfig.getLabel("role"),
-                        type: "status",
-                        render: (u: any) => (
-                          <Badge className={cn("font-medium", ROLE_BADGE_COLORS[u.role] ?? "")}>
-                            {ROLE_LABELS[u.role as Role] ?? u.role}
-                          </Badge>
-                        ),
-                      },
-                      { key: "department", label: userColConfig.getLabel("department") },
-                      {
-                        key: "mill_id",
-                        label: userColConfig.getLabel("mill_id"),
-                        render: (u: any) => mills.find((m: any) => m.id === u.mill_id)?.name ?? "—",
-                        filterable: false,
-                      },
-                      {
-                        key: "company_id",
-                        label: userColConfig.getLabel("company_id"),
-                        render: (u: any) => {
-                          const mill = mills.find((m: any) => m.id === u.mill_id);
-                          return companies.find((c: any) => c.id === (u.company_id || mill?.company_id))?.name ?? "—";
-                        },
-                        filterable: false,
-                      },
-                      {
-                        key: "last_login",
-                        label: userColConfig.getLabel("last_login"),
-                        render: (u: any) =>
-                          u.last_login ? (
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(u.last_login).toLocaleDateString()}
-                            </span>
-                          ) : "—",
-                      },
-                      {
-                        key: "is_active",
-                        label: userColConfig.getLabel("is_active"),
-                        type: "status",
-                        render: (u: any) => (
-                          <Badge variant={u.is_active ? "default" : "secondary"}>
-                            {u.is_active ? "Active" : "Inactive"}
-                          </Badge>
-                        ),
-                      },
-                    ] satisfies ColDef[]}
-                    data={users}
-                    rowKey={(u) => u.id}
-                    exportFilename="users"
-                    emptyMessage="No users found. Create your first user."
-                    actions={(user) => (
-                      <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEdit(user)} title="Edit">
-                          <Pencil className="size-4" />
-                        </Button>
-                        {isSuperAdmin && (
-                          <Button variant="ghost" size="icon" onClick={() => setModulesUser(user)} title="Module Overrides">
-                            <Blocks className="size-4" />
-                          </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => deactivateMutation.mutate(user.id)}
-                          title={user.is_active ? "Deactivate" : "Reactivate"}
-                        >
-                          {user.is_active ? (
-                            <ToggleRight className="size-4 text-destructive" />
-                          ) : (
-                            <ToggleLeft className="size-4 text-green-600" />
-                          )}
-                        </Button>
-                        {user.is_active && (
-                          <Button variant="ghost" size="icon" onClick={() => handleResetPwd(user)} title="Reset Password">
-                            <KeyRound className="size-4" />
-                          </Button>
-                        )}
-                      </div>
+          <Card>
+            <CardContent className="pt-6">
+              <DataTable
+                tableId="users_list"
+                columns={[
+                  { key: "full_name", label: "Name", render: (u: any) => <span className="font-medium">{u.full_name}</span> },
+                  { key: "email", label: "Email" },
+                  {
+                    key: "role",
+                    label: "Role",
+                    type: "status",
+                    render: (u: any) => (
+                      <Badge className={cn("font-medium", ROLE_BADGE_COLORS[u.role] ?? "")}>
+                        {ROLE_LABELS[u.role as Role] ?? u.role}
+                      </Badge>
+                    ),
+                  },
+                  { key: "department", label: "Department" },
+                  {
+                    key: "last_login",
+                    label: "Last Login",
+                    render: (u: any) =>
+                      u.last_login ? (
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(u.last_login).toLocaleDateString()}
+                        </span>
+                      ) : "—",
+                  },
+                  {
+                    key: "is_active",
+                    label: "Status",
+                    type: "status",
+                    render: (u: any) => (
+                      <Badge variant={u.is_active ? "default" : "secondary"}>
+                        {u.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    ),
+                  },
+                ] satisfies ColDef[]}
+                data={users}
+                rowKey={(u) => u.id}
+                exportFilename="users"
+                emptyMessage="No users found. Create your first user."
+                actions={(user) => (
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(user)} title="Edit">
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => deactivateMutation.mutate(user.id)}
+                      title={user.is_active ? "Deactivate" : "Reactivate"}
+                    >
+                      {user.is_active ? (
+                        <ToggleRight className="size-4 text-destructive" />
+                      ) : (
+                        <ToggleLeft className="size-4 text-green-600" />
+                      )}
+                    </Button>
+                    {user.is_active && (
+                      <Button variant="ghost" size="icon" onClick={() => handleResetPwd(user)} title="Reset Password">
+                        <KeyRound className="size-4" />
+                      </Button>
                     )}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {isSuperAdmin && <TabsContent value="modules">
-              <Card>
-                <CardHeader>
-                  <CardTitle>User Module Overrides</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {users.filter((u: any) => u.is_active).length === 0 && (
-                      <p className="text-muted-foreground text-sm">No active users to configure.</p>
-                    )}
-                    {users
-                      .filter((u: any) => u.is_active)
-                      .map((user: any) => (
-                        <div
-                          key={user.id}
-                          className="flex items-center justify-between py-2 border-b last:border-0"
-                        >
-                          <div>
-                            <p className="font-medium text-sm">{user.full_name}</p>
-                            <p className="text-xs text-muted-foreground">{user.email}</p>
-                          </div>
-                          <Button size="sm" variant="outline" onClick={() => setModulesUser(user)}>
-                            <Blocks className="size-3.5 mr-1" /> Configure
-                          </Button>
-                        </div>
-                      ))}
                   </div>
-                </CardContent>
-              </Card>
-            </TabsContent>}
-          </Tabs>
+                )}
+              />
+            </CardContent>
+          </Card>
         </div>
 
         <Dialog open={!!successDialog} onOpenChange={(open) => !open && setSuccessDialog(null)}>
@@ -676,12 +558,12 @@ function UsersPage() {
                   <Label>Email</Label>
                   <div className="flex items-center gap-2 mt-1">
                     <code className="flex-1 px-3 py-2 rounded bg-muted text-sm">
-                      {successDialog.user.email ?? "—"}
+                      {successDialog.user?.email ?? "—"}
                     </code>
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => copyToClipboard(successDialog.user.email)}
+                      onClick={() => successDialog.user?.email && copyToClipboard(successDialog.user.email)}
                     >
                       <Copy className="size-4" />
                     </Button>
@@ -752,106 +634,9 @@ function UsersPage() {
           </DialogContent>
         </Dialog>
 
-        <Sheet
-          open={!!modulesUser}
-          onOpenChange={(o) => {
-            if (!o) setModulesUser(null);
-          }}
-        >
-          <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-            {modulesUser && (
-              <UserModulesPanel
-                user={modulesUser}
-                onClose={() => {
-                  setModulesUser(null);
-                  qc.invalidateQueries({ queryKey: ["system-users"] });
-                }}
-              />
-            )}
-          </SheetContent>
-        </Sheet>
       </AccessGuard>
     </>
   );
 }
 
-const USER_MODULE_LABELS: Record<string, string> = {
-  dashboard: "Dashboard",
-  production: "Production",
-  quality: "Quality",
-  stock: "Stock",
-  inventory: "Inventory",
-  dispatch: "Dispatch",
-  purchase: "Purchase",
-  stores: "Stores",
-  hr: "HR",
-  accounts: "Accounts",
-  maintenance: "Maintenance",
-  payroll: "Payroll",
-  users: "Users",
-  audit: "Audit",
-  reports: "Reports",
-  masters: "Masters",
-  sales: "Sales",
-  lotrac: "LoTrac",
-};
-const ALL_USER_MODULES = Object.keys(USER_MODULE_LABELS);
 
-function UserModulesPanel({ user, onClose }: { user: any; onClose: () => void }) {
-  const qc = useQueryClient();
-  const modulesQ = useQuery({
-    queryKey: ["user-modules", user.id],
-    queryFn: () => adminApi.getUserModules(user.id),
-    staleTime: 60_000,
-  });
-  const [modules, setModules] = useState<Record<string, boolean>>({});
-  const [initialized, setInitialized] = useState(false);
-  const companyName = modulesQ.data?.company_name ?? "Unknown Company";
-
-  useEffect(() => {
-    if (modulesQ.data?.modules && !initialized) {
-      setModules(modulesQ.data.modules);
-      setInitialized(true);
-    }
-  }, [modulesQ.data, initialized]);
-
-  const updateM = useMutation({
-    mutationFn: () => adminApi.updateUserModules(user.id, modules),
-    onSuccess: () => {
-      toast.success("Module overrides updated");
-      qc.invalidateQueries({ queryKey: ["user-modules", user.id] });
-      onClose();
-    },
-    onError: () => toast.error("Failed to update module overrides"),
-  });
-
-  return (
-    <>
-      <SheetHeader>
-        <SheetTitle>Module Access — {companyName}</SheetTitle>
-        <SheetDescription>These settings apply to ALL users in {companyName}</SheetDescription>
-      </SheetHeader>
-      <div className="mt-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md p-3 text-sm text-amber-800 dark:text-amber-300 flex items-start gap-2">
-        <AlertTriangle className="size-4 shrink-0 mt-0.5" />
-        <span>Changing modules here affects all users in this company.</span>
-      </div>
-      <div className="mt-4 space-y-4">
-        {ALL_USER_MODULES.map((mod) => (
-          <div key={mod} className="flex items-center justify-between py-2 border-b last:border-0">
-            <Label>{USER_MODULE_LABELS[mod]}</Label>
-            <Switch
-              checked={modules[mod] ?? false}
-              disabled={updateM.isPending}
-              onCheckedChange={(v) => setModules((prev) => ({ ...prev, [mod]: v }))}
-            />
-          </div>
-        ))}
-        <SheetFooter>
-          <Button onClick={() => updateM.mutate()} disabled={updateM.isPending}>
-            {updateM.isPending ? "Saving\u2026" : "Save"}
-          </Button>
-        </SheetFooter>
-      </div>
-    </>
-  );
-}

@@ -545,9 +545,9 @@ async def update_company_status(
 
     new_status = body.get("status")
     if new_status == "suspended":
-        return await suspend_company(company_id, db, current_user)
+        return await suspend_company(company_id, body, db, current_user)
     elif new_status == "active":
-        return await reactivate_company(company_id, db, current_user)
+        return await reactivate_company(company_id, body, db, current_user)
     else:
         raise HTTPException(422, "status must be 'active' or 'suspended'")
 
@@ -559,79 +559,80 @@ async def get_company_detail(
     current_user: User = Depends(get_current_user),
 ):
     """Return full company detail with stats, subscription, and recent audit."""
-    role_code = current_user.role_rel.code if current_user.role_rel else ""
-    if role_code != "SUPER_ADMIN":
-        raise HTTPException(403, "Super Admin only")
+    try:
+        role_code = current_user.role_rel.code if current_user.role_rel else ""
+        if role_code != "SUPER_ADMIN":
+            raise HTTPException(403, "Super Admin only")
 
-    company = await db.get(Company, company_id)
-    if not company:
-        raise HTTPException(404, "Company not found")
+        company = await db.get(Company, company_id)
+        if not company:
+            raise HTTPException(404, "Company not found")
 
-    mill_count = (
-        await db.execute(select(func.count()).select_from(Mill).where(Mill.company_id == company_id, Mill.is_active == True))
-    ).scalar() or 0
+        mill_count = (
+            await db.execute(select(func.count()).select_from(Mill).where(Mill.company_id == company_id, Mill.is_active == True))
+        ).scalar() or 0
 
-    user_count = (
-        await db.execute(select(func.count()).select_from(User).where(User.company_id == company_id, User.is_active == True, User.deleted_at.is_(None)))
-    ).scalar() or 0
+        user_count = (
+            await db.execute(select(func.count()).select_from(User).where(User.company_id == company_id, User.is_active == True, User.deleted_at.is_(None)))
+        ).scalar() or 0
 
-    employee_count = (
-        await db.execute(
-            select(func.count()).select_from(Employee)
-            .join(Mill, Employee.mill_id == Mill.id)
-            .where(Mill.company_id == company_id, Employee.is_active == True)
+        employee_count = (
+            await db.execute(
+                select(func.count()).select_from(Employee)
+                .join(Mill, Employee.mill_id == Mill.id)
+                .where(Mill.company_id == company_id, Employee.is_active == True)
+            )
+        ).scalar() or 0
+
+        module_result = await db.execute(
+            select(CompanyModule).where(CompanyModule.company_id == company_id)
         )
-    ).scalar() or 0
+        modules = module_result.scalars().all()
+        enabled_modules = [m.module_name for m in modules if m.is_enabled]
 
-    module_result = await db.execute(
-        select(CompanyModule).where(CompanyModule.company_id == company_id)
-    )
-    modules = module_result.scalars().all()
-    enabled_modules = [m.module_name for m in modules if m.is_enabled]
+        sub_result = await db.execute(
+            select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+        )
+        sub = sub_result.scalar_one_or_none()
+        subscription = None
+        if sub:
+            plan = await db.get(SubscriptionPlan, sub.plan_id)
+            subscription = {
+                "plan_id": sub.plan_id,
+                "plan_code": plan.code if plan else None,
+                "plan_name": plan.name if plan else None,
+                "status": sub.status,
+                "billing_cycle": sub.billing_cycle,
+                "started_at": str(sub.started_at) if sub.started_at else None,
+                "expires_at": str(sub.expires_at) if sub.expires_at else None,
+            }
 
-    sub_result = await db.execute(
-        select(CompanySubscription).where(CompanySubscription.company_id == company_id)
-    )
-    sub = sub_result.scalar_one_or_none()
-    subscription = None
-    if sub:
-        plan = await db.get(SubscriptionPlan, sub.plan_id)
-        subscription = {
-            "plan_id": sub.plan_id,
-            "plan_code": plan.code if plan else None,
-            "plan_name": plan.name if plan else None,
-            "status": sub.status,
-            "billing_cycle": sub.billing_cycle,
-            "started_at": str(sub.started_at) if sub.started_at else None,
-            "expires_at": str(sub.expires_at) if sub.expires_at else None,
-        }
+        from app.services.pricing_service import PricingService
+        svc = PricingService(db)
+        effective = await svc.get_effective_limits(company)
 
-    from app.services.pricing_service import PricingService
-    svc = PricingService(db)
-    effective = await svc.get_effective_limits(company)
+        audit_result = await db.execute(
+            select(AuditLog)
+            .where(AuditLog.entity_id == company_id)
+            .order_by(AuditLog.created_at.desc())
+            .limit(20)
+        )
+        recent_audit = [
+            {
+                "action": a.action,
+                "user_name": a.user_name,
+                "details": a.details,
+                "created_at": str(a.created_at) if a.created_at else None,
+            }
+            for a in audit_result.scalars().all()
+        ]
 
-    audit_result = await db.execute(
-        select(AuditLog)
-        .where(AuditLog.entity_id == company_id)
-        .order_by(AuditLog.created_at.desc())
-        .limit(20)
-    )
-    recent_audit = [
-        {
-            "action": a.action,
-            "user_name": a.user_name,
-            "details": a.details,
-            "created_at": str(a.created_at) if a.created_at else None,
-        }
-        for a in audit_result.scalars().all()
-    ]
-
-    return {
-        "id": company.id,
-        "code": company.code,
-        "name": company.name,
-        "gstin": company.gstin,
-        "address": company.address,
+        return {
+            "id": company.id,
+            "code": company.code,
+            "name": company.name,
+            "gstin": company.gstin,
+            "address": company.address,
         "phone": company.phone,
         "email": company.email,
         "is_active": company.is_active,
@@ -657,6 +658,11 @@ async def get_company_detail(
         "subscription": subscription,
         "recent_audit": recent_audit,
     }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"get_company_detail error: {e}")
+        raise HTTPException(500, "Failed to load company detail")
 
 
 @router.post("/admin/onboarding", response_model=OnboardingResult)
@@ -1083,39 +1089,45 @@ async def restore_company(
     current_user: User = Depends(get_current_user),
 ):
     """Restore an archived company back to suspended state with full lifecycle validation."""
-    role_code = current_user.role_rel.code if current_user.role_rel else ""
-    if role_code != "SUPER_ADMIN":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can restore companies")
+    try:
+        role_code = current_user.role_rel.code if current_user.role_rel else ""
+        if role_code != "SUPER_ADMIN":
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can restore companies")
 
-    company_q = await db.execute(select(Company).where(Company.id == company_id))
-    company = company_q.scalar_one_or_none()
-    if not company:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
-    if company.status != "archived":
-        raise HTTPException(status_code=409, detail="Company must be archived before restoring. Only archived companies can be restored.")
+        company_q = await db.execute(select(Company).where(Company.id == company_id))
+        company = company_q.scalar_one_or_none()
+        if not company:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+        if company.status != "archived":
+            raise HTTPException(status_code=409, detail="Company must be archived before restoring. Only archived companies can be restored.")
 
-    # Restore to suspended — admin must explicitly reactivate
-    company.is_active = False
-    company.status = "suspended"
-    company.suspended_at = datetime.utcnow()
-    company.archived_at = None
+        # Restore to suspended — admin must explicitly reactivate
+        company.is_active = False
+        company.status = "suspended"
+        company.suspended_at = datetime.utcnow()
+        company.archived_at = None
 
-    # Restore subscription to suspended
-    sub_result = await db.execute(
-        select(CompanySubscription).where(CompanySubscription.company_id == company_id)
-    )
-    sub = sub_result.scalar_one_or_none()
-    if sub:
-        sub.status = "suspended"
+        # Restore subscription to suspended
+        sub_result = await db.execute(
+            select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+        )
+        sub = sub_result.scalar_one_or_none()
+        if sub:
+            sub.status = "suspended"
 
-    db.add(AuditLog(
-        user_id=current_user.id,
-        user_name=current_user.name,
-        role=role_code,
-        action="company_restored",
-        entity="company",
-        entity_id=company_id,
-        details="Company restored from archive to suspended state",
-    ))
-    await db.commit()
-    return {"id": company_id, "status": "suspended", "message": "Company restored from archive. Use reactivate to fully enable."}
+        db.add(AuditLog(
+            user_id=current_user.id,
+            user_name=current_user.name,
+            role=role_code,
+            action="company_restored",
+            entity="company",
+            entity_id=company_id,
+            details="Company restored from archive to suspended state",
+        ))
+        await db.commit()
+        return {"id": company_id, "status": "suspended", "message": "Company restored from archive. Use reactivate to fully enable."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"restore_company error: {e}")
+        raise HTTPException(500, "Failed to restore company")

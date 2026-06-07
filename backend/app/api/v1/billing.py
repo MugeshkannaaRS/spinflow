@@ -803,7 +803,7 @@ async def admin_billing_companies(
     if company_ids:
         for r in (await db.execute(
             select(Mill.company_id, func.count(Mill.id))
-            .where(Mill.company_id.in_(company_ids))
+            .where(Mill.company_id.in_(company_ids), Mill.is_active == True)
             .group_by(Mill.company_id)
         )).all():
             mill_cnt_map[r[0]] = int(r[1])
@@ -877,7 +877,7 @@ async def admin_billing_companies(
             .join(subq, (BillingInvoice.company_id == subq.c.company_id) & (BillingInvoice.paid_at == subq.c.max_paid_at))
         )
         for r in pay_rows.all():
-            last_pay_map[r[0]] = r[1].isoformat()
+            last_pay_map[r[0]] = r[1].isoformat() if r[1] else None
 
     rows = []
     for co in companies:

@@ -117,6 +117,8 @@ class StatsService:
                 (SELECT COUNT(*) FROM employees WHERE is_active = true) AS active_employees
         """))
         row = result.fetchone()
+        if not row:
+            row = type("Row", (), {k: 0 for k in ("total_companies", "active_companies", "total_mills", "active_mills", "total_users", "active_users", "total_employees", "active_employees")})()
         return {
             "total_companies": row.total_companies or 0,
             "active_companies": row.active_companies or 0,

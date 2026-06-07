@@ -43,15 +43,20 @@ DELETE_STMTS = [
 
     # ── Mills ──────────────────────────────────────────
     "DELETE FROM mills WHERE company_id IN (SELECT id FROM companies WHERE code LIKE 'LR-%')",
-    "DELETE FROM column_config WHERE company_id IN (SELECT id FROM companies WHERE code LIKE 'LR-%')",
+    "DELETE FROM column_configs WHERE company_id IN (SELECT id FROM companies WHERE code LIKE 'LR-%')",
 
     # ── Companies ──────────────────────────────────────
     "DELETE FROM companies WHERE code LIKE 'LR-%'",
+    "DELETE FROM companies WHERE code LIKE 'TEST-%'",
+    "DELETE FROM companies WHERE code LIKE 'DEMO-%'",
+    "DELETE FROM companies WHERE code LIKE 'PSPL-%'",
 
     # ── Orphan users (no company FK) ───────────────────
     "DELETE FROM users WHERE email LIKE '%@lr-%'",
     "DELETE FROM users WHERE name LIKE 'LR-Test-%'",
     "DELETE FROM users WHERE name LIKE 'VERIFY-%'",
+    "DELETE FROM users WHERE name LIKE 'TEST-%'",
+    "DELETE FROM users WHERE name LIKE 'DEMO-%'",
 ]
 
 
@@ -67,7 +72,7 @@ async def safe_exec(conn, stmt: str, label: str) -> int:
 
 
 async def main():
-    engine = create_async_engine(settings.database_url)
+    engine = create_async_engine(settings.DATABASE_URL)
     async with engine.begin() as conn:
         result = await conn.execute(text("SELECT COUNT(*) FROM companies WHERE code LIKE 'LR-%'"))
         count = result.scalar() or 0
