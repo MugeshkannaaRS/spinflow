@@ -23,7 +23,7 @@ from app.models.audit import AuditLog
 from app.models.deletion_log import DeletionLog
 from app.core.error_handler import SpinFlowException
 from app.services.deletion_service import CompanyDeletionService
-from app.services.company_stats import CompanyStatsService
+from app.services.stats_service import StatsService
 from app.services.onboarding_service import OnboardingService
 from app.schemas.onboarding import OnboardingRequest, OnboardingResult
 from sqlalchemy import update as sa_update
@@ -576,7 +576,11 @@ async def get_company_detail(
     ).scalar() or 0
 
     employee_count = (
-        await db.execute(select(func.count()).select_from(Employee).where(Employee.company_id == company_id, Employee.is_active == True))
+        await db.execute(
+            select(func.count()).select_from(Employee)
+            .join(Mill, Employee.mill_id == Mill.id)
+            .where(Mill.company_id == company_id, Employee.is_active == True)
+        )
     ).scalar() or 0
 
     module_result = await db.execute(
@@ -1003,11 +1007,12 @@ async def get_company_stats(
     if role_code != "SUPER_ADMIN":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can view company stats")
     try:
-        svc = CompanyStatsService(db)
+        svc = StatsService(db)
         if company_id:
-            stats = await svc.get_company_stats(company_id)
-            return stats[0] if stats else None
-        return await svc.get_company_stats()
+            stats = await svc.per_company_stats()
+            match = [s for s in stats if s["company_id"] == company_id]
+            return match[0] if match else None
+        return await svc.per_company_stats()
     except Exception as e:
         logger.error(f"company stats error: {e}")
         return []

@@ -58,19 +58,22 @@ class StatsService:
         return result.scalar() or 0
 
     async def employee_count(self, company_id: Optional[str] = None, mill_id: Optional[str] = None, active_only: bool = True) -> int:
+        if company_id:
+            stmt = text("""
+                SELECT COUNT(*) FROM employees e
+                JOIN mills m ON e.mill_id = m.id
+                WHERE m.company_id = :cid
+            """ + (" AND e.is_active = true" if active_only else ""))
+            result = await self.db.execute(stmt, {"cid": company_id})
+            return result.scalar() or 0
         stmt = select(func.count()).select_from(text("employees"))
         if active_only:
             stmt = stmt.where(text("is_active = true"))
-        if company_id:
-            stmt = stmt.where(text("company_id = :cid"))
         if mill_id:
             stmt = stmt.where(text("mill_id = :mid"))
-        params = {}
-        if company_id:
-            params["cid"] = company_id
-        if mill_id:
-            params["mid"] = mill_id
-        result = await self.db.execute(stmt, params) if params else await self.db.execute(stmt)
+            result = await self.db.execute(stmt, {"mid": mill_id})
+        else:
+            result = await self.db.execute(stmt)
         return result.scalar() or 0
 
     async def per_company_stats(self) -> List[Dict]:
@@ -81,7 +84,9 @@ class StatsService:
                 c.code,
                 c.name,
                 (SELECT COUNT(*) FROM users u WHERE u.company_id = c.id AND u.is_active = true AND u.deleted_at IS NULL) AS user_count,
-                (SELECT COUNT(*) FROM mills m WHERE m.company_id = c.id AND m.is_active = true) AS mill_count
+                (SELECT COUNT(*) FROM users u WHERE u.company_id = c.id AND u.is_active = true AND u.deleted_at IS NULL) AS active_user_count,
+                (SELECT COUNT(*) FROM mills m WHERE m.company_id = c.id AND m.is_active = true) AS mill_count,
+                (SELECT COUNT(*) FROM mills m WHERE m.company_id = c.id AND m.is_active = true) AS active_mill_count
             FROM companies c
             ORDER BY c.name
         """))
@@ -91,7 +96,9 @@ class StatsService:
                 "code": row.code,
                 "name": row.name,
                 "user_count": row.user_count or 0,
+                "active_user_count": row.active_user_count or 0,
                 "mill_count": row.mill_count or 0,
+                "active_mill_count": row.active_mill_count or 0,
             }
             for row in result.fetchall()
         ]

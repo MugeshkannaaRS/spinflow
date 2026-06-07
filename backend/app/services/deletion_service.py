@@ -194,6 +194,8 @@ class CompanyDeletionService:
         counts["company_modules"] = await self._table_count("company_modules", "company_id = :p", c)
         counts["company_subscriptions"] = await self._table_count("company_subscriptions", "company_id = :p", c)
         counts["billing_invoices"] = await self._table_count("billing_invoices", "company_id = :p", c)
+        counts["billing_payments"] = await self._table_count("billing_payments", "company_id = :p", c)
+        counts["overage_pricing"] = await self._table_count("overage_pricing", "company_id = :p", c)
         counts["subscription_change_requests"] = await self._table_count("subscription_change_requests", "company_id = :p", c)
         counts["employee_custom_fields"] = await self._table_count("employee_custom_fields", "company_id = :p", c)
 
@@ -401,7 +403,12 @@ class CompanyDeletionService:
                 if cnt:
                     counts["users"] = cnt
 
-            for table in ["company_modules", "company_subscriptions", "billing_invoices", "subscription_change_requests", "employee_custom_fields"]:
+            for table in ["billing_payments", "billing_invoices"]:
+                cnt = await self._delete_from(table, "company_id = :p", company_id)
+                if cnt:
+                    counts[table] = cnt
+
+            for table in ["overage_pricing", "company_modules", "company_subscriptions", "subscription_change_requests", "employee_custom_fields"]:
                 cnt = await self._delete_from(table, "company_id = :p", company_id)
                 if cnt:
                     counts[table] = cnt
