@@ -229,8 +229,15 @@ async def deactivate_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     user.is_active = not user.is_active
+    was_active = user.is_active
     await db.flush()
     role_code = user.role_rel.code if user.role_rel else "UNKNOWN"
+    action_str = "user_deactivated" if was_active else "user_activated"
+    await log_audit(
+        db, current_user.id, current_user.role_rel.code if current_user.role_rel else "UNKNOWN",
+        action_str, "user", user.id,
+        f"User {user.name} ({user.email}) {'deactivated' if was_active else 'activated'} by {current_user.name}",
+    )
     return UserOut(
         id=user.id,
         full_name=user.name,

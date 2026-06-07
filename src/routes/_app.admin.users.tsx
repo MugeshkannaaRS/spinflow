@@ -32,7 +32,7 @@ import { toast } from "sonner";
 import {
   Eye, EyeOff, UserPlus, KeyRound, Copy, Check,
   Building2, Factory, ChevronRight, Search, X,
-  Users, Shield, CheckCircle2, XCircle, Filter,
+  Users, Shield, CheckCircle2, XCircle, Filter, AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -465,24 +465,48 @@ function AdminUsersPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-4 grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Users</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">{allUsers.length}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Active</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-green-600">{activeUsers}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Inactive</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-red-500">{allUsers.length - activeUsers}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Companies</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">{companies.length}</div></CardContent>
-        </Card>
-      </div>
+      {(() => {
+        const totalLicensed = companies.reduce((sum: number, c: any) => sum + (c.max_users ?? 50), 0);
+        const usedPct = totalLicensed > 0 ? Math.round((allUsers.length / totalLicensed) * 100) : 0;
+        return (
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-5">
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Total Users</CardTitle></CardHeader>
+              <CardContent><div className="text-2xl font-bold">{allUsers.length}</div></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Active</CardTitle></CardHeader>
+              <CardContent><div className="text-2xl font-bold text-green-600">{activeUsers}</div></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Inactive</CardTitle></CardHeader>
+              <CardContent><div className="text-2xl font-bold text-red-500">{allUsers.length - activeUsers}</div></CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Licensed Users</CardTitle></CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{allUsers.length} / {totalLicensed}</div>
+                <div className="text-xs text-muted-foreground mt-1">{usedPct}% used</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">Companies</CardTitle></CardHeader>
+              <CardContent><div className="text-2xl font-bold">{companies.length}</div></CardContent>
+            </Card>
+          </div>
+        );
+      })()}
+
+      {/* Error banners */}
+      {usersQ.isError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800 p-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="size-4 text-red-500 shrink-0" />
+            <p className="text-xs text-red-700 dark:text-red-400">Failed to load users. You may be viewing stale data.</p>
+          </div>
+          <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => usersQ.refetch()}>Retry</Button>
+        </div>
+      )}
 
       {/* 3-Panel Layout */}
       <div className="grid grid-cols-12 gap-4 min-h-[500px]">

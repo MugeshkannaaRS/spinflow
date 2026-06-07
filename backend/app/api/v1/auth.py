@@ -70,7 +70,9 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
         raise HTTPException(status_code=500, detail="Login failed. Please try again.")
 
     if not user or not verify_password(form_data.password, user.password_hash):
+        client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "0.0.0.0").split(",")[0].strip()
         if user:
+            await log_audit(db, user.id, user.role_rel.code if user.role_rel else "UNKNOWN", "failed_login", "auth", user.id, "Failed login attempt", ip_address=client_ip)
             user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
             if user.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
                 user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
@@ -82,6 +84,8 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
                     message=f"Account locked after {MAX_FAILED_ATTEMPTS} failed attempts. Try again in {LOCKOUT_MINUTES} minutes.",
                 )
             await db.commit()
+        else:
+            await log_audit(db, None, "UNKNOWN", "failed_login", "auth", "", "Failed login attempt for unknown email", ip_address=client_ip)
         raise SpinFlowException(
             status_code=401,
             code=ErrorCode.INVALID_CREDENTIALS,

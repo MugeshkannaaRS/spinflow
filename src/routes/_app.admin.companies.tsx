@@ -39,6 +39,7 @@ import {
   Pencil,
   Download,
   CheckCircle,
+  AlertTriangle,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { cn } from "@/lib/utils";
@@ -206,6 +207,15 @@ function CompaniesPage() {
 
   return (
     <div className="p-6">
+      {companiesQ.isError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800 p-3 flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="size-4 text-red-500 shrink-0" />
+            <p className="text-xs text-red-700 dark:text-red-400">Failed to load companies.</p>
+          </div>
+          <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => companiesQ.refetch()}>Retry</Button>
+        </div>
+      )}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">Active Companies ({activeCompanies.length})</CardTitle>

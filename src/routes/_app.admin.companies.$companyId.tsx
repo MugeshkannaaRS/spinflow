@@ -74,7 +74,7 @@ function CompanyDetailPage() {
   const qc = useQueryClient();
   const [tab, setTab] = useState("overview");
 
-  const { data: company, isLoading } = useQuery({
+  const { data: company, isLoading, isError, error } = useQuery({
     queryKey: ["company-detail", companyId],
     queryFn: () => adminApi.getCompanyDetail(companyId),
   });
@@ -115,19 +115,38 @@ function CompanyDetailPage() {
     );
   }
 
-  if (!company) {
+  if (isError) {
+    const status = (error as any)?.response?.status;
+    const isNotFound = status === 404;
     return (
       <div className="p-6">
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Building2 className="size-12 text-muted-foreground/40 mb-4" />
-          <p className="text-lg font-medium">Company not found</p>
-          <p className="text-sm text-muted-foreground mt-1">The company you are looking for does not exist or has been removed.</p>
+          {isNotFound ? (
+            <>
+              <Building2 className="size-12 text-muted-foreground/40 mb-4" />
+              <p className="text-lg font-medium">Company not found</p>
+              <p className="text-sm text-muted-foreground mt-1">The company you are looking for does not exist or has been removed.</p>
+            </>
+          ) : (
+            <>
+              <AlertTriangle className="size-12 text-red-300 mb-4" />
+              <p className="text-lg font-medium text-red-700 dark:text-red-400">Failed to load company details</p>
+              <p className="text-sm text-red-500 mt-1">{(error as any)?.response?.data?.detail ?? (error as any)?.message ?? "Request failed"}</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => qc.invalidateQueries({ queryKey: ["company-detail", companyId] })}>
+                Retry
+              </Button>
+            </>
+          )}
           <Link to="/admin/companies" className="text-sm text-blue-600 hover:underline mt-4 inline-flex items-center gap-1">
             <ArrowLeft className="size-3.5" /> Back to Companies
           </Link>
         </div>
       </div>
     );
+  }
+
+  if (!company) {
+    return null;
   }
 
   const userLimit = company.max_users || company.stats?.user_limit || 50;

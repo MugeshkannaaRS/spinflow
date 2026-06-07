@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { adminApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/admin/billing/payments")({
@@ -20,6 +22,29 @@ function PaymentsPage() {
 
   if (!user || user.role !== "SUPER_ADMIN") {
     return <div className="p-6 text-destructive text-lg font-medium">Only Super Admin can access this page.</div>;
+  }
+
+  if (q.isError) {
+    return (
+      <div className="p-6 space-y-4">
+        <div><h1 className="text-xl font-bold">Payments</h1><p className="text-sm text-muted-foreground">Payment records and transaction history.</p></div>
+        <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800 p-8 text-center">
+          <AlertTriangle className="size-8 mx-auto mb-2 text-red-500" />
+          <p className="text-sm font-medium text-red-700 dark:text-red-400">Failed to load payments.</p>
+          <p className="text-xs text-red-500 mt-1 mb-3">{(q.error as any)?.response?.data?.detail ?? (q.error as any)?.message ?? "Request failed"}</p>
+          <Button variant="outline" size="sm" onClick={() => q.refetch()}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (q.isLoading) {
+    return (
+      <div className="p-6 space-y-4">
+        <div><h1 className="text-xl font-bold">Payments</h1><p className="text-sm text-muted-foreground">Payment records and transaction history.</p></div>
+        <div className="rounded-lg border p-12 text-center text-sm text-muted-foreground">Loading payments…</div>
+      </div>
+    );
   }
 
   const rows: any[] = q.data?.items ?? [];

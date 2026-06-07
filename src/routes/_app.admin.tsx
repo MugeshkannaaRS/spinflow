@@ -4,6 +4,7 @@ import { adminApi } from "@/lib/api-service";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -95,6 +96,9 @@ function AdminPage() {
   const pending = pendingUpgradesQ.data;
   const subs = subsQ.data;
 
+  const anyLoading = statsQ.isLoading || dashboardQ.isLoading || analyticsQ.isLoading || pendingUpgradesQ.isLoading || subsQ.isLoading;
+  const anyError = statsQ.isError || dashboardQ.isError || analyticsQ.isError || pendingUpgradesQ.isError || subsQ.isError;
+
   const subsList: any[] = Array.isArray(subs?.items) ? subs.items : [];
   const nearLimitCompanies = subsList.filter((s: any) =>
     s.user_count >= s.user_limit * 0.85 ||
@@ -112,23 +116,55 @@ function AdminPage() {
           <h1 className="text-2xl font-bold">Executive Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">SaaS operations, revenue, and company oversight</p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Activity className="size-4 text-emerald-500" />
-          Live
+        <div className="flex items-center gap-2">
+          {anyLoading ? (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="size-3.5 animate-spin" /> Loading…</span>
+          ) : anyError ? (
+            <span className="flex items-center gap-1.5 text-xs text-destructive"><AlertTriangle className="size-3.5" /> Some data failed to load</span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-xs text-emerald-600"><Activity className="size-3.5" /> Live</span>
+          )}
         </div>
       </div>
 
-      {/* KPI Cards */}
-      {(dd || an) && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <KpiCard label="MRR" value={fmtLakh(dd?.mrr ?? 0)} subLabel="Monthly Recurring Revenue" icon={TrendingUp} iconColor="text-blue-600" iconBg="bg-blue-50" />
-          <KpiCard label="ARR" value={fmtLakh(dd?.arr ?? 0)} subLabel="Annual Recurring Revenue" icon={DollarSign} iconColor="text-green-600" iconBg="bg-green-50" />
-          <KpiCard label="Revenue Growth" value={dd ? `${(dd.revenue_growth ?? 0).toFixed(1)}%` : "—"} subLabel="vs last month" icon={ArrowUpRight} iconColor="text-emerald-600" iconBg="bg-emerald-50" />
-          <KpiCard label="New Customers" value={String(dd?.new_customers_this_month ?? 0)} subLabel="This month" icon={UserPlus} iconColor="text-indigo-600" iconBg="bg-indigo-50" />
-          <KpiCard label="Collection Rate" value={dd ? `${(dd.collection_rate ?? 0).toFixed(0)}%` : "—"} subLabel="Overall" icon={CheckCircle2} iconColor="text-purple-600" iconBg="bg-purple-50" />
-          <KpiCard label="Overdue Revenue" value={fmtLakh(dd?.overdue_companies ?? 0)} subLabel="Overdue accounts" icon={AlertTriangle} iconColor="text-red-600" iconBg="bg-red-50" />
+      {/* Error banner */}
+      {anyError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800 p-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="size-4 text-red-500 shrink-0" />
+            <p className="text-xs text-red-700 dark:text-red-400">
+              {[
+                statsQ.isError && "Stats",
+                dashboardQ.isError && "Dashboard",
+                analyticsQ.isError && "Analytics",
+                pendingUpgradesQ.isError && "Upgrade requests",
+                subsQ.isError && "Subscriptions",
+              ].filter(Boolean).join(", ")} failed to load.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => {
+            statsQ.refetch(); dashboardQ.refetch(); analyticsQ.refetch(); pendingUpgradesQ.refetch(); subsQ.refetch();
+          }}>Retry All</Button>
         </div>
       )}
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {anyLoading && !dd && !an ? (
+          Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i}><CardContent className="p-4"><div className="h-3 w-14 bg-muted rounded animate-pulse mb-2" /><div className="h-6 w-20 bg-muted rounded animate-pulse" /><div className="h-2 w-24 bg-muted rounded animate-pulse mt-2" /></CardContent></Card>
+          ))
+        ) : (
+          <>
+            <KpiCard label="MRR" value={fmtLakh(dd?.mrr ?? 0)} subLabel="Monthly Recurring Revenue" icon={TrendingUp} iconColor="text-blue-600" iconBg="bg-blue-50" />
+            <KpiCard label="ARR" value={fmtLakh(dd?.arr ?? 0)} subLabel="Annual Recurring Revenue" icon={DollarSign} iconColor="text-green-600" iconBg="bg-green-50" />
+            <KpiCard label="Revenue Growth" value={dd ? `${(dd.revenue_growth ?? 0).toFixed(1)}%` : "—"} subLabel="vs last month" icon={ArrowUpRight} iconColor="text-emerald-600" iconBg="bg-emerald-50" />
+            <KpiCard label="New Customers" value={String(dd?.new_customers_this_month ?? 0)} subLabel="This month" icon={UserPlus} iconColor="text-indigo-600" iconBg="bg-indigo-50" />
+            <KpiCard label="Collection Rate" value={dd ? `${(dd.collection_rate ?? 0).toFixed(0)}%` : "—"} subLabel="Overall" icon={CheckCircle2} iconColor="text-purple-600" iconBg="bg-purple-50" />
+            <KpiCard label="Overdue Revenue" value={fmtLakh(dd?.overdue_companies ?? 0)} subLabel="Overdue accounts" icon={AlertTriangle} iconColor="text-red-600" iconBg="bg-red-50" />
+          </>
+        )}
+      </div>
 
       {/* Stats row */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-4">

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { mastersApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { AccessGuard } from "@/components/AccessGuard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -94,8 +95,14 @@ function ColumnConfigPage() {
   const [newOptLabel, setNewOptLabel] = useState("");
 
   const { data: companies } = useQuery({
-    queryKey: ["companies-list"],
-    queryFn: () => api.get("/masters/companies").then(r => r.data?.data ?? r.data?.items ?? []),
+    queryKey: ["masters", "companies", "all"],
+    queryFn: () => mastersApi.getCompanies(1, 500, true),
+    staleTime: 60_000,
+    select: (raw: any) => {
+      const list: any[] = Array.isArray(raw) ? raw : raw?.data ?? raw?.items ?? [];
+      const seen = new Set<string>();
+      return list.filter((c: any) => { if (!c?.id || seen.has(c.id)) return false; seen.add(c.id); return true; });
+    },
   });
 
   const { data: mills } = useQuery({

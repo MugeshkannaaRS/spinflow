@@ -56,6 +56,7 @@ class Company(TimestampMixin, Base):
     archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
     mills = relationship("Mill", back_populates="company", cascade="all, delete-orphan")
+    modules = relationship("CompanyModule", back_populates="company", lazy="selectin")
 
 
 class Mill(TimestampMixin, Base):
@@ -174,6 +175,12 @@ class CompanyModule(Base):
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     enabled_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     enabled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    company = relationship("Company", back_populates="modules")
+
+    @property
+    def enabled(self) -> bool:
+        return self.is_enabled
 
 
 class MillSettings(Base):
