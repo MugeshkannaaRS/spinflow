@@ -568,7 +568,7 @@ async def get_company_detail(
         raise HTTPException(404, "Company not found")
 
     mill_count = (
-        await db.execute(select(func.count()).select_from(Mill).where(Mill.company_id == company_id))
+        await db.execute(select(func.count()).select_from(Mill).where(Mill.company_id == company_id, Mill.is_active == True))
     ).scalar() or 0
 
     user_count = (
@@ -1034,6 +1034,35 @@ async def archive_company(
 
     svc = CompanyDeletionService(db, current_user)
     result = await svc.archive(company_id)
+    return result
+
+
+@router.post("/admin/companies/{company_id}/delete")
+@limiter.limit("10/minute")
+async def permanent_delete_company(
+    company_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Permanently delete a company. Requires X-Confirm-Code header matching the company code."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can delete companies")
+
+    confirm_code = request.headers.get("X-Confirm-Code", "")
+    if not confirm_code:
+        raise HTTPException(status_code=400, detail="X-Confirm-Code header is required (must match company code)")
+
+    company_q = await db.execute(select(Company).where(Company.id == company_id))
+    company = company_q.scalar_one_or_none()
+    if not company:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
+    if company.code != confirm_code:
+        raise HTTPException(status_code=400, detail="X-Confirm-Code does not match company code")
+
+    svc = CompanyDeletionService(db, current_user)
+    result = await svc.hard_delete(company_id)
     return result
 
 

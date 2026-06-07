@@ -443,6 +443,8 @@ class CompanyDeletionService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
 
         company.is_active = False
+        company.status = "archived"
+        company.archived_at = datetime.utcnow()
         self.db.add(company)
         await self.db.flush()
 

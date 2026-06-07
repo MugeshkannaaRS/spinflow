@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.orm import selectinload
 
 from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription
@@ -150,16 +150,20 @@ class PricingService:
                     addon_module_cost_yearly += float(mp.yearly_price)
 
         # Count mills
-        mill_result = await self.db.execute(
-            select(Mill).where(Mill.company_id == company.id, Mill.is_active == True)
+        mill_count_res = await self.db.execute(
+            select(func.count(Mill.id)).where(Mill.company_id == company.id, Mill.is_active == True)
         )
-        mill_count = len(mill_result.scalars().all())
+        mill_count = mill_count_res.scalar() or 0
 
         # Count users
-        user_result = await self.db.execute(
-            select(User).where(User.company_id == company.id, User.is_active == True)
+        user_count_res = await self.db.execute(
+            select(func.count(User.id)).where(
+                User.company_id == company.id,
+                User.is_active == True,
+                User.deleted_at.is_(None),
+            )
         )
-        user_count = len(user_result.scalars().all())
+        user_count = user_count_res.scalar() or 0
 
         extra_mills = 0
         extra_users = 0
@@ -213,14 +217,18 @@ class PricingService:
         cost = await self.calculate_company_cost(company, plan, company_sub)
 
         mill_result = await self.db.execute(
-            select(Mill).where(Mill.company_id == company.id, Mill.is_active == True)
+            select(func.count(Mill.id)).where(Mill.company_id == company.id, Mill.is_active == True)
         )
-        mill_count = len(mill_result.scalars().all())
+        mill_count = mill_result.scalar() or 0
 
         user_result = await self.db.execute(
-            select(User).where(User.company_id == company.id, User.is_active == True)
+            select(func.count(User.id)).where(
+                User.company_id == company.id,
+                User.is_active == True,
+                User.deleted_at.is_(None),
+            )
         )
-        user_count = len(user_result.scalars().all())
+        user_count = user_result.scalar() or 0
 
         mill_limit = plan.included_mills + (company_sub.extra_mills if company_sub else 0)
         user_limit = plan.included_users + (company_sub.extra_users if company_sub else 0)

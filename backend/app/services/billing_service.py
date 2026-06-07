@@ -175,12 +175,13 @@ class BillingService:
             user_count_res = await self.db.execute(
                 select(func.count(User.id)).where(
                     User.company_id == co.id,
+                    User.is_active == True,
                     User.deleted_at.is_(None),
                 )
             )
             user_count = int(user_count_res.scalar() or 0)
 
-            mill_count = len(co.mills) if co.mills else 0
+            mill_count = len([m for m in (co.mills or []) if m.is_active])
             modules_enabled = len([m for m in (co.modules or []) if m.enabled])
 
             if status_filter and status_filter != status:
@@ -280,6 +281,7 @@ class BillingService:
         user_count_res = await self.db.execute(
             select(func.count(User.id)).where(
                 User.company_id == company_id,
+                User.is_active == True,
                 User.deleted_at.is_(None),
             )
         )
@@ -289,7 +291,7 @@ class BillingService:
             user_limit = (plan.included_users or 0) + (sub.extra_users or 0)
 
         mill_count_res = await self.db.execute(
-            select(func.count(Mill.id)).where(Mill.company_id == company_id)
+            select(func.count(Mill.id)).where(Mill.company_id == company_id, Mill.is_active == True)
         )
         mill_count = int(mill_count_res.scalar() or 0)
         mill_limit = 1
