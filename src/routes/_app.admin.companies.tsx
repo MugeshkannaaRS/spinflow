@@ -177,20 +177,38 @@ function CompaniesPage() {
   });
 
   const companiesData = (companiesQ.data ?? []) as Company[];
-  const companyStats: any[] = statsQ.data ?? [];
+  const statsQ_data = statsQ.data ?? {};
+  const companyStats_raw = statsQ_data.company_stats ?? statsQ_data;
+  const companyStats: any[] = Array.isArray(companyStats_raw) ? companyStats_raw : [];
 
   const companyUserCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const s of companyStats) {
-      counts[s.company_id] = (s.user_count ?? 0);
+    try {
+      if (Array.isArray(companyStats)) {
+        for (const s of companyStats) {
+          if (s && typeof s === 'object' && 'company_id' in s) {
+            counts[s.company_id] = (s.user_count ?? 0);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error computing companyUserCounts:', e);
     }
     return counts;
   }, [companyStats]);
 
   const companyMillCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const s of companyStats) {
-      counts[s.company_id] = (s.mill_count ?? 0);
+    try {
+      if (Array.isArray(companyStats)) {
+        for (const s of companyStats) {
+          if (s && typeof s === 'object' && 'company_id' in s) {
+            counts[s.company_id] = (s.mill_count ?? 0);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error computing companyMillCounts:', e);
     }
     return counts;
   }, [companyStats]);
