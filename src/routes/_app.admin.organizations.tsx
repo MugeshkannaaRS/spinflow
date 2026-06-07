@@ -46,7 +46,7 @@ function OrganizationsPage() {
   }
 
   const companies: any[] = (companiesQ.data ?? []) as any[];
-  const companyStats: any[] = statsQ.data ?? [];
+  const companyStats: any[] = (statsQ.data?.company_stats ?? []) as any[];
   const statsMap = new Map(companyStats.map((s: any) => [s.company_id, s]));
 
   return (

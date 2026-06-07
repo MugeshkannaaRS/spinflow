@@ -40,6 +40,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { useState, useEffect, useMemo } from "react";
+import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { toast } from "sonner";
 import {
   ShieldCheck,

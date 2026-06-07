@@ -461,7 +461,7 @@ function usedStr(f: any) {
 function MillsTab({ companyId }: { companyId: string }) {
   const { data: mills } = useQuery({
     queryKey: ["mills", companyId],
-    queryFn: () => mastersApi.getMills(1, 100, undefined, companyId).then((r: any) => r.data ?? []),
+    queryFn: () => mastersApi.getMills(companyId).then((r: any) => r ?? []),
   });
 
   return (

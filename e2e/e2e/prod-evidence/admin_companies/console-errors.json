@@ -1,0 +1,50 @@
+[
+  {
+    "type": "error",
+    "text": "Access to XMLHttpRequest at 'https://spinflow.onrender.com/api/v1/admin/billing/analytics' from origin 'https://spinflow-f.onrender.com' has been blocked by CORS policy: The value of the 'Access-Control-Allow-Credentials' header in the response is '' which must be 'true' when the request's credentials mode is 'include'. The credentials mode of requests initiated by the XMLHttpRequest is controlled by the withCredentials attribute."
+  },
+  {
+    "type": "error",
+    "text": "Failed to load resource: net::ERR_FAILED"
+  },
+  {
+    "type": "error",
+    "text": "Access to XMLHttpRequest at 'https://spinflow.onrender.com/api/v1/admin/billing/subscriptions-enriched?page_size=100' from origin 'https://spinflow-f.onrender.com' has been blocked by CORS policy: The value of the 'Access-Control-Allow-Credentials' header in the response is '' which must be 'true' when the request's credentials mode is 'include'. The credentials mode of requests initiated by the XMLHttpRequest is controlled by the withCredentials attribute."
+  },
+  {
+    "type": "error",
+    "text": "Failed to load resource: net::ERR_FAILED"
+  },
+  {
+    "type": "error",
+    "text": "Access to XMLHttpRequest at 'https://spinflow.onrender.com/api/v1/admin/billing/dashboard' from origin 'https://spinflow-f.onrender.com' has been blocked by CORS policy: The value of the 'Access-Control-Allow-Credentials' header in the response is '' which must be 'true' when the request's credentials mode is 'include'. The credentials mode of requests initiated by the XMLHttpRequest is controlled by the withCredentials attribute."
+  },
+  {
+    "type": "error",
+    "text": "Failed to load resource: net::ERR_FAILED"
+  },
+  {
+    "type": "error",
+    "text": "Access to XMLHttpRequest at 'https://spinflow.onrender.com/api/v1/admin/billing/analytics' from origin 'https://spinflow-f.onrender.com' has been blocked by CORS policy: The value of the 'Access-Control-Allow-Credentials' header in the response is '' which must be 'true' when the request's credentials mode is 'include'. The credentials mode of requests initiated by the XMLHttpRequest is controlled by the withCredentials attribute."
+  },
+  {
+    "type": "error",
+    "text": "Failed to load resource: net::ERR_FAILED"
+  },
+  {
+    "type": "error",
+    "text": "Access to XMLHttpRequest at 'https://spinflow.onrender.com/api/v1/admin/billing/subscriptions-enriched?page_size=100' from origin 'https://spinflow-f.onrender.com' has been blocked by CORS policy: The value of the 'Access-Control-Allow-Credentials' header in the response is '' which must be 'true' when the request's credentials mode is 'include'. The credentials mode of requests initiated by the XMLHttpRequest is controlled by the withCredentials attribute."
+  },
+  {
+    "type": "error",
+    "text": "Failed to load resource: net::ERR_FAILED"
+  },
+  {
+    "type": "error",
+    "text": "Access to XMLHttpRequest at 'https://spinflow.onrender.com/api/v1/admin/billing/dashboard' from origin 'https://spinflow-f.onrender.com' has been blocked by CORS policy: The value of the 'Access-Control-Allow-Credentials' header in the response is '' which must be 'true' when the request's credentials mode is 'include'. The credentials mode of requests initiated by the XMLHttpRequest is controlled by the withCredentials attribute."
+  },
+  {
+    "type": "error",
+    "text": "Failed to load resource: net::ERR_FAILED"
+  }
+]

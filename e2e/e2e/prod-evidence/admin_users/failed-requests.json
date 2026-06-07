@@ -1,0 +1,37 @@
+[
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/dashboard",
+    "method": "GET",
+    "failure": "net::ERR_ABORTED"
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/analytics",
+    "method": "GET",
+    "failure": "net::ERR_FAILED"
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/subscriptions-enriched?page_size=100",
+    "method": "GET",
+    "failure": "net::ERR_FAILED"
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/dashboard",
+    "method": "GET",
+    "failure": "net::ERR_FAILED"
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/analytics",
+    "method": "GET",
+    "failure": "net::ERR_FAILED"
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/subscriptions-enriched?page_size=100",
+    "method": "GET",
+    "failure": "net::ERR_FAILED"
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/dashboard",
+    "method": "GET",
+    "failure": "net::ERR_FAILED"
+  }
+]

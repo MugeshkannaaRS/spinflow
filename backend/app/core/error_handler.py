@@ -34,7 +34,11 @@ def _is_origin_allowed(origin: str) -> bool:
 def _cors_headers(request: Request) -> dict:
     origin = request.headers.get("origin")
     if origin and _is_origin_allowed(origin):
-        return {"Access-Control-Allow-Origin": origin, "Vary": "Origin"}
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Vary": "Origin",
+        }
     return {}
 
 

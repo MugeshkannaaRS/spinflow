@@ -1,0 +1,102 @@
+src/components/RoleGuide.tsx|MISSING_IMPORT|useEffect|160|useEffect(() => {
+src/components/RoleGuide.tsx|MISSING_IMPORT|useState|156|const [dismissed, setDismissed] = useState(false);
+src/components/SetupGuide.tsx|MISSING_IMPORT|useEffect|85|useEffect(() => {
+src/components/SetupGuide.tsx|MISSING_IMPORT|useState|81|const [dismissed, setDismissed] = useState(false);
+src/components/admin/CompanySubscription.tsx|MISSING_IMPORT|useState|88|const [selectedPlanId, setSelectedPlanId] = useState(currentPlanId);
+src/components/admin/PlanManager.tsx|MISSING_IMPORT|useState|51|const [form, setForm] = useState({
+src/components/billing/BillingPortal.tsx|MISSING_IMPORT|useEffect|121|useEffect(() => {
+src/components/billing/BillingPortal.tsx|MISSING_IMPORT|useState|89|const [open, setOpen] = useState(false);
+src/components/common/AlertBanner.tsx|MISSING_IMPORT|useEffect|31|useEffect(() => {
+src/components/common/AlertBanner.tsx|MISSING_IMPORT|useCallback|18|const dismiss = useCallback((id: number) => {
+src/components/common/AlertBanner.tsx|MISSING_IMPORT|useRef|15|const alertIdRef = useRef(0);
+src/components/dashboard/RoleDashboards.tsx|MISSING_IMPORT|useState|765|const [alertDismissed, setAlertDismissed] = useState(false);
+src/components/dashboard/SuperAdminDashboard.tsx|MISSING_IMPORT|useState|31|const [showAddCompany, setShowAddCompany] = useState(false);
+src/components/layout/MobileNav.tsx|MISSING_IMPORT|useState|62|const [moreOpen, setMoreOpen] = useState(false);
+src/components/layout/Sidebar.tsx|MISSING_IMPORT|useEffect|416|useEffect(() => {
+src/components/layout/Sidebar.tsx|MISSING_IMPORT|useState|412|const [collapsed, setCollapsed] = useState(
+src/components/layout/SidebarContext.tsx|MISSING_IMPORT|useState|16|const [open, setOpen] = useState(false);
+src/components/layout/SidebarContext.tsx|MISSING_IMPORT|useCallback|17|const toggle = useCallback(() => setOpen((v) => !v), []);
+src/components/layout/SidebarContext.tsx|MISSING_IMPORT|useContext|25|return useContext(SidebarContext);
+src/components/layout/SidebarContext.tsx|HOOK_IN_CONTROL|useContext|25|return useContext(SidebarContext);
+src/components/layout/Topbar.tsx|MISSING_IMPORT|useEffect|79|useEffect(() => {
+src/components/layout/Topbar.tsx|MISSING_IMPORT|useState|76|const [open, setOpen] = useState(false);
+src/components/ui/DataTable.tsx|MISSING_IMPORT|useEffect|341|useEffect(() => {
+src/components/ui/DataTable.tsx|MISSING_IMPORT|useState|287|const [clientSearch, setClientSearch] = useState("");
+src/components/ui/DataTable.tsx|MISSING_IMPORT|useMemo|227|const allColumns: ColDef<T>[] = useMemo(() => {
+src/components/ui/ImportButton.tsx|MISSING_IMPORT|useState|104|const [open, setOpen] = useState(false);
+src/components/ui/UniversalImportModal.tsx|MISSING_IMPORT|useEffect|143|useEffect(() => {
+src/components/ui/UniversalImportModal.tsx|MISSING_IMPORT|useState|110|const [step, setStep] = useState(1);
+src/components/ui/UniversalImportModal.tsx|MISSING_IMPORT|useMemo|135|const colMap = useMemo(() => {
+src/components/ui/UniversalImportModal.tsx|MISSING_IMPORT|useCallback|185|const handleFileRead = useCallback(
+src/components/ui/calendar.tsx|MISSING_IMPORT|useEffect|146|React.useEffect(() => {
+src/components/ui/carousel.tsx|MISSING_IMPORT|useEffect|85|React.useEffect(() => {
+src/components/ui/carousel.tsx|MISSING_IMPORT|useState|52|const [canScrollPrev, setCanScrollPrev] = React.useState(false);
+src/components/ui/carousel.tsx|MISSING_IMPORT|useCallback|55|const onSelect = React.useCallback((api: CarouselApi) => {
+src/components/ui/carousel.tsx|MISSING_IMPORT|useContext|32|const context = React.useContext(CarouselContext);
+src/components/ui/chart.tsx|MISSING_IMPORT|useMemo|126|const tooltipLabel = React.useMemo(() => {
+src/components/ui/chart.tsx|MISSING_IMPORT|useContext|26|const context = React.useContext(ChartContext);
+src/components/ui/column-configurator.tsx|MISSING_IMPORT|useState|30|const [open, setOpen] = useState(false);
+src/components/ui/excel-column-filter.tsx|MISSING_IMPORT|useEffect|159|useEffect(() => {
+src/components/ui/excel-column-filter.tsx|MISSING_IMPORT|useState|156|const [search, setSearch] = useState("");
+src/components/ui/excel-column-filter.tsx|MISSING_IMPORT|useMemo|36|const uniqueValues = useMemo(() => {
+src/components/ui/file-upload.tsx|MISSING_IMPORT|useState|39|const [dragging, setDragging] = useState(false);
+src/components/ui/file-upload.tsx|MISSING_IMPORT|useCallback|41|const handleFiles = useCallback(
+src/components/ui/form.tsx|MISSING_IMPORT|useContext|41|const fieldContext = React.useContext(FormFieldContext);
+src/components/ui/input-otp.tsx|MISSING_IMPORT|useContext|35|const inputOTPContext = React.useContext(OTPInputContext);
+src/components/ui/sidebar.tsx|MISSING_IMPORT|useEffect|97|React.useEffect(() => {
+src/components/ui/sidebar.tsx|MISSING_IMPORT|useState|70|const [openMobile, setOpenMobile] = React.useState(false);
+src/components/ui/sidebar.tsx|MISSING_IMPORT|useMemo|642|const width = React.useMemo(() => {
+src/components/ui/sidebar.tsx|MISSING_IMPORT|useCallback|76|const setOpen = React.useCallback(
+src/components/ui/sidebar.tsx|MISSING_IMPORT|useContext|41|const context = React.useContext(SidebarContext);
+src/components/ui/toggle-group.tsx|MISSING_IMPORT|useContext|34|const context = React.useContext(ToggleGroupContext);
+src/hooks/use-mobile.tsx|MISSING_IMPORT|useEffect|8|React.useEffect(() => {
+src/main.tsx|MISSING_IMPORT|useEffect|9|useEffect(() => {
+src/routes/_app.accounts.tsx|MISSING_IMPORT|useState|86|const [invSlideOpen, setInvSlideOpen] = useState(false);
+src/routes/_app.admin.alerts.tsx|MISSING_IMPORT|useMemo|83|const alerts = useMemo(() => {
+src/routes/_app.admin.archive.tsx|MISSING_IMPORT|useState|44|const [confirmCode, setConfirmCode] = useState("");
+src/routes/_app.admin.audit.tsx|MISSING_IMPORT|useState|86|const [search, setSearch] = useState("");
+src/routes/_app.admin.billing.subscriptions.tsx|MISSING_IMPORT|useState|38|const [search, setSearch] = useState("");
+src/routes/_app.admin.column-config.tsx|MISSING_IMPORT|useEffect|142|useEffect(() => {
+src/routes/_app.admin.column-config.tsx|MISSING_IMPORT|useState|87|const [selectedCompanyId, setSelectedCompanyId] = useState("");
+src/routes/_app.admin.companies.$companyId.tsx|MISSING_IMPORT|useState|75|const [tab, setTab] = useState("overview");
+src/routes/_app.admin.companies.onboard.tsx|MISSING_IMPORT|useState|74|const [step, setStep] = useState(0);
+src/routes/_app.admin.companies.tsx|MISSING_IMPORT|useEffect|338|useEffect(() => {
+src/routes/_app.admin.companies.tsx|MISSING_IMPORT|useState|334|const [form, setForm] = useState({ name: "", gstin: "", phone: "", email: "", plan: "starter", max_employees: 100 });
+src/routes/_app.admin.companies.tsx|MISSING_IMPORT|useMemo|182|const companyUserCounts = useMemo(() => {
+src/routes/_app.admin.limits.tsx|MISSING_IMPORT|useState|36|const [newLimit, setNewLimit] = useState(company?.max_users ?? 10);
+src/routes/_app.admin.mills.tsx|MISSING_IMPORT|useState|39|const [addOpen, setAddOpen] = useState(false);
+src/routes/_app.admin.modules.tsx|MISSING_IMPORT|useState|29|const [companyId, setCompanyId] = useState("");
+src/routes/_app.admin.users.tsx|MISSING_IMPORT|useState|101|const [globalSearch, setGlobalSearch] = useState(false);
+src/routes/_app.admin.users.tsx|MISSING_IMPORT|useMemo|120|const activeCompanies = useMemo(
+src/routes/_app.dispatch.tsx|MISSING_IMPORT|useState|45|const [page, setPage] = useState(1);
+src/routes/_app.hr.tsx|MISSING_IMPORT|useEffect|416|useEffect(() => {
+src/routes/_app.hr.tsx|MISSING_IMPORT|useState|247|const [tab, setTab] = useState("employees");
+src/routes/_app.hr.tsx|MISSING_IMPORT|useMemo|420|const filtered = useMemo(() => {
+src/routes/_app.inventory.tsx|MISSING_IMPORT|useState|141|const [open, setOpen] = useState(false);
+src/routes/_app.lotrac.tsx|MISSING_IMPORT|useEffect|623|useEffect(() => {
+src/routes/_app.lotrac.tsx|MISSING_IMPORT|useState|122|const [tab, setTab] = useState(search.tab || "trips");
+src/routes/_app.lotrac.tsx|MISSING_IMPORT|useCallback|633|const handleScan = useCallback(async () => {
+src/routes/_app.maintenance.tsx|MISSING_IMPORT|useState|348|const [paramImportOpen, setParamImportOpen] = useState(false);
+src/routes/_app.masters.tsx|MISSING_IMPORT|useEffect|622|useEffect(() => {
+src/routes/_app.masters.tsx|MISSING_IMPORT|useState|84|const [tab, setTab] = useState(user?.role === "SUPER_ADMIN" ? "companies" : "mills");
+src/routes/_app.masters.tsx|MISSING_IMPORT|useMemo|157|const activeCompaniesData = useMemo(
+src/routes/_app.payroll.tsx|MISSING_IMPORT|useState|63|const [year, setYear] = useState(currentYear);
+src/routes/_app.production.tsx|MISSING_IMPORT|useEffect|96|useEffect(() => {
+src/routes/_app.production.tsx|MISSING_IMPORT|useState|88|const [date, setDate] = useState(localDate);
+src/routes/_app.production.tsx|MISSING_IMPORT|useMemo|119|const machines = useMemo(
+src/routes/_app.profile.tsx|MISSING_IMPORT|useState|20|const [changingPw, setChangingPw] = useState(false);
+src/routes/_app.purchase.tsx|MISSING_IMPORT|useEffect|111|useEffect(() => {
+src/routes/_app.purchase.tsx|MISSING_IMPORT|useState|412|const [open, setOpen] = useState(false);
+src/routes/_app.purchase.tsx|MISSING_IMPORT|useMemo|1147|const blend = useMemo(() => {
+src/routes/_app.quality.tsx|MISSING_IMPORT|useState|260|const [open, setOpen] = useState(false);
+src/routes/_app.stock.tsx|MISSING_IMPORT|useEffect|84|useEffect(() => {
+src/routes/_app.stock.tsx|MISSING_IMPORT|useState|76|const [loading, setLoading] = useState(true);
+src/routes/_app.stores.tsx|MISSING_IMPORT|useEffect|401|useEffect(() => {
+src/routes/_app.stores.tsx|MISSING_IMPORT|useState|175|const [open, setOpen] = useState(false);
+src/routes/_app.tsx|MISSING_IMPORT|useEffect|47|useEffect(() => {
+src/routes/_app.tsx|MISSING_IMPORT|useState|45|const [showBanner, setShowBanner] = useState(false);
+src/routes/_app.users.tsx|MISSING_IMPORT|useState|153|const [sheetOpen, setSheetOpen] = useState(false);
+src/routes/_app.users.tsx|MISSING_IMPORT|useMemo|147|const activeCompanies = useMemo(
+src/routes/change-password.tsx|MISSING_IMPORT|useState|37|const [currentPassword, setCurrentPassword] = useState("");
+src/routes/change-password.tsx|MISSING_IMPORT|useMemo|44|const strength = useMemo(() => getStrength(newPassword), [newPassword]);
+src/routes/login.tsx|MISSING_IMPORT|useState|89|const [email, setEmail] = useState("admin@mill.spinflow");

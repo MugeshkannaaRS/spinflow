@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { exportApi } from "@/lib/api-service";
 import { useState } from "react";
+import { Topbar } from "@/components/layout/Topbar";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_app/reports")({

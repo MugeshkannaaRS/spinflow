@@ -1,0 +1,417 @@
+src/components/ModuleStub.tsx|MAP_ON_POTENTIALLY_NULLABLE|29|{features.map((f) => (
+src/components/RoleGuide.tsx|MAP_ON_POTENTIALLY_NULLABLE|196|{content.steps.map((step, idx) => (
+src/components/SetupGuide.tsx|MAP_ON_POTENTIALLY_NULLABLE|124|{Array.from({ length: 4 }).map((_, i) => (
+src/components/SetupGuide.tsx|MAP_ON_POTENTIALLY_NULLABLE|166|{STEPS.map((step, idx) => {
+src/components/admin/CompanySubscription.tsx|MAP_ON_POTENTIALLY_NULLABLE|120|{plans?.map((p) => (
+src/components/admin/CompanySubscription.tsx|MAP_ON_POTENTIALLY_NULLABLE|263|{sub.cost.included_modules.map((m) => (
+src/components/admin/CompanySubscription.tsx|MAP_ON_POTENTIALLY_NULLABLE|269|{sub.cost.addon_modules.map((m) => (
+src/components/admin/PlanManager.tsx|MAP_ON_POTENTIALLY_NULLABLE|61|module_prices: (plan?.module_prices ?? MODULE_NAMES.map((m) => ({
+src/components/admin/PlanManager.tsx|MAP_ON_POTENTIALLY_NULLABLE|63|}))).map((mp) => ({
+src/components/admin/PlanManager.tsx|MAP_ON_POTENTIALLY_NULLABLE|74|module_prices: f.module_prices.map((mp) =>
+src/components/admin/PlanManager.tsx|MAP_ON_POTENTIALLY_NULLABLE|143|{form.module_prices.map((mp) => (
+src/components/admin/PlanManager.tsx|MAP_ON_POTENTIALLY_NULLABLE|202|{[1, 2, 3].map((i) => (
+src/components/admin/PlanManager.tsx|MAP_ON_POTENTIALLY_NULLABLE|208|{plans?.map((plan) => {
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|103|: modules.map(m => (
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|249|{["Company","Plan","Status","Mills","Users","Modules","Monthly ₹","Actions"].map(h => (
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|256|? [...Array(5)].map((_, i) => (
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|258|{[...Array(8)].map((_, j) => (
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|269|: comps.map((co: any) => (
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|317|: co.enabled_modules.map((m: string) => (
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|423|{(["extra_users", "extra_mills", "extra_employees"] as const).map(r => (
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|518|{[1,2,3].map(i => <div key={i} className="h-20 bg-[#e2e8f0] rounded-lg animate-pulse" />)}
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|524|{plans.map((p: any) => (
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|807|{(d?.enabled_modules ?? []).map((mod: any) => {
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|841|{(d?.mills ?? []).map((mill: any) => (
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|870|].map(({ key, label, placeholder }) => (
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|909|{["Month","Amount","Status","Paid On","Invoice"].map(h => (
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|915|{d.invoices.map((inv: any) => (
+src/components/billing/BillingPortal.tsx|MAP_ON_POTENTIALLY_NULLABLE|940|{CURRENCIES.map(c => (
+src/components/billing/BillingPortal.tsx|JSON_PARSE|666|const parsed = JSON.parse(token);
+src/components/common/AlertBanner.tsx|MAP_ON_POTENTIALLY_NULLABLE|83|{wrongDestAlerts.map((alert) => {
+src/components/common/AlertBanner.tsx|MAP_ON_POTENTIALLY_NULLABLE|115|{alerts.map((alert) => {
+src/components/dashboard/RoleDashboards.tsx|MAP_ON_POTENTIALLY_NULLABLE|217|{Array.from({ length: count }).map((_, i) => (
+src/components/dashboard/RoleDashboards.tsx|MAP_ON_POTENTIALLY_NULLABLE|242|const trend  = p ? p.last_7_days.map(d => ({ day: fmtDate(d.date), produced: d.output_kg, target: d.target_kg }))
+src/components/dashboard/RoleDashboards.tsx|MAP_ON_POTENTIALLY_NULLABLE|326|const byDept   = a ? a.by_department.map(d => ({
+src/components/dashboard/RoleDashboards.tsx|MAP_ON_POTENTIALLY_NULLABLE|356|{byDept.map((entry, idx) => (
+src/components/dashboard/RoleDashboards.tsx|MAP_ON_POTENTIALLY_NULLABLE|450|{inv.low_stock_items.map((item, i) => (
+src/components/dashboard/RoleDashboards.tsx|MAP_ON_POTENTIALLY_NULLABLE|519|{list.map((alert, i) => (
+src/components/dashboard/RoleDashboards.tsx|MAP_ON_POTENTIALLY_NULLABLE|544|{list.map((action, i) => (
+src/components/dashboard/RoleDashboards.tsx|DATE_CONSTRUCTION|140|const h = new Date().getHours();
+src/components/dashboard/RoleDashboards.tsx|DATE_CONSTRUCTION|161|Last updated: {new Date(asOf).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+src/components/dashboard/SuperAdminDashboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|64|{stats.map(stat => (
+src/components/dashboard/SuperAdminDashboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|116|[1,2,3].map(i => (
+src/components/dashboard/SuperAdminDashboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|126|data.companies.map((company: any) => (
+src/components/layout/MobileNav.tsx|MAP_ON_POTENTIALLY_NULLABLE|85|{bottomTabs.map((item) => {
+src/components/layout/MobileNav.tsx|MAP_ON_POTENTIALLY_NULLABLE|144|{visibleModules.map((item) => {
+src/components/layout/Sidebar.tsx|MAP_ON_POTENTIALLY_NULLABLE|166|{[1, 2, 3, 4, 5, 6].map((i) => (
+src/components/layout/Sidebar.tsx|MAP_ON_POTENTIALLY_NULLABLE|175|.map((group) => ({
+src/components/layout/Sidebar.tsx|MAP_ON_POTENTIALLY_NULLABLE|218|{filteredGroups.map((group) => (
+src/components/layout/Sidebar.tsx|MAP_ON_POTENTIALLY_NULLABLE|228|{group.items.map((item) => {
+src/components/layout/Topbar.tsx|MAP_ON_POTENTIALLY_NULLABLE|124|{notifications.slice(0, 10).map((n) => (
+src/components/layout/Topbar.tsx|MAP_ON_POTENTIALLY_NULLABLE|209|.map((n) => n[0])
+src/components/layout/Topbar.tsx|MAP_ON_POTENTIALLY_NULLABLE|267|{mills.map(m => {
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|127|rows.map((row) => {
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|141|const lines = [columns.map((c) => `"${c.label}"`).join(",")];
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|143|lines.push(columns.map((c) => `"${getCellValue(row, c.key).replace(/"/g, '""')}"`).join(","));
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|162|const headers = columns.map((c) => c.label);
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|163|const data = rows.map((row) => columns.map((col) => getCellValue(row, col.key)));
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|179|{Array.from({ length: cols }).map((_, i) => (
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|233|.map((c) => ({
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|250|return new Set(allColumns.filter((c) => c.defaultHidden).map((c) => c.key));
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|305|() => allColumns.filter((c) => c.type !== "boolean").map((c) => c.key),
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|440|{allColumns.map((col) => (
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|478|{visibleCols.map((col) => {
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|517|{Array.from({ length: 5 }).map((_, i) => (
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|533|pageRows.map((row: T, idx: number) => (
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|542|{visibleCols.map((col) => {
+src/components/ui/DataTable.tsx|MAP_ON_POTENTIALLY_NULLABLE|586|{[10, 20, 50, 100].map((n) => (
+src/components/ui/DataTable.tsx|DATE_CONSTRUCTION|137|XLSX.writeFile(wb, `${filename}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+src/components/ui/DataTable.tsx|DATE_CONSTRUCTION|149|a.download = `${filename}_${new Date().toISOString().slice(0, 10)}.csv`;
+src/components/ui/DataTable.tsx|DATE_CONSTRUCTION|171|doc.save(`${title}_${new Date().toISOString().slice(0, 10)}.pdf`);
+src/components/ui/DataTable.tsx|JSON_PARSE|248|if (stored) return new Set(JSON.parse(stored));
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|71|const lowerHeaders = headers.map((h) => (h ?? "").toLowerCase().trim());
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|139|const hdrs = aoa[0].map((v: any) => String(v ?? "").trim());
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|140|const rows = aoa.slice(1).filter((r) => r.some((c: any) => c !== "")).map((r) =>
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|141|r.map((c: any) => String(c ?? "").trim()),
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|160|const rows: PreviewRow[] = rawRows.map((raw) => {
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|181|const next = prev.map((r, i) => (i === rowIdx ? { ...r } : r));
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|205|const body = validRows.map((r) => r.cells);
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|241|const headerRow = templateCols.map((c) => c.label);
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|245|exampleRows.push(templateCols.map((c) => exampleRow[c.key] ?? ""));
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|258|exampleRows.push(templateCols.map((c) => variant[c.key] ?? ""));
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|270|exampleRows.push(templateCols.map((c) => third[c.key] ?? ""));
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|274|templateCols.map((c) =>
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|284|const colWidths = templateCols.map((c) => ({
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|355|{templateCols.map((col) => {
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|385|{headers.map((h, i) => (
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|426|{templateCols.map((col) => (
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|436|{preview.map((row, ri) => (
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|442|{templateCols.map((col) => {
+src/components/ui/ImportButton.tsx|MAP_ON_POTENTIALLY_NULLABLE|515|{importResult.errors.map((e, i) => (
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|200|const hdrs = (rows[0] as string[]).map((h) => String(h ?? "").trim()).filter(Boolean);
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|394|.map(([header, field]) => ({
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|621|previewRecords.map((r) => r.data),
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|626|const validRecords = nonBlank.map((rec) => {
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|664|const sanitized = batch.map(record => ({
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|829|{headers.map((header) => {
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|858|{colConfigs.map((c) => (
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|922|Object.keys(r.data.custom_fields || {}).map(k => `__custom__:${k}`)
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|950|{mappedFields.map((fk) => (
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|961|{displayRecords.map((record, ri) => (
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|964|{mappedFields.map((fk) => {
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|1158|const cfKeys = cfHeaders.map((h) => normalizeCustomFieldKey(h));
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|1163|{cfKeys.map((k) => (
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|1187|{hardErrors.map((err, i) => (
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|1198|{warnings.map((err, i) => (
+src/components/ui/UniversalImportModal.tsx|MAP_ON_POTENTIALLY_NULLABLE|1237|{[1, 2, 3, 4, 5].map((s) => (
+src/components/ui/UniversalImportModal.tsx|DATE_CONSTRUCTION|469|const d = new Date(dateVal);
+src/components/ui/UniversalImportModal.tsx|DATE_CONSTRUCTION|471|const cutoff = refDate ?? new Date();
+src/components/ui/chart.tsx|MAP_ON_POTENTIALLY_NULLABLE|75|.map(
+src/components/ui/chart.tsx|MAP_ON_POTENTIALLY_NULLABLE|79|.map(([key, itemConfig]) => {
+src/components/ui/chart.tsx|MAP_ON_POTENTIALLY_NULLABLE|170|.map((item, index) => {
+src/components/ui/chart.tsx|MAP_ON_POTENTIALLY_NULLABLE|268|.map((item) => {
+src/components/ui/column-configurator.tsx|MAP_ON_POTENTIALLY_NULLABLE|36|if (o) setLocalCols(columns.map((c, i) => ({ key: c.key, label: c.label, visible: c.isVisible, order: i + 1 })));
+src/components/ui/column-configurator.tsx|MAP_ON_POTENTIALLY_NULLABLE|40|setLocalCols((prev) => prev.map((c) => (c.key === key ? { ...c, visible: !c.visible } : c)));
+src/components/ui/column-configurator.tsx|MAP_ON_POTENTIALLY_NULLABLE|48|return next.map((c, i) => ({ ...c, order: i + 1 }));
+src/components/ui/column-configurator.tsx|MAP_ON_POTENTIALLY_NULLABLE|57|return next.map((c, i) => ({ ...c, order: i + 1 }));
+src/components/ui/column-configurator.tsx|MAP_ON_POTENTIALLY_NULLABLE|62|setLocalCols(columns.map((c, i) => ({ key: c.key, label: c.label, visible: c.isVisible, order: i + 1 })));
+src/components/ui/column-configurator.tsx|MAP_ON_POTENTIALLY_NULLABLE|68|const updated = localCols.map((c, i) => ({
+src/components/ui/column-configurator.tsx|MAP_ON_POTENTIALLY_NULLABLE|111|{localCols.map((col, i) => (
+src/components/ui/column-filter.tsx|MAP_ON_POTENTIALLY_NULLABLE|54|{columns.map((col, i) => (
+src/components/ui/excel-column-filter.tsx|MAP_ON_POTENTIALLY_NULLABLE|99|{columns.map((col) => (
+src/components/ui/excel-column-filter.tsx|MAP_ON_POTENTIALLY_NULLABLE|207|{filtered.map((val) => (
+src/components/ui/file-upload.tsx|MAP_ON_POTENTIALLY_NULLABLE|111|{files.map((f) => {
+src/routes/_app.accounts.tsx|MAP_ON_POTENTIALLY_NULLABLE|283|? invoice.items.map((it: any) => ({
+src/routes/_app.accounts.tsx|MAP_ON_POTENTIALLY_NULLABLE|312|const msg = Array.isArray(detail) ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ") : detail || err?.message || "Failed to save invoice";
+src/routes/_app.accounts.tsx|MAP_ON_POTENTIALLY_NULLABLE|325|items.map((it, i) => {
+src/routes/_app.accounts.tsx|MAP_ON_POTENTIALLY_NULLABLE|350|items: items.map((it) => ({
+src/routes/_app.accounts.tsx|MAP_ON_POTENTIALLY_NULLABLE|403|{items.map((it, idx) => (
+src/routes/_app.accounts.tsx|MAP_ON_POTENTIALLY_NULLABLE|563|{months.map((n, i) => (
+src/routes/_app.accounts.tsx|MAP_ON_POTENTIALLY_NULLABLE|578|{[now.getFullYear(), now.getFullYear() - 1].map((y) => (
+src/routes/_app.accounts.tsx|MAP_ON_POTENTIALLY_NULLABLE|647|].map((b) => {
+src/routes/_app.accounts.tsx|MAP_ON_POTENTIALLY_NULLABLE|687|].map((b) => {
+src/routes/_app.accounts.tsx|MAP_ON_POTENTIALLY_NULLABLE|718|].map((b) => (
+src/routes/_app.accounts.tsx|DATE_CONSTRUCTION|276|const today = new Date().toISOString().slice(0, 10);
+src/routes/_app.accounts.tsx|DATE_CONSTRUCTION|507|const now = new Date();
+src/routes/_app.admin.alerts.tsx|MAP_ON_POTENTIALLY_NULLABLE|276|].map(chip => (
+src/routes/_app.admin.alerts.tsx|MAP_ON_POTENTIALLY_NULLABLE|287|{["invoice_overdue", "invoice_due", "user_limit", "mill_limit", "employee_limit", "subscription_expiring", "upgrade_request", "company_suspended"].map(t => (
+src/routes/_app.admin.alerts.tsx|MAP_ON_POTENTIALLY_NULLABLE|296|{[1,2,3,4,5].map(i => <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />)}
+src/routes/_app.admin.alerts.tsx|MAP_ON_POTENTIALLY_NULLABLE|307|filtered.map(alert => (
+src/routes/_app.admin.alerts.tsx|DATE_CONSTRUCTION|90|if (inv.status === "overdue" || (inv.due_date && new Date(inv.due_date).getTime() < now && inv.status !== "paid")) {
+src/routes/_app.admin.alerts.tsx|DATE_CONSTRUCTION|101|const daysLeft = Math.ceil((new Date(inv.due_date).getTime() - now) / 86400000);
+src/routes/_app.admin.alerts.tsx|DATE_CONSTRUCTION|192|const daysLeft = Math.ceil((new Date(s.renewal_date).getTime() - now) / 86400000);
+src/routes/_app.admin.alerts.tsx|DATE_CONSTRUCTION|198|description: `${s.company_name} — renews in ${daysLeft} days (${new Date(s.renewal_date).toLocaleDateString("en-IN")})`,
+src/routes/_app.admin.alerts.tsx|DATE_CONSTRUCTION|227|if (a.timestamp && b.timestamp) return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+src/routes/_app.admin.alerts.tsx|DATE_CONSTRUCTION|333|{new Date(alert.timestamp).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+src/routes/_app.admin.archive.tsx|MAP_ON_POTENTIALLY_NULLABLE|127|{tabs.map((tab) => (
+src/routes/_app.admin.audit.tsx|MAP_ON_POTENTIALLY_NULLABLE|124|const companyMap = new Map(companies.map((c: any) => [c.id, c.name]));
+src/routes/_app.admin.audit.tsx|MAP_ON_POTENTIALLY_NULLABLE|199|{Object.entries(ACTION_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+src/routes/_app.admin.audit.tsx|MAP_ON_POTENTIALLY_NULLABLE|209|{ENTITIES.map((e) => <SelectItem key={e} value={e}>{humanEntity(e)}</SelectItem>)}
+src/routes/_app.admin.audit.tsx|DATE_CONSTRUCTION|76|const d = new Date(ts);
+src/routes/_app.admin.audit.tsx|JSON_PARSE|142|const parsed = typeof l.details === "string" ? JSON.parse(l.details) : l.details;
+src/routes/_app.admin.billing.analytics.tsx|MAP_ON_POTENTIALLY_NULLABLE|46|{Array.from({ length: 5 }).map((_, i) => (
+src/routes/_app.admin.billing.analytics.tsx|MAP_ON_POTENTIALLY_NULLABLE|76|{metrics.map((m) => (
+src/routes/_app.admin.billing.analytics.tsx|MAP_ON_POTENTIALLY_NULLABLE|94|{mrrTrend.map((m: any) => (
+src/routes/_app.admin.billing.analytics.tsx|MAP_ON_POTENTIALLY_NULLABLE|100|style={{ width: `${Math.min((m.revenue / Math.max(...mrrTrend.map((x: any) => x.revenue), 1)) * 100, 100)}%` }}
+src/routes/_app.admin.billing.analytics.tsx|MAP_ON_POTENTIALLY_NULLABLE|120|{planDistribution.map((p: any) => (
+src/routes/_app.admin.billing.analytics.tsx|MAP_ON_POTENTIALLY_NULLABLE|139|{topCustomers.map((c: any, i: number) => (
+src/routes/_app.admin.billing.invoices.tsx|MAP_ON_POTENTIALLY_NULLABLE|82|) : rows.map((r: any) => (
+src/routes/_app.admin.billing.invoices.tsx|DATE_CONSTRUCTION|88|{r.issue_date ? new Date(r.issue_date).toLocaleDateString() : "—"}
+src/routes/_app.admin.billing.invoices.tsx|DATE_CONSTRUCTION|91|{r.paid_at ? new Date(r.paid_at).toLocaleDateString() : "—"}
+src/routes/_app.admin.billing.payments.tsx|MAP_ON_POTENTIALLY_NULLABLE|75|) : rows.map((r: any) => (
+src/routes/_app.admin.billing.payments.tsx|DATE_CONSTRUCTION|83|{r.paid_date ? new Date(r.paid_date).toLocaleDateString() : "—"}
+src/routes/_app.admin.billing.subscriptions.tsx|MAP_ON_POTENTIALLY_NULLABLE|93|) : rows.map((r: any) => (
+src/routes/_app.admin.billing.tsx|MAP_ON_POTENTIALLY_NULLABLE|68|? Array.from({ length: 6 }).map((_, i) => ({ label: "", value: "—", icon: TrendingUp, color: "text-muted-foreground", sub: "", key: i }))
+src/routes/_app.admin.billing.tsx|MAP_ON_POTENTIALLY_NULLABLE|89|{Array.from({ length: 6 }).map((_, i) => (
+src/routes/_app.admin.billing.tsx|MAP_ON_POTENTIALLY_NULLABLE|101|{kpis.map((k: any) => (
+src/routes/_app.admin.billing.tsx|MAP_ON_POTENTIALLY_NULLABLE|127|{SECTIONS.map((s) => (
+src/routes/_app.admin.column-config.tsx|MAP_ON_POTENTIALLY_NULLABLE|146|setColumns(cols.map((c: any, i: number) => ({ ...c, _originalIndex: i })));
+src/routes/_app.admin.column-config.tsx|MAP_ON_POTENTIALLY_NULLABLE|166|return next.map((c, i) => ({ ...c, display_order: i + 1 }));
+src/routes/_app.admin.column-config.tsx|MAP_ON_POTENTIALLY_NULLABLE|175|return next.map((c, i) => ({ ...c, display_order: i + 1 }));
+src/routes/_app.admin.column-config.tsx|MAP_ON_POTENTIALLY_NULLABLE|245|{(Array.isArray(companies) ? companies : []).map((c: any) => (
+src/routes/_app.admin.column-config.tsx|MAP_ON_POTENTIALLY_NULLABLE|262|{(Array.isArray(mills) ? mills : []).map((m: any) => (
+src/routes/_app.admin.column-config.tsx|MAP_ON_POTENTIALLY_NULLABLE|295|{ALL_TABLES.map((t) => (
+src/routes/_app.admin.column-config.tsx|MAP_ON_POTENTIALLY_NULLABLE|336|{columns.length > 0 && columns.map((col, i) => (
+src/routes/_app.admin.column-config.tsx|MAP_ON_POTENTIALLY_NULLABLE|358|{COLUMN_TYPES.map((t) => (
+src/routes/_app.admin.column-config.tsx|MAP_ON_POTENTIALLY_NULLABLE|436|{columns.filter((c) => c.is_visible !== false).map((col) => (
+src/routes/_app.admin.column-config.tsx|MAP_ON_POTENTIALLY_NULLABLE|443|{columns.filter((c) => c.is_visible !== false).map((col) => (
+src/routes/_app.admin.column-config.tsx|MAP_ON_POTENTIALLY_NULLABLE|467|{dropdownOptions.map((opt, idx) => (
+src/routes/_app.admin.companies.$companyId.tsx|MAP_ON_POTENTIALLY_NULLABLE|110|{[1, 2, 3, 4].map((i) => (
+src/routes/_app.admin.companies.$companyId.tsx|MAP_ON_POTENTIALLY_NULLABLE|248|].map((action) => (
+src/routes/_app.admin.companies.$companyId.tsx|MAP_ON_POTENTIALLY_NULLABLE|304|{healthFactors.slice(0, 4).map((f) => (
+src/routes/_app.admin.companies.$companyId.tsx|MAP_ON_POTENTIALLY_NULLABLE|358|{alerts.map((a, i) => (
+src/routes/_app.admin.companies.$companyId.tsx|MAP_ON_POTENTIALLY_NULLABLE|411|{company.recent_audit.slice(0, 10).map((entry: any, i: number) => (
+src/routes/_app.admin.companies.$companyId.tsx|MAP_ON_POTENTIALLY_NULLABLE|492|{mills.map((m: any) => (
+src/routes/_app.admin.companies.$companyId.tsx|MAP_ON_POTENTIALLY_NULLABLE|546|{(Array.isArray(users) ? users : []).map((u: any) => (
+src/routes/_app.admin.companies.$companyId.tsx|MAP_ON_POTENTIALLY_NULLABLE|589|{modList.map(([name, enabled]) => (
+src/routes/_app.admin.companies.$companyId.tsx|MAP_ON_POTENTIALLY_NULLABLE|680|{entries.map((e: any) => (
+src/routes/_app.admin.companies.$companyId.tsx|DATE_CONSTRUCTION|196|const daysLeft = Math.ceil((new Date(company.subscription.expires_at).getTime() - Date.now()) / 86400000);
+src/routes/_app.admin.companies.$companyId.tsx|DATE_CONSTRUCTION|210|{company.created_at && <> &middot; Since {new Date(company.created_at).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" })}</>}
+src/routes/_app.admin.companies.$companyId.tsx|DATE_CONSTRUCTION|327|{company.subscription.expires_at && <div className="flex justify-between"><span className="text-muted-foreground">Renewal</span><span className="font-medium">{new Date(company.subscription.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span></div>}
+src/routes/_app.admin.companies.$companyId.tsx|DATE_CONSTRUCTION|351|const daysLeft = Math.ceil((new Date(company.subscription.expires_at).getTime() - Date.now()) / 86400000);
+src/routes/_app.admin.companies.$companyId.tsx|DATE_CONSTRUCTION|421|{entry.created_at ? new Date(entry.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}
+src/routes/_app.admin.companies.$companyId.tsx|DATE_CONSTRUCTION|686|{e.created_at ? new Date(e.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
+src/routes/_app.admin.companies.onboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|50|const CORE_MODULES = ALL_MODULES.filter(m => m.category === "core").map(m => m.key);
+src/routes/_app.admin.companies.onboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|131|mills: mills.map(m => ({
+src/routes/_app.admin.companies.onboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|183|{STEP_LABELS.map((label, i) => {
+src/routes/_app.admin.companies.onboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|259|{mills.map((mill, i) => (
+src/routes/_app.admin.companies.onboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|298|{PLAN_DEFS.map(p => (
+src/routes/_app.admin.companies.onboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|347|{ALL_MODULES.filter(m => m.category === "core").map(m => (
+src/routes/_app.admin.companies.onboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|356|{ALL_MODULES.filter(m => m.category === "addon").map(m => (
+src/routes/_app.admin.companies.onboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|412|{mills.map((m, i) => (
+src/routes/_app.admin.companies.onboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|423|{selectedModules.map(m => (
+src/routes/_app.admin.companies.tsx|MAP_ON_POTENTIALLY_NULLABLE|148|const rows = companiesData.map((c) => ({
+src/routes/_app.admin.companies.tsx|MAP_ON_POTENTIALLY_NULLABLE|414|{PLAN_OPTIONS.map((p) => (
+src/routes/_app.admin.companies.tsx|MAP_ON_POTENTIALLY_NULLABLE|489|{CORE_MODULES.map(mod => (
+src/routes/_app.admin.companies.tsx|MAP_ON_POTENTIALLY_NULLABLE|514|{ADDON_MODULES.map(mod => (
+src/routes/_app.admin.companies.tsx|DATE_CONSTRUCTION|163|XLSX.writeFile(wb, `SpinFlow_Companies_${new Date().toISOString().slice(0, 10)}.xlsx`);
+src/routes/_app.admin.limits.tsx|MAP_ON_POTENTIALLY_NULLABLE|124|const statsMap = new Map(companyStats.map((s: any) => [s.company_id, s]));
+src/routes/_app.admin.mills.tsx|MAP_ON_POTENTIALLY_NULLABLE|210|{companies.map((c) => (
+src/routes/_app.admin.modules.tsx|MAP_ON_POTENTIALLY_NULLABLE|84|{companies.map((c: any) => (
+src/routes/_app.admin.modules.tsx|MAP_ON_POTENTIALLY_NULLABLE|105|{companies.map((c: any) => (
+src/routes/_app.admin.modules.tsx|MAP_ON_POTENTIALLY_NULLABLE|137|{companies.map((c: any) => (
+src/routes/_app.admin.modules.tsx|MAP_ON_POTENTIALLY_NULLABLE|158|{ALL_MODULES.map((mod) => (
+src/routes/_app.admin.organizations.tsx|MAP_ON_POTENTIALLY_NULLABLE|50|const statsMap = new Map(companyStats.map((s: any) => [s.company_id, s]));
+src/routes/_app.admin.tsx|MAP_ON_POTENTIALLY_NULLABLE|154|Array.from({ length: 6 }).map((_, i) => (
+src/routes/_app.admin.tsx|MAP_ON_POTENTIALLY_NULLABLE|220|{nearLimitCompanies.slice(0, 10).map((s: any) => {
+src/routes/_app.admin.tsx|MAP_ON_POTENTIALLY_NULLABLE|253|{pendingUpgrades.map((cr: any) => (
+src/routes/_app.admin.tsx|MAP_ON_POTENTIALLY_NULLABLE|289|{topCustomers.map((c: any, i: number) => (
+src/routes/_app.admin.tsx|MAP_ON_POTENTIALLY_NULLABLE|307|{SECTIONS.map(s => (
+src/routes/_app.admin.users.tsx|MAP_ON_POTENTIALLY_NULLABLE|284|const allRoles = [...new Set(allUsers.map((u: any) => u.role))].sort();
+src/routes/_app.admin.users.tsx|MAP_ON_POTENTIALLY_NULLABLE|354|{(["min8", "upper", "lower", "digit", "special"] as const).map((c) => {
+src/routes/_app.admin.users.tsx|MAP_ON_POTENTIALLY_NULLABLE|381|{ROLES_FOR_CREATE.map((role) => (
+src/routes/_app.admin.users.tsx|MAP_ON_POTENTIALLY_NULLABLE|392|{activeCompanies.filter((c: any) => c?.id).map((c: any) => {
+src/routes/_app.admin.users.tsx|MAP_ON_POTENTIALLY_NULLABLE|452|{formMills.filter((m: any) => m?.id).map((m: any) => (
+src/routes/_app.admin.users.tsx|MAP_ON_POTENTIALLY_NULLABLE|492|{activeCompanies.map((c: any) => {
+src/routes/_app.admin.users.tsx|MAP_ON_POTENTIALLY_NULLABLE|560|{millsData.map((m: any) => {
+src/routes/_app.admin.users.tsx|MAP_ON_POTENTIALLY_NULLABLE|611|{DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+src/routes/_app.admin.users.tsx|MAP_ON_POTENTIALLY_NULLABLE|616|{allRoles.map(r => <option key={r} value={r}>{ROLE_LABELS[r as Role] ?? r}</option>)}
+src/routes/_app.admin.users.tsx|MAP_ON_POTENTIALLY_NULLABLE|648|{users.map((u: any) => (
+src/routes/_app.audit.tsx|DATE_CONSTRUCTION|40|const d = new Date(ts);
+src/routes/_app.dashboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|49|{[...Array(4)].map((_, i) => (
+src/routes/_app.dashboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|141|{(["all", "active", "suspended"] as const).map(f => (
+src/routes/_app.dashboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|162|{["Company","Plan","Status","Mills","Users","Modules"].map(h => (
+src/routes/_app.dashboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|168|{filteredCompanies.map((c: any) => (
+src/routes/_app.dashboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|476|{inv!.low_stock_items.map((item: any, i: number) => (
+src/routes/_app.dashboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|505|{data.alerts.map((a: any, i: number) => (
+src/routes/_app.dashboard.tsx|MAP_ON_POTENTIALLY_NULLABLE|532|{data.pending_actions.map((a: any, i: number) => (
+src/routes/_app.dashboard.tsx|DATE_CONSTRUCTION|28|const h = new Date().getHours();
+src/routes/_app.dashboard.tsx|DATE_CONSTRUCTION|36|return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+src/routes/_app.dispatch.tsx|MAP_ON_POTENTIALLY_NULLABLE|104|const msg = Array.isArray(detail) ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ") : detail || "Failed to create trip";
+src/routes/_app.dispatch.tsx|MAP_ON_POTENTIALLY_NULLABLE|271|{customers.filter((c: any) => c?.id).map((c: any) => (
+src/routes/_app.dispatch.tsx|DATE_CONSTRUCTION|54|dispatch_date: new Date().toISOString().slice(0, 10),
+src/routes/_app.dispatch.tsx|DATE_CONSTRUCTION|96|dispatch_date: new Date().toISOString().slice(0, 10),
+src/routes/_app.dispatch.tsx|DATE_CONSTRUCTION|172|render: (t: any) => t.created_at ? new Date(t.created_at).toLocaleDateString() : "—",
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|273|.map((e: any) => {
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|512|customFieldDefs.map((cf) => ({
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|520|const depts = useMemo(() => [...new Set(employees.map((e) => e.department).filter((d): d is string => !!d))].sort(), [employees]);
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|521|const grades = useMemo(() => [...new Set(employees.map((e) => e.grade).filter((g): g is string => !!g))].sort(), [employees]);
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|532|{depts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|541|{grades.map((g) => (<SelectItem key={g} value={g}>Grade {g}</SelectItem>))}
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|566|{COLUMN_GROUPS.map((g) => (
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|723|{customValues.map((cv) => (
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|824|const nextSlNo = employees.length > 0 ? Math.max(...employees.map((e) => e.sl_no ?? 0)) + 1 : 1;
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|979|{GENDERS.map((g) => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|992|{GENDERS.map((g) => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1023|{DEPARTMENTS.map((d: string) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1034|{SHIFTS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1279|{GENDERS.map((g) => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1292|{GENDERS.map((g) => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1323|{DEPARTMENTS.map((d: string) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1334|{SHIFTS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1479|const depts = useMemo(() => [...new Set(employees.map((e) => e.department).filter(Boolean))].sort(), [employees]);
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1480|const shifts = useMemo(() => [...new Set(employees.map((e) => e.shift).filter((s): s is string => !!s))].sort(), [employees]);
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1571|{MONTHS.map((m, i) => (
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1581|{[2023, 2024, 2025, 2026, 2027].map((y) => (
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1592|{depts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1601|{shifts.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1624|{Array.from({ length: days }, (_, i) => i + 1).map((d) => (
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1645|{(filteredEmployees ?? []).map((emp) => {
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1662|{Array.from({ length: days }, (_, i) => i + 1).map((d) => {
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1708|{Array.from({ length: days }, (_, i) => i + 1).map((d) => {
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1735|{(filteredEmployees ?? []).map((emp) => {
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1778|{Array.from({ length: days }, (_, i) => i + 1).map((d) => {
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1837|records: Object.entries(records).map(([employeeId, rec]) => ({
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|1895|{(employees ?? []).map((emp, i) => emp ? (
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|2036|prev.map((r) => {
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|2078|{MONTHS.map((m, i) => (
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|2091|{[2023, 2024, 2025, 2026, 2027].map((y) => (
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|2139|{(displayData ?? []).map((row, i) => row ? (
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|2384|{(filteredLeaves ?? []).map((l, i) => l ? (
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|2434|{(employees ?? []).slice(0, 20).map((emp, i) => {
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|2482|await Promise.all(files.map((f) => uploadApi.upload("leave", entry.id, f.file)));
+src/routes/_app.hr.tsx|MAP_ON_POTENTIALLY_NULLABLE|2522|{(employees ?? []).filter((emp) => emp?.id).map((emp) => (
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|201|const date = typeof d === "string" ? new Date(d) : d;
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|215|const birth = new Date(dob);
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|216|const today = new Date();
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|224|return new Date(year, month, 0).getDate();
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|286|const todayStr = new Date().toISOString().slice(0, 10);
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|634|const now = new Date();
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|805|date_of_joining: new Date().toISOString().slice(0, 10),
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|848|date_of_joining: new Date().toISOString().slice(0, 10),
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|1453|const now = new Date();
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|1454|const today = new Date();
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|1546|return dayLetters[new Date(year, month - 1, d).getDay()];
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|1820|const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|1976|const now = new Date();
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|2340|const days = Math.max(1, Math.ceil((new Date(l.to_date).getTime() - new Date(l.from_date).getTime()) / (1000 * 60 * 60 * 24)) + 1);
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|2473|from_date: new Date().toISOString().slice(0, 10),
+src/routes/_app.hr.tsx|DATE_CONSTRUCTION|2474|to_date: new Date().toISOString().slice(0, 10),
+src/routes/_app.hr.tsx|JSON_PARSE|414|const [visibleGroups, setVisibleGroups] = useState<Set<string>>(new Set(stored ? JSON.parse(stored) : ["personal", "job", "salary"]));
+src/routes/_app.inventory.tsx|MAP_ON_POTENTIALLY_NULLABLE|172|{(["date", "lotNo", "fromLocation", "toLocation", "unit", "transferredBy"] as const).map((key) => (
+src/routes/_app.inventory.tsx|DATE_CONSTRUCTION|143|const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), lotNo: "", fromLocation: "", toLocation: "", quantity: 0, unit: "kg", transferredBy: "", status: "pending" as const });
+src/routes/_app.lotrac.tsx|MAP_ON_POTENTIALLY_NULLABLE|194|).map((s) => (
+src/routes/_app.lotrac.tsx|MAP_ON_POTENTIALLY_NULLABLE|231|{trips.map((t) => (
+src/routes/_app.lotrac.tsx|MAP_ON_POTENTIALLY_NULLABLE|456|{vehicles.filter((v: any) => v?.id).map((v: any) => (
+src/routes/_app.lotrac.tsx|MAP_ON_POTENTIALLY_NULLABLE|490|{routes.filter((r: any) => r?.id).map((r: any) => (
+src/routes/_app.lotrac.tsx|MAP_ON_POTENTIALLY_NULLABLE|508|{customers.filter((c: any) => c?.id).map((c: any) => (
+src/routes/_app.lotrac.tsx|MAP_ON_POTENTIALLY_NULLABLE|526|{orders.filter((o: any) => o?.id).map((o: any) => (
+src/routes/_app.lotrac.tsx|MAP_ON_POTENTIALLY_NULLABLE|563|{filteredBags.map((b: any) => {
+src/routes/_app.lotrac.tsx|MAP_ON_POTENTIALLY_NULLABLE|693|{loadingTrips.filter((t) => t?.id).map((t) => (
+src/routes/_app.lotrac.tsx|MAP_ON_POTENTIALLY_NULLABLE|805|{recentScans.map((s, i) => (
+src/routes/_app.lotrac.tsx|MAP_ON_POTENTIALLY_NULLABLE|993|{rxTrips.filter((t) => t?.id).map((t) => (
+src/routes/_app.lotrac.tsx|MAP_ON_POTENTIALLY_NULLABLE|1011|{routes.filter((r: any) => r?.id).map((r: any) => (
+src/routes/_app.lotrac.tsx|MAP_ON_POTENTIALLY_NULLABLE|1128|{recentScans.map((s, i) => (
+src/routes/_app.lotrac.tsx|DATE_CONSTRUCTION|649|{ result: { result: "queued", ...decoded }, time: new Date().toLocaleTimeString() },
+src/routes/_app.lotrac.tsx|DATE_CONSTRUCTION|657|[{ result, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 5),
+src/routes/_app.lotrac.tsx|DATE_CONSTRUCTION|903|{ result: { result: "queued", ...decoded }, time: new Date().toLocaleTimeString() },
+src/routes/_app.lotrac.tsx|DATE_CONSTRUCTION|911|[{ result, time: new Date().toLocaleTimeString() }, ...prev].slice(0, 5),
+src/routes/_app.lotrac.tsx|JSON_PARSE|67|const decoded = JSON.parse(atob(qrString));
+src/routes/_app.maintenance.tsx|MAP_ON_POTENTIALLY_NULLABLE|83|ws["!cols"] = [20, 25, 18, 12, 12, 20].map((w) => ({ wch: w }));
+src/routes/_app.maintenance.tsx|MAP_ON_POTENTIALLY_NULLABLE|202|{parseErrors.map((e, i) => (
+src/routes/_app.maintenance.tsx|MAP_ON_POTENTIALLY_NULLABLE|219|{columns.map((c) => (
+src/routes/_app.maintenance.tsx|MAP_ON_POTENTIALLY_NULLABLE|227|{preview.slice(0, 50).map((row, i) => (
+src/routes/_app.maintenance.tsx|MAP_ON_POTENTIALLY_NULLABLE|229|{Object.values(row).map((v, j) => (
+src/routes/_app.maintenance.tsx|MAP_ON_POTENTIALLY_NULLABLE|720|setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+src/routes/_app.maintenance.tsx|MAP_ON_POTENTIALLY_NULLABLE|764|{MACHINE_TYPES.map((t: string) => (
+src/routes/_app.maintenance.tsx|MAP_ON_POTENTIALLY_NULLABLE|777|{departments.filter((d: any) => d?.code).map((d: any) => (
+src/routes/_app.maintenance.tsx|DATE_CONSTRUCTION|367|(t) => t.status === "completed" && t.date === new Date().toISOString().slice(0, 10),
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|213|).map(t => (
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|493|...columns.map((col) => ({
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|641|{ALL_MODULES.map((mod) => (
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|802|setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|904|setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|920|{companies.filter((c) => c?.id).map((c) => (
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|1033|setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|1074|{DEPARTMENT_TYPES.map((t) => (
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|1139|setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|1285|setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|1451|setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|1482|{VEHICLE_TYPES.map((t) => (
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|1592|setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|1737|setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|1753|{["A", "B", "C"].map((c) => (
+src/routes/_app.masters.tsx|MAP_ON_POTENTIALLY_NULLABLE|1840|setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
+src/routes/_app.payroll.tsx|MAP_ON_POTENTIALLY_NULLABLE|97|{[currentYear, currentYear - 1, currentYear - 2].map((y) => (
+src/routes/_app.payroll.tsx|MAP_ON_POTENTIALLY_NULLABLE|114|{MONTHS.map((name, idx) => {
+src/routes/_app.payroll.tsx|MAP_ON_POTENTIALLY_NULLABLE|409|{MONTHS.map((n, i) => (
+src/routes/_app.payroll.tsx|DATE_CONSTRUCTION|62|const currentYear = new Date().getFullYear();
+src/routes/_app.payroll.tsx|DATE_CONSTRUCTION|373|const currentMonth = new Date().getMonth() + 1;
+src/routes/_app.production.tsx|MAP_ON_POTENTIALLY_NULLABLE|67|return (machines ?? []).map((m: any) => ({
+src/routes/_app.production.tsx|MAP_ON_POTENTIALLY_NULLABLE|92|const DEPARTMENTS = deptOptions.map((d: any) => typeof d === "string" ? d : d.name);
+src/routes/_app.production.tsx|MAP_ON_POTENTIALLY_NULLABLE|156|entries: activeRows.map((r) => ({
+src/routes/_app.production.tsx|MAP_ON_POTENTIALLY_NULLABLE|280|) : deptOptions.map((d: any) => {
+src/routes/_app.production.tsx|MAP_ON_POTENTIALLY_NULLABLE|379|{(rows ?? []).map((row, idx) => {
+src/routes/_app.production.tsx|MAP_ON_POTENTIALLY_NULLABLE|562|const msg = Array.isArray(detail) ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ") : detail || err.message || "Failed to log downtime";
+src/routes/_app.production.tsx|MAP_ON_POTENTIALLY_NULLABLE|816|{MACHINE_TYPES.map((t) => (
+src/routes/_app.production.tsx|MAP_ON_POTENTIALLY_NULLABLE|963|{machines.filter((m: any) => m?.id).map((m: any) => (
+src/routes/_app.production.tsx|DATE_CONSTRUCTION|82|const today = new Date();
+src/routes/_app.production.tsx|DATE_CONSTRUCTION|83|const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+src/routes/_app.profile.tsx|MAP_ON_POTENTIALLY_NULLABLE|104|{["current", "next", "confirm"].map((field, i) => (
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|262|{purchaseFiltered.map((p) => (
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|324|{supplierFiltered.map((s) => (
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|379|{grnFiltered.map((g) => (
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|439|await Promise.all(files.map((f) => uploadApi.upload("purchase", entry.id, f.file)));
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|732|{["A", "B", "C", "D", "E", "F", "G", "H", "Reject"].map((c) => (
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|775|{bales.map((b) => (
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1134|if (!ids) setSelectedIds(new Set((res.selected_bales ?? []).map((b: any) => b.id)));
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1153|const mics = sel.map((b: any) => b.micronaire).filter(Boolean);
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1162|const bStaple = avg(sel.map((b: any) => b.staple_length).filter(Boolean));
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1163|const bStrength = avg(sel.map((b: any) => b.strength).filter(Boolean));
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1164|const bUnif = avg(sel.map((b: any) => b.uniformity).filter(Boolean));
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1165|const bTrash = avg(sel.map((b: any) => b.trash_area).filter(Boolean)) || 1;
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1212|const rows = sel.map((b: any) => [
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1247|{YARN_COUNTS.map((c) => (
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1331|].map(({ label, value, icon }) => (
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1371|{groupData.selected_bales.map((b: any) => {
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1454|.map(([cat, count]) => ({ cat, count, fill: CATEGORY_COLORS[cat] ?? "#64748b" }));
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1459|.map((s: any) => ({
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1477|].map(({ label, value }) => (
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1500|{catData.map((entry, idx) => (
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1529|{supplierData.map((_: any, idx: number) => (
+src/routes/_app.purchase.tsx|MAP_ON_POTENTIALLY_NULLABLE|1555|{((s.lot_stats ?? []) as any[]).map((l: any) => (
+src/routes/_app.purchase.tsx|DATE_CONSTRUCTION|416|date: new Date().toISOString().slice(0, 10),
+src/routes/_app.purchase.tsx|DATE_CONSTRUCTION|834|date_received: new Date().toISOString().slice(0, 10),
+src/routes/_app.purchase.tsx|DATE_CONSTRUCTION|1229|XLSX.writeFile(wb, `mixing_plan_${yarnCount}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+src/routes/_app.quality.tsx|MAP_ON_POTENTIALLY_NULLABLE|379|const msg = Array.isArray(detail) ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ") : detail || "Failed to record test";
+src/routes/_app.quality.tsx|MAP_ON_POTENTIALLY_NULLABLE|409|{lots.map((lot: any) => (
+src/routes/_app.quality.tsx|MAP_ON_POTENTIALLY_NULLABLE|435|{testTypes.map((t) => (
+src/routes/_app.quality.tsx|DATE_CONSTRUCTION|307|date: new Date().toISOString().slice(0, 10),
+src/routes/_app.quality.tsx|DATE_CONSTRUCTION|368|date: new Date().toISOString().slice(0, 10),
+src/routes/_app.reports.tsx|MAP_ON_POTENTIALLY_NULLABLE|227|{summaryData.map((row) => (
+src/routes/_app.stock.tsx|MAP_ON_POTENTIALLY_NULLABLE|122|{fgStates.map((s) =>
+src/routes/_app.stock.tsx|MAP_ON_POTENTIALLY_NULLABLE|165|Array.from({ length: 5 }).map((_, i) => (
+src/routes/_app.stock.tsx|MAP_ON_POTENTIALLY_NULLABLE|167|{Array.from({ length: 10 }).map((_, j) => (
+src/routes/_app.stock.tsx|MAP_ON_POTENTIALLY_NULLABLE|181|rows.map((r) => (
+src/routes/_app.stock.tsx|MAP_ON_POTENTIALLY_NULLABLE|256|{ledgerHistory.map((entry: any) => (
+src/routes/_app.stock.tsx|MAP_ON_POTENTIALLY_NULLABLE|321|{stats.map((s) =>
+src/routes/_app.stock.tsx|MAP_ON_POTENTIALLY_NULLABLE|377|Array.from({ length: 4 }).map((_, i) => (
+src/routes/_app.stock.tsx|MAP_ON_POTENTIALLY_NULLABLE|379|{Array.from({ length: 9 }).map((_, j) => (
+src/routes/_app.stock.tsx|MAP_ON_POTENTIALLY_NULLABLE|393|filteredOrders.map((so: any) => (
+src/routes/_app.stock.tsx|MAP_ON_POTENTIALLY_NULLABLE|537|lines: lines.map((l) => ({
+src/routes/_app.stock.tsx|MAP_ON_POTENTIALLY_NULLABLE|571|{customers.map((c) => (
+src/routes/_app.stock.tsx|MAP_ON_POTENTIALLY_NULLABLE|626|{lines.map((line, i) => (
+src/routes/_app.stock.tsx|MAP_ON_POTENTIALLY_NULLABLE|648|{lots.map((l) => (
+src/routes/_app.stock.tsx|DATE_CONSTRUCTION|206|{r.last_move_at ? new Date(r.last_move_at).toLocaleString() : "-"}
+src/routes/_app.stock.tsx|DATE_CONSTRUCTION|261|{entry.created_at ? new Date(entry.created_at).toLocaleString() : ""}
+src/routes/_app.stock.tsx|DATE_CONSTRUCTION|484|const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
+src/routes/_app.stores.tsx|MAP_ON_POTENTIALLY_NULLABLE|187|if (files.length > 0) await Promise.all(files.map((f) => uploadApi.upload("stores_issue", entry.id, f.file)));
+src/routes/_app.stores.tsx|MAP_ON_POTENTIALLY_NULLABLE|221|{(["date", "itemCode", "itemName", "issuedTo", "department", "issuedBy"] as const).map((key) => (
+src/routes/_app.stores.tsx|DATE_CONSTRUCTION|179|const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), itemCode: "", itemName: "", quantity: 0, issuedTo: "", department: "", purpose: "", issuedBy: "" });
+src/routes/_app.users.tsx|MAP_ON_POTENTIALLY_NULLABLE|378|.map((role) => (
+src/routes/_app.users.tsx|MAP_ON_POTENTIALLY_NULLABLE|406|{activeCompanies.filter((c: any) => c?.id).map((c: any) => (
+src/routes/_app.users.tsx|MAP_ON_POTENTIALLY_NULLABLE|434|{filteredMills.filter((m: any) => m?.id).map((m: any) => (
+src/routes/_app.users.tsx|DATE_CONSTRUCTION|499|{new Date(u.last_login).toLocaleDateString()}
+src/routes/change-password.tsx|MAP_ON_POTENTIALLY_NULLABLE|159|{requirements.map((req) => {
+src/routes/login.tsx|MAP_ON_POTENTIALLY_NULLABLE|164|{FEATURES.map((f) => (
+src/routes/login.tsx|MAP_ON_POTENTIALLY_NULLABLE|286|{DEMO_ACCOUNTS.map((demo) => (

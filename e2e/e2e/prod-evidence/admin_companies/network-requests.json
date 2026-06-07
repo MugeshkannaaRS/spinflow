@@ -1,0 +1,170 @@
+[
+  {
+    "url": "https://spinflow-f.onrender.com/login",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow-f.onrender.com/registerSW.js",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow-f.onrender.com/assets/index-Dtwi4xca.css",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow-f.onrender.com/assets/index-BfXnUj8c.js",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://fonts.gstatic.com/s/dmmono/v16/aFTU7PB1QTsUX8KYthqQBK6PYK0.woff2",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://fonts.gstatic.com/s/dmmono/v16/aFTR7PB1QTsUX8KYvumzEYOtbYf-Vlg.woff2",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://fonts.gstatic.com/s/dmsans/v17/rP2Hp2ywxg089UriCZOIHTWEBlw.woff2",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/health",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/auth/login",
+    "method": "POST",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow-f.onrender.com/admin/companies",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/dashboard",
+    "method": "GET",
+    "status": null,
+    "statusText": null
+  },
+  {
+    "url": "https://spinflow-f.onrender.com/assets/index-Dtwi4xca.css",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow-f.onrender.com/registerSW.js",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow-f.onrender.com/assets/index-BfXnUj8c.js",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://fonts.gstatic.com/s/dmsans/v17/rP2Hp2ywxg089UriCZOIHTWEBlw.woff2",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/health",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/company-stats",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/subscription/change-requests?status=pending",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/company-stats",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/masters/companies?page=1&page_size=100&include_inactive=true",
+    "method": "GET",
+    "status": 200,
+    "statusText": ""
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/analytics",
+    "method": "GET",
+    "status": null,
+    "statusText": null
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/subscriptions-enriched?page_size=100",
+    "method": "GET",
+    "status": null,
+    "statusText": null
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/dashboard",
+    "method": "GET",
+    "status": null,
+    "statusText": null
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/analytics",
+    "method": "GET",
+    "status": null,
+    "statusText": null
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/subscriptions-enriched?page_size=100",
+    "method": "GET",
+    "status": null,
+    "statusText": null
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/dashboard",
+    "method": "GET",
+    "status": null,
+    "statusText": null
+  }
+]
