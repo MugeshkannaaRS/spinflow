@@ -259,7 +259,7 @@ async def list_all_users(
     if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN or MILL_OWNER can list users")
     try:
-        query = select(User).where(User.deleted_at.is_(None))
+        query = select(User).where(User.deleted_at.is_(None), User.is_active == True)
         if company_id:
             if role_code == "MILL_OWNER":
                 if str(company_id) != str(current_user.company_id):
@@ -870,12 +870,15 @@ async def admin_dashboard(
         companies = companies_res.scalars().all()
         company_ids = [c.id for c in companies]
 
-        # Single query: mill counts per company
+        # Single query: mill counts per company (active mills only)
         mill_counts = {
             row[0]: row[1] for row in (
                 await db.execute(
                     select(Mill.company_id, func.count(Mill.id))
-                    .where(Mill.company_id.in_(company_ids))
+                    .where(
+                        Mill.company_id.in_(company_ids),
+                        Mill.is_active == True,
+                    )
                     .group_by(Mill.company_id)
                 )
             ).all()

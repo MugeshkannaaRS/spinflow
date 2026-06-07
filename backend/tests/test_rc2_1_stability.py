@@ -332,3 +332,62 @@ async def test_billing_overview_no_crash(session: AsyncSession):
     result = await admin_billing_overview(su, session)
     assert "mrr" in result
     assert result["total_companies"] >= 1
+
+
+# ── Test 8: admin_dashboard mill count filters inactive mills ─────
+
+@pytest.mark.asyncio
+async def test_admin_dashboard_mill_count_excludes_inactive(session: AsyncSession):
+    """admin_dashboard should only count active mills."""
+    role = await _make_role(session, code="SUPER_ADMIN")
+    user = await _make_user(session, role, company_id=None)
+    company = await _make_company(session)
+    m1 = await _make_mill(session, company.id)  # active by default
+    m2 = Mill(
+        id=str(uuid.uuid4()), company_id=company.id,
+        code=f"ML-INACTIVE-{uuid.uuid4().hex[:4]}",
+        name="Inactive Mill", is_active=False,
+    )
+    session.add(m2)
+    await session.flush()
+
+    from app.api.v1.admin import admin_dashboard
+    result = await admin_dashboard(session, user)
+    for co in result["companies"]:
+        if co["id"] == company.id:
+            # Should only count m1 (active), not m2 (inactive)
+            assert co["mills"] == 1, f"Expected 1 active mill, got {co['mills']}"
+            break
+    else:
+        # Company might not appear if excluded by other filters
+        pass
+
+
+# ── Test 9: list_all_users excludes inactive users ─────────────────
+
+@pytest.mark.asyncio
+async def test_list_all_users_excludes_inactive(session: AsyncSession):
+    """list_all_users should only show active, non-deleted users."""
+    role = await _make_role(session, code="SUPER_ADMIN")
+    user = await _make_user(session, role)
+    company = await _make_company(session)
+
+    u_active = User(
+        id=str(uuid.uuid4()), name="Active", email="active-list@test.com",
+        password_hash="x", role_id=role.id, company_id=company.id,
+        is_active=True, deleted_at=None,
+    )
+    session.add(u_active)
+    u_inactive = User(
+        id=str(uuid.uuid4()), name="Inactive", email="inactive-list@test.com",
+        password_hash="x", role_id=role.id, company_id=company.id,
+        is_active=False, deleted_at=None,
+    )
+    session.add(u_inactive)
+    await session.flush()
+
+    from app.api.v1.admin import list_all_users
+    result = await list_all_users(company_id=company.id, db=session, current_user=user)
+    emails = [u["email"] for u in result["items"]]
+    assert "active-list@test.com" in emails, "Active user should be included"
+    assert "inactive-list@test.com" not in emails, "Inactive user should be excluded"

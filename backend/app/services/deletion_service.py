@@ -389,6 +389,12 @@ class CompanyDeletionService:
             user_ids = []
             users_q = await self.db.execute(text("SELECT id FROM users WHERE company_id = :p"), {"p": company_id})
             user_ids = [row[0] for row in users_q.fetchall()]
+            # Delete subscription_change_requests BEFORE users
+            # (requested_by/reviewed_by have FKs to users.id)
+            cnt = await self._delete_from("subscription_change_requests", "company_id = :p", company_id)
+            if cnt:
+                counts["subscription_change_requests"] = cnt
+
             if user_ids:
                 up = ",".join(f"'{u}'" for u in user_ids)
                 for table, cond in [
@@ -408,7 +414,7 @@ class CompanyDeletionService:
                 if cnt:
                     counts[table] = cnt
 
-            for table in ["overage_pricing", "company_modules", "company_subscriptions", "subscription_change_requests", "employee_custom_fields"]:
+            for table in ["overage_pricing", "company_modules", "company_subscriptions", "employee_custom_fields"]:
                 cnt = await self._delete_from(table, "company_id = :p", company_id)
                 if cnt:
                     counts[table] = cnt
