@@ -141,7 +141,7 @@ async def get_mill_scope(
 
 async def log_audit(
     db: AsyncSession,
-    user_id: str,
+    user_id: Optional[str],
     role: str,
     action: str,
     entity: str,

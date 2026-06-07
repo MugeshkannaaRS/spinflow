@@ -1,6 +1,7 @@
 from sqlalchemy import String, Text, DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
+from typing import Optional
 from app.db.base import Base, generate_uuid
 
 
@@ -8,7 +9,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
-    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    user_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id"), nullable=True, index=True)
     user_name: Mapped[str] = mapped_column(String(200), nullable=True)
     role: Mapped[str] = mapped_column(String(50), nullable=True)
     action: Mapped[str] = mapped_column(String(50), nullable=False, index=True)

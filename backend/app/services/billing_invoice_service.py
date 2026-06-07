@@ -98,7 +98,7 @@ class InvoiceService:
         try:
             await log_audit(
                 self.db,
-                user_id="SYSTEM",
+                user_id=None,
                 role="SYSTEM",
                 action="invoice_generated",
                 entity="billing_invoice",
@@ -229,7 +229,7 @@ class InvoiceService:
         try:
             await log_audit(
                 self.db,
-                user_id="SYSTEM",
+                user_id=None,
                 role="SYSTEM",
                 action="prorated_invoice_generated",
                 entity="billing_invoice",
@@ -308,7 +308,7 @@ class InvoiceService:
         try:
             await log_audit(
                 self.db,
-                user_id="SYSTEM",
+                user_id=None,
                 role="SYSTEM",
                 action="overage_invoice_generated",
                 entity="billing_invoice",

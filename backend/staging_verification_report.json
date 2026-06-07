@@ -1,0 +1,239 @@
+{
+  "elapsed_seconds": 12.68,
+  "passed": 46,
+  "failed": 0,
+  "skipped": 0,
+  "verdict": "PASS",
+  "checks": [
+    {
+      "check": "database_reachable",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "table_users",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "table_companies",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "table_roles",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "table_subscription_plans",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "table_billing_invoices",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "table_audit_logs",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "table_company_subscriptions",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_SUPER_ADMIN",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_MILL_OWNER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_GENERAL_MANAGER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_PRODUCTION_MANAGER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_QUALITY_MANAGER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_DISPATCH_MANAGER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_STORE_MANAGER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_HR_MANAGER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_ACCOUNTANT",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_MAINTENANCE_MANAGER",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_SUPERVISOR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_MACHINE_OPERATOR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_SECURITY_GATE",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_AUDITOR",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "role_count",
+      "status": "PASS",
+      "detail": "14 roles present"
+    },
+    {
+      "check": "plan_starter",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "plan_growth",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "plan_business",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "plan_enterprise",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "plan_custom",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "plan_count",
+      "status": "PASS",
+      "detail": "5 plans present"
+    },
+    {
+      "check": "admin_user",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "admin_role",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "has_companies",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "company_suspend",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "company_reactivate",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "company_archive",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "company_restore",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "company_active_final",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "billing_subscription_exists",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "invoice_generate",
+      "status": "PASS",
+      "detail": "INV-202606-0004 for 4999.0"
+    },
+    {
+      "check": "payment_reconcile",
+      "status": "PASS",
+      "detail": "Paid via VERIFY-dd786de2"
+    },
+    {
+      "check": "perm_companies_available",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "perm_mo_own_company",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "perm_mo_other_company_blocked",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "perm_operator_billing_blocked",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "audit_entry_created",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "check": "audit_user_id_nullable",
+      "status": "PASS",
+      "detail": ""
+    }
+  ]
+}

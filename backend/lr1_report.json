@@ -1,0 +1,194 @@
+{
+  "elapsed_seconds": 32.82,
+  "total_errors": 0,
+  "total_slow_queries": 1,
+  "total_workflows": 26,
+  "errors": [],
+  "slow_queries": [
+    {
+      "query": "generate_subscription_invoice",
+      "duration_ms": 1114.89,
+      "context": "billing_lifecycle"
+    }
+  ],
+  "workflows": [
+    {
+      "name": "company_suspend",
+      "status": "passed",
+      "detail": "Suspended LR-PSPL-e1b8 in 247ms",
+      "time": "2026-06-07T00:38:18.078039+00:00"
+    },
+    {
+      "name": "company_reactivate",
+      "status": "passed",
+      "detail": "Reactivated LR-PSPL-e1b8 in 124ms",
+      "time": "2026-06-07T00:38:18.201725+00:00"
+    },
+    {
+      "name": "company_archive",
+      "status": "passed",
+      "detail": "Archived LR-PSPL-e1b8",
+      "time": "2026-06-07T00:38:18.569853+00:00"
+    },
+    {
+      "name": "company_restore",
+      "status": "passed",
+      "detail": "Restored LR-PSPL-e1b8",
+      "time": "2026-06-07T00:38:18.816784+00:00"
+    },
+    {
+      "name": "company_final_reactivate",
+      "status": "passed",
+      "detail": "LR-PSPL-e1b8 active",
+      "time": "2026-06-07T00:38:18.939218+00:00"
+    },
+    {
+      "name": "user_create",
+      "status": "passed",
+      "detail": "Created user lr-test-d4ac@test.com in 248ms",
+      "time": "2026-06-07T00:38:19.947938+00:00"
+    },
+    {
+      "name": "user_read",
+      "status": "passed",
+      "detail": "Read user lr-test-d4ac@test.com",
+      "time": "2026-06-07T00:38:20.198569+00:00"
+    },
+    {
+      "name": "user_update",
+      "status": "passed",
+      "detail": "Updated user in 250ms",
+      "time": "2026-06-07T00:38:20.448443+00:00"
+    },
+    {
+      "name": "user_deactivate",
+      "status": "passed",
+      "detail": "Deactivated in 248ms",
+      "time": "2026-06-07T00:38:20.696288+00:00"
+    },
+    {
+      "name": "user_reactivate",
+      "status": "passed",
+      "detail": "Reactivated",
+      "time": "2026-06-07T00:38:20.822168+00:00"
+    },
+    {
+      "name": "change_request_created",
+      "status": "passed",
+      "detail": "From starter to growth",
+      "time": "2026-06-07T00:38:22.453734+00:00"
+    },
+    {
+      "name": "overage_purchase",
+      "status": "passed",
+      "detail": "Added 5 extra users at 149.0/ea",
+      "time": "2026-06-07T00:38:23.027881+00:00"
+    },
+    {
+      "name": "invoice_generate",
+      "status": "passed",
+      "detail": "Invoice INV-202606-0001 in 1115ms",
+      "time": "2026-06-07T00:38:24.142828+00:00"
+    },
+    {
+      "name": "payment_record",
+      "status": "passed",
+      "detail": "Payment REF-9caf1734",
+      "time": "2026-06-07T00:38:24.523128+00:00"
+    },
+    {
+      "name": "payment_reconcile",
+      "status": "passed",
+      "detail": "Invoice INV-202606-0001 marked paid",
+      "time": "2026-06-07T00:38:24.770033+00:00"
+    },
+    {
+      "name": "sub_change_request",
+      "status": "passed",
+      "detail": "CR to growth",
+      "time": "2026-06-07T00:38:26.166180+00:00"
+    },
+    {
+      "name": "sub_approve",
+      "status": "passed",
+      "detail": "Approved in 492ms",
+      "time": "2026-06-07T00:38:26.658373+00:00"
+    },
+    {
+      "name": "sub_set_expiry",
+      "status": "passed",
+      "detail": "Expiry set to 2 days from now",
+      "time": "2026-06-07T00:38:26.907583+00:00"
+    },
+    {
+      "name": "sub_renewal",
+      "status": "passed",
+      "detail": "Generated 1 renewal invoices in 1378ms",
+      "time": "2026-06-07T00:38:28.285704+00:00"
+    },
+    {
+      "name": "inv_generate",
+      "status": "passed",
+      "detail": "Invoice INV-202606-0003 for \u20b949999.0",
+      "time": "2026-06-07T00:38:29.535346+00:00"
+    },
+    {
+      "name": "inv_verify",
+      "status": "passed",
+      "detail": "Invoice #INV-202606-0003: \u20b949999.0, pending",
+      "time": "2026-06-07T00:38:29.535357+00:00"
+    },
+    {
+      "name": "inv_pdf_download",
+      "status": "passed",
+      "detail": "PDF generated: 2280 bytes in 6ms",
+      "time": "2026-06-07T00:38:29.840008+00:00"
+    },
+    {
+      "name": "inv_pay_reconcile",
+      "status": "passed",
+      "detail": "Invoice INV-202606-0003 paid and reconciled",
+      "time": "2026-06-07T00:38:30.085199+00:00"
+    },
+    {
+      "name": "perm_mo_own_company",
+      "status": "passed",
+      "detail": "MILL_OWNER can access own company",
+      "time": "2026-06-07T00:38:31.211266+00:00"
+    },
+    {
+      "name": "perm_mo_other_company_blocked",
+      "status": "passed",
+      "detail": "MILL_OWNER blocked from other company",
+      "time": "2026-06-07T00:38:31.211326+00:00"
+    },
+    {
+      "name": "perm_op_billing_blocked",
+      "status": "passed",
+      "detail": "MACHINE_OPERATOR blocked from billing",
+      "time": "2026-06-07T00:38:31.211387+00:00"
+    }
+  ],
+  "timing": {
+    "seed_roles": 0.46241211891174316,
+    "seed_plans": 0.7392551898956299,
+    "seed_companies": 1.8251352310180664,
+    "seed_mills": 2.3708012104034424,
+    "seed_users": 3.142620325088501,
+    "seed_employees": 5.1518731117248535
+  },
+  "dataset": {
+    "companies": 10,
+    "mills": 30,
+    "users": 500,
+    "employees": 3000,
+    "plans": [
+      "starter",
+      "growth",
+      "business",
+      "enterprise",
+      "custom"
+    ]
+  },
+  "verdict": "GO"
+}

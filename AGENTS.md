@@ -1,7 +1,7 @@
 # SpinFlow ERP
 
 ## Goal
-- Deploy a fresh staging environment (new Supabase + Render) and validate SpinFlow ERP end-to-end before onboarding pilot clients.
+- Validated launch-ready (LR-1 GO). Next: generate production deployment artifacts (staging environment, pilot onboarding guide, final report).
 
 ## Constraints & Preferences
 - Do NOT start another refactor or architecture sprint — codebase is production-hardened enough.
@@ -55,9 +55,27 @@
   - **Legacy removed**: Deleted `AddCompanyDialog` from companies page, deleted `components/onboarding/OnboardingWizard.tsx`. "Add Company" button now links to `/admin/companies/onboard`.
   - 8 integration tests: 5 plan types (starter, growth, business, enterprise, custom), 3 rollback scenarios (duplicate company code, duplicate email, duplicate mill code). 238 total backend tests pass.
 
+- **RC-1.1 Security & Scale Hardening**: 4 critical + 10 high issues resolved.
+  - `check_company_scope()` helper on 11 billing endpoints; MILL_OWNER 403 on cross-company access.
+  - 4 N+1 patterns rewritten with batch `GROUP BY` queries (`admin_billing_overview`, `admin_billing_companies`, `admin_billing_dashboard`, `enriched_subscriptions`).
+  - Rate limiting (10/min) on 10 admin/billing mutation endpoints.
+  - `MILL_ADMIN` → `MILL_OWNER` in `auth.py` and `lotrac.py`.
+  - `POST /admin/companies/{id}/restore` for archive → suspended recovery + audit log.
+  - Pagination on `/subscription/invoices` and `/subscription/change-requests`.
+  - 11 integration tests in `test_rc1_1_security.py`. 306 tests pass.
+
+- **LR-1 Launch Readiness Validation**:
+  - Wrote `lr1_launch_readiness.py` — validates 26 workflows across dataset seeding, company lifecycle, user CRUD, billing, subscription, invoice, and permission guards.
+  - Applied 4 missing DB migrations to Supabase (`companies.status`, `company_subscriptions.overdue_*`, `subscription_change_requests.request_metadata`, `billing_invoices.invoice_metadata`, `deletion_logs`).
+  - Made `audit_logs.user_id` nullable and changed 3 callers from `"SYSTEM"` to `None` (was FK-breaking invoice generation).
+  - Created 10 companies, 30 mills, 500 users, 3000 employees on real Supabase.
+  - **Verdict: GO** — 26/26 workflows passed, 0 errors, 1 slow query (1115ms invoice generation).
+  - Report saved to `backend/lr1_report.json`.
+
 ### Deferred
 - 8 pre-existing dashboard test failures (unrelated to admin/onboarding)
 - `log_audit()` in deps.py still calls its own `db.commit()` — 50+ callers need eventual refactor for transactional safety
+- `generate_subscription_invoice` is slow (1115ms) — exceeds 1s SLOW_QUERY_THRESHOLD
 
 ## Key Decisions
 - Company is the root entity — everything managed inside Company workspace, not sibling pages
@@ -92,6 +110,9 @@
 - Pricing seed must include `ModulePricing.is_included` for `get_modules_for_plan()` to work
 - Fresh deploys: `alembic upgrade head` → `scripts/seed_pilot.py` — 396K rows in ~29s
 - Index migration 004 not yet applied to production
+- **LR-1 Verdict: GO** — 26/26 workflows pass against real Supabase. 1 slow query (1115ms: `generate_subscription_invoice`).
+- DB schema drift found: `companies.status`, `company_subscriptions.overdue_status/since`, `subscription_change_requests.request_metadata`, `billing_invoices.invoice_metadata` all applied manually via ALTER TABLE (migrations 004/008/009 never ran against this Supabase instance).
+- `audit_logs.user_id` changed to `nullable=True` — 3 callers in `billing_invoice_service.py` use `None` instead of `"SYSTEM"`.
 
 ## Relevant Files
 - `backend/app/core/module_registry.py`: Canonical list of 19 modules with labels, descriptions, categories
@@ -113,3 +134,7 @@
 - `src/components/billing/BillingPortal.tsx`: Enhanced with overage purchase, upgrade dialog, usage bars, invoice download
 - `backend/app/api/v1/billing.py`: POST /billing/purchase-overage, GET /billing/invoices/{id}/download, enriched GET /billing/my-plan
 - `backend/app/services/pdf_export.py`: invoice_pdf() function for PDF generation
+- `backend/scripts/lr1_launch_readiness.py`: LR-1 orchestration (dataset seeding + 26 lifecycle workflows + metrics + report)
+- `backend/lr1_report.json`: LR-1 results (GO, 26/26 passed, 1 slow query)
+- `backend/tests/test_rc1_1_security.py`: 11 integration tests for RC-1.1 fixes
+- `backend/app/models/audit.py`: `user_id` changed to `nullable=True`
