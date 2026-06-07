@@ -1,0 +1,7 @@
+[
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/dashboard",
+    "method": "GET",
+    "failure": "net::ERR_ABORTED"
+  }
+]

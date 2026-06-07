@@ -4,6 +4,7 @@ import { adminApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import {
   CreditCard, Receipt, DollarSign, TrendingUp, Building2,
   AlertTriangle, Users as UsersIcon, CheckCircle2,
@@ -43,7 +44,11 @@ function BillingPage() {
   }
 
   if (isChildRoute) {
-    return <Outlet />;
+    return (
+      <ErrorBoundary>
+        <Outlet />
+      </ErrorBoundary>
+    );
   }
 
   if (summaryQ.isError) {

@@ -3,6 +3,13 @@ import { Component, type ReactNode, type ErrorInfo } from "react";
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  /**
+   * inline=true → compact card error (widget-level, doesn't fill screen).
+   * inline=false (default) → full-page error (route-level).
+   */
+  inline?: boolean;
+  /** Optional label shown in the inline error card (e.g. "Billing Summary") */
+  label?: string;
 }
 
 interface State {
@@ -24,12 +31,30 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error("SPINFLOW ERROR:", error.message);
     console.error("Stack trace:", error.stack);
     console.error("Component stack:", info.componentStack);
-    console.error("Full error object:", error);
   }
 
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) return this.props.fallback;
+
+      // ── Inline (widget-level) error ──────────────────────────────────────
+      if (this.props.inline) {
+        return (
+          <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800 p-4 text-center">
+            <p className="text-xs font-medium text-red-700 dark:text-red-400">
+              {this.props.label ? `${this.props.label} failed to load` : "This section failed to load"}
+            </p>
+            <button
+              onClick={() => this.setState({ hasError: false, error: null })}
+              className="mt-2 text-xs text-red-600 hover:underline"
+            >
+              Retry
+            </button>
+          </div>
+        );
+      }
+
+      // ── Full-page (route-level) error ────────────────────────────────────
       return (
         <div className="flex min-h-screen items-center justify-center bg-background px-4">
           <div className="max-w-md text-center">

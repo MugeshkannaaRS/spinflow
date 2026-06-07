@@ -16,9 +16,32 @@ class BillingService:
         self.db = db
 
     async def get_billing_summary(self) -> dict:
+        # ── Batch query: companies + subscriptions + plans in 3 round-trips ──
         companies_res = await self.db.execute(select(Company))
         companies = companies_res.scalars().all()
         total_companies = len(companies)
+        company_ids = [c.id for c in companies]
+
+        # Batch-load all subscriptions
+        sub_map: Dict[str, CompanySubscription] = {}
+        plan_ids_needed: set = set()
+        if company_ids:
+            subs_res = await self.db.execute(
+                select(CompanySubscription).where(CompanySubscription.company_id.in_(company_ids))
+            )
+            for sub in subs_res.scalars().all():
+                sub_map[sub.company_id] = sub
+                if sub.plan_id:
+                    plan_ids_needed.add(sub.plan_id)
+
+        # Batch-load all plans
+        plan_map: Dict[str, SubscriptionPlan] = {}
+        if plan_ids_needed:
+            plans_res = await self.db.execute(
+                select(SubscriptionPlan).where(SubscriptionPlan.id.in_(list(plan_ids_needed)))
+            )
+            for plan in plans_res.scalars().all():
+                plan_map[plan.id] = plan
 
         mrr = 0.0
         active_count = 0
@@ -27,10 +50,7 @@ class BillingService:
         suspended_count = 0
 
         for co in companies:
-            sub_res = await self.db.execute(
-                select(CompanySubscription).where(CompanySubscription.company_id == co.id)
-            )
-            sub = sub_res.scalar_one_or_none()
+            sub = sub_map.get(co.id)
             if sub:
                 s = sub.status
                 if s == "active":
@@ -46,10 +66,7 @@ class BillingService:
                 if os != "active" and s not in ("suspended", "cancelled"):
                     overdue_count += 1
 
-                plan_res = await self.db.execute(
-                    select(SubscriptionPlan).where(SubscriptionPlan.id == sub.plan_id)
-                )
-                plan = plan_res.scalar_one_or_none()
+                plan = plan_map.get(sub.plan_id or "")
                 if plan and s not in ("suspended", "cancelled"):
                     mrr += float(plan.monthly_price or 0)
 
@@ -121,6 +138,7 @@ class BillingService:
         plan_filter: Optional[str] = None,
         search: Optional[str] = None,
     ) -> Tuple[List[dict], int]:
+        # ── Build base company query ──────────────────────────────────────────
         stmt = (
             select(Company)
             .options(
@@ -133,21 +151,55 @@ class BillingService:
             stmt = stmt.where(
                 Company.name.ilike(f"%{search}%") | Company.code.ilike(f"%{search}%")
             )
-        count_stmt = select(func.count()).select_from(stmt.subquery())
-        total = (await self.db.execute(count_stmt)).scalar() or 0
-        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-        result = await self.db.execute(stmt)
-        companies = result.scalars().all()
 
-        rows = []
-        for co in companies:
-            sub_res = await self.db.execute(
-                select(CompanySubscription).where(CompanySubscription.company_id == co.id)
+        # Fetch ALL matching companies (needed for filter-accurate count)
+        result = await self.db.execute(stmt)
+        all_companies = result.scalars().all()
+        company_ids = [c.id for c in all_companies]
+
+        # ── Batch-load subscriptions ──────────────────────────────────────────
+        sub_map: Dict[str, CompanySubscription] = {}
+        plan_ids_needed: set = set()
+        if company_ids:
+            subs_res = await self.db.execute(
+                select(CompanySubscription).where(CompanySubscription.company_id.in_(company_ids))
             )
-            sub = sub_res.scalar_one_or_none()
+            for sub in subs_res.scalars().all():
+                sub_map[sub.company_id] = sub
+                if sub.plan_id:
+                    plan_ids_needed.add(sub.plan_id)
+
+        # ── Batch-load plans ──────────────────────────────────────────────────
+        plan_map: Dict[str, SubscriptionPlan] = {}
+        if plan_ids_needed:
+            plans_res = await self.db.execute(
+                select(SubscriptionPlan).where(SubscriptionPlan.id.in_(list(plan_ids_needed)))
+            )
+            for plan in plans_res.scalars().all():
+                plan_map[plan.id] = plan
+
+        # ── Batch-load user counts ────────────────────────────────────────────
+        user_cnt_map: Dict[str, int] = {}
+        if company_ids:
+            ucnt_res = await self.db.execute(
+                select(User.company_id, func.count(User.id))
+                .where(
+                    User.company_id.in_(company_ids),
+                    User.is_active == True,
+                    User.deleted_at.is_(None),
+                )
+                .group_by(User.company_id)
+            )
+            for row in ucnt_res.all():
+                user_cnt_map[row[0]] = int(row[1])
+
+        # ── Build rows with filter ────────────────────────────────────────────
+        all_rows = []
+        for co in all_companies:
+            sub = sub_map.get(co.id)
             plan_name = "—"
             plan_code = "none"
-            monthly_amount = 0
+            monthly_amount = 0.0
             status = "inactive"
             overdue_status = "active"
             renewal_date = None
@@ -159,37 +211,25 @@ class BillingService:
                 overdue_status = getattr(sub, "overdue_status", "active")
                 if sub.expires_at:
                     renewal_date = sub.expires_at.strftime("%Y-%m-%d")
-                plan_res = await self.db.execute(
-                    select(SubscriptionPlan).where(SubscriptionPlan.id == sub.plan_id)
-                )
-                plan = plan_res.scalar_one_or_none()
+                plan = plan_map.get(sub.plan_id or "")
                 if plan:
                     plan_name = plan.name
                     plan_code = plan.code
                     monthly_amount = float(plan.monthly_price or 0)
-                    included_mills = plan.included_mills or 0
-                    included_users = plan.included_users or 0
-                    user_limit = included_users + (sub.extra_users or 0)
-                    mill_limit = included_mills + (sub.extra_mills or 0)
+                    user_limit = (plan.included_users or 0) + (sub.extra_users or 0)
+                    mill_limit = (plan.included_mills or 0) + (sub.extra_mills or 0)
 
-            user_count_res = await self.db.execute(
-                select(func.count(User.id)).where(
-                    User.company_id == co.id,
-                    User.is_active == True,
-                    User.deleted_at.is_(None),
-                )
-            )
-            user_count = int(user_count_res.scalar() or 0)
-
-            mill_count = len([m for m in (co.mills or []) if m.is_active])
-            modules_enabled = len([m for m in (co.modules or []) if m.enabled])
-
+            # Apply filters before building row (accurate count)
             if status_filter and status_filter != status:
                 continue
             if plan_filter and plan_filter != plan_code:
                 continue
 
-            rows.append({
+            user_count = user_cnt_map.get(co.id, 0)
+            mill_count = len([m for m in (co.mills or []) if m.is_active])
+            modules_enabled = len([m for m in (co.modules or []) if m.is_enabled])
+
+            all_rows.append({
                 "company_id": co.id,
                 "company_name": co.name,
                 "company_code": co.code,
@@ -206,7 +246,10 @@ class BillingService:
                 "overdue_status": overdue_status,
             })
 
-        total = len(rows)
+        # ── Paginate after filter ─────────────────────────────────────────────
+        total = len(all_rows)
+        offset = (page - 1) * page_size
+        rows = all_rows[offset: offset + page_size]
         return rows, total
 
     async def get_company_billing_detail(self, company_id: str) -> Optional[dict]:

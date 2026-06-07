@@ -1,0 +1,38 @@
+[
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/analytics",
+    "status": 500,
+    "statusText": "",
+    "body": "{\"error\":true,\"code\":\"INTERNAL_ERROR\",\"message\":\"An unexpected error occurred\",\"detail\":null,\"path\":\"/api/v1/admin/billing/analytics\",\"timestamp\":\"2026-06-07T16:45:03.808262+00:00\"}"
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/subscriptions-enriched?page_size=100",
+    "status": 500,
+    "statusText": "",
+    "body": "{\"error\":true,\"code\":\"INTERNAL_ERROR\",\"message\":\"An unexpected error occurred\",\"detail\":null,\"path\":\"/api/v1/admin/billing/subscriptions-enriched\",\"timestamp\":\"2026-06-07T16:45:09.338533+00:00\"}"
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/dashboard",
+    "status": 500,
+    "statusText": "",
+    "body": "{\"error\":true,\"code\":\"INTERNAL_ERROR\",\"message\":\"An unexpected error occurred\",\"detail\":null,\"path\":\"/api/v1/admin/billing/dashboard\",\"timestamp\":\"2026-06-07T16:45:16.106131+00:00\"}"
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/analytics",
+    "status": 500,
+    "statusText": "",
+    "body": "{\"error\":true,\"code\":\"INTERNAL_ERROR\",\"message\":\"An unexpected error occurred\",\"detail\":null,\"path\":\"/api/v1/admin/billing/analytics\",\"timestamp\":\"2026-06-07T16:45:19.309238+00:00\"}"
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/subscriptions-enriched?page_size=100",
+    "status": 500,
+    "statusText": "",
+    "body": "{\"error\":true,\"code\":\"INTERNAL_ERROR\",\"message\":\"An unexpected error occurred\",\"detail\":null,\"path\":\"/api/v1/admin/billing/subscriptions-enriched\",\"timestamp\":\"2026-06-07T16:45:30.231392+00:00\"}"
+  },
+  {
+    "url": "https://spinflow.onrender.com/api/v1/admin/billing/dashboard",
+    "status": 500,
+    "statusText": "",
+    "body": "{\"error\":true,\"code\":\"INTERNAL_ERROR\",\"message\":\"An unexpected error occurred\",\"detail\":null,\"path\":\"/api/v1/admin/billing/dashboard\",\"timestamp\":\"2026-06-07T16:45:43.749434+00:00\"}"
+  }
+]

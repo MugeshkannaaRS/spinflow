@@ -343,6 +343,15 @@ class CompanyDeletionService:
                 if cb_cnt:
                     counts["cotton_bales"] = cb_cnt
 
+                # ── Step 1: Delete all child-of-child records FIRST ──────────
+                # These reference parent tables deleted in Step 2 via subquery;
+                # they must be deleted before the parents so the subquery still works.
+                for table, cond in tables_to_log:
+                    cnt = await self._delete_from(table, cond, None)
+                    if cnt:
+                        counts[table] = cnt
+
+                # ── Step 2: Delete direct mill-scoped tables ─────────────────
                 direct_mill_tables = [
                     "stock_balance",
                     "stock_ledger",
@@ -378,11 +387,6 @@ class CompanyDeletionService:
 
                 for table in direct_mill_tables:
                     cnt = await self._delete_from(table, f"mill_id IN ({mp})", None)
-                    if cnt:
-                        counts[table] = cnt
-
-                for table, cond in tables_to_log:
-                    cnt = await self._delete_from(table, cond, None)
                     if cnt:
                         counts[table] = cnt
 
@@ -452,10 +456,8 @@ class CompanyDeletionService:
             return {"success": True, "company_name": self.company_name, "affected_records": counts}
 
         except Exception as e:
-            deletion_log_entry.deletion_result = "failed"
-            deletion_log_entry.error_message = str(e)
-            await self.db.flush()
-            logger.error(f"Company deletion failed for {company_id}: {e}")
+            await self.db.rollback()
+            logger.error(f"Company deletion failed for {company_id}: {e}", exc_info=True)
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Deletion failed: {str(e)}")
 
     async def archive(self, company_id: str) -> Dict[str, Any]:

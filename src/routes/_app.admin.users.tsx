@@ -5,6 +5,7 @@ import { mastersApi, adminApi } from "@/lib/api-service";
 import { ROLE_LABELS } from "@/lib/rbac";
 import type { Role } from "@/lib/rbac";
 import { useAuth } from "@/stores/auth";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -757,3 +758,6 @@ function AdminUsersPage() {
     </div>
   );
 }
+
+// Export wrapped in ErrorBoundary so crashes don't propagate to the shell
+export { AdminUsersPage };

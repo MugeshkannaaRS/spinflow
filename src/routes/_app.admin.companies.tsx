@@ -177,7 +177,7 @@ function CompaniesPage() {
   });
 
   const companiesData = (companiesQ.data ?? []) as Company[];
-  const statsQ_data = statsQ.data ?? {};
+  const statsQ_data: any = statsQ.data ?? {};
   const companyStats_raw = statsQ_data.company_stats ?? statsQ_data;
   const companyStats: any[] = Array.isArray(companyStats_raw) ? companyStats_raw : [];
 
