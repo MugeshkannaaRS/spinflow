@@ -16,7 +16,7 @@ ROLES = [
     "PRODUCTION_MANAGER", "QUALITY_MANAGER", "DISPATCH_MANAGER",
     "STORE_MANAGER", "HR_MANAGER", "ACCOUNTANT",
     "MAINTENANCE_MANAGER", "SUPERVISOR", "MACHINE_OPERATOR",
-    "SECURITY_GATE", "AUDITOR",
+    "SECURITY_GATE", "AUDITOR", "OPERATOR",
 ]
 
 MODULES = ALL_MODULE_CODES + ["whatsapp", "lc_tracking", "analytics"]
@@ -95,16 +95,29 @@ ACCESS_MATRIX: dict[str, dict[str, AccessLevel]] = {
 
     "MACHINE_OPERATOR": {
         "dashboard": True,
+        "production": True,   # can submit shift entries for their machine
     },
 
     "SECURITY_GATE": {
         "dashboard": True,
+        "dispatch": "read",   # view trips at gate
+        "lotrac": True,       # QR scan at gate
     },
 
     "AUDITOR": {
         "dashboard": True, "production": "read", "quality": "read",
         "hr": "read", "accounts": "read", "reports": True,
-        "audit": True,
+        "audit": True, "inventory": "read", "stores": "read",
+        "dispatch": "read", "maintenance": "read",
+    },
+
+    # OPERATOR — general factory floor, lighter than SUPERVISOR
+    "OPERATOR": {
+        "dashboard": True,
+        "production": True,
+        "quality": "read",
+        "stores": "read",
+        "reports": "read",
     },
 }
 

@@ -104,16 +104,29 @@ const ACCESS_MATRIX: Record<string, Record<string, AccessLevel>> = {
 
   MACHINE_OPERATOR: {
     dashboard: "write",
+    production: "write", // can enter shift entries for their machine
   },
 
   SECURITY_GATE: {
     dashboard: "write",
+    dispatch: "read",    // can view outgoing trips / scan gate
+    lotrac: "write",     // QR scan at gate
   },
 
   AUDITOR: {
     dashboard: "write", production: "read", quality: "read",
     hr: "read", accounts: "read", reports: "write",
-    audit: "write",
+    audit: "write", inventory: "read", stores: "read",
+    dispatch: "read", maintenance: "read",
+  },
+
+  // OPERATOR is a general factory floor role — lighter than SUPERVISOR
+  OPERATOR: {
+    dashboard: "write",
+    production: "write",
+    quality: "read",
+    stores: "read",
+    reports: "read",
   },
 };
 

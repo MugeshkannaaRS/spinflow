@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useRouterState, useNavigate, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { adminApi } from "@/lib/api-service";
@@ -18,6 +18,12 @@ import {
 
 export const Route = createFileRoute("/_app/admin")({
   head: () => ({ meta: [{ title: "Admin — SpinFlow ERP" }] }),
+  beforeLoad: () => {
+    const { user } = useAuth.getState();
+    if (!user || user.role !== "SUPER_ADMIN") {
+      throw redirect({ to: "/dashboard" });
+    }
+  },
   component: AdminPage,
 });
 

@@ -167,9 +167,19 @@ function ColumnConfigPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // 1. Save column config
       const res = await api.put("/ui-config/columns", { columns }, {
         params: { table: selectedTable, mill_id: selectedMillId },
       });
+      // 2. Register any custom fields in MillCustomField so import + forms see them
+      const customFields = columns.filter(c => c._isCustom);
+      if (customFields.length > 0) {
+        await api.post("/ui-config/custom-fields", {
+          mill_id: selectedMillId,
+          table: selectedTable,
+          fields: customFields.map(c => ({ key: c.key, label: c.label, type: c.type })),
+        });
+      }
       return res.data;
     },
     onSuccess: () => {

@@ -641,3 +641,109 @@ async def list_available_tables():
         {"key": t, "label": t.replace("_", " ").title()}
         for t in ALL_TABLES
     ]
+
+
+# ── Map table_key → module name for MillCustomField ───────────────────────────
+_TABLE_TO_MODULE: dict[str, str] = {
+    "masters_machines":    "machines",
+    "hr_employees":        "employees",
+    "production_entries":  "production",
+    "quality_tests":       "quality",
+    "stores_spares":       "stores",
+    "maintenance_tasks":   "maintenance",
+    "inventory_lots":      "inventory",
+    "dispatch_trips":      "dispatch",
+    "accounts_invoices":   "accounts",
+}
+
+
+class CustomFieldRegisterRequest(BaseModel):
+    mill_id: str
+    table: str
+    fields: List[dict]  # [{key, label, type}]
+
+
+@router.get("/ui-config/custom-fields")
+async def get_custom_fields(
+    mill_id: str = Query(...),
+    module: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return custom field definitions for a mill + module."""
+    from app.models.mill_config import MillCustomField
+    result = await db.execute(
+        select(MillCustomField).where(
+            MillCustomField.mill_id == mill_id,
+            MillCustomField.module == module,
+        ).order_by(MillCustomField.sequence, MillCustomField.field_label)
+    )
+    fields = result.scalars().all()
+    return {
+        "mill_id": mill_id,
+        "module": module,
+        "fields": [
+            {
+                "field_key": f.field_key,
+                "field_label": f.field_label,
+                "field_type": f.field_type,
+                "is_required": f.is_required,
+            }
+            for f in fields
+        ],
+    }
+
+
+@router.post("/ui-config/custom-fields")
+async def register_custom_fields(
+    req: CustomFieldRegisterRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Register SA-defined custom fields into MillCustomField so the import
+    engine and forms know about them."""
+    from app.models.mill_config import MillCustomField
+
+    role_name = current_user.role_rel.code if current_user.role_rel else ""
+    if role_name != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="SUPER_ADMIN only")
+
+    module = _TABLE_TO_MODULE.get(req.table, req.table.split("_")[0])
+
+    # Fetch existing keys for this mill + module to avoid duplication
+    existing_res = await db.execute(
+        select(MillCustomField).where(
+            MillCustomField.mill_id == req.mill_id,
+            MillCustomField.module == module,
+        )
+    )
+    existing_map: dict[str, MillCustomField] = {
+        cf.field_key: cf for cf in existing_res.scalars().all()
+    }
+
+    added = 0
+    for f in req.fields:
+        key = str(f.get("key", "")).strip()
+        label = str(f.get("label", "")).strip()
+        ftype = str(f.get("type", "text")).strip()
+        if not key or not label:
+            continue
+        if key in existing_map:
+            # Update label/type if changed
+            existing_map[key].field_label = label
+            existing_map[key].field_type = ftype
+        else:
+            db.add(MillCustomField(
+                mill_id=req.mill_id,
+                company_id=str(current_user.company_id or ""),
+                module=module,
+                field_key=key,
+                field_label=label,
+                field_type=ftype,
+                is_required=False,
+                source="column_config",
+            ))
+            added += 1
+
+    await db.commit()
+    return {"registered": added, "module": module, "mill_id": req.mill_id}

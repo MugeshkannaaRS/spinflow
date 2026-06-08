@@ -1,6 +1,7 @@
 import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, productionApi, inventoryApi, adminApi } from "@/lib/api-service";
+import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { canWrite } from "@/lib/rbac";
@@ -2015,7 +2016,40 @@ function MachinesTab({
     )},
   ];
 
-  const colDefs = allColDefs.filter(c => visibleKeys.includes(c.key));
+  // Auto-append custom field columns from first machine's custom_fields dict
+  // and from colConfig custom keys not already in allColDefs
+  const customColKeys = (colConfig?.columns ?? [])
+    .filter((c: any) => c._isCustom && c.is_visible !== false)
+    .map((c: any) => ({ key: c.key, label: c.label }));
+
+  // Also pick up any custom_fields keys that came from the API (imported but not yet in config)
+  const apiCustomKeys = new Set<string>();
+  for (const m of machines.slice(0, 5)) {
+    if (m.custom_fields && typeof m.custom_fields === "object") {
+      Object.keys(m.custom_fields).forEach(k => apiCustomKeys.add(k));
+    }
+  }
+
+  const allCustomKeys = [
+    ...customColKeys,
+    ...[...apiCustomKeys]
+      .filter(k => !customColKeys.find((c: any) => c.key === k))
+      .map(k => ({ key: k, label: k.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) })),
+  ];
+
+  const customColDefs: ColDef<any>[] = allCustomKeys.map(({ key, label }: { key: string; label: string }) => ({
+    key,
+    label,
+    render: (m: any) => {
+      const val = m.custom_fields?.[key] ?? m[key] ?? "—";
+      return <span className="text-xs text-blue-700">{String(val)}</span>;
+    },
+  }));
+
+  const colDefs = [
+    ...allColDefs.filter(c => visibleKeys.includes(c.key)),
+    ...customColDefs,
+  ];
 
   return (
     <div className="space-y-4 mt-4">
@@ -2115,6 +2149,10 @@ function MachineForm({
     installation_date: item?.installation_date ? String(item.installation_date).slice(0, 10) : "",
     current_status:    item?.current_status    ?? "running",
   });
+  // Custom fields from MillCustomField definitions
+  const [customVals, setCustomVals] = useState<Record<string, string>>(
+    item?.custom_fields ?? {}
+  );
   const [saving, setSaving] = useState(false);
   const isEdit = !!item;
 
@@ -2124,6 +2162,17 @@ function MachineForm({
     staleTime: 60_000,
   });
   const depts = (Array.isArray(deptsRaw) ? deptsRaw : []) as any[];
+
+  // Fetch custom field definitions for this mill's machines
+  const { data: customFieldDefs } = useQuery({
+    queryKey: ["custom-field-defs", millId, "machines"],
+    queryFn: () => api.get("/ui-config/custom-fields", {
+      params: { mill_id: millId, module: "machines" },
+    }).then(r => r.data?.fields ?? []),
+    staleTime: 60_000,
+    enabled: !!millId,
+  });
+  const customDefs = (Array.isArray(customFieldDefs) ? customFieldDefs : []) as any[];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2241,6 +2290,30 @@ function MachineForm({
               onChange={e => setForm({ ...form, installation_date: e.target.value })}
             />
           </div>
+
+          {/* Custom fields — rendered from MillCustomField definitions */}
+          {customDefs.length > 0 && (
+            <div className="border-t pt-3 space-y-3">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Custom Fields
+              </p>
+              {customDefs.map((def: any) => (
+                <div key={def.field_key} className="space-y-1.5">
+                  <Label className="flex items-center gap-1.5">
+                    {def.field_label}
+                    <span className="text-[10px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-sans">custom</span>
+                  </Label>
+                  <Input
+                    type={def.field_type === "number" ? "number" : def.field_type === "date" ? "date" : "text"}
+                    value={customVals[def.field_key] ?? ""}
+                    onChange={e => setCustomVals(prev => ({ ...prev, [def.field_key]: e.target.value }))}
+                    placeholder={`Enter ${def.field_label.toLowerCase()}…`}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
           <SheetFooter className="pt-2">
             <Button
               type="submit"
