@@ -156,7 +156,7 @@ function MastersPage() {
   });
   const machinesQ = useQuery({
     queryKey: ["masters", "machines"],
-    queryFn: () => productionApi.getMachines(),
+    queryFn: () => productionApi.getMachines({ page_size: 1000, page: 1 }),
     staleTime: 60_000,
     retry: 1,
   });

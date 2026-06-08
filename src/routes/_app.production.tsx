@@ -496,7 +496,7 @@ function ProductionPage() {
   const { millId } = useActiveMill();
   const machinesQ = useQuery({
     queryKey: ["machines", millId],
-    queryFn: () => productionApi.getMachines({ mill_id: millId }),
+    queryFn: () => productionApi.getMachines({ mill_id: millId, page_size: 1000, page: 1 }),
     staleTime: 60_000,
     retry: 1,
     enabled: !!millId,
