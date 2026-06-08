@@ -6,15 +6,13 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { KpiCard } from "@/components/ui/KpiCard";
-import { StatusBadge } from "@/components/ui/StatusBadge";
 import { fmtLakh } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import {
   Building2, Factory, SlidersHorizontal, CreditCard, Archive, FileText,
   Blocks, Shield, Users, TrendingUp, DollarSign, AlertTriangle,
-  CheckCircle2, XCircle, ArrowUpRight, Loader2, Receipt, ShoppingCart,
+  CheckCircle2, ArrowUpRight, Loader2, ShoppingCart,
   UserPlus, Activity, Bell, ChevronDown, UserCog,
 } from "lucide-react";
 
@@ -31,10 +29,10 @@ const SECTION_GROUPS = [
     icon: Building2,
     color: "bg-blue-50 text-blue-600 border-blue-100",
     items: [
-      { id: "companies",     label: "Companies",      icon: Building2,       desc: "Manage companies, plans, modules" },
-      { id: "mills",         label: "Mills",           icon: Factory,         desc: "View and manage mills across companies" },
-      { id: "organizations", label: "Organizations",   icon: Shield,          desc: "Company overview, usage and limits" },
-      { id: "archive",       label: "Archive",         icon: Archive,         desc: "View and restore suspended companies" },
+      { id: "companies",     label: "Companies",      icon: Building2,         desc: "Manage companies, plans, modules" },
+      { id: "mills",         label: "Mills",           icon: Factory,           desc: "View and manage mills across companies" },
+      { id: "organizations", label: "Organizations",   icon: Shield,            desc: "Company overview, usage and limits" },
+      { id: "archive",       label: "Archive",         icon: Archive,           desc: "View and restore suspended companies" },
     ],
   },
   {
@@ -43,9 +41,9 @@ const SECTION_GROUPS = [
     icon: UserCog,
     color: "bg-green-50 text-green-600 border-green-100",
     items: [
-      { id: "users",   label: "Users",       icon: Users,           desc: "Provision, manage and enforce user limits" },
+      { id: "users",   label: "Users",       icon: Users,             desc: "Provision, manage and enforce user limits" },
       { id: "limits",  label: "User Limits", icon: SlidersHorizontal, desc: "Monitor and adjust user limits" },
-      { id: "modules", label: "Modules",     icon: Blocks,          desc: "Toggle module access per company" },
+      { id: "modules", label: "Modules",     icon: Blocks,            desc: "Toggle module access per company" },
     ],
   },
   {
@@ -54,8 +52,8 @@ const SECTION_GROUPS = [
     icon: CreditCard,
     color: "bg-teal-50 text-teal-600 border-teal-100",
     items: [
-      { id: "billing",  label: "Billing",      icon: CreditCard, desc: "Subscriptions, invoicing, plans, revenue" },
-      { id: "alerts",   label: "Alert Center", icon: Bell,        desc: "Overdue invoices, limits, expiring subs" },
+      { id: "billing", label: "Billing",      icon: CreditCard, desc: "Subscriptions, invoicing, plans, revenue" },
+      { id: "alerts",  label: "Alert Center", icon: Bell,        desc: "Overdue invoices, limits, expiring subs" },
     ],
   },
   {
@@ -71,17 +69,6 @@ const SECTION_GROUPS = [
 ];
 
 // ── Near Limit row with inline action dropdown ────────────────────────────────
-<<<<<<< HEAD
-function NearLimitRow({ company: s, flags, navigate }: { company: any; flags: string[]; navigate: (o: { to: string }) => void }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="relative flex items-center justify-between p-2 rounded-lg border border-amber-100 bg-amber-50/50">
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium truncate">{s.company_name}</p>
-        <p className="text-xs text-muted-foreground">{flags.join(", ")}</p>
-      </div>
-      <div className="relative shrink-0 ml-2">
-=======
 function NearLimitRow({ company: s, flags, navigate, userPct, millPct }: {
   company: any;
   flags: string[];
@@ -97,14 +84,15 @@ function NearLimitRow({ company: s, flags, navigate, userPct, millPct }: {
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{s.company_name}</p>
         <p className="text-xs text-muted-foreground">{flags.join(" · ")}</p>
-        {/* Usage bars */}
         <div className="flex items-center gap-2 mt-1.5">
           {s.user_limit > 0 && (
             <div className="flex items-center gap-1 flex-1 max-w-[120px]">
               <span className="text-[10px] text-muted-foreground w-6">U</span>
               <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-slate-700">
-                <div className={`h-1.5 rounded-full transition-all ${userPct >= 1 ? "bg-red-500" : userPct >= 0.85 ? "bg-amber-400" : "bg-blue-400"}`}
-                  style={{ width: `${Math.min(userPct * 100, 100)}%` }} />
+                <div
+                  className={`h-1.5 rounded-full transition-all ${userPct >= 1 ? "bg-red-500" : userPct >= 0.85 ? "bg-amber-400" : "bg-blue-400"}`}
+                  style={{ width: `${Math.min(userPct * 100, 100)}%` }}
+                />
               </div>
               <span className="text-[10px] text-muted-foreground w-7 text-right">{Math.round(userPct * 100)}%</span>
             </div>
@@ -113,8 +101,10 @@ function NearLimitRow({ company: s, flags, navigate, userPct, millPct }: {
             <div className="flex items-center gap-1 flex-1 max-w-[120px]">
               <span className="text-[10px] text-muted-foreground w-6">M</span>
               <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-slate-700">
-                <div className={`h-1.5 rounded-full transition-all ${millPct >= 1 ? "bg-red-500" : millPct >= 0.85 ? "bg-amber-400" : "bg-blue-400"}`}
-                  style={{ width: `${Math.min(millPct * 100, 100)}%` }} />
+                <div
+                  className={`h-1.5 rounded-full transition-all ${millPct >= 1 ? "bg-red-500" : millPct >= 0.85 ? "bg-amber-400" : "bg-blue-400"}`}
+                  style={{ width: `${Math.min(millPct * 100, 100)}%` }}
+                />
               </div>
               <span className="text-[10px] text-muted-foreground w-7 text-right">{Math.round(millPct * 100)}%</span>
             </div>
@@ -122,7 +112,6 @@ function NearLimitRow({ company: s, flags, navigate, userPct, millPct }: {
         </div>
       </div>
       <div className="relative shrink-0">
->>>>>>> 52939f0 (feat: company deletion, billing updates, admin UI improvements)
         <button
           onClick={() => setOpen(o => !o)}
           className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors"
@@ -159,15 +148,9 @@ function NearLimitRow({ company: s, flags, navigate, userPct, millPct }: {
   );
 }
 
-<<<<<<< HEAD
-// Accordion group state — all open by default
-function AccordionGroup({ group, navigate }: { group: typeof SECTION_GROUPS[0]; navigate: (opts: { to: string }) => void }) {
-  const [open, setOpen] = useState(true);
-=======
-// Accordion group state — closed by default (compact at top)
+// Accordion group — closed by default so all 4 fit above the fold
 function AccordionGroup({ group, navigate }: { group: typeof SECTION_GROUPS[0]; navigate: (opts: { to: string }) => void }) {
   const [open, setOpen] = useState(false);
->>>>>>> 52939f0 (feat: company deletion, billing updates, admin UI improvements)
   const GroupIcon = group.icon;
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
@@ -281,7 +264,6 @@ function AdminPage() {
     s.mill_count >= s.mill_limit * 0.85 ||
     (s.employee_count ?? 0) >= (s.employee_limit ?? 9999) * 0.85
   );
-  const topCustomers: any[] = Array.isArray(an?.top_customers) ? an.top_customers : [];
   const pendingUpgrades: any[] = Array.isArray(pending) ? pending : [];
 
   return (
@@ -302,7 +284,7 @@ function AdminPage() {
         )}
       </div>
 
-      {/* ── ADMIN SECTIONS — at top, no scrolling needed ──────────────────── */}
+      {/* ── ADMIN SECTIONS — compact accordions at top, no scroll needed ───── */}
       <div>
         <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Admin Sections</h2>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -358,37 +340,8 @@ function AdminPage() {
         ))}
       </div>
 
-      {/* ── Companies Near Limits + Upgrade Requests — improved UI at bottom ─ */}
+      {/* ── Companies Near Limits + Upgrade Requests — at bottom ─────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-<<<<<<< HEAD
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Companies Near Limits</CardTitle>
-            <AlertTriangle className="size-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            {nearLimitCompanies.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <CheckCircle2 className="size-8 text-emerald-400 mb-2" />
-                <p className="text-sm text-muted-foreground">All companies within limits</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {nearLimitCompanies.slice(0, 10).map((s: any) => {
-                  const flags: string[] = [];
-                  if (s.user_count >= s.user_limit * 0.85) flags.push(`Users ${s.user_count}/${s.user_limit}`);
-                  if (s.mill_count >= s.mill_limit * 0.85) flags.push(`Mills ${s.mill_count}/${s.mill_limit}`);
-                  if ((s.employee_count ?? 0) >= (s.employee_limit ?? 9999) * 0.85) flags.push(`Employees ${s.employee_count}/${s.employee_limit}`);
-                  return (
-                    <NearLimitRow key={s.company_id} company={s} flags={flags} navigate={navigate} />
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-=======
->>>>>>> 52939f0 (feat: company deletion, billing updates, admin UI improvements)
 
         {/* Near Limits */}
         <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
@@ -431,15 +384,6 @@ function AdminPage() {
           )}
         </div>
 
-<<<<<<< HEAD
-      {/* Navigation Sections — grouped accordion dropdowns */}
-      <div>
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Admin Sections</h2>
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
-          {SECTION_GROUPS.map(group => (
-            <AccordionGroup key={group.id} group={group} navigate={navigate} />
-          ))}
-=======
         {/* Upgrade Requests */}
         <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-slate-800">
@@ -466,19 +410,21 @@ function AdminPage() {
                     <ArrowUpRight className="size-3.5 text-blue-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium capitalize">{(cr.change_type ?? "upgrade").replace(/_/g," ")} request</p>
+                    <p className="text-sm font-medium capitalize">{(cr.change_type ?? "upgrade").replace(/_/g, " ")} request</p>
                     <p className="text-xs text-muted-foreground truncate">{cr.reason || "No reason provided"}</p>
                   </div>
-                  <button onClick={() => navigate({ to: "/admin/billing" })}
-                    className="shrink-0 text-xs bg-blue-600 text-white px-2.5 py-1 rounded-md hover:bg-blue-700 transition-colors">
+                  <button
+                    onClick={() => navigate({ to: "/admin/billing" })}
+                    className="shrink-0 text-xs bg-blue-600 text-white px-2.5 py-1 rounded-md hover:bg-blue-700 transition-colors"
+                  >
                     Review
                   </button>
                 </div>
               ))}
             </div>
           )}
->>>>>>> 52939f0 (feat: company deletion, billing updates, admin UI improvements)
         </div>
+
       </div>
     </div>
   );
