@@ -581,6 +581,7 @@ def _make_bulk_validator():
 
 class MachineBulkRequest(BaseModel):
     items: List[Dict[str, Any]] = []
+    mill_id: Optional[str] = None   # also accepted in body (frontend sends it here)
     accept_any_key = _make_bulk_validator()
 
 
@@ -769,7 +770,9 @@ async def bulk_create_machines(
     - Structured error details with code and name
     """
     scope = await get_mill_scope(current_user, db)
-    eff_mill_id = await _resolve_mill_id(scope, current_user, db, mill_id)
+    # Accept mill_id from body when not in query params (frontend sends in body)
+    effective_mill_id_param = mill_id or req.mill_id or None
+    eff_mill_id = await _resolve_mill_id(scope, current_user, db, effective_mill_id_param)
 
     raw_items: List[Dict[str, Any]] = req.items
     if len(raw_items) > 1000:
@@ -1021,6 +1024,8 @@ async def bulk_create_machines(
                 created += 1
 
             # Collect custom field values for this machine
+            # Serial-number columns are never useful as stored values — skip them
+            _SERIAL_KEYS = frozenset({"sl_no","si_no","sr_no","s_no","slno","sno","serial_no","serial","sl.no","si.no"})
             if machine_id:
                 custom_values: list = []
                 for col_header, val in row.items():
@@ -1029,6 +1034,9 @@ async def bulk_create_machines(
                         continue
                     col_norm = col_key.lower().replace(" ", "_").replace(".", "_")
                     col_lower = col_key.lower()
+                    # Skip serial-number placeholder columns
+                    if col_norm in _SERIAL_KEYS or col_lower in _SERIAL_KEYS:
+                        continue
                     if col_norm in MACHINE_SYSTEM_ALIASES or col_lower in MACHINE_SYSTEM_ALIASES:
                         continue
                     if val is None or str(val).strip() == "":

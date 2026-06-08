@@ -126,6 +126,8 @@ export function UniversalImportModal({
     auto_created_departments?: string[];
   } | null>(null);
   const [duplicateMode, setDuplicateMode] = useState<"skip" | "update" | "create">("update");
+  // Track which autoCustom (unmapped) headers the user explicitly wants to skip
+  const [skippedCustomHeaders, setSkippedCustomHeaders] = useState<Set<string>>(new Set());
   const qc = useQueryClient();
   const invalidateMillMasters = useInvalidateMillMasters();
   const [importError, setImportError] = useState<string | null>(null);
@@ -334,7 +336,11 @@ export function UniversalImportModal({
         );
 
         if (isCustom) {
-          record.custom_fields[normalizeCustomFieldKey(header)] = row[i] != null ? String(row[i]) : null;
+          // Respect explicit skip by user, and auto-skip serial number columns
+          const cfKey = normalizeCustomFieldKey(header);
+          const isSerialCol = ["sl_no","si_no","sr_no","s_no","slno","sno","serial_no","serial","sno"].includes(cfKey);
+          if (skippedCustomHeaders.has(header) || isSerialCol) continue;
+          record.custom_fields[cfKey] = row[i] != null ? String(row[i]) : null;
           continue;
         }
 
@@ -650,7 +656,6 @@ export function UniversalImportModal({
       setImportError(null);
       setImportProgress({ current: 0, total: validRecords.length });
 
-      const BATCH_SIZE = 20;
       const MAX_RETRIES = 3;
       let successCount = 0;
       let totalCreated = 0;
@@ -659,58 +664,58 @@ export function UniversalImportModal({
       const errors: ImportError[] = [];
       const autoDepts: string[] = [];
 
-      for (let i = 0; i < validRecords.length; i += BATCH_SIZE) {
-        const batch = validRecords.slice(i, i + BATCH_SIZE);
-        const sanitized = batch.map(record => ({
-          ...record,
-          employee_code: record.employee_code != null ? String(record.employee_code).trim() : "",
-          gen: record.gen != null ? String(record.gen).trim() : null,
-          grade: record.grade != null ? String(record.grade).trim() : null,
-        }));
+      // Send all records in a single request — avoids silent batch failures on
+      // slower deployments (Render free tier). Backend supports up to 1000 rows.
+      const sanitized = validRecords.map(record => ({
+        ...record,
+        employee_code: record.employee_code != null ? String(record.employee_code).trim() : "",
+        gen: record.gen != null ? String(record.gen).trim() : null,
+        grade: record.grade != null ? String(record.grade).trim() : null,
+      }));
 
-        let res;
-        let lastErr: any;
-        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-          try {
-            res = await api.post(`${endpoint}?mode=${duplicateMode}`, { items: sanitized, mill_id: millId });
-            break;
-          } catch (err: any) {
-            lastErr = err;
-            if (attempt < MAX_RETRIES) {
-              await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
-            }
+      let res: any = null;
+      let lastErr: any;
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          res = await api.post(`${endpoint}?mode=${duplicateMode}&mill_id=${millId ?? ""}`, {
+            items: sanitized,
+            mill_id: millId,
+          });
+          break;
+        } catch (err: any) {
+          lastErr = err;
+          if (attempt < MAX_RETRIES) {
+            await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
           }
         }
-        if (!res) {
-          errors.push({ row: i + 1, message: `Network error after ${MAX_RETRIES} retries: ${lastErr?.message}`, severity: "error" });
-          setImportProgress({ current: Math.min(i + BATCH_SIZE, validRecords.length), total: validRecords.length });
-          continue;
-        }
+      }
 
-        const data: any = res.data;
-        console.log("batch response data:", data);
-        const batchCreated = typeof data?.created === "number" ? data.created : 0;
-        const batchUpdated = typeof data?.updated === "number" ? data.updated : 0;
-        const batchSkipped = typeof data?.skipped === "number" ? data.skipped : 0;
-        totalCreated += batchCreated;
-        totalUpdated += batchUpdated;
-        totalSkipped += batchSkipped;
-        successCount += batchCreated + batchUpdated;
-        if (Array.isArray(data?.auto_created_departments)) {
-          autoDepts.push(...data.auto_created_departments);
+      setImportProgress({ current: validRecords.length, total: validRecords.length });
+
+      if (!res) {
+        setImportError(`Import failed after ${MAX_RETRIES} retries: ${lastErr?.response?.data?.detail ?? lastErr?.message ?? "Network error"}`);
+        setIsImporting(false);
+        return;
+      }
+
+      const data: any = res.data;
+      totalCreated = typeof data?.created === "number" ? data.created : 0;
+      totalUpdated = typeof data?.updated === "number" ? data.updated : 0;
+      totalSkipped = typeof data?.skipped === "number" ? data.skipped : 0;
+      successCount = totalCreated + totalUpdated;
+      if (Array.isArray(data?.auto_created_departments)) {
+        autoDepts.push(...data.auto_created_departments);
+      }
+      if (data?.errors?.length > 0) {
+        for (const e of data.errors) {
+          errors.push({
+            row: e.row ?? 1,
+            message: e.error ?? e.message ?? "Import error",
+            field: e.code ? `Code: ${e.code}` : e.field,
+            value: e.name ?? e.value,
+            severity: e.severity ?? "error",
+          });
         }
-        if (data?.errors?.length > 0) {
-          for (const e of data.errors) {
-            errors.push({
-              row: (i + (e.row ?? 1)),
-              message: e.error ?? e.message ?? "Import error",
-              field: e.code ? `Code: ${e.code}` : e.field,
-              value: e.name ?? e.value,
-              severity: e.severity ?? "error",
-            });
-          }
-        }
-        setImportProgress({ current: Math.min(i + BATCH_SIZE, validRecords.length), total: validRecords.length });
       }
 
       setIsImporting(false);
@@ -877,14 +882,22 @@ export function UniversalImportModal({
                       </TableCell>
                       <TableCell className="text-center">
                         <Checkbox
-                          checked={mapping[header] === null && !autoCustom}
+                          checked={autoCustom ? skippedCustomHeaders.has(header) : mapping[header] === null}
                           onCheckedChange={(chk) => {
-                            if (chk) {
-                              handleMappingChange(header, null);
-                            } else if (headers.length > 0) {
-                              const fuzzyResult = fuzzyMatchColumns([header], colConfigs, savedMappings);
-                              const matched = fuzzyResult.get(header);
-                              handleMappingChange(header, matched?.key ?? null);
+                            if (autoCustom) {
+                              setSkippedCustomHeaders(prev => {
+                                const next = new Set(prev);
+                                chk ? next.add(header) : next.delete(header);
+                                return next;
+                              });
+                            } else {
+                              if (chk) {
+                                handleMappingChange(header, null);
+                              } else {
+                                const fuzzyResult = fuzzyMatchColumns([header], colConfigs, savedMappings);
+                                const matched = fuzzyResult.get(header);
+                                handleMappingChange(header, matched?.key ?? null);
+                              }
                             }
                           }}
                         />
