@@ -183,7 +183,8 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
     }))
     .filter((group) => group.items.length > 0);
 
-  const showBilling = COMPANY_OWNER_ROLES.has(user.role) && !isDashboardOnly();
+  // SUPER_ADMIN uses /admin/billing (Settings > Billing); only MILL_OWNER gets the Company Billing section
+  const showBilling = user.role === "MILL_OWNER" && !isDashboardOnly();
 
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#0f172a" }}>

@@ -1,9 +1,17 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { BillingPortal } from "@/components/billing/BillingPortal";
 import { Building2 } from "lucide-react";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { useAuth } from "@/stores/auth";
 
 export const Route = createFileRoute("/_app/company/billing")({
+  // SUPER_ADMIN should use /admin/billing — redirect them away
+  beforeLoad: () => {
+    const user = useAuth.getState().user;
+    if (user?.role === "SUPER_ADMIN") {
+      throw redirect({ to: "/admin/billing" });
+    }
+  },
   component: () => (
     <div className="flex flex-col min-h-full bg-[#f8fafc]">
       <div className="px-4 md:px-6 pt-4">
