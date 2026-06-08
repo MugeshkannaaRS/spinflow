@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/sheet";
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
-import { Plus, Search, Settings, Blocks, ArrowDownToLine, Pencil, Factory } from "lucide-react";
+import { Plus, Search, Settings, Blocks, ArrowDownToLine, Pencil, Factory, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useMillMasterCategory } from "@/hooks/useMillConfig";
@@ -507,6 +507,8 @@ function MasterTable<T = any>({
   headerExtra?: React.ReactNode;
 }) {
   const [adding, setAdding] = useState(false);
+  const [editItem, setEditItem] = useState<T | null>(null);
+  const [deactivateConfirm, setDeactivateConfirm] = useState<string | null>(null);
   const tableId = `masters_${title.toLowerCase().replace(/\s+/g, "_")}`;
 
   const colDefs: ColDef<T>[] = [
@@ -541,60 +543,103 @@ function MasterTable<T = any>({
   ];
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">{title} ({data.length})</CardTitle>
-        {canEdit && (
-          <Sheet open={adding} onOpenChange={(o) => { if (!o) setAdding(false); }}>
-            <SheetTrigger asChild>
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">{title} ({data.length})</CardTitle>
+          <div className="flex items-center gap-2">
+            {canEdit && (
               <Button size="sm" onClick={() => setAdding(true)}>
                 <Plus className="size-4 mr-1" /> Add {singularize(title)}
               </Button>
-            </SheetTrigger>
-            <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-              <SheetHeader><SheetTitle>Add {singularize(title)}</SheetTitle></SheetHeader>
-              <div className="mt-4">{onAdd}</div>
-            </SheetContent>
-          </Sheet>
-        )}
-        {headerExtra}
-      </CardHeader>
-      <CardContent>
-        <DataTable
-          tableId={tableId}
-          columns={colDefs}
-          data={data}
-          loading={false}
-          rowKey={(item: any) => String(item.id ?? "")}
-          exportFilename={title.toLowerCase().replace(/\s+/g, "_")}
-          actions={(canEdit || extraActions) ? (item: T) => {
-            const row = item as any;
-            const id = String(row.id ?? "");
-            return (
-              <div className="flex gap-1">
-                {canEdit && (
-                  <Sheet>
-                    <SheetTrigger asChild>
-                      <Button size="sm" variant="outline"><Pencil className="size-3.5 mr-1" /> Edit</Button>
-                    </SheetTrigger>
-                    <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-                      <SheetHeader><SheetTitle>Edit {singularize(title)}</SheetTitle></SheetHeader>
-                      <div className="mt-4">{onEdit(item)}</div>
-                    </SheetContent>
-                  </Sheet>
-                )}
-                {extraActions?.(item)}
-                {canEdit && onDeactivate && (
-                  <Button size="sm" variant="outline" className="text-destructive" onClick={() => onDeactivate(id)}>
-                    Deactivate
-                  </Button>
-                )}
+            )}
+            {headerExtra}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <DataTable
+            tableId={tableId}
+            columns={colDefs}
+            data={data}
+            loading={false}
+            rowKey={(item: any) => String(item.id ?? "")}
+            exportFilename={title.toLowerCase().replace(/\s+/g, "_")}
+            actions={(canEdit || extraActions) ? (item: T) => {
+              const row = item as any;
+              const id = String(row.id ?? "");
+              return (
+                <div className="flex items-center gap-1">
+                  {/* Edit — compact icon button, opens sheet */}
+                  {canEdit && (
+                    <button
+                      title="Edit"
+                      onClick={() => setEditItem(item)}
+                      className="p-1.5 rounded hover:bg-blue-50 text-blue-600 hover:text-blue-700 transition-colors"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                  )}
+                  {extraActions?.(item)}
+                  {/* Deactivate — confirm then call */}
+                  {canEdit && onDeactivate && (
+                    <button
+                      title={row[activeKey ?? "is_active"] ? "Deactivate" : "Already inactive"}
+                      disabled={!row[activeKey ?? "is_active"]}
+                      onClick={() => setDeactivateConfirm(id)}
+                      className="p-1.5 rounded hover:bg-red-50 text-red-500 hover:text-red-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+              );
+            } : undefined}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Edit Sheet */}
+      <Sheet open={!!editItem} onOpenChange={(o) => { if (!o) setEditItem(null); }}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader><SheetTitle>Edit {singularize(title)}</SheetTitle></SheetHeader>
+          <div className="mt-4">{editItem ? onEdit(editItem) : null}</div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Add Sheet */}
+      <Sheet open={adding} onOpenChange={(o) => { if (!o) setAdding(false); }}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader><SheetTitle>Add {singularize(title)}</SheetTitle></SheetHeader>
+          <div className="mt-4">{onAdd}</div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Deactivate confirmation */}
+      {deactivateConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="size-5 text-red-600" />
               </div>
-            );
-          } : undefined}
-        />
-      </CardContent>
-    </Card>
+              <div>
+                <p className="font-semibold text-sm">Deactivate {singularize(title)}?</p>
+                <p className="text-xs text-muted-foreground mt-0.5">This marks it as inactive. It won't appear in active lists but data is preserved.</p>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" size="sm" onClick={() => setDeactivateConfirm(null)}>Cancel</Button>
+              <Button size="sm" variant="destructive" onClick={() => {
+                onDeactivate!(deactivateConfirm);
+                setDeactivateConfirm(null);
+              }}>
+                Deactivate
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

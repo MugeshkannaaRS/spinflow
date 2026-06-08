@@ -133,6 +133,8 @@ function ColumnConfigPage() {
   const [dropdownOptions, setDropdownOptions] = useState<{ value: string; label: string; order: number }[]>([]);
   const [newOptValue, setNewOptValue] = useState("");
   const [newOptLabel, setNewOptLabel] = useState("");
+  const [addFieldOpen, setAddFieldOpen] = useState(false);
+  const [newField, setNewField] = useState({ key: "", label: "", type: "text" });
 
   const { data: companies } = useQuery({
     queryKey: ["masters", "companies", "all"],
@@ -218,6 +220,41 @@ function ColumnConfigPage() {
 
   const handleSave = () => {
     saveMutation.mutate();
+  };
+
+  const deleteColumn = (index: number) => {
+    setColumns((prev) => prev.filter((_, i) => i !== index).map((c, i) => ({ ...c, display_order: i + 1 })));
+  };
+
+  const addCustomField = () => {
+    const key = newField.key.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+    if (!key || !newField.label.trim()) {
+      toast.error("Key and Label are required");
+      return;
+    }
+    if (columns.some(c => c.key === key)) {
+      toast.error(`Field key "${key}" already exists`);
+      return;
+    }
+    setColumns(prev => [
+      ...prev,
+      {
+        key,
+        label: newField.label.trim(),
+        type: newField.type,
+        is_visible: true,
+        is_required: false,
+        is_searchable: true,
+        is_sortable: true,
+        is_exportable: true,
+        is_importable: true,
+        display_order: prev.length + 1,
+        _isCustom: true,
+      },
+    ]);
+    setNewField({ key: "", label: "", type: "text" });
+    setAddFieldOpen(false);
+    toast.success(`Custom field "${key}" added — click Save to persist`);
   };
 
   const openOptionEditor = (colKey: string) => {
@@ -355,22 +392,30 @@ function ColumnConfigPage() {
                     <Save className="size-3.5 mr-1" /> {saveMutation.isPending ? "Saving…" : "Save"}
                   </Button>
                 </div>
-                {/* Row 2: bulk controls */}
-                {columns.length > 0 && (
-                  <div className="flex items-center gap-2 border-t pt-2">
+                {/* Row 2: bulk controls + add field */}
+                {selectedMillId && (
+                  <div className="flex flex-wrap items-center gap-2 border-t pt-2">
                     <span className="text-xs text-muted-foreground">Bulk:</span>
                     <Button variant="outline" size="sm" className="h-7 text-xs"
-                      onClick={() => setColumns(prev => prev.map(c => ({ ...c, is_visible: true })))}>
+                      onClick={() => setColumns(prev => prev.map(c => ({ ...c, is_visible: true })))}
+                      disabled={columns.length === 0}>
                       <Eye className="size-3 mr-1" /> Show All
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-xs"
-                      onClick={() => setColumns(prev => prev.map(c => ({ ...c, is_visible: false })))}>
+                      onClick={() => setColumns(prev => prev.map(c => ({ ...c, is_visible: false })))}
+                      disabled={columns.length === 0}>
                       <EyeOff className="size-3 mr-1" /> Hide All
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-xs text-amber-600 border-amber-200 hover:bg-amber-50"
-                      onClick={() => { setColumns([]); qc.invalidateQueries({ queryKey: ["column-config-admin"] }); }}>
+                      onClick={() => { setColumns([]); qc.invalidateQueries({ queryKey: ["column-config-admin"] }); }}
+                      disabled={columns.length === 0}>
                       <RotateCcw className="size-3 mr-1" /> Reset to Defaults
                     </Button>
+                    <div className="ml-auto">
+                      <Button size="sm" className="h-7 text-xs" onClick={() => setAddFieldOpen(true)}>
+                        <Plus className="size-3 mr-1" /> Add New Field
+                      </Button>
+                    </div>
                   </div>
                 )}
               </CardHeader>
@@ -403,11 +448,18 @@ function ColumnConfigPage() {
                         </TableRow>
                       )}
                       {columns.length > 0 && columns.map((col, i) => (
-                        <TableRow key={col.key ?? i} className="hover:bg-muted/30">
+                        <TableRow key={col.key ?? i} className={col._isCustom ? "bg-blue-50/40 hover:bg-blue-50/60" : "hover:bg-muted/30"}>
                           <TableCell className="text-muted-foreground cursor-grab">
                             <GripVertical className="size-3.5" />
                           </TableCell>
-                          <TableCell className="font-mono text-xs">{col.key}</TableCell>
+                          <TableCell className="font-mono text-xs">
+                            <div className="flex items-center gap-1.5">
+                              {col.key}
+                              {col._isCustom && (
+                                <span className="text-[10px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-sans">custom</span>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Input
                               value={col.label ?? ""}
@@ -449,35 +501,27 @@ function ColumnConfigPage() {
                             />
                           </TableCell>
                           <TableCell>
-                            <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="size-6"
-                                onClick={() => moveUp(i)}
-                                disabled={i === 0}
-                              >
+                            <div className="flex gap-1 items-center">
+                              <Button variant="ghost" size="icon" className="size-6" onClick={() => moveUp(i)} disabled={i === 0}>
                                 <ArrowUp className="size-3" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="size-6"
-                                onClick={() => moveDown(i)}
-                                disabled={i >= columns.length - 1}
-                              >
+                              <Button variant="ghost" size="icon" className="size-6" onClick={() => moveDown(i)} disabled={i >= columns.length - 1}>
                                 <ArrowDown className="size-3" />
                               </Button>
                               {col.type === "dropdown" && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-6 text-[10px]"
-                                  onClick={() => openOptionEditor(col.key)}
-                                >
+                                <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => openOptionEditor(col.key)}>
                                   Options
                                 </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="size-6 text-destructive hover:bg-red-50 ml-1"
+                                title="Remove this field from config"
+                                onClick={() => deleteColumn(i)}
+                              >
+                                <Trash2 className="size-3" />
+                              </Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -520,6 +564,62 @@ function ColumnConfigPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setPreviewOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Add New Field Dialog ────────────────────────────────────────── */}
+      <Dialog open={addFieldOpen} onOpenChange={setAddFieldOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Field</DialogTitle>
+            <DialogDescription>
+              Define a new column for <strong>{ALL_TABLES.find(t => t.key === selectedTable)?.label ?? selectedTable}</strong>.
+              Custom fields appear in the table and import engine. They are stored as extra metadata per record.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-2">
+            <div className="space-y-1.5">
+              <Label>Field Key <span className="text-destructive">*</span></Label>
+              <Input
+                value={newField.key}
+                onChange={e => setNewField(f => ({ ...f, key: e.target.value.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "") }))}
+                placeholder="e.g. serial_no, brand_name, warranty_years"
+                className="font-mono text-sm"
+              />
+              <p className="text-[11px] text-muted-foreground">Lowercase, underscores only. This is the database/import column name.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Display Label <span className="text-destructive">*</span></Label>
+              <Input
+                value={newField.label}
+                onChange={e => setNewField(f => ({ ...f, label: e.target.value }))}
+                placeholder="e.g. Serial No, Brand Name, Warranty (yrs)"
+              />
+              <p className="text-[11px] text-muted-foreground">What users see in tables and forms.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Field Type</Label>
+              <Select value={newField.type} onValueChange={v => setNewField(f => ({ ...f, type: v }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COLUMN_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              <strong>What happens:</strong> This field key is added to the column config for this mill and table.
+              When importing Excel, any column matching this key name is mapped automatically.
+              For existing records, the value is stored as custom metadata (no schema change needed).
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setAddFieldOpen(false)}>Cancel</Button>
+            <Button size="sm" onClick={addCustomField} disabled={!newField.key.trim() || !newField.label.trim()}>
+              <Plus className="size-3 mr-1" /> Add Field
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
