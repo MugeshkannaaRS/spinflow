@@ -929,7 +929,7 @@ export function UniversalImportModal({
   };
 
   const renderStep3 = () => {
-    const displayRecords = previewRecords.slice(0, 20);
+    const displayRecords = previewRecords.slice(0, 50);
     const standardFields = Object.values(mapping).filter(Boolean) as string[];
     const customKeys = [...new Set(displayRecords.flatMap(r =>
       Object.keys(r.data.custom_fields || {}).map(k => `__custom__:${k}`)
@@ -951,7 +951,9 @@ export function UniversalImportModal({
             {previewRecords.length - validCount - errorCount} Skipped
           </span>
           <span className="text-xs text-muted-foreground ml-auto">
-            Showing first {displayRecords.length} of {previewRecords.length} rows
+            {previewRecords.length > displayRecords.length
+              ? `Preview: first ${displayRecords.length} rows shown — all ${previewRecords.length} will be imported`
+              : `All ${previewRecords.length} rows shown`}
           </span>
         </div>
 
