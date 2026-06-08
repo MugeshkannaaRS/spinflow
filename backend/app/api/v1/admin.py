@@ -1132,3 +1132,98 @@ async def restore_company(
     except Exception as e:
         logger.error(f"restore_company error: {e}")
         raise HTTPException(500, "Failed to restore company")
+
+
+# ── Mill Suspend / Reactivate ─────────────────────────────────────────────────
+
+@router.post("/admin/mills/{mill_id}/suspend")
+@limiter.limit("20/minute")
+async def suspend_mill(
+    mill_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Suspend a single mill and cascade: deactivates all mill users + sessions.
+    This is a partial suspension — the parent company remains active.
+    """
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(403, "Super Admin only")
+
+    mill = await db.get(Mill, mill_id)
+    if not mill:
+        raise HTTPException(404, "Mill not found")
+    if not mill.is_active:
+        raise HTTPException(409, "Mill is already suspended")
+
+    # Suspend the mill
+    mill.is_active = False
+
+    # Cascade: deactivate all users assigned to this mill
+    await db.execute(
+        sa_update(User).where(User.mill_id == mill_id).values(is_active=False)
+    )
+
+    # Cascade: kill all active sessions for those users
+    await db.execute(
+        sa_update(UserSession)
+        .where(UserSession.user_id.in_(
+            select(User.id).where(User.mill_id == mill_id)
+        ))
+        .values(is_active=False)
+    )
+
+    db.add(AuditLog(
+        user_id=current_user.id,
+        user_name=current_user.name,
+        role=role_code,
+        action="mill_suspended",
+        entity="mill",
+        entity_id=mill_id,
+        details=f"Mill '{mill.name}' ({mill.code}) suspended — users and sessions deactivated",
+    ))
+    await db.commit()
+    return {"id": mill_id, "name": mill.name, "status": "suspended"}
+
+
+@router.post("/admin/mills/{mill_id}/reactivate")
+@limiter.limit("20/minute")
+async def reactivate_mill(
+    mill_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Reactivate a suspended mill and restore its users."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(403, "Super Admin only")
+
+    mill = await db.get(Mill, mill_id)
+    if not mill:
+        raise HTTPException(404, "Mill not found")
+    if mill.is_active:
+        raise HTTPException(409, "Mill is already active")
+
+    # Check parent company is active before restoring
+    company = await db.get(Company, mill.company_id)
+    if company and not company.is_active:
+        raise HTTPException(400, "Cannot reactivate mill — parent company is suspended")
+
+    mill.is_active = True
+    await db.execute(
+        sa_update(User).where(User.mill_id == mill_id).values(is_active=True)
+    )
+
+    db.add(AuditLog(
+        user_id=current_user.id,
+        user_name=current_user.name,
+        role=role_code,
+        action="mill_reactivated",
+        entity="mill",
+        entity_id=mill_id,
+        details=f"Mill '{mill.name}' ({mill.code}) reactivated — users restored",
+    ))
+    await db.commit()
+    return {"id": mill_id, "name": mill.name, "status": "active"}

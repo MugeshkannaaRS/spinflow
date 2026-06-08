@@ -71,6 +71,7 @@ const SECTION_GROUPS = [
 ];
 
 // ── Near Limit row with inline action dropdown ────────────────────────────────
+<<<<<<< HEAD
 function NearLimitRow({ company: s, flags, navigate }: { company: any; flags: string[]; navigate: (o: { to: string }) => void }) {
   const [open, setOpen] = useState(false);
   return (
@@ -80,6 +81,48 @@ function NearLimitRow({ company: s, flags, navigate }: { company: any; flags: st
         <p className="text-xs text-muted-foreground">{flags.join(", ")}</p>
       </div>
       <div className="relative shrink-0 ml-2">
+=======
+function NearLimitRow({ company: s, flags, navigate, userPct, millPct }: {
+  company: any;
+  flags: string[];
+  navigate: (o: { to: string }) => void;
+  userPct: number;
+  millPct: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const isOver = userPct >= 1 || millPct >= 1;
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+      <div className={`w-2 h-2 rounded-full shrink-0 ${isOver ? "bg-red-500" : "bg-amber-400"}`} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{s.company_name}</p>
+        <p className="text-xs text-muted-foreground">{flags.join(" · ")}</p>
+        {/* Usage bars */}
+        <div className="flex items-center gap-2 mt-1.5">
+          {s.user_limit > 0 && (
+            <div className="flex items-center gap-1 flex-1 max-w-[120px]">
+              <span className="text-[10px] text-muted-foreground w-6">U</span>
+              <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-slate-700">
+                <div className={`h-1.5 rounded-full transition-all ${userPct >= 1 ? "bg-red-500" : userPct >= 0.85 ? "bg-amber-400" : "bg-blue-400"}`}
+                  style={{ width: `${Math.min(userPct * 100, 100)}%` }} />
+              </div>
+              <span className="text-[10px] text-muted-foreground w-7 text-right">{Math.round(userPct * 100)}%</span>
+            </div>
+          )}
+          {s.mill_limit > 0 && (
+            <div className="flex items-center gap-1 flex-1 max-w-[120px]">
+              <span className="text-[10px] text-muted-foreground w-6">M</span>
+              <div className="flex-1 h-1.5 rounded-full bg-gray-100 dark:bg-slate-700">
+                <div className={`h-1.5 rounded-full transition-all ${millPct >= 1 ? "bg-red-500" : millPct >= 0.85 ? "bg-amber-400" : "bg-blue-400"}`}
+                  style={{ width: `${Math.min(millPct * 100, 100)}%` }} />
+              </div>
+              <span className="text-[10px] text-muted-foreground w-7 text-right">{Math.round(millPct * 100)}%</span>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="relative shrink-0">
+>>>>>>> 52939f0 (feat: company deletion, billing updates, admin UI improvements)
         <button
           onClick={() => setOpen(o => !o)}
           className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors"
@@ -116,9 +159,15 @@ function NearLimitRow({ company: s, flags, navigate }: { company: any; flags: st
   );
 }
 
+<<<<<<< HEAD
 // Accordion group state — all open by default
 function AccordionGroup({ group, navigate }: { group: typeof SECTION_GROUPS[0]; navigate: (opts: { to: string }) => void }) {
   const [open, setOpen] = useState(true);
+=======
+// Accordion group state — closed by default (compact at top)
+function AccordionGroup({ group, navigate }: { group: typeof SECTION_GROUPS[0]; navigate: (opts: { to: string }) => void }) {
+  const [open, setOpen] = useState(false);
+>>>>>>> 52939f0 (feat: company deletion, billing updates, admin UI improvements)
   const GroupIcon = group.icon;
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
@@ -237,45 +286,46 @@ function AdminPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-6">
-      {/* Header */}
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Executive Dashboard</h1>
           <p className="text-sm text-muted-foreground mt-1">SaaS operations, revenue, and company oversight</p>
         </div>
-        <div className="flex items-center gap-2">
-          {anyLoading ? (
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="size-3.5 animate-spin" /> Loading…</span>
-          ) : anyError ? (
-            <span className="flex items-center gap-1.5 text-xs text-destructive"><AlertTriangle className="size-3.5" /> Some data failed to load</span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-xs text-emerald-600"><Activity className="size-3.5" /> Live</span>
-          )}
+        {anyLoading ? (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="size-3.5 animate-spin" /> Loading…</span>
+        ) : anyError ? (
+          <span className="flex items-center gap-1.5 text-xs text-destructive"><AlertTriangle className="size-3.5" /> Some data failed to load</span>
+        ) : (
+          <span className="flex items-center gap-1.5 text-xs text-emerald-600"><Activity className="size-3.5" /> Live</span>
+        )}
+      </div>
+
+      {/* ── ADMIN SECTIONS — at top, no scrolling needed ──────────────────── */}
+      <div>
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">Admin Sections</h2>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {SECTION_GROUPS.map(group => (
+            <AccordionGroup key={group.id} group={group} navigate={navigate} />
+          ))}
         </div>
       </div>
 
-      {/* Error banner */}
+      {/* ── Error banner ──────────────────────────────────────────────────── */}
       {anyError && (
         <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800 p-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertTriangle className="size-4 text-red-500 shrink-0" />
             <p className="text-xs text-red-700 dark:text-red-400">
-              {[
-                statsQ.isError && "Stats",
-                dashboardQ.isError && "Dashboard",
-                analyticsQ.isError && "Analytics",
-                pendingUpgradesQ.isError && "Upgrade requests",
-                subsQ.isError && "Subscriptions",
-              ].filter(Boolean).join(", ")} failed to load.
+              {[statsQ.isError && "Stats", dashboardQ.isError && "Dashboard", analyticsQ.isError && "Analytics", pendingUpgradesQ.isError && "Upgrade requests", subsQ.isError && "Subscriptions"].filter(Boolean).join(", ")} failed to load.
             </p>
           </div>
-          <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => {
-            statsQ.refetch(); dashboardQ.refetch(); analyticsQ.refetch(); pendingUpgradesQ.refetch(); subsQ.refetch();
-          }}>Retry All</Button>
+          <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => { statsQ.refetch(); dashboardQ.refetch(); analyticsQ.refetch(); pendingUpgradesQ.refetch(); subsQ.refetch(); }}>Retry All</Button>
         </div>
       )}
 
-      {/* KPI Cards */}
+      {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {anyLoading && !dd && !an ? (
           Array.from({ length: 6 }).map((_, i) => (
@@ -293,44 +343,24 @@ function AdminPage() {
         )}
       </div>
 
-      {/* Stats row */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Total Companies</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.total_companies ?? "..."}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Active</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">{dd?.active_subscriptions ?? "..."}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Suspended</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{dd?.suspended_companies ?? "..."}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Churn Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{an ? `${an.churn_rate}%` : "..."}</div>
-          </CardContent>
-        </Card>
+      {/* ── Stats row ─────────────────────────────────────────────────────── */}
+      <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+        {[
+          { label: "Total Companies", value: stats?.total_companies ?? "…", color: "" },
+          { label: "Active",          value: dd?.active_subscriptions ?? "…", color: "text-emerald-600" },
+          { label: "Suspended",       value: dd?.suspended_companies ?? "…",  color: "text-red-600" },
+          { label: "Churn Rate",      value: an ? `${an.churn_rate}%` : "…",  color: "" },
+        ].map(s => (
+          <Card key={s.label}>
+            <CardHeader className="pb-1 pt-4 px-4"><CardTitle className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{s.label}</CardTitle></CardHeader>
+            <CardContent className="px-4 pb-4"><div className={`text-2xl font-bold ${s.color}`}>{s.value}</div></CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Companies Near Limits + Open Upgrade Requests */}
+      {/* ── Companies Near Limits + Upgrade Requests — improved UI at bottom ─ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+<<<<<<< HEAD
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Companies Near Limits</CardTitle>
@@ -357,70 +387,51 @@ function AdminPage() {
             )}
           </CardContent>
         </Card>
+=======
+>>>>>>> 52939f0 (feat: company deletion, billing updates, admin UI improvements)
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Open Upgrade Requests</CardTitle>
-            <ShoppingCart className="size-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            {pendingUpgrades.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <CheckCircle2 className="size-8 text-emerald-400 mb-2" />
-                <p className="text-sm text-muted-foreground">No pending upgrade requests</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {pendingUpgrades.map((cr: any) => (
-                  <div key={cr.id} className="flex items-center justify-between p-2 rounded-lg border border-blue-100 bg-blue-50/50">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{cr.change_type} request</p>
-                      <p className="text-xs text-muted-foreground">{cr.reason || "No reason provided"}</p>
-                    </div>
-                    <button onClick={() => navigate({ to: "/admin/billing" })} className="text-xs text-blue-600 hover:underline shrink-0 ml-2">Review</button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Top Customers */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Top Customers by Revenue</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {topCustomers.length === 0 ? (
-            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-              No customer revenue data yet.
+        {/* Near Limits */}
+        <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="size-4 text-amber-500" />
+              <span className="text-sm font-semibold">Companies Near Limits</span>
+              {nearLimitCompanies.length > 0 && (
+                <span className="bg-amber-100 text-amber-700 text-xs font-semibold px-1.5 py-0.5 rounded-full">{nearLimitCompanies.length}</span>
+              )}
+            </div>
+            <button onClick={() => navigate({ to: "/admin/companies" as any })} className="text-xs text-blue-600 hover:underline">View all</button>
+          </div>
+          {nearLimitCompanies.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <CheckCircle2 className="size-8 text-emerald-400 mb-2" />
+              <p className="text-sm font-medium text-emerald-700">All companies within limits</p>
+              <p className="text-xs text-muted-foreground mt-1">No action required</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-2 font-medium">#</th>
-                    <th className="pb-2 font-medium">Company</th>
-                    <th className="pb-2 font-medium text-right">Total Paid</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topCustomers.map((c: any, i: number) => (
-                    <tr key={i} className="border-b last:border-0 hover:bg-muted/30">
-                      <td className="py-2 text-muted-foreground w-8">{i + 1}</td>
-                      <td className="py-2 font-medium">{c.company_name}</td>
-                      <td className="py-2 text-right font-mono">₹{c.total_paid.toLocaleString("en-IN")}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="divide-y divide-gray-50 dark:divide-slate-800 max-h-80 overflow-y-auto">
+              {nearLimitCompanies.slice(0, 10).map((s: any) => {
+                const flags: string[] = [];
+                const userPct = s.user_limit > 0 ? s.user_count / s.user_limit : 0;
+                const millPct = s.mill_limit > 0 ? s.mill_count / s.mill_limit : 0;
+                if (s.user_count >= s.user_limit * 0.85) flags.push(`Users ${s.user_count}/${s.user_limit}`);
+                if (s.mill_count >= s.mill_limit * 0.85) flags.push(`Mills ${s.mill_count}/${s.mill_limit}`);
+                return (
+                  <NearLimitRow
+                    key={s.company_id}
+                    company={s}
+                    flags={flags}
+                    navigate={navigate}
+                    userPct={userPct}
+                    millPct={millPct}
+                  />
+                );
+              })}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
 
+<<<<<<< HEAD
       {/* Navigation Sections — grouped accordion dropdowns */}
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Admin Sections</h2>
@@ -428,6 +439,45 @@ function AdminPage() {
           {SECTION_GROUPS.map(group => (
             <AccordionGroup key={group.id} group={group} navigate={navigate} />
           ))}
+=======
+        {/* Upgrade Requests */}
+        <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="size-4 text-blue-500" />
+              <span className="text-sm font-semibold">Open Upgrade Requests</span>
+              {pendingUpgrades.length > 0 && (
+                <span className="bg-blue-100 text-blue-700 text-xs font-semibold px-1.5 py-0.5 rounded-full">{pendingUpgrades.length}</span>
+              )}
+            </div>
+            <button onClick={() => navigate({ to: "/admin/billing" })} className="text-xs text-blue-600 hover:underline">Go to Billing</button>
+          </div>
+          {pendingUpgrades.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <CheckCircle2 className="size-8 text-emerald-400 mb-2" />
+              <p className="text-sm font-medium text-emerald-700">No pending upgrade requests</p>
+              <p className="text-xs text-muted-foreground mt-1">All upgrade requests reviewed</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-50 dark:divide-slate-800 max-h-72 overflow-y-auto">
+              {pendingUpgrades.map((cr: any) => (
+                <div key={cr.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                    <ArrowUpRight className="size-3.5 text-blue-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium capitalize">{(cr.change_type ?? "upgrade").replace(/_/g," ")} request</p>
+                    <p className="text-xs text-muted-foreground truncate">{cr.reason || "No reason provided"}</p>
+                  </div>
+                  <button onClick={() => navigate({ to: "/admin/billing" })}
+                    className="shrink-0 text-xs bg-blue-600 text-white px-2.5 py-1 rounded-md hover:bg-blue-700 transition-colors">
+                    Review
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+>>>>>>> 52939f0 (feat: company deletion, billing updates, admin UI improvements)
         </div>
       </div>
     </div>

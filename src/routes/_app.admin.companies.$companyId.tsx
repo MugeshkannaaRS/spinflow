@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { mastersApi, adminApi } from "@/lib/api-service";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -459,18 +459,40 @@ function usedStr(f: any) {
 /* ── Mills Tab ────────────────────────────────────────── */
 
 function MillsTab({ companyId }: { companyId: string }) {
-  const { data: mills } = useQuery({
+  const qc = useQueryClient();
+  const { data: mills, isLoading } = useQuery({
     queryKey: ["mills", companyId],
     queryFn: () => mastersApi.getMills(companyId).then((r: any) => r ?? []),
+  });
+
+  const suspendMill = useMutation({
+    mutationFn: (millId: string) => api.post(`/admin/mills/${millId}/suspend`).then(r => r.data),
+    onSuccess: (_, millId) => {
+      qc.invalidateQueries({ queryKey: ["mills", companyId] });
+      toast.success("Mill suspended — users and sessions deactivated");
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Failed to suspend mill"),
+  });
+
+  const reactivateMill = useMutation({
+    mutationFn: (millId: string) => api.post(`/admin/mills/${millId}/reactivate`).then(r => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mills", companyId] });
+      toast.success("Mill reactivated — users restored");
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Failed to reactivate mill"),
   });
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Mills</CardTitle>
+        <p className="text-xs text-muted-foreground">Suspending a mill deactivates all its users and sessions</p>
       </CardHeader>
       <CardContent>
-        {(!mills || mills.length === 0) ? (
+        {isLoading ? (
+          <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-10 bg-muted rounded animate-pulse" />)}</div>
+        ) : (!mills || mills.length === 0) ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <Store className="size-10 text-muted-foreground/40 mb-3" />
             <p className="text-sm font-medium">No mills found</p>
@@ -486,22 +508,48 @@ function MillsTab({ companyId }: { companyId: string }) {
                   <th className="text-left px-4 py-2 font-medium hidden md:table-cell">City</th>
                   <th className="text-left px-4 py-2 font-medium hidden md:table-cell">State</th>
                   <th className="text-left px-4 py-2 font-medium">Status</th>
+                  <th className="text-left px-4 py-2 font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {mills.map((m: any) => (
-                  <tr key={m.id} className="border-t hover:bg-muted/30">
-                    <td className="px-4 py-2 font-medium">{m.name}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{m.code}</td>
-                    <td className="px-4 py-2 text-muted-foreground hidden md:table-cell">{m.city || "—"}</td>
-                    <td className="px-4 py-2 text-muted-foreground hidden md:table-cell">{m.state || "—"}</td>
-                    <td className="px-4 py-2">
-                      <Badge className={m.is_active !== false ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}>
-                        {m.is_active !== false ? "Active" : "Suspended"}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
+                {mills.map((m: any) => {
+                  const active = m.is_active !== false;
+                  const busy = suspendMill.isPending || reactivateMill.isPending;
+                  return (
+                    <tr key={m.id} className="border-t hover:bg-muted/30">
+                      <td className="px-4 py-2 font-medium">{m.name}</td>
+                      <td className="px-4 py-2 text-muted-foreground font-mono text-xs">{m.code}</td>
+                      <td className="px-4 py-2 text-muted-foreground hidden md:table-cell">{m.city || "—"}</td>
+                      <td className="px-4 py-2 text-muted-foreground hidden md:table-cell">{m.state || "—"}</td>
+                      <td className="px-4 py-2">
+                        <Badge className={active ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}>
+                          {active ? "Active" : "Suspended"}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-2">
+                        {active ? (
+                          <Button
+                            size="sm" variant="outline"
+                            className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                            disabled={busy}
+                            onClick={() => suspendMill.mutate(m.id)}
+                          >
+                            Suspend Mill
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm" variant="outline"
+                            className="h-7 text-xs text-green-600 border-green-200 hover:bg-green-50"
+                            disabled={busy}
+                            onClick={() => reactivateMill.mutate(m.id)}
+                          >
+                            Reactivate
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
