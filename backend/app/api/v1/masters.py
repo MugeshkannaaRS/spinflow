@@ -711,10 +711,28 @@ def _normalize_mobile(val: Any) -> Optional[str]:
 
 
 def _is_annotation_row(row_dict: dict, num_headers: int) -> bool:
-    """Return True for section-header / brand-annotation / total rows."""
-    values = [str(v).strip() for v in row_dict.values() if v and str(v).strip()]
+    """Return True for section-header / brand-annotation / total rows.
+
+    IMPORTANT: When the frontend sends pre-mapped records (with SpinFlow field
+    keys like 'code', 'name', 'department'), those are never annotation rows.
+    Only raw Excel rows (with original header names) need annotation detection.
+    """
+    # Fast path: pre-mapped records from the frontend always have 'name' or 'code'
+    # as direct keys. If so, skip annotation detection entirely.
+    if row_dict.get("name") or row_dict.get("code") or row_dict.get("employee_id"):
+        return False
+
+    # Only check scalar (non-dict, non-list) top-level values.
+    # Checking str(nested_dict) causes false positives when dicts contain
+    # strings like "Brand:- Trutzschler" inside custom_fields.
+    values = [
+        str(v).strip()
+        for v in row_dict.values()
+        if v and not isinstance(v, (dict, list)) and str(v).strip()
+    ]
     if not values:
         return True
+
     annotation_patterns = [
         "brand:-", "brand:", "country name:-", "country:",
         "department:", "section:", "note:", "total:", "sub total",
@@ -724,9 +742,12 @@ def _is_annotation_row(row_dict: dict, num_headers: int) -> bool:
         vl = val.lower()
         if any(p in vl for p in annotation_patterns):
             return True
-    # Rows with ≤2 values in a wide table = section label
+
+    # Rows with ≤2 non-empty values in a wide table = likely a section label
+    # (only applies to raw Excel rows, not pre-mapped records)
     if len(values) <= 2 and num_headers > 4:
         return True
+
     return False
 
 
