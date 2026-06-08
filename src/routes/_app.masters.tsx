@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/sheet";
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
-import { Plus, Search, Settings, Blocks, ArrowDownToLine, Pencil } from "lucide-react";
+import { Plus, Search, Settings, Blocks, ArrowDownToLine, Pencil, Factory } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useMillMasterCategory } from "@/hooks/useMillConfig";
@@ -81,6 +81,7 @@ function MastersPage() {
   const vehColConfig = useColumnConfig("masters_vehicles");
   const shiftColConfig = useColumnConfig("masters_shifts");
   const yarnColConfig = useColumnConfig("masters_yarn_counts");
+  const machineColConfig = useColumnConfig("masters_machines");
   const [tab, setTab] = useState(user?.role === "SUPER_ADMIN" ? "companies" : "mills");
   const [search, setSearch] = useState("");
   const [modulesCompany, setModulesCompany] = useState<Company | null>(null);
@@ -152,6 +153,12 @@ function MastersPage() {
     staleTime: 60_000,
     retry: 1,
   });
+  const machinesQ = useQuery({
+    queryKey: ["masters", "machines"],
+    queryFn: () => productionApi.getMachines(),
+    staleTime: 60_000,
+    retry: 1,
+  });
 
   const companiesData = (companiesQ.data ?? []) as Company[];
   const activeCompaniesData = useMemo(
@@ -166,6 +173,7 @@ function MastersPage() {
   const routeData = (routeQ.data ?? []) as MasterRoute[];
   const shiftsData = (shiftsQ.data ?? []) as any[];
   const warehousesData = (warehousesQ.data ?? []) as any[];
+  const machinesData = (Array.isArray(machinesQ.data) ? machinesQ.data : []) as any[];
 
   if (!user) return null;
 
@@ -197,15 +205,16 @@ function MastersPage() {
             <TabsList className="flex-wrap h-auto">
               {(() => {
                 const allTabs = [
-                  { key: "companies", label: "Companies" },
-                  { key: "mills", label: "Mills" },
+                  { key: "companies",   label: "Companies" },
+                  { key: "mills",       label: "Mills" },
+                  { key: "machines",    label: "Machines" },
                   { key: "departments", label: "Departments" },
                   { key: "yarn-counts", label: "Yarn Counts" },
-                  { key: "customers", label: "Customers" },
-                  { key: "vehicles", label: "Vehicles" },
-                  { key: "routes", label: "Routes" },
-                  { key: "shifts", label: "Shifts" },
-                  { key: "warehouses", label: "Warehouses" },
+                  { key: "customers",   label: "Customers" },
+                  { key: "vehicles",    label: "Vehicles" },
+                  { key: "routes",      label: "Routes" },
+                  { key: "shifts",      label: "Shifts" },
+                  { key: "warehouses",  label: "Warehouses" },
                 ];
                 const isSuperAdmin = false;
                 return allTabs.filter(t =>
@@ -269,6 +278,17 @@ function MastersPage() {
                     <Settings className="size-3.5 mr-1" /> Settings
                   </Button>
                 )}
+              />
+            </TabsContent>
+
+            {/* ── Machines ─────────────────────────────────────────────────── */}
+            <TabsContent value="machines">
+              <MachinesTab
+                machines={machinesData.filter((x: any) => matchesSearch(x, search))}
+                isLoading={machinesQ.isLoading}
+                colConfig={machineColConfig}
+                canEdit={canEdit}
+                onImportSuccess={() => qcMasters.invalidateQueries({ queryKey: ["masters", "machines"] })}
               />
             </TabsContent>
 
@@ -1892,5 +1912,301 @@ function WarehouseForm({ item }: { item?: Warehouse }) {
         </Button>
       </SheetFooter>
     </form>
+  );
+}
+
+// ── Machines Tab ─────────────────────────────────────────────────────────────
+function MachinesTab({
+  machines,
+  isLoading,
+  colConfig,
+  canEdit,
+  onImportSuccess,
+}: {
+  machines: any[];
+  isLoading: boolean;
+  colConfig: any;
+  canEdit: boolean;
+  onImportSuccess: () => void;
+}) {
+  const qc = useQueryClient();
+  const [importOpen, setImportOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editItem, setEditItem] = useState<any | null>(null);
+
+  // Derive visible column keys from column config, fallback to sensible defaults
+  const visibleKeys: string[] = colConfig?.columns
+    ?.filter((c: any) => c.is_visible !== false)
+    .map((c: any) => c.key) ?? [
+    "code", "name", "machine_type", "department", "spindles",
+    "current_status", "make", "installation_date", "is_active",
+  ];
+
+  const allColDefs: ColDef<any>[] = [
+    { key: "code",              label: "Code",           render: (m) => <span className="font-mono text-xs font-semibold">{m.code}</span> },
+    { key: "name",              label: "Name",           render: (m) => <span className="font-medium">{m.name}</span> },
+    { key: "machine_type",      label: "Type/Model",     render: (m) => <span className="text-xs">{m.machine_type ?? m.model ?? "—"}</span> },
+    { key: "department",        label: "Department",     render: (m) => <span className="text-xs">{m.department ?? "—"}</span> },
+    { key: "spindles",          label: "Spindles/Heads", render: (m) => <span className="text-xs">{m.spindles ?? "—"}</span> },
+    { key: "make",              label: "Make",           render: (m) => <span className="text-xs text-muted-foreground">{m.make ?? "—"}</span> },
+    { key: "installation_date", label: "Comm. Date",     render: (m) => <span className="text-xs">{m.installation_date ? String(m.installation_date).slice(0, 10) : "—"}</span> },
+    {
+      key: "current_status",
+      label: "Status",
+      render: (m) => {
+        const s = m.current_status ?? "running";
+        const cls =
+          s === "running"     ? "bg-green-100 text-green-700" :
+          s === "breakdown"   ? "bg-red-100 text-red-700" :
+          s === "maintenance" ? "bg-amber-100 text-amber-700" :
+                                "bg-gray-100 text-gray-600";
+        return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${cls}`}>{s}</span>;
+      },
+    },
+    { key: "is_active", label: "Active", render: (m) => (
+      <span className={`text-xs font-medium ${m.is_active !== false ? "text-emerald-600" : "text-red-500"}`}>
+        {m.is_active !== false ? "Yes" : "No"}
+      </span>
+    )},
+  ];
+
+  const colDefs = allColDefs.filter(c => visibleKeys.includes(c.key));
+
+  return (
+    <div className="space-y-4 mt-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Factory className="size-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold">Machines</h2>
+          {!isLoading && (
+            <span className="text-xs text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded-full">{machines.length}</span>
+          )}
+        </div>
+        {canEdit && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+              <ArrowDownToLine className="size-4 mr-1" /> Import Excel
+            </Button>
+            <Button size="sm" onClick={() => setAddOpen(true)}>
+              <Plus className="size-4 mr-1" /> Add Machine
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Info banner shown only when empty */}
+      {!isLoading && machines.length === 0 && (
+        <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-700">
+          <p className="font-semibold mb-1">How to import machines</p>
+          <p>Use <strong>Import Excel</strong> with your machine register file. Supported columns:</p>
+          <p className="mt-1 font-mono text-[11px]">Mc_code · Department · Name of item · Type No · Manufacturing Year · No of delivery Head · Comm. Date · Remarks</p>
+          <p className="mt-1">Machines without a code get auto-generated codes. Brand/Country from Remarks is captured automatically.</p>
+        </div>
+      )}
+
+      {/* DataTable */}
+      <DataTable
+        tableId="masters_machines"
+        columns={colDefs}
+        data={machines}
+        isLoading={isLoading}
+        emptyMessage="No machines yet — click Import Excel to upload your machine register."
+        exportFilename="machines"
+        rowKey={(m) => m.id ?? m.code}
+        onRowClick={canEdit ? (m) => setEditItem(m) : undefined}
+      />
+
+      {/* Import Modal */}
+      <UniversalImportModal
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
+        tableName="masters_machines"
+        endpoint="/masters/machines/bulk"
+        onSuccess={() => {
+          setImportOpen(false);
+          onImportSuccess();
+          qc.invalidateQueries({ queryKey: ["machines"] });
+        }}
+        title="Import Machines from Excel"
+      />
+
+      {/* Add / Edit Machine Sheet */}
+      <MachineForm
+        item={editItem ?? undefined}
+        open={addOpen || !!editItem}
+        onOpenChange={(v) => { if (!v) { setAddOpen(false); setEditItem(null); } }}
+        onSaved={() => {
+          setAddOpen(false);
+          setEditItem(null);
+          onImportSuccess();
+          qc.invalidateQueries({ queryKey: ["machines"] });
+        }}
+      />
+    </div>
+  );
+}
+
+// ── MachineForm (add / edit single machine) ───────────────────────────────────
+function MachineForm({
+  item,
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  item?: any;
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSaved: () => void;
+}) {
+  const { millId } = useActiveMill();
+  const [form, setForm] = useState({
+    code:              item?.code              ?? "",
+    name:              item?.name              ?? "",
+    machine_type:      item?.machine_type      ?? "",
+    department:        item?.department        ?? "",
+    spindles:          item?.spindles ? String(item.spindles) : "",
+    make:              item?.make              ?? "",
+    installation_date: item?.installation_date ? String(item.installation_date).slice(0, 10) : "",
+    current_status:    item?.current_status    ?? "running",
+  });
+  const [saving, setSaving] = useState(false);
+  const isEdit = !!item;
+
+  const { data: deptsRaw } = useQuery({
+    queryKey: ["masters", "departments"],
+    queryFn: () => mastersApi.getDepartments(),
+    staleTime: 60_000,
+  });
+  const depts = (Array.isArray(deptsRaw) ? deptsRaw : []) as any[];
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.code.trim() || !form.name.trim()) {
+      toast.error("Code and Name are required");
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        ...form,
+        spindles: form.spindles ? Number(form.spindles) : null,
+        installation_date: form.installation_date || null,
+        mill_id: millId,
+      };
+      if (isEdit) {
+        await productionApi.updateMachine(item.id, payload);
+        toast.success("Machine updated");
+      } else {
+        await productionApi.createMachine(payload);
+        toast.success("Machine created");
+      }
+      onSaved();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail ?? "Failed to save machine");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="flex items-center gap-2">
+            <Factory className="size-4" />
+            {isEdit ? `Edit — ${item?.code}` : "Add Machine"}
+          </SheetTitle>
+        </SheetHeader>
+        <form onSubmit={handleSubmit} className="space-y-3 mt-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Code <span className="text-destructive">*</span></Label>
+              <Input
+                value={form.code}
+                onChange={e => setForm({ ...form, code: e.target.value })}
+                placeholder="e.g. CD_001"
+                disabled={isEdit}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Status</Label>
+              <Select value={form.current_status} onValueChange={v => setForm({ ...form, current_status: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="running">Running</SelectItem>
+                  <SelectItem value="idle">Idle</SelectItem>
+                  <SelectItem value="breakdown">Breakdown</SelectItem>
+                  <SelectItem value="maintenance">Maintenance</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Name / Model <span className="text-destructive">*</span></Label>
+            <Input
+              value={form.name}
+              onChange={e => setForm({ ...form, name: e.target.value })}
+              placeholder="e.g. Trutzschler DK-740"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Department</Label>
+            <Select value={form.department} onValueChange={v => setForm({ ...form, department: v })}>
+              <SelectTrigger><SelectValue placeholder="Select department…" /></SelectTrigger>
+              <SelectContent>
+                {depts.map((d: any) => (
+                  <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Type / Model No</Label>
+              <Input
+                value={form.machine_type}
+                onChange={e => setForm({ ...form, machine_type: e.target.value })}
+                placeholder="e.g. 168757 L"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Spindles / Heads</Label>
+              <Input
+                type="number"
+                value={form.spindles}
+                onChange={e => setForm({ ...form, spindles: e.target.value })}
+                placeholder="e.g. 120"
+              />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Make (Brand / Country)</Label>
+            <Input
+              value={form.make}
+              onChange={e => setForm({ ...form, make: e.target.value })}
+              placeholder="e.g. Trutzschler (Germany)"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Commissioning Date</Label>
+            <Input
+              type="date"
+              value={form.installation_date}
+              onChange={e => setForm({ ...form, installation_date: e.target.value })}
+            />
+          </div>
+          <SheetFooter className="pt-2">
+            <Button
+              type="submit"
+              disabled={saving || !form.code.trim() || !form.name.trim()}
+              className="w-full"
+            >
+              {saving ? "Saving…" : isEdit ? "Update Machine" : "Add Machine"}
+            </Button>
+          </SheetFooter>
+        </form>
+      </SheetContent>
+    </Sheet>
   );
 }

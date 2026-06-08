@@ -45,6 +45,8 @@ import {
   ArrowUp,
   ArrowDown,
   Building2,
+  RotateCcw,
+  EyeOff,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/admin/column-config")({
@@ -52,32 +54,70 @@ export const Route = createFileRoute("/_app/admin/column-config")({
   component: ColumnConfigPage,
 });
 
-const ALL_TABLES = [
-  { key: "hr_employees", label: "HR Employees" },
-  { key: "hr_attendance", label: "HR Attendance" },
-  { key: "hr_leaves", label: "HR Leaves" },
-  { key: "hr_payroll", label: "HR Payroll" },
-  { key: "production_entries", label: "Production Entries" },
-  { key: "production_downtime", label: "Production Downtime" },
-  { key: "quality_tests", label: "Quality Tests" },
-  { key: "quality_approvals", label: "Quality Approvals" },
-  { key: "inventory_lots", label: "Inventory Lots" },
-  { key: "inventory_warehouses", label: "Inventory Warehouses" },
-  { key: "dispatch_trips", label: "Dispatch Trips" },
-  { key: "dispatch_sales_orders", label: "Dispatch Sales Orders" },
-  { key: "stores_spares", label: "Stores Spares" },
-  { key: "stores_issues", label: "Stores Issues" },
-  { key: "maintenance_tasks", label: "Maintenance Tasks" },
-  { key: "maintenance_schedules", label: "Maintenance Schedules" },
-  { key: "accounts_invoices", label: "Accounts Invoices" },
-  { key: "accounts_gst", label: "Accounts GST" },
-  { key: "masters_departments", label: "Masters Departments" },
-  { key: "maintenance_machines", label: "Maintenance Machines" },
-  { key: "masters_customers", label: "Masters Customers" },
-  { key: "masters_vehicles", label: "Masters Vehicles" },
-  { key: "masters_shifts", label: "Masters Shifts" },
-  { key: "masters_yarn_counts", label: "Masters Yarn Counts" },
+// Grouped for clarity in the selector
+const TABLE_GROUPS = [
+  {
+    group: "Masters",
+    tables: [
+      { key: "masters_machines",    label: "Machines" },
+      { key: "masters_departments", label: "Departments" },
+      { key: "masters_customers",   label: "Customers" },
+      { key: "masters_vehicles",    label: "Vehicles" },
+      { key: "masters_shifts",      label: "Shifts" },
+      { key: "masters_yarn_counts", label: "Yarn Counts" },
+    ],
+  },
+  {
+    group: "Production",
+    tables: [
+      { key: "production_entries",  label: "Production Entries" },
+      { key: "production_downtime", label: "Production Downtime" },
+    ],
+  },
+  {
+    group: "HR",
+    tables: [
+      { key: "hr_employees",  label: "Employees" },
+      { key: "hr_attendance", label: "Attendance" },
+      { key: "hr_leaves",     label: "Leaves" },
+      { key: "hr_payroll",    label: "Payroll" },
+    ],
+  },
+  {
+    group: "Quality",
+    tables: [
+      { key: "quality_tests",     label: "Quality Tests" },
+      { key: "quality_approvals", label: "Quality Approvals" },
+    ],
+  },
+  {
+    group: "Inventory & Dispatch",
+    tables: [
+      { key: "inventory_lots",       label: "Lots" },
+      { key: "inventory_warehouses", label: "Warehouses" },
+      { key: "dispatch_trips",       label: "Trips" },
+      { key: "dispatch_sales_orders","label": "Sales Orders" },
+    ],
+  },
+  {
+    group: "Stores & Maintenance",
+    tables: [
+      { key: "stores_spares",          label: "Spares" },
+      { key: "stores_issues",          label: "Issues" },
+      { key: "maintenance_tasks",      label: "Maintenance Tasks" },
+      { key: "maintenance_schedules",  label: "Maintenance Schedules" },
+    ],
+  },
+  {
+    group: "Accounts",
+    tables: [
+      { key: "accounts_invoices", label: "Invoices" },
+      { key: "accounts_gst",      label: "GST" },
+    ],
+  },
 ];
+
+const ALL_TABLES = TABLE_GROUPS.flatMap(g => g.tables);
 
 const COLUMN_TYPES = ["text", "number", "date", "dropdown", "boolean", "phone", "email"];
 
@@ -86,7 +126,7 @@ function ColumnConfigPage() {
   const qc = useQueryClient();
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [selectedMillId, setSelectedMillId] = useState("");
-  const [selectedTable, setSelectedTable] = useState("hr_employees");
+  const [selectedTable, setSelectedTable] = useState("masters_machines");
   const [columns, setColumns] = useState<any[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [optionEditor, setOptionEditor] = useState<{ open: boolean; columnKey: string }>({ open: false, columnKey: "" });
@@ -282,21 +322,32 @@ function ColumnConfigPage() {
             </div>
           ) : (
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between py-3">
-                <CardTitle className="text-base">
-                  Column Configuration — {ALL_TABLES.find((t) => t.key === selectedTable)?.label ?? selectedTable}
-                </CardTitle>
-                <div className="flex gap-2">
+              <CardHeader className="py-3 space-y-3">
+                {/* Row 1: table selector + actions */}
+                <div className="flex flex-wrap items-center gap-2">
                   <Select value={selectedTable} onValueChange={(v) => { setSelectedTable(v); setColumns([]); }}>
-                    <SelectTrigger className="w-52">
+                    <SelectTrigger className="w-56">
                       <SelectValue placeholder="Select table" />
                     </SelectTrigger>
                     <SelectContent>
-                      {ALL_TABLES.map((t) => (
-                        <SelectItem key={t.key} value={t.key}>{t.label}</SelectItem>
+                      {TABLE_GROUPS.map(g => (
+                        <div key={g.group}>
+                          <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{g.group}</div>
+                          {g.tables.map(t => (
+                            <SelectItem key={t.key} value={t.key} className="pl-4">{t.label}</SelectItem>
+                          ))}
+                        </div>
                       ))}
                     </SelectContent>
                   </Select>
+                  <span className="text-sm font-semibold text-gray-700 flex-1">
+                    {ALL_TABLES.find((t) => t.key === selectedTable)?.label ?? selectedTable}
+                    {columns.length > 0 && (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        {columns.filter(c => c.is_visible !== false).length} visible / {columns.length} total
+                      </span>
+                    )}
+                  </span>
                   <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)} disabled={columns.length === 0}>
                     <Eye className="size-3.5 mr-1" /> Preview
                   </Button>
@@ -304,6 +355,24 @@ function ColumnConfigPage() {
                     <Save className="size-3.5 mr-1" /> {saveMutation.isPending ? "Saving…" : "Save"}
                   </Button>
                 </div>
+                {/* Row 2: bulk controls */}
+                {columns.length > 0 && (
+                  <div className="flex items-center gap-2 border-t pt-2">
+                    <span className="text-xs text-muted-foreground">Bulk:</span>
+                    <Button variant="outline" size="sm" className="h-7 text-xs"
+                      onClick={() => setColumns(prev => prev.map(c => ({ ...c, is_visible: true })))}>
+                      <Eye className="size-3 mr-1" /> Show All
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 text-xs"
+                      onClick={() => setColumns(prev => prev.map(c => ({ ...c, is_visible: false })))}>
+                      <EyeOff className="size-3 mr-1" /> Hide All
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 text-xs text-amber-600 border-amber-200 hover:bg-amber-50"
+                      onClick={() => { setColumns([]); qc.invalidateQueries({ queryKey: ["column-config-admin"] }); }}>
+                      <RotateCcw className="size-3 mr-1" /> Reset to Defaults
+                    </Button>
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
