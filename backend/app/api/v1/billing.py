@@ -1050,6 +1050,7 @@ async def get_my_plan(
     monthly_amt = 0.0
     next_billing = None
     last_payment = None
+    plan_obj = None   # always initialise — prevents NameError when no subscription exists
 
     if sub:
         sub_status = sub.status

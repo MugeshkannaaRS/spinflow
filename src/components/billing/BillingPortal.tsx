@@ -608,7 +608,6 @@ function MillOwnerBillingView() {
   const { data: sub, refetch: refetchSub } = useMillSubscription();
   const updateCurrencyMut = useUpdateCurrency();
 
-  // Sync currency symbol to global formatters when subscription loads
   useEffect(() => {
     if (sub?.currency_symbol) setCurrencySymbol(sub.currency_symbol);
   }, [sub?.currency_symbol]);
@@ -621,8 +620,7 @@ function MillOwnerBillingView() {
 
   const [addMillOpen, setAddMillOpen] = useState(false);
   const [millForm, setMillForm] = useState({ name: "", code: "", city: "", state: "", phone: "" });
-  const [millFormErrors, setMillFormErrors] = useState<Record<string,string>>({});
-
+  const [millFormErrors, setMillFormErrors] = useState<Record<string, string>>({});
   const [overageOpen, setOverageOpen] = useState(false);
   const [overageResource, setOverageResource] = useState<"extra_users" | "extra_mills" | "extra_employees">("extra_users");
   const [upgradeOpen, setUpgradeOpen] = useState(false);
@@ -642,7 +640,7 @@ function MillOwnerBillingView() {
   });
 
   function handleAddMill() {
-    const errs: Record<string,string> = {};
+    const errs: Record<string, string> = {};
     if (!millForm.name.trim()) errs.name = "Mill name is required";
     if (!millForm.code.trim()) errs.code = "Mill code is required";
     else if (millForm.code.trim().length > 6) errs.code = "Max 6 characters";
@@ -658,7 +656,7 @@ function MillOwnerBillingView() {
     refetchOnWindowFocus: false,
   });
 
-  const d = planQ.data;
+  const d = planQ.data ?? {};
 
   function handleDownloadInvoice(invoiceId: string) {
     const token = localStorage.getItem("spinflow-auth");
@@ -686,242 +684,258 @@ function MillOwnerBillingView() {
     xhr.send();
   }
 
+  // Loading skeleton
   if (planQ.isLoading) {
     return (
       <div className="flex flex-col min-h-full bg-[#f8fafc]">
-        <PageHeader title="Billing & Plan" subtitle="Your subscription details" />
-        <div className="p-6 space-y-4 animate-pulse">
-          <div className="h-28 bg-white border border-[#e2e8f0] rounded-lg" />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="h-32 bg-white border border-[#e2e8f0] rounded-lg" />
-            <div className="h-32 bg-white border border-[#e2e8f0] rounded-lg" />
-            <div className="h-32 bg-white border border-[#e2e8f0] rounded-lg" />
+        <PageHeader title="Billing & Plan" subtitle="Your subscription and usage" />
+        <div className="p-6 space-y-4 animate-pulse max-w-5xl mx-auto w-full">
+          <div className="h-32 bg-white border border-[#e2e8f0] rounded-xl" />
+          <div className="grid grid-cols-3 gap-4">
+            {[1,2,3].map(i => <div key={i} className="h-28 bg-white border border-[#e2e8f0] rounded-xl" />)}
           </div>
-          <div className="h-48 bg-white border border-[#e2e8f0] rounded-lg" />
-          <div className="h-48 bg-white border border-[#e2e8f0] rounded-lg" />
+          <div className="h-48 bg-white border border-[#e2e8f0] rounded-xl" />
         </div>
       </div>
     );
   }
 
+  // Error state
   if (planQ.isError) {
     return (
       <div className="flex flex-col min-h-full bg-[#f8fafc]">
-        <PageHeader title="Billing & Plan" subtitle="Your subscription details" />
-        <div className="p-6">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 shrink-0" />
-            Failed to load plan details.
-            <button onClick={() => qc.invalidateQueries({ queryKey: ["billing-my-plan"] })}
-              className="ml-auto underline text-red-600 hover:text-red-800">Retry</button>
+        <PageHeader title="Billing & Plan" subtitle="Your subscription and usage" />
+        <div className="p-6 max-w-5xl mx-auto w-full">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-5 flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold text-red-800 text-sm">Failed to load billing details</p>
+              <p className="text-xs text-red-600 mt-0.5">Please try again or contact support if the issue persists.</p>
+            </div>
+            <button
+              onClick={() => qc.invalidateQueries({ queryKey: ["billing-my-plan"] })}
+              className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700"
+            >
+              Retry
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
+  // Derived values with safe defaults
+  const totalUsers     = d.total_users     ?? 0;
+  const maxUsers       = d.max_users       ?? 0;
+  const currentMills   = d.current_mills   ?? 0;
+  const maxMills       = d.max_mills       ?? 0;
+  const currentEmps    = d.current_employees ?? 0;
+  const maxEmps        = d.max_employees   ?? 0;
+
+  const userPct   = maxUsers  > 0 ? totalUsers  / maxUsers  : 0;
+  const millPct   = maxMills  > 0 ? currentMills / maxMills  : 0;
+  const empPct    = maxEmps   > 0 ? currentEmps  / maxEmps   : 0;
+
+  const nearLimit = userPct >= 0.85 || millPct >= 0.85 || empPct >= 0.85;
+  const atLimit   = userPct >= 1    || millPct >= 1    || empPct >= 1;
+
   const overageLabels: Record<string, string> = {
-    extra_users: "₹" + (d?.additional_user_cost ?? 0).toLocaleString("en-IN") + "/user/mo",
-    extra_mills: "₹" + (d?.additional_mill_cost ?? 0).toLocaleString("en-IN") + "/mill/mo",
-    extra_employees: "₹" + (d?.additional_employee_cost ?? 0).toLocaleString("en-IN") + "/emp/mo",
+    extra_users:     "₹" + (d.additional_user_cost     ?? 0).toLocaleString("en-IN") + "/user/mo",
+    extra_mills:     "₹" + (d.additional_mill_cost     ?? 0).toLocaleString("en-IN") + "/mill/mo",
+    extra_employees: "₹" + (d.additional_employee_cost ?? 0).toLocaleString("en-IN") + "/emp/mo",
   };
 
   return (
     <div className="flex flex-col min-h-full bg-[#f8fafc]">
       <PageHeader
         title="Billing & Plan"
-        subtitle="Your subscription details and module access"
+        subtitle="Your subscription and usage"
         onRefresh={() => qc.invalidateQueries({ queryKey: ["billing-my-plan"] })}
         isRefreshing={planQ.isFetching}
       />
-      <div className="p-6 space-y-6">
 
-        {/* Plan summary */}
-        <div className="bg-white border border-[#e2e8f0] rounded-lg p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <h2 className="text-[20px] font-bold text-[#0f172a]">{d?.plan_display ?? d?.plan ?? "Starter"}</h2>
-                <PlanBadge plan={d?.plan ?? "starter"} />
-                <StatusBadge status={d?.status ?? "active"} />
+      <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto w-full">
+
+        {/* ── Upgrade alert banner ── */}
+        {(atLimit || nearLimit) && (
+          <div className={cn(
+            "rounded-xl border p-4 flex items-start gap-3",
+            atLimit
+              ? "bg-red-50 border-red-200"
+              : "bg-amber-50 border-amber-200"
+          )}>
+            <AlertTriangle className={cn("w-5 h-5 shrink-0 mt-0.5", atLimit ? "text-red-500" : "text-amber-500")} />
+            <div className="flex-1 min-w-0">
+              <p className={cn("font-semibold text-sm", atLimit ? "text-red-800" : "text-amber-800")}>
+                {atLimit ? "You have reached your plan limits" : "You are approaching your plan limits"}
+              </p>
+              <p className={cn("text-xs mt-0.5", atLimit ? "text-red-600" : "text-amber-700")}>
+                {[
+                  userPct  >= 0.85 && `Users: ${totalUsers}/${maxUsers}`,
+                  millPct  >= 0.85 && `Mills: ${currentMills}/${maxMills}`,
+                  empPct   >= 0.85 && `Employees: ${currentEmps}/${maxEmps}`,
+                ].filter(Boolean).join(" · ")} — Upgrade your plan to continue growing.
+              </p>
+            </div>
+            <button
+              onClick={() => setUpgradeOpen(true)}
+              className={cn(
+                "shrink-0 px-3 py-1.5 rounded-lg text-white text-xs font-semibold",
+                atLimit ? "bg-red-600 hover:bg-red-700" : "bg-amber-600 hover:bg-amber-700"
+              )}
+            >
+              Upgrade Now
+            </button>
+          </div>
+        )}
+
+        {/* ── Plan card ── */}
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-5">
+          <div className="flex flex-wrap items-start gap-4 justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-bold text-[#0f172a]">{d.plan_display ?? d.plan ?? "Starter"}</h2>
+                <PlanBadge plan={d.plan ?? "starter"} />
+                <StatusBadge status={d.status ?? "active"} />
               </div>
-              <p className="text-[13px] text-[#64748b]">{d?.company_name}</p>
+              <p className="text-sm text-[#64748b]">{d.company_name ?? "Your company"}</p>
+              <div className="flex flex-wrap gap-4 text-xs text-[#64748b] mt-2">
+                {d.next_billing_at && <span>Next billing: <strong className="text-[#374151]">{fmtDate(d.next_billing_at)}</strong></span>}
+                {d.last_payment_at && <span>Last payment: <strong className="text-[#374151]">{fmtDate(d.last_payment_at)}</strong></span>}
+              </div>
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={() => setUpgradeOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[12px] font-semibold transition-colors">
+              <div className="text-right">
+                <p className="text-2xl font-bold font-mono text-[#0f172a]">{fmtLakh(d.monthly_amount ?? 0)}</p>
+                <p className="text-xs text-[#64748b]">per month</p>
+              </div>
+              <button
+                onClick={() => setUpgradeOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+              >
                 <ArrowUp className="w-3.5 h-3.5" /> Upgrade Plan
               </button>
-              <div className="text-right">
-                <p className="text-[28px] font-bold font-mono text-[#0f172a]">{fmtLakh(d?.monthly_amount ?? 0)}</p>
-                <p className="text-[13px] text-[#64748b]">per month</p>
-              </div>
             </div>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-6 text-[13px] text-[#64748b]">
-            {d?.next_billing_at && (
-              <div><span className="font-medium text-[#374151]">Next billing: </span>{fmtDate(d.next_billing_at)}</div>
-            )}
-            {d?.last_payment_at && (
-              <div><span className="font-medium text-[#374151]">Last payment: </span>{fmtDate(d.last_payment_at)}</div>
-            )}
-            <div><span className="font-medium text-[#374151]">Users: </span>{d?.total_users ?? 0}</div>
-            <div><span className="font-medium text-[#374151]">Mills: </span>{d?.current_mills ?? 0}</div>
-            <div><span className="font-medium text-[#374151]">Employees: </span>{d?.current_employees ?? 0}</div>
           </div>
         </div>
 
-        {/* Usage bars */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* ── Usage bars ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <UsageBarCard
-            label="User Licenses"
-            current={d?.total_users ?? 0}
-            max={d?.max_users ?? 0}
-            unitPrice={d?.additional_user_cost ?? 0}
+            label="Users"
+            current={totalUsers}
+            max={maxUsers}
+            unitPrice={d.additional_user_cost ?? 0}
             overageCostLabel={overageLabels.extra_users}
             onPurchase={() => { setOverageResource("extra_users"); setOverageOpen(true); }}
           />
           <UsageBarCard
-            label="Mill Licenses"
-            current={d?.current_mills ?? 0}
-            max={d?.max_mills ?? 0}
-            unitPrice={d?.additional_mill_cost ?? 0}
+            label="Mills"
+            current={currentMills}
+            max={maxMills}
+            unitPrice={d.additional_mill_cost ?? 0}
             overageCostLabel={overageLabels.extra_mills}
             onPurchase={() => { setOverageResource("extra_mills"); setOverageOpen(true); }}
           />
           <UsageBarCard
-            label="Employee Licenses"
-            current={d?.current_employees ?? 0}
-            max={d?.max_employees ?? 0}
-            unitPrice={d?.additional_employee_cost ?? 0}
+            label="Employees"
+            current={currentEmps}
+            max={maxEmps}
+            unitPrice={d.additional_employee_cost ?? 0}
             overageCostLabel={overageLabels.extra_employees}
             onPurchase={() => { setOverageResource("extra_employees"); setOverageOpen(true); }}
           />
         </div>
 
-        {/* Modules + Mills */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <div className="lg:col-span-3 bg-white border border-[#e2e8f0] rounded-lg p-5">
+        {/* ── Modules + Mills side by side ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          {/* Active modules */}
+          <div className="lg:col-span-3 bg-white border border-[#e2e8f0] rounded-xl p-5">
             <h3 className="text-sm font-semibold text-[#0f172a] mb-4">Active Modules</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {(d?.enabled_modules ?? []).map((mod: any) => {
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {(d.enabled_modules ?? []).map((mod: any) => {
                 const Icon = MODULE_ICONS[mod.name] ?? Package;
                 return (
-                  <div key={mod.name} className={cn(
-                    "flex flex-col items-center gap-1.5 p-3 rounded-lg border text-center",
-                    mod.enabled ? "border-green-200 bg-green-50" : "border-[#e2e8f0] bg-gray-50 opacity-60",
-                  )}>
-                    <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", mod.enabled ? "bg-green-100" : "bg-gray-100")}>
-                      <Icon className={cn("w-4 h-4", mod.enabled ? "text-green-600" : "text-[#94a3b8]")} />
-                    </div>
-                    <span className="text-[12px] font-medium text-[#374151] leading-tight">{mod.label}</span>
-                    {mod.enabled ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full">
-                        <CheckCircle2 className="w-2.5 h-2.5" /> Active
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-[#94a3b8]">Contact support</span>
+                  <div
+                    key={mod.name}
+                    className={cn(
+                      "flex flex-col items-center gap-1 p-2.5 rounded-lg border text-center",
+                      mod.enabled
+                        ? "border-green-200 bg-green-50"
+                        : "border-[#e2e8f0] bg-gray-50 opacity-50",
                     )}
+                  >
+                    <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center", mod.enabled ? "bg-green-100" : "bg-gray-100")}>
+                      <Icon className={cn("w-3.5 h-3.5", mod.enabled ? "text-green-600" : "text-[#94a3b8]")} />
+                    </div>
+                    <span className="text-[11px] font-medium text-[#374151] leading-tight">{mod.label}</span>
+                    {mod.enabled
+                      ? <span className="text-[10px] text-green-600 font-semibold">Active</span>
+                      : <span className="text-[10px] text-[#94a3b8]">Inactive</span>
+                    }
                   </div>
                 );
               })}
             </div>
           </div>
-          <div className="lg:col-span-2 bg-white border border-[#e2e8f0] rounded-lg p-5">
+
+          {/* Mills list */}
+          <div className="lg:col-span-2 bg-white border border-[#e2e8f0] rounded-xl p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-[#0f172a]">Your Mills</h3>
               <button
                 onClick={() => setAddMillOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-semibold transition-colors"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" /> Add Mill
               </button>
             </div>
-            <div className="space-y-2 max-h-72 overflow-y-auto">
-              {(d?.mills ?? []).map((mill: any) => (
-                <div key={mill.id} className="flex items-center gap-3 p-3 rounded-lg border border-[#e2e8f0] hover:bg-[#f8fafc] transition-colors">
-                  <span className="font-mono text-[11px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-semibold">{mill.code}</span>
-                  <span className="flex-1 text-[13px] font-medium text-[#374151] truncate">{mill.name}</span>
-                  <span className="text-[11px] text-[#94a3b8] flex items-center gap-1 shrink-0">
-                    <Users className="w-3 h-3" /> {mill.users_count}
-                  </span>
-                </div>
-              ))}
-              {(d?.mills ?? []).length === 0 && (
-                <p className="text-[13px] text-[#94a3b8] text-center py-6">No mills yet</p>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {(d.mills ?? []).length === 0 ? (
+                <p className="text-xs text-[#94a3b8] text-center py-6">No mills yet. Add your first mill.</p>
+              ) : (
+                (d.mills ?? []).map((mill: any) => (
+                  <div key={mill.id} className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-[#e2e8f0] hover:bg-[#f8fafc]">
+                    <span className="font-mono text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-semibold shrink-0">{mill.code}</span>
+                    <span className="flex-1 text-xs font-medium text-[#374151] truncate">{mill.name}</span>
+                    <span className="text-[11px] text-[#94a3b8] flex items-center gap-0.5 shrink-0">
+                      <Users className="w-3 h-3" /> {mill.users_count}
+                    </span>
+                  </div>
+                ))
               )}
             </div>
-
-            {/* Add Mill Dialog */}
-            {addMillOpen && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-[#e2e8f0] flex items-center justify-between">
-                    <h2 className="text-[17px] font-bold text-[#0f172a]">Add New Mill</h2>
-                    <button onClick={() => { setAddMillOpen(false); setMillFormErrors({}); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 text-lg leading-none">✕</button>
-                  </div>
-                  <div className="px-6 py-4 space-y-3">
-                    {[
-                      { key: "name", label: "Mill Name*", placeholder: "e.g. Ambur Spinning Mill 1" },
-                      { key: "code", label: "Mill Code*", placeholder: "e.g. AM1 (max 6 chars)" },
-                      { key: "city", label: "City", placeholder: "e.g. Ambur" },
-                      { key: "state", label: "State", placeholder: "e.g. Tamil Nadu" },
-                      { key: "phone", label: "Phone", placeholder: "e.g. 9876543210" },
-                    ].map(({ key, label, placeholder }) => (
-                      <div key={key}>
-                        <label className="block text-[13px] font-semibold text-[#374151] mb-1">{label}</label>
-                        <input
-                          value={(millForm as any)[key]}
-                          onChange={e => setMillForm(prev => ({ ...prev, [key]: key === "code" ? e.target.value.toUpperCase() : e.target.value }))}
-                          placeholder={placeholder}
-                          maxLength={key === "code" ? 6 : 200}
-                          className="w-full h-10 px-3 rounded-lg border border-[#d1d5db] text-[14px] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        />
-                        {millFormErrors[key] && <p className="text-[12px] text-red-600 mt-1">{millFormErrors[key]}</p>}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="px-6 py-4 border-t border-[#e2e8f0] flex justify-end gap-2">
-                    <button onClick={() => { setAddMillOpen(false); setMillFormErrors({}); }}
-                      className="px-4 py-2 rounded-lg border border-[#d1d5db] text-[13px] font-medium text-[#374151] hover:bg-gray-50">Cancel</button>
-                    <button onClick={handleAddMill} disabled={addMillMut.isPending}
-                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold disabled:opacity-50 flex items-center gap-2">
-                      {addMillMut.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                      Add Mill
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Payment history */}
-        {(d?.invoices ?? []).length > 0 && (
-          <div className="bg-white border border-[#e2e8f0] rounded-lg overflow-hidden">
+        {/* ── Invoice history ── */}
+        {(d.invoices ?? []).length > 0 && (
+          <div className="bg-white border border-[#e2e8f0] rounded-xl overflow-hidden">
             <div className="px-5 py-4 border-b border-[#e2e8f0]">
               <h3 className="text-sm font-semibold text-[#0f172a]">Payment History</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-[#f1f5f9] border-b border-[#e2e8f0]">
-                    {["Month","Amount","Status","Paid On","Invoice"].map(h => (
+                  <tr className="bg-[#f8fafc] border-b border-[#e2e8f0]">
+                    {["Period", "Amount", "Status", "Paid On", ""].map(h => (
                       <th key={h} className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {d.invoices.map((inv: any) => (
-                    <tr key={inv.id} className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors">
+                  {(d.invoices ?? []).map((inv: any) => (
+                    <tr key={inv.id} className="border-b border-[#f1f5f9] hover:bg-[#f8fafc]">
                       <td className="px-4 py-3 font-medium text-[#0f172a] whitespace-nowrap">{inv.month}</td>
                       <td className="px-4 py-3 font-mono text-[#0f172a] whitespace-nowrap">{fmtLakh(inv.amount)}</td>
                       <td className="px-4 py-3"><StatusBadge status={inv.status} size="sm" /></td>
                       <td className="px-4 py-3 text-[#64748b] whitespace-nowrap">{inv.paid_at ? fmtDate(inv.paid_at) : "—"}</td>
                       <td className="px-4 py-3">
-                        <button onClick={() => handleDownloadInvoice(inv.id)}
-                          className="inline-flex items-center gap-1 text-[12px] font-medium text-blue-600 hover:text-blue-800 transition-colors">
-                          <Download className="w-3.5 h-3.5 shrink-0" /> PDF
+                        <button
+                          onClick={() => handleDownloadInvoice(inv.id)}
+                          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          <Download className="w-3.5 h-3.5" /> PDF
                         </button>
                       </td>
                     </tr>
@@ -932,19 +946,24 @@ function MillOwnerBillingView() {
           </div>
         )}
 
-        {/* Currency Selector */}
-        <div className="bg-white border border-[#e2e8f0] rounded-lg p-5">
+        {/* ── Currency selector ── */}
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-5">
           <h3 className="text-sm font-semibold text-[#0f172a] mb-1">Display Currency</h3>
-          <p className="text-xs text-[#64748b] mb-4">Changes the currency symbol shown throughout the ERP. Values are not converted.</p>
+          <p className="text-xs text-[#64748b] mb-3">Changes the currency symbol shown throughout the ERP. Values are not converted.</p>
           <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
             {CURRENCIES.map(c => (
-              <button key={c.code} onClick={() => handleCurrencyUpdate(c.symbol)}
+              <button
+                key={c.code}
+                onClick={() => handleCurrencyUpdate(c.symbol)}
                 disabled={updateCurrencyMut.isPending}
-                className={"p-3 rounded-lg border text-center transition-all disabled:opacity-50 " +
-                  (sub?.currency_symbol === c.symbol
+                className={cn(
+                  "p-2.5 rounded-lg border text-center transition-all disabled:opacity-50",
+                  sub?.currency_symbol === c.symbol
                     ? "border-blue-400 bg-blue-50 text-blue-700"
-                    : "border-[#e2e8f0] hover:border-blue-300 text-[#374151]")}>
-                <span className="text-xl block">{c.symbol}</span>
+                    : "border-[#e2e8f0] hover:border-blue-300 text-[#374151]",
+                )}
+              >
+                <span className="text-lg block">{c.symbol}</span>
                 <span className="text-[10px] text-[#94a3b8] mt-0.5 block">{c.code}</span>
               </button>
             ))}
@@ -953,7 +972,52 @@ function MillOwnerBillingView() {
 
       </div>
 
-      {/* Dialogs */}
+      {/* ── Add Mill Dialog ── */}
+      {addMillOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-[#e2e8f0] flex items-center justify-between">
+              <h2 className="text-base font-bold text-[#0f172a]">Add New Mill</h2>
+              <button onClick={() => { setAddMillOpen(false); setMillFormErrors({}); }}
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 text-lg leading-none">✕</button>
+            </div>
+            <div className="px-6 py-4 space-y-3">
+              {[
+                { key: "name",  label: "Mill Name *",  placeholder: "e.g. Ambur Spinning Mill 1" },
+                { key: "code",  label: "Mill Code *",  placeholder: "e.g. AM1 (max 6 chars)" },
+                { key: "city",  label: "City",         placeholder: "e.g. Ambur" },
+                { key: "state", label: "State",        placeholder: "e.g. Tamil Nadu" },
+                { key: "phone", label: "Phone",        placeholder: "e.g. 9876543210" },
+              ].map(({ key, label, placeholder }) => (
+                <div key={key}>
+                  <label className="block text-xs font-semibold text-[#374151] mb-1">{label}</label>
+                  <input
+                    value={(millForm as any)[key]}
+                    onChange={e => setMillForm(prev => ({ ...prev, [key]: key === "code" ? e.target.value.toUpperCase() : e.target.value }))}
+                    placeholder={placeholder}
+                    maxLength={key === "code" ? 6 : 200}
+                    className="w-full h-9 px-3 rounded-lg border border-[#d1d5db] text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                  {millFormErrors[key] && <p className="text-xs text-red-600 mt-1">{millFormErrors[key]}</p>}
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-4 border-t border-[#e2e8f0] flex justify-end gap-2">
+              <button onClick={() => { setAddMillOpen(false); setMillFormErrors({}); }}
+                className="px-4 py-2 rounded-lg border border-[#d1d5db] text-xs font-medium text-[#374151] hover:bg-gray-50">
+                Cancel
+              </button>
+              <button onClick={handleAddMill} disabled={addMillMut.isPending}
+                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5">
+                {addMillMut.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                Add Mill
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Dialogs ── */}
       <OveragePurchaseDialog
         open={overageOpen}
         onClose={() => setOverageOpen(false)}
@@ -962,8 +1026,8 @@ function MillOwnerBillingView() {
       <UpgradeDialog
         open={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
-        currentPlanId={d?.plan_id}
-        companyName={d?.company_name}
+        currentPlanId={d.plan_id}
+        companyName={d.company_name}
       />
     </div>
   );
