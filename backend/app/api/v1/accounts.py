@@ -24,7 +24,7 @@ router = APIRouter()
 @router.get("/accounts/invoices")
 async def get_invoices(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),
@@ -156,7 +156,7 @@ async def delete_invoice(
 @router.get("/accounts/receivables")
 async def get_receivables(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("accounts")),

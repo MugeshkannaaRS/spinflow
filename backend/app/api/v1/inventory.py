@@ -24,7 +24,7 @@ router = APIRouter()
 @router.get("/inventory/lots")
 async def get_lots(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory")),
@@ -73,7 +73,7 @@ async def get_lots(
 @router.get("/inventory/transfers")
 async def get_transfers(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("inventory")),

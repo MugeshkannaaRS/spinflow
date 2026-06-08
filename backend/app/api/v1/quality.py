@@ -47,7 +47,7 @@ async def get_tests(
     status: Optional[str] = Query(None),
     mill_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):
@@ -201,7 +201,7 @@ async def approve_test(
 async def list_lots(
     mill_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):
@@ -285,7 +285,7 @@ async def csp_trend(
 async def list_approvals(
     mill_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):
@@ -412,7 +412,7 @@ async def approve_or_reject_approval(
 async def list_rejections(
     mill_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality")),
 ):

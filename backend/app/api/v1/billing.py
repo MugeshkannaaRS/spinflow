@@ -340,7 +340,7 @@ async def generate_invoice(
 async def list_invoices(
     company_id: str,
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -421,7 +421,7 @@ async def list_change_requests(
     company_id: Optional[str] = None,
     status: Optional[str] = None,
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -608,7 +608,7 @@ async def admin_billing_summary(
 @router.get("/admin/billing/subscriptions")
 async def admin_billing_subscriptions(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     status_filter: Optional[str] = None,
     plan_filter: Optional[str] = None,
     search: Optional[str] = None,
@@ -640,7 +640,7 @@ async def admin_billing_company_detail(
 @router.get("/admin/billing/invoices")
 async def admin_billing_invoices(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     status_filter: Optional[str] = None,
     company_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
@@ -656,7 +656,7 @@ async def admin_billing_invoices(
 @router.get("/admin/billing/payments")
 async def admin_billing_payments(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     company_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -1368,7 +1368,7 @@ async def record_payment(
 @router.get("/admin/billing/payments-list")
 async def list_payments(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     company_id: Optional[str] = None,
     status_filter: Optional[str] = None,
     current_user: User = Depends(get_current_user),
@@ -1386,7 +1386,7 @@ async def list_payments(
 async def company_payments(
     company_id: str,
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -1759,7 +1759,7 @@ async def billing_dashboard(
 @router.get("/admin/billing/subscriptions-enriched")
 async def enriched_subscriptions(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     status_filter: Optional[str] = None,
     plan_filter: Optional[str] = None,
     search: Optional[str] = None,

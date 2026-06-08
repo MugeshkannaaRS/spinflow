@@ -60,7 +60,7 @@ async def _resolve_company_id(current_user: User, db: AsyncSession) -> Optional[
 @router.get("/masters/companies")
 async def list_companies(
     page: int = Query(1, ge=1),
-    page_size: int = Query(100, ge=1, le=500),
+    page_size: int = Query(100, ge=1, le=1000),
     include_inactive: bool = Query(True),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
@@ -199,7 +199,7 @@ async def update_mill(
 async def list_departments(
     mill_id: str = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     include_inactive: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
@@ -270,7 +270,7 @@ async def update_department(
 async def list_yarn_counts(
     mill_id: str = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     include_inactive: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
@@ -341,7 +341,7 @@ async def update_yarn_count(
 async def list_customers(
     mill_id: str = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     include_inactive: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
@@ -421,7 +421,7 @@ async def deactivate_customer(
 async def list_vehicles(
     mill_id: str = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     include_inactive: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
@@ -492,7 +492,7 @@ async def update_vehicle(
 async def list_routes(
     mill_id: str = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     include_inactive: bool = Query(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters")),
@@ -775,7 +775,7 @@ async def bulk_create_machines(
     mode: str = Query("update", regex="^(skip|update|create)$"),
     mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_module("maintenance", write=True)),
+    current_user: User = Depends(require_module("masters", write=True)),
 ):
     """
     Bulk upsert machines.

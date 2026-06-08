@@ -26,7 +26,7 @@ MAX_BATCH = 500
 @router.get("/maintenance/tasks")
 async def get_tasks(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance")),
@@ -136,7 +136,7 @@ async def update_task_status(
 @router.get("/maintenance/schedules")
 async def get_schedules(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance")),
@@ -287,7 +287,7 @@ async def update_schedule(
 async def get_parameters(
     machine_code: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
+    page_size: int = Query(50, ge=1, le=1000),
     mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance")),

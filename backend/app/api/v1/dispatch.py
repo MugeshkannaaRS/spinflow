@@ -29,7 +29,7 @@ async def get_trips(
     status: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     sort_by: Optional[str] = Query(None),
     sort_dir: Optional[str] = Query("desc"),
     db: AsyncSession = Depends(get_db),
@@ -148,7 +148,7 @@ async def get_dispatches(
     status: Optional[str] = Query(None),
     date: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dispatch")),
 ):

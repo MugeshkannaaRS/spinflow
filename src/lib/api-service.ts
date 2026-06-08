@@ -341,16 +341,16 @@ export const financeApi = {
       .then((r) => r.data),
 };
 
-// Masters
+// Masters — all list calls default to page_size=1000 so full data always loads
 export const mastersApi = {
-  getCompanies: (page = 1, pageSize = 20, includeInactive?: boolean) =>
+  getCompanies: (page = 1, pageSize = 1000, includeInactive?: boolean) =>
     api.get("/masters/companies", { params: { page, page_size: pageSize, include_inactive: includeInactive } }).then((r) => extractList(r.data)),
   getCompany: (id: string) => api.get(`/masters/companies/${id}`).then((r) => r.data),
   createCompany: (data: any) => api.post("/masters/companies", data).then((r) => r.data),
   updateCompany: (id: string, data: any) =>
     api.patch(`/masters/companies/${id}`, data).then((r) => r.data),
 
-  getMills: (companyId?: string, page = 1, pageSize = 500) =>
+  getMills: (companyId?: string, page = 1, pageSize = 1000) =>
     api
       .get("/masters/mills", { params: { company_id: companyId, page, page_size: pageSize, include_inactive: true } })
       .then((r) => extractList(r.data)),
@@ -359,7 +359,7 @@ export const mastersApi = {
   updateMill: (id: string, data: any) =>
     api.patch(`/masters/mills/${id}`, data).then((r) => r.data),
 
-  getDepartments: (millId?: string, page = 1, pageSize = 20) =>
+  getDepartments: (millId?: string, page = 1, pageSize = 1000) =>
     api
       .get("/masters/departments", { params: { mill_id: millId, page, page_size: pageSize } })
       .then((r) => extractList(r.data)),
@@ -368,7 +368,7 @@ export const mastersApi = {
   updateDepartment: (id: string, data: any) =>
     api.patch(`/masters/departments/${id}`, data).then((r) => r.data),
 
-  getYarnCounts: (millId?: string, page = 1, pageSize = 20) =>
+  getYarnCounts: (millId?: string, page = 1, pageSize = 1000) =>
     api
       .get("/masters/yarn-counts", { params: { mill_id: millId, page, page_size: pageSize } })
       .then((r) => extractList(r.data)),
@@ -377,7 +377,7 @@ export const mastersApi = {
   updateYarnCount: (id: string, data: any) =>
     api.patch(`/masters/yarn-counts/${id}`, data).then((r) => r.data),
 
-  getCustomers: (millId?: string, page = 1, pageSize = 20) =>
+  getCustomers: (millId?: string, page = 1, pageSize = 1000) =>
     api
       .get("/masters/customers", { params: { mill_id: millId, page, page_size: pageSize } })
       .then((r) => extractList(r.data)),
@@ -387,7 +387,7 @@ export const mastersApi = {
     api.patch(`/masters/customers/${id}`, data).then((r) => r.data),
   deactivateCustomer: (id: string) => api.delete(`/masters/customers/${id}`).then((r) => r.data),
 
-  getVehicles: (millId?: string, page = 1, pageSize = 20) =>
+  getVehicles: (millId?: string, page = 1, pageSize = 1000) =>
     api
       .get("/masters/vehicles", { params: { mill_id: millId, page, page_size: pageSize } })
       .then((r) => extractList(r.data)),
@@ -396,7 +396,7 @@ export const mastersApi = {
   updateVehicle: (id: string, data: any) =>
     api.patch(`/masters/vehicles/${id}`, data).then((r) => r.data),
 
-  getRoutes: (millId?: string, page = 1, pageSize = 20) =>
+  getRoutes: (millId?: string, page = 1, pageSize = 1000) =>
     api
       .get("/masters/routes", { params: { mill_id: millId, page, page_size: pageSize } })
       .then((r) => extractList(r.data)),

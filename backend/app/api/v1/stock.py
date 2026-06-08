@@ -39,7 +39,7 @@ async def stock_snapshot(
 @router.get("/stock/lot/{lot_id}/history")
 async def lot_history(
     lot_id: str,
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("stock")),
 ):

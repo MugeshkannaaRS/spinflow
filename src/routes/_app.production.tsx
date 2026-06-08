@@ -111,6 +111,8 @@ function ShiftGrid() {
     queryFn: () => productionApi.getMachines({
       ...(departmentId ? { department_id: departmentId } : { department }),
       mill_id: millId,
+      page_size: 1000,
+      page: 1,
     }),
     staleTime: 60_000,
     enabled: !!millId && !!(departmentId || department),
