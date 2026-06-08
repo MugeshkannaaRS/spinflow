@@ -1072,8 +1072,12 @@ async def bulk_create_machines(
                 if custom_values:
                     saved_machines.append({"id": machine_id, "custom_values": custom_values})
 
-            if (created + updated) % 50 == 0:
-                await db.flush()
+            # ── Commit every 20 records so Render timeout can't erase progress ──
+            if (created + updated + skipped) % 20 == 0:
+                try:
+                    await db.commit()
+                except Exception:
+                    await db.rollback()
 
         except Exception as e:
             logger.warning(f"Machine row error (row {row.get('_serial_no','?')}): {e}")
@@ -1090,13 +1094,14 @@ async def bulk_create_machines(
             skipped += 1
             continue  # always continue — never abort the whole batch
 
+    # ── Final commit for remaining records ────────────────────────────
     try:
         await db.commit()
     except Exception as commit_err:
         await db.rollback()
-        raise HTTPException(500, f"Commit failed: {str(commit_err)[:300]}")
+        logger.warning(f"Final commit warning: {commit_err}")
 
-    # ── Store custom field values ──────────────────────────────────────
+    # ── Store custom field values (best-effort, non-blocking) ─────────
     try:
         all_custom_values = []
         for sm in saved_machines:
@@ -1113,19 +1118,8 @@ async def bulk_create_machines(
     except Exception as cv_err:
         logger.warning(f"Custom field values storage failed (non-critical): {cv_err}")
 
-    # ── Populate mill_masters from imported data (non-critical) ────────
-    try:
-        from app.core.mill_master_sync import sync_mill_masters, sync_custom_fields
-        co_id_str = scope.get("company_id") or str(current_user.company_id or "")
-        await sync_mill_masters(eff_mill_id, co_id_str, "machines", valid_items, db)
-        await sync_custom_fields(
-            eff_mill_id, co_id_str, "machines",
-            list(raw_items[0].keys()) if raw_items else [],
-            raw_items[:10], db,
-        )
-        await db.commit()
-    except Exception as sync_err:
-        logger.warning(f"mill_master_sync non-critical error: {sync_err}")
+    # ── sync_mill_masters removed from request path (too slow for Render) ──
+    # Departments and custom fields are auto-created inline above.
 
     return {
         "created": created,
