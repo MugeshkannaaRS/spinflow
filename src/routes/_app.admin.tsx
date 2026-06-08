@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { adminApi } from "@/lib/api-service";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
@@ -9,11 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { fmtLakh } from "@/lib/formatters";
+import { cn } from "@/lib/utils";
 import {
   Building2, Factory, SlidersHorizontal, CreditCard, Archive, FileText,
   Blocks, Shield, Users, TrendingUp, DollarSign, AlertTriangle,
   CheckCircle2, XCircle, ArrowUpRight, Loader2, Receipt, ShoppingCart,
-  UserPlus, Activity, Bell,
+  UserPlus, Activity, Bell, ChevronDown, UserCog,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/admin")({
@@ -21,19 +23,144 @@ export const Route = createFileRoute("/_app/admin")({
   component: AdminPage,
 });
 
-const SECTIONS = [
-  { id: "companies", label: "Companies", icon: Building2, desc: "Manage companies, plans, and modules", color: "bg-blue-50 text-blue-600" },
-  { id: "mills", label: "Mills", icon: Factory, desc: "View and manage mills across companies", color: "bg-indigo-50 text-indigo-600" },
-  { id: "users", label: "Users", icon: Users, desc: "Provision, manage, and enforce user limits", color: "bg-green-50 text-green-600" },
-  { id: "organizations", label: "Organizations", icon: Shield, desc: "Company overview, usage, and limits", color: "bg-teal-50 text-teal-600" },
-  { id: "modules", label: "Module Manager", icon: Blocks, desc: "Toggle module access per company", color: "bg-purple-50 text-purple-600" },
-  { id: "limits", label: "User Limits", icon: SlidersHorizontal, desc: "Monitor and adjust user limits", color: "bg-amber-50 text-amber-600" },
-  { id: "audit", label: "Audit Logs", icon: FileText, desc: "View audit trail across all companies", color: "bg-rose-50 text-rose-600" },
-  { id: "alerts", label: "Alert Center", icon: Bell, desc: "Invoice overdue, limits reached, expiring subscriptions", color: "bg-red-50 text-red-600" },
-  { id: "billing", label: "Billing", icon: CreditCard, desc: "Subscriptions, invoicing, plans, and revenue analytics", color: "bg-teal-50 text-teal-600" },
-  { id: "archive", label: "Archive", icon: Archive, desc: "View and restore suspended companies", color: "bg-gray-50 text-gray-600" },
-  { id: "column-config", label: "Column Config", icon: SlidersHorizontal, desc: "Configure table column visibility", color: "bg-orange-50 text-orange-600" },
+// Grouped admin sections — each group is an accordion on the admin page
+const SECTION_GROUPS = [
+  {
+    id: "companies",
+    label: "Company Management",
+    icon: Building2,
+    color: "bg-blue-50 text-blue-600 border-blue-100",
+    items: [
+      { id: "companies",     label: "Companies",      icon: Building2,       desc: "Manage companies, plans, modules" },
+      { id: "mills",         label: "Mills",           icon: Factory,         desc: "View and manage mills across companies" },
+      { id: "organizations", label: "Organizations",   icon: Shield,          desc: "Company overview, usage and limits" },
+      { id: "archive",       label: "Archive",         icon: Archive,         desc: "View and restore suspended companies" },
+    ],
+  },
+  {
+    id: "users",
+    label: "User Management",
+    icon: UserCog,
+    color: "bg-green-50 text-green-600 border-green-100",
+    items: [
+      { id: "users",   label: "Users",       icon: Users,           desc: "Provision, manage and enforce user limits" },
+      { id: "limits",  label: "User Limits", icon: SlidersHorizontal, desc: "Monitor and adjust user limits" },
+      { id: "modules", label: "Modules",     icon: Blocks,          desc: "Toggle module access per company" },
+    ],
+  },
+  {
+    id: "billing",
+    label: "Billing & Revenue",
+    icon: CreditCard,
+    color: "bg-teal-50 text-teal-600 border-teal-100",
+    items: [
+      { id: "billing",  label: "Billing",      icon: CreditCard, desc: "Subscriptions, invoicing, plans, revenue" },
+      { id: "alerts",   label: "Alert Center", icon: Bell,        desc: "Overdue invoices, limits, expiring subs" },
+    ],
+  },
+  {
+    id: "system",
+    label: "System & Config",
+    icon: SlidersHorizontal,
+    color: "bg-orange-50 text-orange-600 border-orange-100",
+    items: [
+      { id: "audit",         label: "Audit Logs",    icon: FileText,          desc: "Full audit trail across all companies" },
+      { id: "column-config", label: "Column Config", icon: SlidersHorizontal, desc: "Configure table column visibility" },
+    ],
+  },
 ];
+
+// ── Near Limit row with inline action dropdown ────────────────────────────────
+function NearLimitRow({ company: s, flags, navigate }: { company: any; flags: string[]; navigate: (o: { to: string }) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative flex items-center justify-between p-2 rounded-lg border border-amber-100 bg-amber-50/50">
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium truncate">{s.company_name}</p>
+        <p className="text-xs text-muted-foreground">{flags.join(", ")}</p>
+      </div>
+      <div className="relative shrink-0 ml-2">
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+        >
+          Actions <ChevronDown className={cn("size-3 transition-transform", open ? "rotate-180" : "")} />
+        </button>
+        {open && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+            <div className="absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-gray-200 bg-white shadow-lg py-1">
+              <button
+                onClick={() => { setOpen(false); navigate({ to: `/admin/companies/${s.company_id}` as any }); }}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2"
+              >
+                <Building2 className="size-3.5 text-blue-500" /> View Detail
+              </button>
+              <button
+                onClick={() => { setOpen(false); navigate({ to: `/admin/billing` }); }}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2"
+              >
+                <CreditCard className="size-3.5 text-green-500" /> Adjust Limits
+              </button>
+              <button
+                onClick={() => { setOpen(false); navigate({ to: `/admin/companies` }); }}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2"
+              >
+                <Users className="size-3.5 text-purple-500" /> Manage Users
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Accordion group state — all open by default
+function AccordionGroup({ group, navigate }: { group: typeof SECTION_GROUPS[0]; navigate: (opts: { to: string }) => void }) {
+  const [open, setOpen] = useState(true);
+  const GroupIcon = group.icon;
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center border text-sm", group.color)}>
+            <GroupIcon className="size-4" />
+          </div>
+          <span className="font-semibold text-sm text-gray-800">{group.label}</span>
+          <span className="text-xs text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded-full">
+            {group.items.length}
+          </span>
+        </div>
+        <ChevronDown className={cn("size-4 text-muted-foreground transition-transform duration-200", open ? "rotate-0" : "-rotate-90")} />
+      </button>
+      {open && (
+        <div className="border-t border-gray-100 grid grid-cols-1 divide-y divide-gray-50">
+          {group.items.map(item => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => navigate({ to: `/admin/${item.id}` })}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-blue-50 hover:text-blue-700 transition-colors text-left group"
+              >
+                <Icon className="size-4 text-muted-foreground group-hover:text-blue-600 shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-gray-700 group-hover:text-blue-700">{item.label}</div>
+                  <div className="text-xs text-muted-foreground truncate">{item.desc}</div>
+                </div>
+                <ArrowUpRight className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 ml-auto shrink-0 transition-opacity" />
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AdminPage() {
   const user = useAuth((s) => s.user);
@@ -223,13 +350,7 @@ function AdminPage() {
                   if (s.mill_count >= s.mill_limit * 0.85) flags.push(`Mills ${s.mill_count}/${s.mill_limit}`);
                   if ((s.employee_count ?? 0) >= (s.employee_limit ?? 9999) * 0.85) flags.push(`Employees ${s.employee_count}/${s.employee_limit}`);
                   return (
-                    <div key={s.company_id} className="flex items-center justify-between p-2 rounded-lg border border-amber-100 bg-amber-50/50">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{s.company_name}</p>
-                        <p className="text-xs text-muted-foreground">{flags.join(", ")}</p>
-                      </div>
-                      <button onClick={() => navigate({ to: `/admin/companies/${s.company_id}` as any })} className="text-xs text-blue-600 hover:underline shrink-0 ml-2">View</button>
-                    </div>
+                    <NearLimitRow key={s.company_id} company={s} flags={flags} navigate={navigate} />
                   );
                 })}
               </div>
@@ -300,20 +421,12 @@ function AdminPage() {
         </CardContent>
       </Card>
 
-      {/* Navigation Sections */}
+      {/* Navigation Sections — grouped accordion dropdowns */}
       <div>
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Admin Sections</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {SECTIONS.map(s => (
-            <button key={s.id} onClick={() => navigate({ to: `/admin/${s.id}` })}
-              className="text-left p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all bg-white"
-            >
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${s.color} mb-3`}>
-                <s.icon className="size-5" />
-              </div>
-              <h3 className="font-semibold text-sm">{s.label}</h3>
-              <p className="text-xs text-muted-foreground mt-1">{s.desc}</p>
-            </button>
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
+          {SECTION_GROUPS.map(group => (
+            <AccordionGroup key={group.id} group={group} navigate={navigate} />
           ))}
         </div>
       </div>

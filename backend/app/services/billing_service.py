@@ -447,11 +447,17 @@ class BillingService:
 
         mrr_trend = summary["revenue_trend"]
 
+        # BUG FIX: sort_order must be aggregated — it's not in GROUP BY.
+        # PostgreSQL raises "must appear in GROUP BY or aggregate function" otherwise.
         plan_count_res = await self.db.execute(
-            select(SubscriptionPlan.code, func.count(CompanySubscription.id))
+            select(
+                SubscriptionPlan.code,
+                func.count(CompanySubscription.id),
+                func.min(SubscriptionPlan.sort_order).label("sort_order"),
+            )
             .outerjoin(CompanySubscription, SubscriptionPlan.id == CompanySubscription.plan_id)
             .group_by(SubscriptionPlan.code)
-            .order_by(SubscriptionPlan.sort_order)
+            .order_by(func.min(SubscriptionPlan.sort_order))
         )
         plan_distribution = [{"plan": row[0], "count": row[1]} for row in plan_count_res.all()]
 

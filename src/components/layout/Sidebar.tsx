@@ -25,6 +25,9 @@ import {
   CreditCard,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  Building2,
+  Archive,
   X,
   LogOut,
 } from "lucide-react";
@@ -84,14 +87,21 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Settings",
     items: [
-      { to: "/masters",           label: "Masters",       icon: Settings2,       module: "masters" },
-      { to: "/users",             label: "Users & Roles", icon: UserCog,         module: "users" },
-      { to: "/audit",             label: "Audit Logs",    icon: ClipboardList,   module: "audit" },
-      { to: "/admin",             label: "Admin Panel",   icon: Shield,          module: "admin" },
-      { to: "/admin/column-config", label: "Column Config", icon: SlidersHorizontal, module: "column_config" },
-      { to: "/admin/billing",       label: "Billing",       icon: CreditCard,       module: "billing" },
+      { to: "/masters", label: "Masters",       icon: Settings2,  module: "masters" },
+      { to: "/users",   label: "Users & Roles", icon: UserCog,    module: "users" },
+      { to: "/audit",   label: "Audit Logs",    icon: ClipboardList, module: "audit" },
     ],
   },
+];
+
+// Admin sub-items shown inside the collapsible Admin group (SUPER_ADMIN only)
+const ADMIN_SUB_ITEMS = [
+  { to: "/admin",                label: "Dashboard",     icon: LayoutDashboard,  exact: true },
+  { to: "/admin/companies",      label: "Companies",     icon: Building2,        exact: false },
+  { to: "/admin/users",          label: "Users",         icon: Users,            exact: false },
+  { to: "/admin/archive",        label: "Archive",       icon: Archive,          exact: false },
+  { to: "/admin/billing",        label: "Billing",       icon: CreditCard,       exact: false },
+  { to: "/admin/column-config",  label: "Column Config", icon: SlidersHorizontal, exact: false },
 ];
 
 const COMPANY_OWNER_ROLES = new Set(["MILL_OWNER", "SUPER_ADMIN"]);
@@ -135,10 +145,14 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
 
+  // Admin group open by default if currently on an admin route
+  const isOnAdminRoute = pathname.startsWith("/admin");
+  const [adminOpen, setAdminOpen] = useState(isOnAdminRoute);
+
   if (!user) return null;
 
-  const isActive = (to: string) => {
-    if (to === "/admin") return pathname === "/admin";
+  const isActive = (to: string, exact = false) => {
+    if (exact || to === "/admin") return pathname === to;
     return pathname === to || pathname.startsWith(to + "/");
   };
 
@@ -176,7 +190,8 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
       ...group,
       items: group.items.filter((item) => {
         if (isDashboardOnly()) return item.module === "dashboard";
-        const SA_MODULES = new Set(["dashboard", "admin", "column_config", "users", "audit", "billing"]);
+        // SUPER_ADMIN: dashboard + users + audit shown flat; admin sub-items in collapsible group
+        const SA_MODULES = new Set(["dashboard", "users", "audit"]);
         if (isSuperAdmin) return SA_MODULES.has(item.module);
         return moduleCanAccess(item.module);
       }),
@@ -228,7 +243,7 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
             )}
             {group.items.map((item) => {
               const Icon = item.icon;
-              const active = isActive(item.to);
+              const active = isActive(item.to, false);
               const link = (
                 <Link
                   key={item.to}
@@ -287,6 +302,92 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
             })}
           </div>
         ))}
+
+        {/* ── Admin collapsible group (SUPER_ADMIN only) ───────────── */}
+        {isSuperAdmin && !isDashboardOnly() && (
+          <div className="mb-1">
+            {!collapsed && (
+              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "#475569" }}>
+                Admin
+              </div>
+            )}
+            {/* Accordion trigger */}
+            <button
+              onClick={() => setAdminOpen((o) => !o)}
+              className={cn(
+                "w-full flex items-center rounded-md transition-all duration-150 mb-0.5 cursor-pointer min-h-[40px]",
+                collapsed ? "justify-center px-2" : "px-3",
+                isOnAdminRoute ? "text-white" : "text-[#94a3b8] hover:text-white",
+              )}
+              style={isOnAdminRoute ? { backgroundColor: "#1e3a5f" } : undefined}
+              onMouseEnter={(e) => {
+                if (!isOnAdminRoute) (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
+              }}
+              onMouseLeave={(e) => {
+                if (!isOnAdminRoute) (e.currentTarget as HTMLElement).style.backgroundColor = "";
+              }}
+            >
+              <Shield className={cn("shrink-0", collapsed ? "w-5 h-5" : "w-[18px] h-[18px] mr-3", isOnAdminRoute ? "text-blue-400" : "text-[#94a3b8]")} />
+              {!collapsed && (
+                <>
+                  <span className={cn("text-[14px] font-medium truncate flex-1 text-left", isOnAdminRoute ? "text-white" : "text-[#94a3b8]")}>
+                    Admin Panel
+                  </span>
+                  <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200 shrink-0", adminOpen ? "rotate-0" : "-rotate-90", isOnAdminRoute ? "text-blue-400" : "text-[#64748b]")} />
+                </>
+              )}
+            </button>
+
+            {/* Sub-items */}
+            {(adminOpen || collapsed) && (
+              <div className={cn("overflow-hidden", !collapsed && "ml-3 border-l pl-2", collapsed && "mt-0.5")} style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+                {ADMIN_SUB_ITEMS.map((sub) => {
+                  const Icon = sub.icon;
+                  const active = isActive(sub.to, sub.exact);
+                  const link = (
+                    <Link
+                      key={sub.to}
+                      to={sub.to}
+                      onClick={onNavClick}
+                      className={cn(
+                        "flex items-center rounded-md transition-all duration-150 mb-0.5 cursor-pointer min-h-[36px]",
+                        collapsed ? "justify-center px-2" : "px-2.5",
+                        active ? "text-white" : "text-[#94a3b8] hover:text-white",
+                      )}
+                      style={active ? { backgroundColor: "#3b82f6" } : undefined}
+                      onMouseEnter={active ? undefined : (e) => {
+                        (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
+                      }}
+                      onMouseLeave={active ? undefined : (e) => {
+                        (e.currentTarget as HTMLElement).style.backgroundColor = "";
+                      }}
+                    >
+                      <Icon className={cn("shrink-0", collapsed ? "w-4 h-4" : "w-[15px] h-[15px] mr-2.5", active ? "text-white" : "text-[#64748b]")} />
+                      {!collapsed && (
+                        <span className={cn("text-[13px] font-medium truncate", active ? "text-white" : "text-[#94a3b8]")}>
+                          {sub.label}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                  if (collapsed) {
+                    return (
+                      <TooltipProvider key={sub.to}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>{link}</TooltipTrigger>
+                          <TooltipContent side="right" className="text-xs" style={{ backgroundColor: "#0f172a", color: "white", border: "1px solid rgba(255,255,255,0.1)" }}>
+                            {sub.label}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    );
+                  }
+                  return link;
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Billing */}
         {showBilling && (

@@ -1,39 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { mastersApi, adminApi } from "@/lib/api-service";
+import { mastersApi } from "@/lib/api-service";
 import { ROLE_LABELS } from "@/lib/rbac";
 import type { Role } from "@/lib/rbac";
 import { useAuth } from "@/stores/auth";
-import { ErrorBoundary } from "@/components/common/ErrorBoundary";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Eye, EyeOff, UserPlus, KeyRound, Copy, Check,
-  Building2, Factory, ChevronRight, Search, X,
-  Users, Shield, CheckCircle2, XCircle, Filter, AlertTriangle,
+  Search, X, CheckCircle2, XCircle, AlertTriangle, ChevronUp, ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,715 +27,553 @@ export const Route = createFileRoute("/_app/admin/users")({
   component: AdminUsersPage,
 });
 
-const ROLE_BADGE_COLORS: Record<string, string> = {
-  SUPER_ADMIN: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  MILL_OWNER: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  GENERAL_MANAGER: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  PRODUCTION_MANAGER: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-400",
-  QUALITY_MANAGER: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  DISPATCH_MANAGER: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  STORE_MANAGER: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  HR_MANAGER: "bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-400",
-  ACCOUNTANT: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  MAINTENANCE_MANAGER: "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400",
-  SUPERVISOR: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400",
-  MACHINE_OPERATOR: "bg-stone-100 text-stone-800 dark:bg-stone-900/30 dark:text-stone-400",
-  SECURITY_GATE: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  AUDITOR: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-400",
+// ── Role colours ─────────────────────────────────────────────────────────────
+const ROLE_BADGE: Record<string, string> = {
+  SUPER_ADMIN:          "bg-red-100 text-red-800",
+  MILL_OWNER:           "bg-purple-100 text-purple-800",
+  GENERAL_MANAGER:      "bg-blue-100 text-blue-800",
+  PRODUCTION_MANAGER:   "bg-cyan-100 text-cyan-800",
+  QUALITY_MANAGER:      "bg-green-100 text-green-800",
+  DISPATCH_MANAGER:     "bg-amber-100 text-amber-800",
+  STORE_MANAGER:        "bg-orange-100 text-orange-800",
+  HR_MANAGER:           "bg-pink-100 text-pink-800",
+  ACCOUNTANT:           "bg-indigo-100 text-indigo-800",
+  MAINTENANCE_MANAGER:  "bg-teal-100 text-teal-800",
+  SUPERVISOR:           "bg-slate-100 text-slate-700",
+  MACHINE_OPERATOR:     "bg-stone-100 text-stone-700",
+  SECURITY_GATE:        "bg-yellow-100 text-yellow-800",
+  AUDITOR:              "bg-violet-100 text-violet-800",
 };
 
 const ROLES_FOR_CREATE = [
-  "MILL_OWNER", "GENERAL_MANAGER", "PRODUCTION_MANAGER", "QUALITY_MANAGER",
-  "DISPATCH_MANAGER", "STORE_MANAGER", "HR_MANAGER", "ACCOUNTANT",
-  "MAINTENANCE_MANAGER", "SUPERVISOR", "MACHINE_OPERATOR", "SECURITY_GATE", "AUDITOR",
+  "MILL_OWNER","GENERAL_MANAGER","PRODUCTION_MANAGER","QUALITY_MANAGER",
+  "DISPATCH_MANAGER","STORE_MANAGER","HR_MANAGER","ACCOUNTANT",
+  "MAINTENANCE_MANAGER","SUPERVISOR","MACHINE_OPERATOR","SECURITY_GATE","AUDITOR",
 ];
 
-const DEPARTMENTS = [
-  "Production", "Quality", "Dispatch", "Stores", "HR",
-  "Accounts", "Maintenance", "Purchase", "Sales", "Administration",
-];
+const INIT_FORM = { name:"", email:"", password:"", confirm:"", role_code:"MILL_OWNER", company_id:"", mill_id:"" };
 
-function generateTempPassword() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
-  let pwd = "";
-  for (let i = 0; i < 10; i++) pwd += chars[Math.floor(Math.random() * chars.length)];
-  return pwd;
+function initials(name: string) {
+  return (name ?? "?").split(" ").slice(0,2).map(w => w[0]?.toUpperCase()).join("") || "?";
+}
+function pwOk(pw: string) {
+  return pw.length >= 8 && /[A-Z]/.test(pw) && /[a-z]/.test(pw) && /\d/.test(pw);
+}
+function genPwd() {
+  const c = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%";
+  return Array.from({length:10}, () => c[Math.floor(Math.random()*c.length)]).join("");
 }
 
-function pwChecks(pw: string) {
-  const checks = {
-    min8: pw.length >= 8,
-    upper: /[A-Z]/.test(pw),
-    lower: /[a-z]/.test(pw),
-    digit: /[0-9]/.test(pw),
-    special: /[!@#$%^&*(),.?":{}|<>]/.test(pw),
-  };
-  return { ...checks, passed: Object.values(checks).every(Boolean) };
+const PAGE_SIZE = 20;
+
+// ── Sort helper ───────────────────────────────────────────────────────────────
+type SortKey = "name" | "role" | "company" | "mill" | "status" | "last_login";
+
+function SortIcon({ col, sortKey, dir }: { col: SortKey; sortKey: SortKey; dir: "asc"|"desc" }) {
+  if (col !== sortKey) return <span className="ml-1 text-muted-foreground/30 text-[10px]">⇅</span>;
+  return dir === "asc"
+    ? <ChevronUp className="inline size-3 ml-0.5 text-blue-600" />
+    : <ChevronDown className="inline size-3 ml-0.5 text-blue-600" />;
 }
 
-const INITIAL_FORM = {
-  name: "", email: "", password: "", confirmPassword: "",
-  role_code: "MILL_OWNER", company_id: "", mill_id: "",
-};
-
+// ── Main component ────────────────────────────────────────────────────────────
 function AdminUsersPage() {
   const qc = useQueryClient();
   const user = useAuth((s) => s.user);
 
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
-  const [selectedMillId, setSelectedMillId] = useState<string | null>(null);
-  const [globalSearch, setGlobalSearch] = useState(false);
-  const [deptFilter, setDeptFilter] = useState("");
-  const [roleFilter, setRoleFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  // ── filter state ──
+  const [search, setSearch]           = useState("");
+  const [companyFilter, setCompanyFilter] = useState("all");
+  const [roleFilter, setRoleFilter]   = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage]               = useState(1);
+  const [sortKey, setSortKey]         = useState<SortKey>("name");
+  const [sortDir, setSortDir]         = useState<"asc"|"desc">("asc");
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [form, setForm] = useState(INITIAL_FORM);
-  const [showPwd, setShowPwd] = useState(false);
-  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
-  const [successDialog, setSuccessDialog] = useState<{ user: any; password: string } | null>(null);
-  const [resetDialog, setResetDialog] = useState<{ user: any; password: string } | null>(null);
-  const [copied, setCopied] = useState(false);
+  // ── dialog state ──
+  const [createOpen, setCreateOpen]   = useState(false);
+  const [form, setForm]               = useState(INIT_FORM);
+  const [showPwd, setShowPwd]         = useState(false);
+  const [successDlg, setSuccessDlg]   = useState<{user:any;pwd:string}|null>(null);
+  const [resetDlg, setResetDlg]       = useState<{user:any;pwd:string}|null>(null);
+  const [copied, setCopied]           = useState(false);
 
+  // ── data ──
   const companiesQ = useQuery({
-    queryKey: ["masters", "companies", "all"],
-    queryFn: () => mastersApi.getCompanies(1, 100, true),
+    queryKey: ["masters","companies","all"],
+    queryFn: () => mastersApi.getCompanies(1, 200, true),
     staleTime: 60_000,
   });
   const companies: any[] = (companiesQ.data as any[]) ?? [];
-  const activeCompanies = useMemo(
-    () => companies.filter((c: any) => c?.id && c.is_active !== false),
-    [companies]
-  );
-
-  const selectedCompany = useMemo(
-    () => companies.find((c: any) => c.id === selectedCompanyId),
-    [companies, selectedCompanyId]
-  );
-
-  const millsQ = useQuery({
-    queryKey: ["masters", "mills", selectedCompanyId],
-    queryFn: () => api.get("/masters/mills", { params: { company_id: selectedCompanyId, page_size: 500 } }).then(r => r.data?.data ?? []),
-    enabled: !!selectedCompanyId && !globalSearch,
-  });
-  const millsData: any[] = millsQ.data ?? [];
-  const selectedMill = useMemo(
-    () => millsData.find((m: any) => m.id === selectedMillId),
-    [millsData, selectedMillId]
-  );
 
   const usersQ = useQuery({
-    queryKey: ["admin-system-users", selectedCompanyId, globalSearch],
-    queryFn: () =>
-      api.get("/admin/users", {
-        params: globalSearch ? { page_size: 500 } : { company_id: selectedCompanyId || undefined, page_size: 500 },
-      }).then((r) => r.data),
+    queryKey: ["admin-users-all"],
+    queryFn: () => api.get("/admin/users", { params: { page_size: 1000 } }).then(r => r.data?.items ?? []),
     staleTime: 30_000,
   });
-  const allUsers: any[] = usersQ.data?.items ?? [];
-
-  const users = useMemo(() => {
-    let filtered = allUsers;
-    if (selectedMillId) {
-      filtered = filtered.filter((u: any) => u.mill_id === selectedMillId);
-    }
-    if (deptFilter) {
-      filtered = filtered.filter((u: any) => u.department === deptFilter);
-    }
-    if (roleFilter) {
-      filtered = filtered.filter((u: any) => u.role === roleFilter);
-    }
-    if (statusFilter) {
-      filtered = filtered.filter((u: any) =>
-        statusFilter === "active" ? u.is_active : !u.is_active
-      );
-    }
-    return filtered;
-  }, [allUsers, selectedMillId, deptFilter, roleFilter, statusFilter]);
-
-  const millUserCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const u of allUsers) {
-      const mid = u.mill_id ?? "";
-      counts[mid] = (counts[mid] ?? 0) + 1;
-    }
-    return counts;
-  }, [allUsers]);
-
-  const companyStats = useMemo(() => {
-    const companyUsers: Record<string, number> = {};
-    const companyActive: Record<string, number> = {};
-    for (const u of allUsers) {
-      const cid = u.company_id ?? "";
-      companyUsers[cid] = (companyUsers[cid] ?? 0) + 1;
-      if (u.is_active) companyActive[cid] = (companyActive[cid] ?? 0) + 1;
-    }
-    const millCounts: Record<string, number> = {};
-    for (const m of millsData) {
-      const cid = m.company_id ?? "";
-      millCounts[cid] = (millCounts[cid] ?? 0) + 1;
-    }
-    return { companyUsers, companyActive, millCounts };
-  }, [allUsers, millsData]);
+  const allUsers: any[] = usersQ.data ?? [];
 
   const formMillsQ = useQuery({
-    queryKey: ["masters", "mills", "form", form.company_id],
+    queryKey: ["mills-for-form", form.company_id],
     queryFn: () => mastersApi.getMills(form.company_id),
     enabled: !!form.company_id,
     staleTime: 30_000,
   });
   const formMills: any[] = formMillsQ.data ?? [];
 
-  const createMutation = useMutation({
-    mutationFn: (data: any) => api.post("/admin/users", data).then((r) => r.data),
+  // ── mutations ──
+  const createMut = useMutation({
+    mutationFn: (d: any) => api.post("/admin/users", d).then(r => r.data),
     onSuccess: (resp) => {
-      qc.invalidateQueries({ queryKey: ["admin-system-users"] });
+      qc.invalidateQueries({ queryKey: ["admin-users-all"] });
       setCreateOpen(false);
-      setSuccessDialog({ user: resp, password: form.password });
-      setForm(INITIAL_FORM);
+      setSuccessDlg({ user: resp, pwd: form.password });
+      setForm(INIT_FORM);
     },
-    onError: (err: any) => toast.error(err?.response?.data?.detail ?? "Failed to create user"),
+    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Failed to create user"),
   });
 
-  const resetPwdMutation = useMutation({
-    mutationFn: ({ id, password: pwd }: { id: string; password: string }) =>
-      api.patch(`/admin/users/${id}/reset-password`, { password: pwd }).then((r) => r.data),
-    onSuccess: (_data, vars) => {
-      const u = allUsers.find((u: any) => u.id === vars.id);
-      qc.invalidateQueries({ queryKey: ["admin-system-users"] });
-      setResetDialog(null);
-      setSuccessDialog({ user: u, password: vars.password });
+  const resetMut = useMutation({
+    mutationFn: ({ id, pwd }: { id:string; pwd:string }) =>
+      api.patch(`/admin/users/${id}/reset-password`, { password: pwd }).then(r => r.data),
+    onSuccess: (_, vars) => {
+      const u = allUsers.find(u => u.id === vars.id);
+      qc.invalidateQueries({ queryKey: ["admin-users-all"] });
+      setResetDlg(null);
+      setSuccessDlg({ user: u, pwd: vars.pwd });
     },
-    onError: (err: any) => toast.error(err?.response?.data?.detail ?? "Failed to reset password"),
+    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Failed to reset password"),
   });
 
-  const deactivateMutation = useMutation({
-    mutationFn: (id: string) => api.patch(`/users/${id}/deactivate`).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-system-users"] }),
-    onError: (err: any) => toast.error(err?.response?.data?.detail ?? "Failed to toggle user status"),
+  const toggleMut = useMutation({
+    mutationFn: (id: string) => api.patch(`/users/${id}/deactivate`).then(r => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-users-all"] }),
+    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Failed to toggle status"),
   });
 
-  function handleResetPwd(u: any) {
-    setResetDialog({ user: u, password: generateTempPassword() });
+  // ── filter + sort + paginate ──
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let out = allUsers.filter(u => {
+      if (q && !(u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q) || u.mill_name?.toLowerCase().includes(q))) return false;
+      if (companyFilter !== "all" && u.company_id !== companyFilter) return false;
+      if (roleFilter !== "all" && u.role !== roleFilter) return false;
+      if (statusFilter === "active" && !u.is_active) return false;
+      if (statusFilter === "inactive" && u.is_active) return false;
+      return true;
+    });
+
+    out = [...out].sort((a, b) => {
+      let va = "", vb = "";
+      if (sortKey === "name")       { va = a.name ?? ""; vb = b.name ?? ""; }
+      if (sortKey === "role")       { va = a.role ?? ""; vb = b.role ?? ""; }
+      if (sortKey === "company")    { va = a.company_name ?? ""; vb = b.company_name ?? ""; }
+      if (sortKey === "mill")       { va = a.mill_name ?? ""; vb = b.mill_name ?? ""; }
+      if (sortKey === "status")     { va = a.is_active ? "1" : "0"; vb = b.is_active ? "1" : "0"; }
+      if (sortKey === "last_login") { va = a.last_login ?? ""; vb = b.last_login ?? ""; }
+      const cmp = va.localeCompare(vb);
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    return out;
+  }, [allUsers, search, companyFilter, roleFilter, statusFilter, sortKey, sortDir]);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
+  const pageUsers = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+
+  const activeCount  = allUsers.filter(u => u.is_active).length;
+  const ownerCount   = allUsers.filter(u => u.role === "MILL_OWNER").length;
+  const inactiveCount = allUsers.filter(u => !u.is_active).length;
+
+  const allRoles = useMemo(() => [...new Set(allUsers.map((u:any)=>u.role))].sort(), [allUsers]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
+    setPage(1);
   }
 
-  function confirmResetPwd(userId: string, password: string) {
-    resetPwdMutation.mutate({ id: userId, password });
+  function handleCreate() {
+    if (!form.name || !form.email || !form.password || !form.company_id) {
+      return toast.error("Name, email, password, and company are required");
+    }
+    if (form.password !== form.confirm) return toast.error("Passwords do not match");
+    if (!pwOk(form.password)) return toast.error("Password must be 8+ chars with uppercase, lowercase, and digit");
+    createMut.mutate({ name: form.name, email: form.email, password: form.password, role_code: form.role_code, company_id: form.company_id, mill_id: form.mill_id || undefined });
   }
 
-  function copyToClipboard(text: string) {
-    navigator.clipboard.writeText(text);
+  function copyText(t: string) {
+    navigator.clipboard.writeText(t);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
 
-  function handleCreate() {
-    const pw = pwChecks(form.password);
-    if (!form.name || !form.email || !form.password || !form.company_id) {
-      toast.error("Name, email, password, and company are required");
-      return;
-    }
-    if (form.password !== form.confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
-    if (!pw.passed) {
-      toast.error("Password must be 8+ chars with uppercase, lowercase, digit, and special");
-      return;
-    }
-    const c = companies.find((c: any) => c.id === form.company_id);
-    if (c) {
-      const current = companyStats.companyUsers[c.id] ?? 0;
-      const max = c.max_users ?? 50;
-      if (current >= max) {
-        toast.error(`User limit reached for ${c.name}. Current: ${current}/${max}. Upgrade plan or increase limit first.`);
-        return;
-      }
-    }
-    createMutation.mutate({
-      name: form.name, email: form.email, password: form.password,
-      role_code: form.role_code, company_id: form.company_id,
-      mill_id: form.mill_id || undefined,
-    });
-  }
-
   if (!user || user.role !== "SUPER_ADMIN") {
-    return (
-      <div className="p-6 text-destructive text-lg font-medium">
-        Only Super Admin can access this page.
-      </div>
-    );
+    return <div className="p-6 text-destructive text-lg font-medium">Only Super Admin can access this page.</div>;
   }
 
-  const allRoles = [...new Set(allUsers.map((u: any) => u.role))].sort();
-  const activeUsers = allUsers.filter((u: any) => u.is_active).length;
+  const hasFilter = search || companyFilter !== "all" || roleFilter !== "all" || statusFilter !== "all";
 
   return (
     <div className="p-6 space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">User Management</h1>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-            {selectedCompany ? (
-              <>
-                <button onClick={() => { setSelectedCompanyId(null); setSelectedMillId(null); }}
-                  className="text-blue-600 hover:underline cursor-pointer">
-                  {selectedCompany.name}
-                </button>
-                {selectedMill && (
-                  <>
-                    <ChevronRight className="size-3" />
-                    <span className="font-medium">{selectedMill.name}</span>
-                  </>
-                )}
-              </>
-            ) : (
-              <span>Select a company to manage users</span>
-            )}
-          </div>
+          <p className="text-sm text-muted-foreground mt-0.5">Search, filter and manage users across all companies</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={globalSearch ? "default" : "outline"}
-            size="sm"
-            onClick={() => { setGlobalSearch(!globalSearch); setSelectedCompanyId(null); setSelectedMillId(null); }}
-          >
-            <Search className="size-3.5 mr-1" />
-            Global Search
-          </Button>
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <UserPlus className="size-3.5 mr-1" />
-                Create User
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="w-full max-w-lg mx-4 overflow-y-auto max-h-[90vh]">
-              <DialogHeader>
-                <DialogTitle>Create New User</DialogTitle>
-                <DialogDescription>Create a user under any company across the system.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Full Name</Label>
-                  <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="John Doe" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="john@mill.com" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <div className="relative">
-                    <Input id="password" type={showPwd ? "text" : "password"} value={form.password}
-                      onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Min 8 chars" />
-                    <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer"
-                      onClick={() => setShowPwd(!showPwd)}>
-                      {showPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </button>
-                  </div>
-                  {form.password && (
-                    <div className="flex gap-2 text-xs mt-1">
-                      {(["min8", "upper", "lower", "digit", "special"] as const).map((c) => {
-                        const pass = pwChecks(form.password)[c];
-                        return (
-                          <span key={c} className={pass ? "text-green-600" : "text-muted-foreground"}>
-                            {pass ? "✓" : "○"} {c === "min8" ? "8+" : c === "special" ? "!@#" : c}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <div className="relative">
-                    <Input id="confirmPassword" type={showConfirmPwd ? "text" : "password"} value={form.confirmPassword}
-                      onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} placeholder="Re-enter password" />
-                    <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer"
-                      onClick={() => setShowConfirmPwd(!showConfirmPwd)}>
-                      {showConfirmPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
-                  <Select value={form.role_code} onValueChange={(v) => setForm({ ...form, role_code: v })}>
-                    <SelectTrigger id="role"><SelectValue placeholder="Select role" /></SelectTrigger>
-                    <SelectContent>
-                      {ROLES_FOR_CREATE.map((role) => (
-                        <SelectItem key={role} value={role}>{ROLE_LABELS[role as Role]}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="company_id">Company</Label>
-                  <Select value={form.company_id} onValueChange={(v) => setForm({ ...form, company_id: v, mill_id: "" })}>
-                    <SelectTrigger id="company_id"><SelectValue placeholder="Select company" /></SelectTrigger>
-                    <SelectContent>
-                      {activeCompanies.filter((c: any) => c?.id).map((c: any) => {
-                        const cid = c.id;
-                        const current = companyStats.companyUsers[cid] ?? 0;
-                        const max = c.max_users ?? 50;
-                        const pct = max > 0 ? (current / max) * 100 : 0;
-                        const overLimit = current >= max;
-                        return (
-                          <SelectItem key={c.id} value={c.id}>
-                            <div className="flex items-center justify-between w-full gap-4">
-                              <span>{c.name}</span>
-                              <span className={cn(
-                                "text-xs whitespace-nowrap",
-                                pct >= 100 ? "text-red-500 font-semibold" : pct >= 90 ? "text-amber-500" : "text-muted-foreground"
-                              )}>
-                                {current}/{max}
-                                {pct >= 100 ? " ⛔" : pct >= 90 ? " ⚠" : ""}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  {form.company_id && (() => {
-                    const c = companies.find((c: any) => c.id === form.company_id);
-                    if (!c) return null;
-                    const current = companyStats.companyUsers[c.id] ?? 0;
-                    const max = c.max_users ?? 50;
-                    const pct = max > 0 ? (current / max) * 100 : 0;
-                    const overLimit = current >= max;
-                    return (
-                      <div className={cn(
-                        "mt-1 p-2 rounded text-xs border",
-                        pct >= 100
-                          ? "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800"
-                          : pct >= 90
-                          ? "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800"
-                          : "bg-muted/30 border-transparent text-muted-foreground"
-                      )}>
-                        <div className="flex items-center justify-between">
-                          <span>User Limit</span>
-                          <span className="font-semibold">{current} / {max}</span>
-                        </div>
-                        {pct >= 100 && (
-                          <p className="text-[10px] mt-1">⛔ User limit reached. Upgrade plan or increase limit before creating more users.</p>
-                        )}
-                        {pct >= 90 && pct < 100 && (
-                          <p className="text-[10px] mt-1">⚠ Approaching user limit ({Math.round(pct)}% used).</p>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="mill_id">Mill (optional)</Label>
-                  <Select value={form.mill_id} onValueChange={(v) => setForm({ ...form, mill_id: v })} disabled={!form.company_id}>
-                    <SelectTrigger id="mill_id">
-                      <SelectValue placeholder={form.company_id ? "Select mill" : "Select company first"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {formMills.filter((m: any) => m?.id).map((m: any) => (
-                        <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button className="w-full cursor-pointer" onClick={handleCreate} disabled={createMutation.isPending}>
-                  {createMutation.isPending ? "Creating\u2026" : "Create User"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
+        <Button size="sm" onClick={() => setCreateOpen(true)}>
+          <UserPlus className="size-3.5 mr-1.5" /> Create User
+        </Button>
       </div>
 
-      {/* Error banners */}
+      {/* ── Stats row ─────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Total users",  value: allUsers.length,  color: "text-gray-900 dark:text-gray-100" },
+          { label: "Active",       value: activeCount,      color: "text-emerald-600" },
+          { label: "Mill owners",  value: ownerCount,       color: "text-blue-600" },
+          { label: "Inactive",     value: inactiveCount,    color: "text-amber-600" },
+        ].map(s => (
+          <div key={s.label} className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-4">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{s.label}</p>
+            <p className={cn("text-2xl font-semibold", s.color)}>{usersQ.isLoading ? "—" : s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Filter bar ────────────────────────────────────────────────────── */}
+      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-3 flex flex-wrap gap-2 items-center">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+          <input
+            type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Search name, email, mill…"
+            className="w-full pl-8 pr-8 py-1.5 text-sm border border-gray-200 dark:border-slate-600 rounded-lg bg-gray-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {search && <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="size-3.5" /></button>}
+        </div>
+
+        {/* Company */}
+        <select value={companyFilter} onChange={e => { setCompanyFilter(e.target.value); setPage(1); }}
+          className="text-sm border border-gray-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-gray-50 dark:bg-slate-800 text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="all">All companies</option>
+          {companies.filter((c:any) => c?.id).map((c:any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+
+        {/* Role */}
+        <select value={roleFilter} onChange={e => { setRoleFilter(e.target.value); setPage(1); }}
+          className="text-sm border border-gray-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-gray-50 dark:bg-slate-800 text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="all">All roles</option>
+          {allRoles.map(r => <option key={r} value={r}>{ROLE_LABELS[r as Role] ?? r}</option>)}
+        </select>
+
+        {/* Status */}
+        <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+          className="text-sm border border-gray-200 dark:border-slate-600 rounded-lg px-2.5 py-1.5 bg-gray-50 dark:bg-slate-800 text-foreground focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="all">All status</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+
+        {hasFilter && (
+          <button onClick={() => { setSearch(""); setCompanyFilter("all"); setRoleFilter("all"); setStatusFilter("all"); setPage(1); }}
+            className="text-xs text-blue-600 hover:underline whitespace-nowrap">
+            Clear all
+          </button>
+        )}
+
+        <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap">
+          {filtered.length} user{filtered.length !== 1 ? "s" : ""}
+        </span>
+      </div>
+
+      {/* ── Error ─────────────────────────────────────────────────────────── */}
       {usersQ.isError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800 p-3 flex items-center justify-between">
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertTriangle className="size-4 text-red-500 shrink-0" />
-            <p className="text-xs text-red-700 dark:text-red-400">Failed to load users. You may be viewing stale data.</p>
+            <p className="text-xs text-red-700">Failed to load users.</p>
           </div>
-          <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => usersQ.refetch()}>Retry</Button>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => usersQ.refetch()}>Retry</Button>
         </div>
       )}
 
-      {/* 3-Panel Layout */}
-      <div className="grid grid-cols-12 gap-4 min-h-[500px]">
-        {/* LEFT PANEL: Companies */}
-        <div className="col-span-3 border rounded-lg bg-white dark:bg-slate-900 dark:border-slate-700 overflow-hidden">
-          <div className="p-3 bg-muted/30 border-b">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              <Building2 className="size-4" /> Companies
-            </h3>
-          </div>
-          <ScrollArea className="h-[500px]">
-            {activeCompanies.length === 0 ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">No active companies found.</div>
-            ) : (
-              <div className="divide-y">
-                {activeCompanies.map((c: any) => {
-                  const isSelected = selectedCompanyId === c.id;
-                  const uCount = companyStats.companyUsers[c.id] ?? 0;
-                  return (
-                    <button
-                      key={c.id}
-                      onClick={() => { setSelectedCompanyId(c.id); setSelectedMillId(null); setGlobalSearch(false); }}
-                      className={cn(
-                        "w-full text-left p-3 transition-colors cursor-pointer hover:bg-muted/50",
-                        isSelected && "bg-blue-50 dark:bg-blue-900/20 border-l-2 border-blue-500"
-                      )}
-                    >
-                      <div className="font-medium text-sm truncate">{c.name}</div>
-                      <div className="text-xs text-muted-foreground mt-1 flex gap-3">
-                        <span>{uCount} users</span>
-                        <span>{companyStats.millCounts[c.id] ?? 0} mills</span>
-                      </div>
-                      {isSelected && selectedCompany && (
-                        <div className="mt-2 pt-2 border-t text-xs space-y-1 text-muted-foreground">
-                          <span className="flex justify-between">
-                            <span>Active users</span>
-                            <span className="font-semibold text-green-600">{companyStats.companyActive[c.id] ?? 0}</span>
-                          </span>
-                          <span className="flex justify-between">
-                            <span>Plan</span>
-                            <span className="font-semibold capitalize">{c.plan ?? c.subscription_plan ?? "starter"}</span>
-                          </span>
-                          <span className="flex justify-between">
-                            <span>User Limit</span>
-                            <span className={cn(
-                              "font-semibold",
-                              (() => { const pct = (c.max_users ?? 50) > 0 ? ((uCount) / (c.max_users ?? 50)) * 100 : 0; return pct >= 100 ? "text-red-500" : pct >= 90 ? "text-amber-500" : "text-muted-foreground"; })()
-                            )}>
-                              {uCount} / {c.max_users ?? 50}
-                            </span>
-                          </span>
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </ScrollArea>
-        </div>
-
-        {/* MIDDLE PANEL: Mills */}
-        <div className="col-span-3 border rounded-lg bg-white dark:bg-slate-900 dark:border-slate-700 overflow-hidden">
-          <div className="p-3 bg-muted/30 border-b">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              <Factory className="size-4" /> Mills
-              {selectedCompany && <span className="text-xs font-normal text-muted-foreground">— {selectedCompany.name}</span>}
-            </h3>
-          </div>
-          <ScrollArea className="h-[500px]">
-            {!selectedCompanyId ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">
-                <Building2 className="size-8 mx-auto mb-2 opacity-40" />
-                Select a company
-              </div>
-            ) : globalSearch ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">
-                Global search mode — all mills
-              </div>
-            ) : millsData.length === 0 ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">No mills found.</div>
-            ) : (
-              <div className="divide-y">
-                {millsData.map((m: any) => {
-                  const isSelected = selectedMillId === m.id;
-                  const uCount = millUserCounts[m.id] ?? 0;
-                  return (
-                    <button
-                      key={m.id}
-                      onClick={() => setSelectedMillId(m.id)}
-                      className={cn(
-                        "w-full text-left p-3 transition-colors cursor-pointer hover:bg-muted/50",
-                        isSelected && "bg-emerald-50 dark:bg-emerald-900/20 border-l-2 border-emerald-500"
-                      )}
-                    >
-                      <div className="font-medium text-sm truncate">{m.name}</div>
-                      <div className="text-xs text-muted-foreground mt-1">{uCount} users</div>
-                      {isSelected && (
-                        <div className="mt-2 pt-2 border-t text-xs space-y-1 text-muted-foreground">
-                          <span className="flex justify-between">
-                            <span>Code</span>
-                            <span className="font-mono">{m.code}</span>
-                          </span>
-                          <span className="flex justify-between">
-                            <span>Status</span>
-                            <span className={m.is_active ? "text-green-600" : "text-red-500"}>{m.is_active ? "Active" : "Inactive"}</span>
-                          </span>
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </ScrollArea>
-        </div>
-
-        {/* RIGHT PANEL: Users */}
-        <div className="col-span-6 border rounded-lg bg-white dark:bg-slate-900 dark:border-slate-700 overflow-hidden">
-          <div className="p-3 bg-muted/30 border-b">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Users className="size-4" /> Users
-                {selectedMill && <span className="text-xs font-normal text-muted-foreground">— {selectedMill.name}</span>}
-                {globalSearch && <span className="text-xs font-normal text-muted-foreground">— All Companies</span>}
-              </h3>
-              <span className="text-xs text-muted-foreground">{users.length} of {allUsers.length}</span>
-            </div>
-            {/* Filters */}
-            <div className="flex items-center gap-2 mt-2 pt-2 border-t">
-              <Filter className="size-3 text-muted-foreground" />
-              <select value={deptFilter} onChange={e => setDeptFilter(e.target.value)}
-                className="px-2 py-1 text-xs border rounded-md bg-white dark:bg-slate-800">
-                <option value="">All Departments</option>
-                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-              <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)}
-                className="px-2 py-1 text-xs border rounded-md bg-white dark:bg-slate-800">
-                <option value="">All Roles</option>
-                {allRoles.map(r => <option key={r} value={r}>{ROLE_LABELS[r as Role] ?? r}</option>)}
-              </select>
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-                className="px-2 py-1 text-xs border rounded-md bg-white dark:bg-slate-800">
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-              {(deptFilter || roleFilter || statusFilter) && (
-                <button onClick={() => { setDeptFilter(""); setRoleFilter(""); setStatusFilter(""); }}
-                  className="text-xs text-blue-600 hover:underline cursor-pointer ml-auto">
-                  Clear filters
-                </button>
-              )}
-            </div>
-          </div>
-
-          <ScrollArea className="h-[500px]">
-            {!selectedCompanyId && !globalSearch ? (
-              <div className="p-12 text-center text-sm text-muted-foreground">
-                <Users className="size-12 mx-auto mb-3 opacity-30" />
-                <p className="font-medium">Select a company and mill</p>
-                <p className="text-xs mt-1">Use the left panels to navigate the hierarchy</p>
-              </div>
-            ) : users.length === 0 ? (
-              <div className="p-12 text-center text-sm text-muted-foreground">
-                <Users className="size-12 mx-auto mb-3 opacity-30" />
-                <p>No users found</p>
-                <p className="text-xs mt-1">Create a user or adjust filters</p>
-              </div>
-            ) : (
-              <div className="divide-y">
-                {users.map((u: any) => (
-                  <div key={u.id} className="p-3 flex items-center gap-3 hover:bg-muted/30">
-                    <div className={cn(
-                      "w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
-                      u.is_active ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-400"
-                    )}>
-                      {u.name?.charAt(0)?.toUpperCase() ?? "?"}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm truncate">{u.name}</span>
-                        <span className={cn(
-                          "text-xs px-1.5 py-0.5 rounded font-medium",
-                          ROLE_BADGE_COLORS[u.role] ?? "bg-gray-100 text-gray-600"
-                        )}>
-                          {ROLE_LABELS[u.role as Role] ?? u.role}
-                        </span>
-                        {u.is_active
-                          ? <CheckCircle2 className="size-3 text-green-500 shrink-0" />
-                          : <XCircle className="size-3 text-red-400 shrink-0" />
-                        }
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{u.email}</div>
-                    </div>
-                    <div className="text-xs text-muted-foreground hidden md:block">
-                      {u.mill_name ?? "—"}
-                    </div>
-                    <div className="flex gap-1 shrink-0">
-                      <Button variant="ghost" size="sm" className="h-7 text-xs"
-                        onClick={() => handleResetPwd(u)} disabled={!u.is_active}>
-                        <KeyRound className="size-3 mr-1" /> Reset
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 text-xs"
-                        onClick={() => deactivateMutation.mutate(u.id)}>
-                        {u.is_active ? "Deactivate" : "Reactivate"}
-                      </Button>
-                    </div>
-                  </div>
+      {/* ── Table ─────────────────────────────────────────────────────────── */}
+      <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-gray-50 dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700">
+                {([
+                  { key: "name",       label: "User" },
+                  { key: "role",       label: "Role" },
+                  { key: "company",    label: "Company" },
+                  { key: "mill",       label: "Mill" },
+                  { key: "last_login", label: "Last login" },
+                  { key: "status",     label: "Status" },
+                ] as { key: SortKey; label: string }[]).map(col => (
+                  <th key={col.key}
+                    onClick={() => toggleSort(col.key)}
+                    className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide cursor-pointer select-none hover:text-foreground whitespace-nowrap"
+                  >
+                    {col.label}
+                    <SortIcon col={col.key} sortKey={sortKey} dir={sortDir} />
+                  </th>
                 ))}
-              </div>
-            )}
-          </ScrollArea>
+                <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {usersQ.isLoading ? (
+                [...Array(8)].map((_, i) => (
+                  <tr key={i} className="border-b border-gray-100 dark:border-slate-800">
+                    {[...Array(7)].map((_, j) => (
+                      <td key={j} className="px-4 py-3">
+                        <div className="h-3.5 bg-gray-100 dark:bg-slate-700 rounded animate-pulse" style={{width: j===0?"140px":j===1?"90px":j===2?"120px":"70px"}} />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : pageUsers.length === 0 ? (
+                <tr><td colSpan={7} className="px-4 py-16 text-center text-sm text-muted-foreground">
+                  {hasFilter ? "No users match the current filters." : "No users found."}
+                </td></tr>
+              ) : pageUsers.map(u => {
+                const av = initials(u.name);
+                const avColor = ["bg-blue-100 text-blue-700","bg-green-100 text-green-700","bg-purple-100 text-purple-700","bg-amber-100 text-amber-700","bg-pink-100 text-pink-700"][av.charCodeAt(0) % 5];
+                return (
+                  <tr key={u.id} className="border-b border-gray-100 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
+
+                    {/* User */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0", avColor)}>
+                          {av}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate max-w-[140px]">{u.name}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-[140px]">{u.email}</p>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Role */}
+                    <td className="px-4 py-3">
+                      <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap", ROLE_BADGE[u.role] ?? "bg-gray-100 text-gray-700")}>
+                        {ROLE_LABELS[u.role as Role] ?? u.role}
+                      </span>
+                    </td>
+
+                    {/* Company */}
+                    <td className="px-4 py-3">
+                      <span className="text-xs bg-gray-100 dark:bg-slate-700 text-muted-foreground px-2 py-0.5 rounded-full whitespace-nowrap max-w-[120px] truncate block">
+                        {u.company_name ?? "—"}
+                      </span>
+                    </td>
+
+                    {/* Mill */}
+                    <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                      {u.mill_name ?? "—"}
+                    </td>
+
+                    {/* Last login */}
+                    <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                      {u.last_login ? new Date(u.last_login).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "—"}
+                    </td>
+
+                    {/* Status */}
+                    <td className="px-4 py-3">
+                      {u.is_active
+                        ? <span className="flex items-center gap-1.5 text-xs text-emerald-700"><CheckCircle2 className="size-3" /> Active</span>
+                        : <span className="flex items-center gap-1.5 text-xs text-red-500"><XCircle className="size-3" /> Inactive</span>
+                      }
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setResetDlg({ user: u, pwd: genPwd() })}
+                          className="flex items-center gap-1 px-2 py-1 text-xs border border-gray-200 dark:border-slate-600 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 text-muted-foreground hover:text-foreground transition-colors"
+                          title="Reset password"
+                        >
+                          <KeyRound className="size-3" /> Reset
+                        </button>
+                        <button
+                          onClick={() => toggleMut.mutate(u.id)}
+                          disabled={toggleMut.isPending}
+                          className={cn(
+                            "flex items-center gap-1 px-2 py-1 text-xs border rounded-md transition-colors",
+                            u.is_active
+                              ? "border-red-200 text-red-600 hover:bg-red-50"
+                              : "border-green-200 text-green-600 hover:bg-green-50"
+                          )}
+                        >
+                          {u.is_active ? "Deactivate" : "Reactivate"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
+
+        {/* ── Pagination ─────────────────────────────────────────────────── */}
+        {filtered.length > PAGE_SIZE && (
+          <div className="px-4 py-3 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between text-xs text-muted-foreground">
+            <span>
+              Showing {(page-1)*PAGE_SIZE+1}–{Math.min(page*PAGE_SIZE, filtered.length)} of {filtered.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage(p => Math.max(1,p-1))} disabled={page===1}
+                className="px-2.5 py-1 border border-gray-200 dark:border-slate-600 rounded-md disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                ‹
+              </button>
+              {Array.from({length: Math.min(totalPages,7)}, (_, i) => {
+                let p = i+1;
+                if (totalPages > 7) {
+                  if (page <= 4) p = i+1;
+                  else if (page >= totalPages-3) p = totalPages-6+i;
+                  else p = page-3+i;
+                }
+                return (
+                  <button key={p} onClick={() => setPage(p)}
+                    className={cn("px-2.5 py-1 rounded-md border transition-colors",
+                      page===p ? "bg-blue-600 text-white border-blue-600" : "border-gray-200 dark:border-slate-600 hover:bg-gray-100 dark:hover:bg-slate-700")}>
+                    {p}
+                  </button>
+                );
+              })}
+              <button onClick={() => setPage(p => Math.min(totalPages,p+1))} disabled={page===totalPages}
+                className="px-2.5 py-1 border border-gray-200 dark:border-slate-600 rounded-md disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                ›
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Success Dialog */}
-      <Dialog open={!!successDialog} onOpenChange={(open) => !open && setSuccessDialog(null)}>
-        <DialogContent className="w-full max-w-lg mx-4 overflow-y-auto max-h-[90vh]">
+      {/* ── Create User Dialog ────────────────────────────────────────────── */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="w-full max-w-md mx-4 overflow-y-auto max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-green-600">
-              <Check className="size-5" /> User Created / Password Reset
-            </DialogTitle>
-            <DialogDescription>Share these credentials with the user.</DialogDescription>
+            <DialogTitle>Create New User</DialogTitle>
+            <DialogDescription>Add a user to any company in the system.</DialogDescription>
           </DialogHeader>
-          {successDialog && (
+          <div className="space-y-3 mt-2">
+            <div className="space-y-1">
+              <Label>Full Name</Label>
+              <Input value={form.name} onChange={e => setForm({...form, name:e.target.value})} placeholder="John Doe" />
+            </div>
+            <div className="space-y-1">
+              <Label>Email</Label>
+              <Input type="email" value={form.email} onChange={e => setForm({...form, email:e.target.value})} placeholder="john@mill.com" />
+            </div>
+            <div className="space-y-1">
+              <Label>Password</Label>
+              <div className="relative">
+                <Input type={showPwd?"text":"password"} value={form.password} onChange={e => setForm({...form, password:e.target.value})} placeholder="Min 8 chars" />
+                <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" onClick={() => setShowPwd(!showPwd)}>
+                  {showPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Confirm Password</Label>
+              <Input type="password" value={form.confirm} onChange={e => setForm({...form, confirm:e.target.value})} placeholder="Re-enter" />
+            </div>
+            <div className="space-y-1">
+              <Label>Role</Label>
+              <Select value={form.role_code} onValueChange={v => setForm({...form, role_code:v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ROLES_FOR_CREATE.map(r => <SelectItem key={r} value={r}>{ROLE_LABELS[r as Role]}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Company</Label>
+              <Select value={form.company_id} onValueChange={v => setForm({...form, company_id:v, mill_id:""})}>
+                <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+                <SelectContent>
+                  {companies.filter((c:any) => c?.id).map((c:any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Mill (optional)</Label>
+              <Select value={form.mill_id} onValueChange={v => setForm({...form, mill_id:v})} disabled={!form.company_id}>
+                <SelectTrigger><SelectValue placeholder={form.company_id ? "Select mill" : "Select company first"} /></SelectTrigger>
+                <SelectContent>
+                  {formMills.filter((m:any) => m?.id).map((m:any) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button className="w-full" onClick={handleCreate} disabled={createMut.isPending}>
+              {createMut.isPending ? "Creating…" : "Create User"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Reset Password Dialog ──────────────────────────────────────────── */}
+      <Dialog open={!!resetDlg} onOpenChange={open => !open && setResetDlg(null)}>
+        <DialogContent className="w-full max-w-sm mx-4">
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>New password for {resetDlg?.user?.name}</DialogDescription>
+          </DialogHeader>
+          {resetDlg && (
             <div className="space-y-3 mt-2">
-              <div>
-                <Label>Email</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <code className="flex-1 px-3 py-2 rounded bg-muted text-sm">{successDialog.user?.email ?? "—"}</code>
-                  <Button variant="outline" size="icon" onClick={() => copyToClipboard(successDialog.user?.email ?? "")}>
-                    <Copy className="size-4" />
-                  </Button>
-                </div>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 px-3 py-2 rounded bg-muted text-sm">{resetDlg.pwd}</code>
+                <Button variant="outline" size="icon" onClick={() => copyText(resetDlg.pwd)}><Copy className="size-4" /></Button>
               </div>
-              <div>
-                <Label>Password</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <code className="flex-1 px-3 py-2 rounded bg-muted text-sm">{successDialog.password}</code>
-                  <Button variant="outline" size="icon" onClick={() => copyToClipboard(successDialog.password)}>
-                    <Copy className="size-4" />
-                  </Button>
-                </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setResetDlg(null)}>Cancel</Button>
+                <Button className="flex-1" onClick={() => resetMut.mutate({ id: resetDlg.user.id, pwd: resetDlg.pwd })}>
+                  {resetMut.isPending ? "Resetting…" : "Confirm Reset"}
+                </Button>
               </div>
-              {copied && <p className="text-xs text-green-600">Copied to clipboard!</p>}
-              <Button className="w-full mt-2" onClick={() => setSuccessDialog(null)}>Done</Button>
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Reset Password Dialog */}
-      <Dialog open={!!resetDialog} onOpenChange={(open) => !open && setResetDialog(null)}>
-        <DialogContent className="w-full max-w-lg mx-4">
+      {/* ── Success Dialog ─────────────────────────────────────────────────── */}
+      <Dialog open={!!successDlg} onOpenChange={open => !open && setSuccessDlg(null)}>
+        <DialogContent className="w-full max-w-sm mx-4">
           <DialogHeader>
-            <DialogTitle>Reset Password</DialogTitle>
-            <DialogDescription>New password for {resetDialog?.user?.name}</DialogDescription>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <Check className="size-4" /> Done
+            </DialogTitle>
+            <DialogDescription>Share these credentials with the user.</DialogDescription>
           </DialogHeader>
-          {resetDialog && (
+          {successDlg && (
             <div className="space-y-3 mt-2">
               <div>
-                <Label>New Password</Label>
+                <Label className="text-xs">Email</Label>
                 <div className="flex items-center gap-2 mt-1">
-                  <code className="flex-1 px-3 py-2 rounded bg-muted text-sm">{resetDialog.password}</code>
-                  <Button variant="outline" size="icon" onClick={() => copyToClipboard(resetDialog.password)}>
-                    <Copy className="size-4" />
-                  </Button>
+                  <code className="flex-1 px-2 py-1.5 rounded bg-muted text-sm truncate">{successDlg.user?.email ?? "—"}</code>
+                  <Button variant="outline" size="icon" className="shrink-0" onClick={() => copyText(successDlg.user?.email ?? "")}><Copy className="size-3.5" /></Button>
                 </div>
               </div>
-              <div className="flex gap-2 mt-4">
-                <Button variant="outline" className="flex-1" onClick={() => setResetDialog(null)}>Cancel</Button>
-                <Button className="flex-1" onClick={() => confirmResetPwd(resetDialog.user.id, resetDialog.password)}>
-                  Confirm Reset
-                </Button>
+              <div>
+                <Label className="text-xs">Password</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <code className="flex-1 px-2 py-1.5 rounded bg-muted text-sm">{successDlg.pwd}</code>
+                  <Button variant="outline" size="icon" className="shrink-0" onClick={() => copyText(successDlg.pwd)}><Copy className="size-3.5" /></Button>
+                </div>
               </div>
+              {copied && <p className="text-xs text-green-600">Copied!</p>}
+              <Button className="w-full" onClick={() => setSuccessDlg(null)}>Done</Button>
             </div>
           )}
         </DialogContent>
@@ -759,5 +582,4 @@ function AdminUsersPage() {
   );
 }
 
-// Export wrapped in ErrorBoundary so crashes don't propagate to the shell
 export { AdminUsersPage };

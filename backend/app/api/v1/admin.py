@@ -534,6 +534,7 @@ async def reactivate_company(
 @router.post("/admin/companies/{company_id}/status")
 async def update_company_status(
     company_id: str,
+    request: Request,
     body: dict,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -545,9 +546,9 @@ async def update_company_status(
 
     new_status = body.get("status")
     if new_status == "suspended":
-        return await suspend_company(company_id, body, db, current_user)
+        return await suspend_company(company_id, request, db, current_user)
     elif new_status == "active":
-        return await reactivate_company(company_id, body, db, current_user)
+        return await reactivate_company(company_id, request, db, current_user)
     else:
         raise HTTPException(422, "status must be 'active' or 'suspended'")
 

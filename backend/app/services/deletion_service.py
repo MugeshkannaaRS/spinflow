@@ -38,12 +38,49 @@ class CompanyDeletionService:
         return result.scalar() or 0
 
     async def _delete_from(self, table: str, where: str, param: Any) -> int:
-        result = await self.db.execute(text(f"DELETE FROM {table} WHERE {where}"), {"p": param})
-        return result.rowcount
+        """Delete rows with SAVEPOINT isolation.
+
+        CRITICAL: Without SAVEPOINT, any exception (e.g. table not found) puts the
+        PostgreSQL connection in ABORTED state — all subsequent queries in the same
+        transaction fail with 'current transaction is aborted'. SAVEPOINT lets us
+        roll back only the failed statement and continue.
+        """
+        params = {"p": param} if ":p" in where else {}
+        sp = f"sp_{table[:20].replace('-', '_')}"
+        try:
+            await self.db.execute(text(f"SAVEPOINT {sp}"))
+            result = await self.db.execute(text(f"DELETE FROM {table} WHERE {where}"), params)
+            await self.db.execute(text(f"RELEASE SAVEPOINT {sp}"))
+            return result.rowcount
+        except Exception as e:
+            # Roll back to savepoint so the transaction stays valid
+            try:
+                await self.db.execute(text(f"ROLLBACK TO SAVEPOINT {sp}"))
+            except Exception:
+                pass
+            err = str(e).lower()
+            if "does not exist" in err or "undefined" in err or "no such" in err:
+                logger.warning(f"Skipping non-existent table '{table}': {e}")
+                return 0
+            raise  # Re-raise real errors (FK violations, etc.)
 
     async def _delete_from_two(self, table: str, where: str, p1: Any, p2: Any) -> int:
-        result = await self.db.execute(text(f"DELETE FROM {table} WHERE {where}"), {"p1": p1, "p2": p2})
-        return result.rowcount
+        sp = f"sp2_{table[:18].replace('-', '_')}"
+        try:
+            await self.db.execute(text(f"SAVEPOINT {sp}"))
+            result = await self.db.execute(text(f"DELETE FROM {table} WHERE {where}"), {"p1": p1, "p2": p2})
+            await self.db.execute(text(f"RELEASE SAVEPOINT {sp}"))
+            return result.rowcount
+        except Exception as e:
+            try:
+                await self.db.execute(text(f"ROLLBACK TO SAVEPOINT {sp}"))
+            except Exception:
+                pass
+            err = str(e).lower()
+            if "does not exist" in err or "undefined" in err or "no such" in err:
+                logger.warning(f"Skipping non-existent table '{table}': {e}")
+                return 0
+            raise
 
     def _inc(self, key: str, count: int = 1):
         self.affected_counts[key] = self.affected_counts.get(key, 0) + count
@@ -295,17 +332,25 @@ class CompanyDeletionService:
         mill_ids = [row[0] for row in mills_q.fetchall()]
         mp = ",".join(f"'{m}'" for m in mill_ids) if mill_ids else "''"
 
-        deletion_log_entry = DeletionLog(
-            company_id=company_id,
-            company_name=self.company_name,
-            company_code=self.company_code,
-            deleted_by=self.current_user.id,
-            deleted_by_name=self.current_user.name,
-            mode="hard",
-            deletion_result="in_progress",
-        )
-        self.db.add(deletion_log_entry)
-        await self.db.flush()
+        # DeletionLog is optional — if the table doesn't exist (e.g. migration 018 not yet run),
+        # we skip it and proceed with deletion rather than blocking the entire operation.
+        deletion_log_entry = None
+        try:
+            deletion_log_entry = DeletionLog(
+                company_id=company_id,
+                company_name=self.company_name,
+                company_code=self.company_code,
+                deleted_by=self.current_user.id,
+                deleted_by_name=self.current_user.name,
+                mode="hard",
+                deletion_result="in_progress",
+            )
+            self.db.add(deletion_log_entry)
+            await self.db.flush()
+        except Exception as log_err:
+            logger.warning(f"DeletionLog insert skipped (table may not exist yet): {log_err}")
+            await self.db.rollback()
+            deletion_log_entry = None
 
         try:
             counts = {}
@@ -336,12 +381,21 @@ class CompanyDeletionService:
             ]
 
             if mill_ids:
-                cnt_cb = await self.db.execute(text(
-                    f"DELETE FROM cotton_bales WHERE bale_number IN (SELECT bs.bale_no FROM bale_stock bs WHERE bs.purchase_id IN (SELECT id FROM cotton_purchases WHERE mill_id IN ({mp})))"
-                ))
-                cb_cnt = cnt_cb.rowcount
-                if cb_cnt:
-                    counts["cotton_bales"] = cb_cnt
+                try:
+                    await self.db.execute(text("SAVEPOINT sp_cotton_bales"))
+                    cnt_cb = await self.db.execute(text(
+                        f"DELETE FROM cotton_bales WHERE bale_number IN (SELECT bs.bale_no FROM bale_stock bs WHERE bs.purchase_id IN (SELECT id FROM cotton_purchases WHERE mill_id IN ({mp})))"
+                    ))
+                    await self.db.execute(text("RELEASE SAVEPOINT sp_cotton_bales"))
+                    cb_cnt = cnt_cb.rowcount
+                    if cb_cnt:
+                        counts["cotton_bales"] = cb_cnt
+                except Exception as e:
+                    try:
+                        await self.db.execute(text("ROLLBACK TO SAVEPOINT sp_cotton_bales"))
+                    except Exception:
+                        pass
+                    logger.warning(f"cotton_bales delete skipped: {e}")
 
                 # ── Step 1: Delete all child-of-child records FIRST ──────────
                 # These reference parent tables deleted in Step 2 via subquery;
@@ -442,9 +496,13 @@ class CompanyDeletionService:
                 counts["company"] = cnt
 
             self.affected_counts = counts
-            deletion_log_entry.affected_records = counts
-            deletion_log_entry.deletion_result = "success"
-            await self.db.flush()
+            if deletion_log_entry is not None:
+                try:
+                    deletion_log_entry.affected_records = counts
+                    deletion_log_entry.deletion_result = "success"
+                    await self.db.flush()
+                except Exception:
+                    pass  # log update is best-effort
 
             role_code = self.current_user.role_rel.code if self.current_user.role_rel else "SUPER_ADMIN"
             await log_audit(

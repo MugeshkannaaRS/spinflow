@@ -38,6 +38,7 @@ import {
   Ban,
   Pencil,
   Download,
+  Upload,
   CheckCircle,
   AlertTriangle,
 } from "lucide-react";
@@ -239,12 +240,10 @@ function CompaniesPage() {
           <CardTitle className="text-base">Active Companies ({activeCompanies.length})</CardTitle>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={handleExport}>
-              <Download className="size-4 mr-1" /> Export
+              <Upload className="size-4 mr-1" /> Import
             </Button>
-            <Button size="sm" asChild>
-              <Link to="/admin/companies/onboard">
-                <Plus className="size-4 mr-1" /> Add Company
-              </Link>
+            <Button size="sm" onClick={() => navigate({ to: "/admin/companies/onboard" as any })}>
+              <Plus className="size-4 mr-1" /> Add Company
             </Button>
           </div>
         </CardHeader>

@@ -1145,9 +1145,12 @@ async def get_my_plan(
     max_mills = plan_incl_mills + extra_mills
     max_employees = (plan_incl_users * 20) + extra_employees  # 20 employees per included user
     current_mills = len(mills_list)
+    # Employee has mill_id (not company_id) — count via Mill join
     current_employees = int((await db.execute(
-        select(func.count()).select_from(Employee).where(
-            Employee.company_id == company_id,
+        select(func.count(Employee.id))
+        .join(Mill, Mill.id == Employee.mill_id)
+        .where(
+            Mill.company_id == company_id,
             Employee.is_active == True,
         )
     )).scalar() or 0)
@@ -1773,15 +1776,17 @@ async def enriched_subscriptions(
     enriched = []
     company_ids = [row["company_id"] for row in rows]
 
+    # Employee has mill_id (not company_id) — join through Mill to count per company
     emp_cnt_map = {}
     if company_ids:
         for r in (await db.execute(
-            select(Employee.company_id, func.count(Employee.id))
+            select(Mill.company_id, func.count(Employee.id))
+            .join(Employee, Employee.mill_id == Mill.id)
             .where(
-                Employee.company_id.in_(company_ids),
+                Mill.company_id.in_(company_ids),
                 Employee.is_active == True,
             )
-            .group_by(Employee.company_id)
+            .group_by(Mill.company_id)
         )).all():
             emp_cnt_map[r[0]] = int(r[1])
 
@@ -1855,9 +1860,12 @@ async def company_billing_detail_enriched(
         raise HTTPException(status_code=404, detail="Company not found")
 
     # Add employee info
+    # Employee has mill_id (not company_id) — count via Mill join
     emp_res = await db.execute(
-        select(func.count()).select_from(Employee).where(
-            Employee.company_id == company_id,
+        select(func.count(Employee.id))
+        .join(Mill, Mill.id == Employee.mill_id)
+        .where(
+            Mill.company_id == company_id,
             Employee.is_active == True,
         )
     )
