@@ -524,45 +524,55 @@ async def update_column_config(
     if role_name not in ("SUPER_ADMIN",):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="SUPER_ADMIN only")
 
-    result = await db.execute(
-        select(ColumnConfig).where(
-            ColumnConfig.mill_id == mill_id,
-            ColumnConfig.table_key == table,
-        ).order_by(ColumnConfig.updated_at.desc())
-    )
-    config = result.scalars().first()
+    # Derive module from table key — must match what was stored on first insert
+    module = table.split("_")[0] if "_" in table else table
 
     import json
     col_dicts = []
     for c in req.columns:
         d = c.model_dump()
+        # Strip frontend-only keys that aren't in the schema
         d.pop("dropdown_options", None)
         col_dicts.append(d)
-
     serialized = json.dumps(col_dicts)
 
-    if config:
-        config.columns = serialized
-        config.updated_by = current_user.name
-    else:
-        config = ColumnConfig(
-            mill_id=mill_id,
-            module=table.split("_")[0] if "_" in table else table,
-            table_key=table,
-            columns=serialized,
-            updated_by=current_user.name,
+    try:
+        # Find existing row using the full unique key (mill_id + module + table_key)
+        result = await db.execute(
+            select(ColumnConfig).where(
+                ColumnConfig.mill_id == mill_id,
+                ColumnConfig.module == module,
+                ColumnConfig.table_key == table,
+            )
         )
-        db.add(config)
-    await db.commit()
+        config = result.scalars().first()
+
+        if config:
+            config.columns = serialized
+            config.updated_by = current_user.name
+        else:
+            config = ColumnConfig(
+                mill_id=mill_id,
+                module=module,
+                table_key=table,
+                columns=serialized,
+                updated_by=current_user.name,
+            )
+            db.add(config)
+
+        await db.commit()
+        await db.refresh(config)
+
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"update_column_config error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to save column config: {str(e)[:200]}")
 
     defaults = _get_default_columns(table)
-    if config:
-        try:
-            parsed = json.loads(config.columns)
-            columns = _build_column_response(parsed, {})
-        except (json.JSONDecodeError, TypeError):
-            columns = defaults
-    else:
+    try:
+        parsed = json.loads(config.columns)
+        columns = _build_column_response(parsed, {})
+    except (json.JSONDecodeError, TypeError):
         columns = defaults
 
     return TableConfigResponse(
@@ -701,8 +711,10 @@ async def register_custom_fields(
     current_user: User = Depends(get_current_user),
 ):
     """Register SA-defined custom fields into MillCustomField so the import
-    engine and forms know about them."""
+    engine and forms know about them. Uses PostgreSQL upsert against the
+    UNIQUE(mill_id, module, field_key) constraint."""
     from app.models.mill_config import MillCustomField
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
 
     role_name = current_user.role_rel.code if current_user.role_rel else ""
     if role_name != "SUPER_ADMIN":
@@ -710,40 +722,44 @@ async def register_custom_fields(
 
     module = _TABLE_TO_MODULE.get(req.table, req.table.split("_")[0])
 
-    # Fetch existing keys for this mill + module to avoid duplication
-    existing_res = await db.execute(
-        select(MillCustomField).where(
-            MillCustomField.mill_id == req.mill_id,
-            MillCustomField.module == module,
-        )
-    )
-    existing_map: dict[str, MillCustomField] = {
-        cf.field_key: cf for cf in existing_res.scalars().all()
-    }
+    # SA has no company — look up the mill's company_id instead
+    from app.models.masters import Mill
+    mill_row = await db.get(Mill, req.mill_id)
+    company_id_str = str(mill_row.company_id) if mill_row and mill_row.company_id else "system"
 
-    added = 0
-    for f in req.fields:
-        key = str(f.get("key", "")).strip()
-        label = str(f.get("label", "")).strip()
-        ftype = str(f.get("type", "text")).strip()
-        if not key or not label:
-            continue
-        if key in existing_map:
-            # Update label/type if changed
-            existing_map[key].field_label = label
-            existing_map[key].field_type = ftype
-        else:
-            db.add(MillCustomField(
+    added = updated = 0
+    try:
+        for f in req.fields:
+            key = str(f.get("key", "")).strip()
+            label = str(f.get("label", "")).strip()
+            ftype = str(f.get("type", "text")).strip()
+            if not key or not label:
+                continue
+
+            # Upsert against UNIQUE(mill_id, module, field_key)
+            stmt = pg_insert(MillCustomField).values(
+                id=str(__import__("uuid").uuid4()),
                 mill_id=req.mill_id,
-                company_id=str(current_user.company_id or ""),
+                company_id=company_id_str,
                 module=module,
                 field_key=key,
                 field_label=label,
                 field_type=ftype,
                 is_required=False,
                 source="column_config",
-            ))
+                sequence=0,
+            ).on_conflict_do_update(
+                constraint="uq_mill_custom_fields",
+                set_={"field_label": label, "field_type": ftype, "source": "column_config"},
+            )
+            result = await db.execute(stmt)
+            # rowcount==1 means insert, check if it was an update
             added += 1
 
-    await db.commit()
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"register_custom_fields error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to register custom fields: {str(e)[:200]}")
+
     return {"registered": added, "module": module, "mill_id": req.mill_id}
