@@ -145,11 +145,11 @@ function DispatchPage() {
   if (!user) return null;
 
   const orderCols: ColDef[] = [
-    { key: "orderNo", label: orderColConfig.getLabel('order_no'), className: "font-mono text-xs" },
+    { key: "order_no", label: orderColConfig.getLabel('order_no'), className: "font-mono text-xs" },
     { key: "customer", label: orderColConfig.getLabel('customer'), render: (o: any) => <span className="font-medium">{o.customer || o.customer_name || ""}</span> },
     { key: "date", label: orderColConfig.getLabel('date'), type: "date" },
-    { key: "items", label: orderColConfig.getLabel('items') },
-    { key: "quantityKg", label: orderColConfig.getLabel('quantity_kg') },
+    { key: "lot_no", label: orderColConfig.getLabel('items') },
+    { key: "quantity_kg", label: orderColConfig.getLabel('quantity_kg') },
     {
       key: "status", label: orderColConfig.getLabel('status'), type: "status",
       render: (o: any) => <StatusBadge status={o.status} size="sm" />,

@@ -350,8 +350,8 @@ async def bulk_create_employees(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("hr", write=True)),
 ):
-    if len(req.items) > 100:
-        raise HTTPException(status_code=400, detail="Maximum 100 employees per batch")
+    if len(req.items) > 2000:
+        raise HTTPException(status_code=400, detail="Maximum 2000 employees per batch")
 
     scope = await get_mill_scope(current_user, db)
     mill_id = req.mill_id or scope["mill_id"]

@@ -89,7 +89,7 @@ function QualityPage() {
     ? Math.round((tests.filter((t) => t.status === "pass").length / tests.length) * 100)
     : 0;
   const pendingLots = lots.filter((l) => l.status === "pending").length;
-  const totalRejectedKg = rejections.reduce((s, r) => s + (r.quantityKg ?? 0), 0);
+  const totalRejectedKg = rejections.reduce((s, r) => s + (r.quantity_kg ?? 0), 0);
 
   if (!user) return null;
 

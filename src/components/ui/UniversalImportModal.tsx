@@ -693,8 +693,11 @@ export function UniversalImportModal({
       setImportProgress({ current: validRecords.length, total: validRecords.length });
 
       if (!res) {
-        setImportError(`Import failed after ${MAX_RETRIES} retries: ${lastErr?.response?.data?.detail ?? lastErr?.message ?? "Network error"}`);
+        const errMsg = lastErr?.response?.data?.detail ?? lastErr?.message ?? "Network error";
+        setImportError(`Import failed: ${Array.isArray(errMsg) ? errMsg.map((e: any) => e.msg).join(", ") : errMsg}`);
         setIsImporting(false);
+        setImportResult({ success: 0, created: 0, updated: 0, skipped: 0, errors: [] });
+        setStep(5);
         return;
       }
 

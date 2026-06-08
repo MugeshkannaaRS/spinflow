@@ -58,17 +58,18 @@ class CottonPurchaseCreate(BaseModel):
 
 class CottonPurchaseOut(BaseModel):
     id: str
-    purchase_no: Optional[str] = None
-    supplier_id: str
-    purchase_date: Optional[date] = None
-    bale_count: Optional[int] = None
-    weight_kg: Optional[float] = None
-    total_weight_kg: Optional[float] = None
-    moisture_pct: Optional[float] = None
-    rate_per_quintal: Optional[float] = None
-    total_value: Optional[float] = None
+    date: Optional[str] = None
     invoice_no: Optional[str] = None
-    grn_status: Optional[str] = None
+    supplier_id: Optional[str] = None
+    supplier_name: Optional[str] = None
+    bales: Optional[int] = None
+    gross_kg: Optional[float] = None
+    net_kg: Optional[float] = None
+    rate_per_kg: Optional[float] = None
+    moisture: Optional[float] = None
+    grade: Optional[str] = None
+    gst_amount: Optional[float] = None
+    status: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:

@@ -618,10 +618,10 @@ function ProductionPage() {
   const machineColConfig = useColumnConfig("production_entries");
   const downColConfig = useColumnConfig("production_downtime");
 
-  const totalProduced = machines.reduce(
-    (s: number, m: any) => s + (m.produced_kg ?? m.producedKg ?? 0),
-    0,
-  );
+  const todayStr = new Date().toISOString().split("T")[0];
+  const totalProduced = shifts
+    .filter((s: any) => s.date === todayStr && s.status === "approved")
+    .reduce((acc: number, s: any) => acc + (Number(s.produced_kg) || 0), 0);
   const totalTarget = machines.reduce(
     (s: number, m: any) => s + (m.target_kg ?? m.targetKg ?? 0),
     0,
@@ -884,12 +884,12 @@ function ProductionPage() {
                     columns={[
                       { key: "date", label: machineColConfig.getLabel('date'), type: "date" },
                       { key: "shift", label: machineColConfig.getLabel('shift'), render: (s: any) => <Badge variant="outline">{s.shift}</Badge> },
-                      { key: "machineCode", label: machineColConfig.getLabel('machine_code'), className: "font-mono text-xs" },
+                      { key: "machine_code", label: machineColConfig.getLabel('machine_code'), className: "font-mono text-xs" },
                       { key: "department", label: machineColConfig.getLabel('department'), type: "status" },
                       { key: "operator", label: machineColConfig.getLabel('operator') },
                       { key: "count", label: machineColConfig.getLabel('count') },
-                      { key: "producedKg", label: machineColConfig.getLabel('produced_kg'), render: (s: any) => `${s.producedKg} kg` },
-                      { key: "wasteKg", label: machineColConfig.getLabel('waste_kg'), render: (s: any) => <span className="text-muted-foreground">{s.wasteKg} kg</span> },
+                      { key: "produced_kg", label: machineColConfig.getLabel('produced_kg'), render: (s: any) => `${s.produced_kg ?? 0} kg` },
+                      { key: "waste_kg", label: machineColConfig.getLabel('waste_kg'), render: (s: any) => <span className="text-muted-foreground">{s.waste_kg ?? 0} kg</span> },
                       { key: "status", label: machineColConfig.getLabel('status'), type: "status", render: (s: any) => <StatusBadge status={s.status} size="sm" /> },
                     ] satisfies ColDef[]}
                     data={shifts}
@@ -935,10 +935,10 @@ function ProductionPage() {
                   <DataTable
                     tableId="production_downtime"
                     columns={[
-                      { key: "machineCode", label: "Machine", className: "font-mono text-xs" },
+                      { key: "machine_code", label: "Machine", className: "font-mono text-xs" },
                       { key: "reason", label: "Reason" },
-                      { key: "startedAt", label: "Started" },
-                      { key: "durationMin", label: "Duration", render: (d: any) => `${d.durationMin} min` },
+                      { key: "started_at", label: "Started" },
+                      { key: "duration_min", label: "Duration", render: (d: any) => `${d.duration_min ?? 0} min` },
                       { key: "resolved", label: "Status", type: "status", render: (d: any) => <StatusBadge status={d.resolved ? "active" : "down"} label={d.resolved ? "Resolved" : "Open"} size="sm" /> },
                     ] satisfies ColDef[]}
                     data={downtime}

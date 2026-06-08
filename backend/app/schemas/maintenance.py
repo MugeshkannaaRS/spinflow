@@ -39,17 +39,17 @@ class MaintenanceCreate(BaseModel):
 
 class MaintenanceOut(BaseModel):
     id: str
-    machine_id: Optional[str] = None
-    maintenance_type: Optional[str] = None
-    failure_type: Optional[str] = None
+    date: Optional[str] = None
+    machine_code: Optional[str] = None
+    type: Optional[str] = None
+    department: Optional[str] = None
     description: Optional[str] = None
-    priority: Optional[str] = None
+    technician_name: Optional[str] = None
     status: Optional[str] = None
-    estimated_minutes: Optional[int] = None
-    actual_minutes: Optional[int] = None
-    reported_by: Optional[str] = None
-    assigned_to: Optional[str] = None
-    resolved_by: Optional[str] = None
+    downtime_min: Optional[int] = None
+    spare_used: Optional[str] = None
+    cost: Optional[float] = None
+    completed_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
 
     class Config:

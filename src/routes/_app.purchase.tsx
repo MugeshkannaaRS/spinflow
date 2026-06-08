@@ -121,7 +121,7 @@ function PurchasePage() {
   const activeSuppliers = suppliers.filter((s) => s.status === "active").length;
   const totalBales = purchases.reduce((s, p) => s + (p.bales ?? 0), 0);
   const pendingGrn = purchases.filter((p) => p.status === "grn-pending").length;
-  const totalPurchaseKg = purchases.reduce((s, p) => s + (p.netKg ?? 0), 0);
+  const totalPurchaseKg = purchases.reduce((s, p) => s + (p.net_kg ?? 0), 0);
 
   const purchaseColumns = [
     { key: "date" as const, label: "Date" },
@@ -262,12 +262,12 @@ function PurchasePage() {
                         {purchaseFiltered.map((p) => (
                           <TableRow key={p.id}>
                             <TableCell className="text-sm">{p.date}</TableCell>
-                            <TableCell className="font-mono text-xs">{p.invoiceNo}</TableCell>
-                            <TableCell>{p.supplier}</TableCell>
+                            <TableCell className="font-mono text-xs">{p.invoice_no}</TableCell>
+                            <TableCell>{p.supplier_name}</TableCell>
                             <TableCell className="text-right">{p.bales}</TableCell>
-                            <TableCell className="text-right">{p.grossKg}</TableCell>
-                            <TableCell className="text-right font-medium">{p.netKg}</TableCell>
-                            <TableCell className="text-right">₹{p.ratePerKg}</TableCell>
+                            <TableCell className="text-right">{p.gross_kg}</TableCell>
+                            <TableCell className="text-right font-medium">{p.net_kg}</TableCell>
+                            <TableCell className="text-right">₹{p.rate_per_kg}</TableCell>
                             <TableCell className="text-right">{p.moisture}%</TableCell>
                             <TableCell>
                               <Badge variant={p.grade === "A" ? "default" : "secondary"}>

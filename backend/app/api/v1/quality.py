@@ -455,11 +455,11 @@ async def list_rejections(
         out.append({
             "id": t.id,
             "date": t.date,
-            "lotId": t.lot_id or "",
+            "lot_id": t.lot_id or "",
             "category": t.type,
-            "quantityKg": 0,
+            "quantity_kg": 0,
             "reason": f"{t.type} result {t.result} below standard {t.standard}",
             "disposition": "rework",
-            "notedBy": t.tested_by or "",
+            "noted_by": t.tested_by or "",
         })
     return {"items": out, "total": total, "page": page, "page_size": page_size}

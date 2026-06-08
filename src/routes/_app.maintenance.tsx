@@ -478,12 +478,12 @@ function MaintenancePage() {
                     columns={[
                       { key: "date", label: taskColConfig.getLabel("date"), type: "date" },
                       { key: "type", label: taskColConfig.getLabel("type"), render: (t: any) => <Badge variant={t.type === "breakdown" ? "destructive" : t.type === "preventive" ? "default" : "secondary"}>{t.type}</Badge> },
-                      { key: "machineCode", label: taskColConfig.getLabel("machine_code"), className: "font-mono text-xs" },
+                      { key: "machine_code", label: taskColConfig.getLabel("machine_code"), className: "font-mono text-xs" },
                       { key: "department", label: taskColConfig.getLabel("department"), type: "status" },
                       { key: "description", label: taskColConfig.getLabel("description"), className: "max-w-[250px] truncate" },
-                      { key: "technician", label: taskColConfig.getLabel("technician") },
-                      { key: "downtimeMin", label: taskColConfig.getLabel("downtime_min"), render: (t: any) => `${t.downtimeMin} min` },
-                      { key: "spareUsed", label: taskColConfig.getLabel("spare_used"), render: (t: any) => t.spareUsed || "—" },
+                      { key: "technician_name", label: taskColConfig.getLabel("technician") },
+                      { key: "downtime_min", label: taskColConfig.getLabel("downtime_min"), render: (t: any) => `${t.downtime_min ?? 0} min` },
+                      { key: "spare_used", label: taskColConfig.getLabel("spare_used"), render: (t: any) => t.spare_used || "—" },
                       { key: "status", label: taskColConfig.getLabel("status"), type: "status", render: (t: any) => <StatusBadge status={t.status} size="sm" /> },
                     ] satisfies ColDef[]}
                     data={tasks}
