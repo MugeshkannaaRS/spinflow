@@ -478,8 +478,9 @@ async def log_downtime_from_datalog(
                 detail=f"Machine '{machine_code}' not found in this mill. Select a valid machine."
             )
 
+        new_id = generate_uuid()
         log = DowntimeLog(
-            id=generate_uuid(),
+            id=new_id,
             machine_code=machine_code,
             reason=f"[{datalog_code}] {code_name}",
             started_at=started_at,
@@ -491,18 +492,20 @@ async def log_downtime_from_datalog(
             production_loss_kg=float(body.get("production_loss_kg", 0)),
             datalog_code=int(datalog_code),
             mill_id=resolved_mill_id,
+            stop_from=stop_from_str,
+            stop_to=stop_to_str,
         )
         db.add(log)
         await db.commit()
-        await db.refresh(log)
+        # Return from local variables — avoids refresh decode issues on TIME columns
         return {
-            "id": log.id,
-            "machine_code": log.machine_code,
-            "datalog_code": log.datalog_code,
+            "id": new_id,
+            "machine_code": machine_code,
+            "datalog_code": int(datalog_code),
             "code_name": code_name,
             "stop_type": stop_type,
-            "duration_min": log.duration_min,
-            "production_loss_kg": log.production_loss_kg,
+            "duration_min": duration_min,
+            "production_loss_kg": float(body.get("production_loss_kg", 0)),
         }
     except HTTPException:
         raise
