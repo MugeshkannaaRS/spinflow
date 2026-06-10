@@ -418,23 +418,43 @@ async def execute_import(
 
                 elif req.module == "employees":
                     from app.models.hr import Employee
+                    # Remap column-config keys → Employee model attribute names
+                    if "full_name" in data and "name" not in data:
+                        data["name"] = data.pop("full_name")
+                    elif "full_name" in data:
+                        data.pop("full_name")
+                    if "date_of_joining" in data and "joining_date" not in data:
+                        data["joining_date"] = data.pop("date_of_joining")
+                    elif "date_of_joining" in data:
+                        data.pop("date_of_joining")
+
                     code = str(data.get("employee_code", data.get("code", ""))).strip()
                     if not code:
+                        # Try name as fallback identifier
+                        if not data.get("name"):
+                            skipped += 1
+                            continue
+                    existing = None
+                    if code:
+                        res = await db.execute(select(Employee).where(Employee.code == code))
+                        existing = res.scalar_one_or_none()
+                    if existing and req.duplicate_handling == "skip":
                         skipped += 1
                         continue
-                    existing = await db.execute(select(Employee).where(Employee.code == code))
-                    ex = existing.scalar_one_or_none()
-                    if ex and req.duplicate_handling == "skip":
-                        skipped += 1
-                        continue
-                    elif ex and req.duplicate_handling == "update":
+                    elif existing and req.duplicate_handling == "update":
                         for k, v in data.items():
-                            if k not in ("id",) and hasattr(ex, k):
-                                setattr(ex, k, v)
+                            if k not in ("id", "employee_code") and hasattr(existing, k):
+                                setattr(existing, k, v)
+                        if not existing.code and code:
+                            existing.code = code
                     else:
                         emp_data = {k: v for k, v in data.items()
                                     if hasattr(Employee, k) and k not in ("id", "employee_code")}
-                        emp_data["code"] = code
+                        if code:
+                            emp_data["code"] = code
+                        if not emp_data.get("name"):
+                            skipped += 1
+                            continue
                         e = Employee(**emp_data)
                         db.add(e)
                     imported += 1

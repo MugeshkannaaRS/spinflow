@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ArrowDownToLine, Download, CheckCircle2, AlertTriangle, X } from "lucide-react";
+import { ArrowDown, Download, CheckCircle2, AlertTriangle, X } from "lucide-react";
 import { api } from "@/lib/api";
 import * as XLSXOut from "xlsx";
 
@@ -312,7 +312,7 @@ export function ImportButton({
           disabled={disabled}
           onClick={() => fileRef.current?.click()}
         >
-          <ArrowDownToLine className="size-3.5" />
+          <ArrowDown className="size-3.5" />
           {label}
         </Button>
         <Button

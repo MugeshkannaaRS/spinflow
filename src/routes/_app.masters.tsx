@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/sheet";
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
-import { Plus, Search, Settings, Blocks, ArrowDownToLine, Pencil, Factory, Trash2 } from "lucide-react";
+import { Plus, Search, Settings, Blocks, ArrowDown, Pencil, Factory, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useMillMasterCategory } from "@/hooks/useMillConfig";
@@ -1753,7 +1753,7 @@ function ImportCustomersDialog() {
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <ArrowDownToLine className="size-4 mr-1" />
+        <ArrowDown className="size-4 mr-1" />
         Import Excel
       </Button>
       <UniversalImportModal
@@ -2065,7 +2065,7 @@ function MachinesTab({
         {canEdit && (
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-              <ArrowDownToLine className="size-4 mr-1" /> Import Excel
+              <ArrowDown className="size-4 mr-1" /> Import Excel
             </Button>
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <Plus className="size-4 mr-1" /> Add Machine

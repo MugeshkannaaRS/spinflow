@@ -72,7 +72,7 @@ import {
   XCircle,
   ClipboardCheck,
   UserPlus,
-  ArrowDownToLine,
+  ArrowDown,
   Search,
   Pencil,
   Trash2,
@@ -82,6 +82,7 @@ import {
   Settings2,
   Eye,
 } from "lucide-react";
+import { ExportMenu } from "@/components/ui/ExportMenu";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { useMillMasters } from "@/hooks/useMillConfig";
 
@@ -553,6 +554,23 @@ function EmployeesTab({ employees, canEdit, customFieldDefs = [] }: { employees:
         </Select>
         {canEdit && <AddEmployeeSheet employees={employees} />}
         {canEdit && <ImportEmployeeDialog />}
+        <ExportMenu
+          filename={`employees_${new Date().toISOString().slice(0, 10)}`}
+          title="Employee List"
+          columns={[
+            { key: "code", label: "Emp Code" },
+            { key: "name", label: "Name" },
+            { key: "designation", label: "Designation" },
+            { key: "department", label: "Department" },
+            { key: "grade", label: "Grade" },
+            { key: "joining_date", label: "Joining Date" },
+            { key: "basic", label: "Basic" },
+            { key: "total_salary", label: "Total Salary" },
+            { key: "phone", label: "Phone" },
+            { key: "bank_account_no", label: "Bank A/C" },
+          ]}
+          rows={filtered}
+        />
         <Popover>
           <PopoverTrigger asChild>
             <Button size="sm" variant="outline">
@@ -1425,7 +1443,7 @@ function ImportEmployeeDialog() {
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <ArrowDownToLine className="size-4 mr-1" />
+        <ArrowDown className="size-4 mr-1" />
         Import Excel
       </Button>
       <UniversalImportModal
@@ -1952,7 +1970,7 @@ function ImportAttendanceDialog({ month, year, onSuccess }: { month: number; yea
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <ArrowDownToLine className="size-4 mr-1" />
+        <ArrowDown className="size-4 mr-1" />
         Import Excel
       </Button>
       <UniversalImportModal

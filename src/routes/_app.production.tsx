@@ -42,7 +42,8 @@ import type { ColDef } from "@/components/ui/DataTable";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, ArrowDownToLine, Trash2, Clock, Users2 } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, ArrowDown, ArrowUp, Trash2, Clock, Users2 } from "lucide-react";
+import { ExportMenu } from "@/components/ui/ExportMenu";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { useMillMasters, useMillMasterCategory } from "@/hooks/useMillConfig";
@@ -686,8 +687,21 @@ function WasteGrid() {
 
       {pastEntries.length > 0 && (
         <Card>
-          <CardHeader className="py-3">
+          <CardHeader className="py-3 flex flex-row items-center justify-between">
             <CardTitle className="text-sm">Submitted Entries — {date} · {shift}</CardTitle>
+            <ExportMenu
+              filename={`waste_entries_${date}_${shift}`}
+              title="Waste Entries"
+              subtitle={`Date: ${date}  Shift: ${shift}`}
+              columns={[
+                { key: "machine_code", label: "Machine" },
+                { key: "lot_no", label: "Lot" },
+                { key: "ratio", label: "Ratio" },
+                { key: "waste_kg", label: "Waste (kg)" },
+                { key: "status", label: "Status" },
+              ]}
+              rows={pastEntries}
+            />
           </CardHeader>
           <CardContent className="p-0">
             <div className="w-full overflow-x-auto">
@@ -1031,32 +1045,22 @@ function StoppageForm() {
         <Card>
           <CardHeader className="py-3 flex flex-row items-center justify-between">
             <CardTitle className="text-sm">Today's Stoppage Log ({stoppageLogs.length} entries · {todayTotal} min)</CardTitle>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs gap-1.5"
-              onClick={() => {
-                const headers = ["Machine", "Stop Code", "Reason", "From", "To", "Min", "Loss (kg)", "Status"];
-                const rows = stoppageLogs.map((r: any) => [
-                  r.machine_code ?? "",
-                  r.datalog_code ?? "",
-                  r.reason ?? "",
-                  r.started_at ? new Date(r.started_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
-                  r.ended_at ? new Date(r.ended_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
-                  r.duration_min ?? "",
-                  r.production_loss_kg ?? "",
-                  r.resolved ? "Done" : "Open",
-                ]);
-                const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
-                const blob = new Blob([csv], { type: "text/csv" });
-                const a = document.createElement("a");
-                a.href = URL.createObjectURL(blob);
-                a.download = `stoppage_log_${date}.csv`;
-                a.click();
-              }}
-            >
-              <ArrowDownToLine className="size-3.5" /> Export CSV
-            </Button>
+            <ExportMenu
+              filename={`stoppage_log_${date}`}
+              title="Stoppage Log"
+              subtitle={`Date: ${date}  Shift: ${shift}`}
+              columns={[
+                { key: "machine_code", label: "Machine" },
+                { key: "datalog_code", label: "Code" },
+                { key: "reason", label: "Reason" },
+                { key: "started_at", label: "From", format: (v) => v ? new Date(v).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "" },
+                { key: "ended_at", label: "To", format: (v) => v ? new Date(v).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "" },
+                { key: "duration_min", label: "Min" },
+                { key: "production_loss_kg", label: "Loss (kg)" },
+                { key: "resolved", label: "Status", format: (v) => v ? "Done" : "Open" },
+              ]}
+              rows={stoppageLogs}
+            />
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -1364,7 +1368,7 @@ function ImportShiftEntriesDialog() {
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <ArrowDownToLine className="size-4 mr-1" />
+        <ArrowDown className="size-4 mr-1" />
         Import Excel
       </Button>
       <UniversalImportModal

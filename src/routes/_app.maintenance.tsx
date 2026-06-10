@@ -50,7 +50,7 @@ import {
   X,
   Plus,
   Pencil,
-  ArrowDownToLine,
+  ArrowDown,
 } from "lucide-react";
 import type { MaintenanceTask, MasterMachine } from "@/lib/types";
 import * as XLSX from "xlsx";
@@ -648,7 +648,7 @@ function ImportMachinesDialog() {
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <ArrowDownToLine className="size-4 mr-1" />
+        <ArrowDown className="size-4 mr-1" />
         Import Excel
       </Button>
       <UniversalImportModal
