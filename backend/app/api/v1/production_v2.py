@@ -434,61 +434,81 @@ async def log_downtime_from_datalog(
     if datalog_code is None:
         raise HTTPException(status_code=400, detail="datalog_code required")
 
-    # Lookup stop code
-    stop_code_row = (await db.execute(
-        select(DatalogStopCode).where(DatalogStopCode.code == int(datalog_code))
-    )).scalar_one_or_none()
+    try:
+        # Lookup stop code
+        stop_code_row = (await db.execute(
+            select(DatalogStopCode).where(DatalogStopCode.code == int(datalog_code))
+        )).scalar_one_or_none()
 
-    stop_type = stop_code_row.category if stop_code_row else "misc"
-    code_name = stop_code_row.name if stop_code_row else str(datalog_code)
+        stop_type = stop_code_row.category if stop_code_row else "misc"
+        code_name = stop_code_row.name if stop_code_row else str(datalog_code)
 
-    # Parse times
-    stop_from_str: Optional[str] = body.get("stop_from")
-    stop_to_str: Optional[str] = body.get("stop_to")
-    date_str: str = body.get("date", "")
+        # Resolve mill
+        resolved_mill_id = await _resolve_mill(current_user, db, mill_id)
 
-    started_at = datetime.now(timezone.utc)
-    ended_at = None
-    duration_min = 0
+        # Parse times
+        stop_from_str: Optional[str] = body.get("stop_from")
+        stop_to_str: Optional[str] = body.get("stop_to")
+        date_str: str = body.get("date", "")
 
-    if date_str and stop_from_str:
-        try:
-            started_at = datetime.fromisoformat(f"{date_str}T{stop_from_str}:00+00:00")
-        except Exception:
-            pass
-    if date_str and stop_to_str:
-        try:
-            ended_at = datetime.fromisoformat(f"{date_str}T{stop_to_str}:00+00:00")
-            duration_min = max(0, int((ended_at - started_at).total_seconds() / 60))
-        except Exception:
-            pass
+        started_at = datetime.now(timezone.utc)
+        ended_at = None
+        duration_min = 0
 
-    log = DowntimeLog(
-        id=generate_uuid(),
-        machine_code=machine_code,
-        reason=f"[{datalog_code}] {code_name}",
-        started_at=started_at,
-        ended_at=ended_at,
-        duration_min=duration_min,
-        resolved=ended_at is not None,
-        reported_by=current_user.name or current_user.email,
-        stop_type=stop_type,
-        production_loss_kg=float(body.get("production_loss_kg", 0)),
-        datalog_code=int(datalog_code),
-        mill_id=await _resolve_mill(current_user, db, mill_id),
-    )
-    db.add(log)
-    await db.commit()
-    await db.refresh(log)
-    return {
-        "id": log.id,
-        "machine_code": log.machine_code,
-        "datalog_code": log.datalog_code,
-        "code_name": code_name,
-        "stop_type": stop_type,
-        "duration_min": log.duration_min,
-        "production_loss_kg": log.production_loss_kg,
-    }
+        if date_str and stop_from_str:
+            try:
+                started_at = datetime.fromisoformat(f"{date_str}T{stop_from_str}:00+00:00")
+            except Exception:
+                pass
+        if date_str and stop_to_str:
+            try:
+                ended_at = datetime.fromisoformat(f"{date_str}T{stop_to_str}:00+00:00")
+                duration_min = max(0, int((ended_at - started_at).total_seconds() / 60))
+            except Exception:
+                pass
+
+        # Verify machine exists (avoids FK violation 500)
+        from app.models.production import Machine
+        machine = (await db.execute(
+            select(Machine).where(Machine.code == machine_code, Machine.mill_id == resolved_mill_id)
+        )).scalar_one_or_none()
+        if not machine:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Machine '{machine_code}' not found in this mill. Select a valid machine."
+            )
+
+        log = DowntimeLog(
+            id=generate_uuid(),
+            machine_code=machine_code,
+            reason=f"[{datalog_code}] {code_name}",
+            started_at=started_at,
+            ended_at=ended_at,
+            duration_min=duration_min,
+            resolved=ended_at is not None,
+            reported_by=current_user.name or current_user.email,
+            stop_type=stop_type,
+            production_loss_kg=float(body.get("production_loss_kg", 0)),
+            datalog_code=int(datalog_code),
+            mill_id=resolved_mill_id,
+        )
+        db.add(log)
+        await db.commit()
+        await db.refresh(log)
+        return {
+            "id": log.id,
+            "machine_code": log.machine_code,
+            "datalog_code": log.datalog_code,
+            "code_name": code_name,
+            "stop_type": stop_type,
+            "duration_min": log.duration_min,
+            "production_loss_kg": log.production_loss_kg,
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"log_downtime_from_datalog error: {exc!r} | body={body}")
+        raise HTTPException(status_code=400, detail=f"Failed to log stoppage: {exc}")
 
 
 # ================================================================== #

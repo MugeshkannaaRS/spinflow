@@ -1,4 +1,4 @@
-from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Numeric, Date
+from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Numeric, Date, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from typing import Optional
@@ -7,10 +7,13 @@ from app.db.base import Base, TimestampMixin, generate_uuid
 
 class Employee(TimestampMixin, Base):
     __tablename__ = "employees"
+    __table_args__ = (
+        UniqueConstraint("code", "mill_id", name="uq_employees_code_mill"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
-    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     sl_no: Mapped[int] = mapped_column(Integer, nullable=True)
     employee_id: Mapped[str] = mapped_column(String(50), nullable=True)
