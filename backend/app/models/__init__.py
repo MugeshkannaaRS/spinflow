@@ -53,3 +53,9 @@ from app.models.mixing import (
     SpliceQualityLog,
     ShiftManpowerPlan,
 )
+from app.models.production_v2 import (
+    DatalogStopCode,
+    WasteEntry,
+    RFManpowerPlan,
+    MixingChangeFibreRow,
+)

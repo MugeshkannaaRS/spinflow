@@ -58,6 +58,15 @@ export const productionApi = {
   updateMachineStatus: (id: string, data: any) => api.patch(`/production/machines/${id}/status`, data).then((r) => r.data),
   getShifts: () => api.get("/production/shifts").then((r: any) => extractList(r.data)),
   createShift: (data: any) => api.post("/production/shifts", data).then((r) => r.data),
+  // v2 additions
+  getStopCodes: () => api.get("/production/datalog-stop-codes").then((r) => r.data?.data ?? []),
+  getPageInit: (millId: string) => api.get("/production/v2/page-init", { params: { mill_id: millId } }).then((r) => r.data),
+  getWasteEntries: (params?: Record<string, any>) => api.get("/production/waste-entries", { params }).then((r) => r.data),
+  createWasteBulk: (data: any) => api.post("/production/waste-entries/bulk", data).then((r) => r.data),
+  approveWasteEntry: (id: string) => api.patch(`/production/waste-entries/${id}/approve`).then((r) => r.data),
+  logDatalogDowntime: (data: any, millId: string) => api.post(`/production/downtime/datalog?mill_id=${millId}`, data).then((r) => r.data),
+  getRFManpower: (params?: Record<string, any>) => api.get("/production/rf-manpower", { params }).then((r) => r.data),
+  upsertRFManpowerBulk: (data: any, millId: string) => api.post(`/production/rf-manpower/bulk?mill_id=${millId}`, data).then((r) => r.data),
 };
 
 // Quality
