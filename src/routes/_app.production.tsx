@@ -1029,8 +1029,34 @@ function StoppageForm() {
       {/* Live stoppage log table */}
       {stoppageLogs.length > 0 && (
         <Card>
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm">Today's Stoppage Log ({stoppageLogs.length} entries)</CardTitle>
+          <CardHeader className="py-3 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm">Today's Stoppage Log ({stoppageLogs.length} entries · {todayTotal} min)</CardTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs gap-1.5"
+              onClick={() => {
+                const headers = ["Machine", "Stop Code", "Reason", "From", "To", "Min", "Loss (kg)", "Status"];
+                const rows = stoppageLogs.map((r: any) => [
+                  r.machine_code ?? "",
+                  r.datalog_code ?? "",
+                  r.reason ?? "",
+                  r.started_at ? new Date(r.started_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+                  r.ended_at ? new Date(r.ended_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+                  r.duration_min ?? "",
+                  r.production_loss_kg ?? "",
+                  r.resolved ? "Done" : "Open",
+                ]);
+                const csv = [headers, ...rows].map(r => r.join(",")).join("\n");
+                const blob = new Blob([csv], { type: "text/csv" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = `stoppage_log_${date}.csv`;
+                a.click();
+              }}
+            >
+              <ArrowDownToLine className="size-3.5" /> Export CSV
+            </Button>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -1038,7 +1064,8 @@ function StoppageForm() {
                 <TableHeader>
                   <TableRow className="bg-muted/40">
                     <TableHead className="pl-4">Machine</TableHead>
-                    <TableHead>Stop Code / Reason</TableHead>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Reason</TableHead>
                     <TableHead>From</TableHead>
                     <TableHead>To</TableHead>
                     <TableHead>Min</TableHead>
@@ -1050,7 +1077,8 @@ function StoppageForm() {
                   {stoppageLogs.map((r: any) => (
                     <TableRow key={r.id}>
                       <TableCell className="pl-4 font-mono text-xs font-medium">{r.machine_code}</TableCell>
-                      <TableCell className="text-xs">{r.reason}</TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">{r.datalog_code ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{r.reason ?? r.code_name ?? "—"}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{r.started_at ? new Date(r.started_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{r.ended_at ? new Date(r.ended_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</TableCell>
                       <TableCell className="text-xs font-medium text-amber-600">{r.duration_min ?? "—"}</TableCell>
@@ -1102,7 +1130,37 @@ function ManpowerGrid() {
   const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split("T")[0];
   const [date, setDate] = useState(localDate);
   const [shift, setShift] = useState<"A" | "B" | "C">("A");
+  const [department, setDepartment] = useState<string>("Ring Frame");
+  const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const { data: millMasters } = useMillMasters();
+  const deptOptions = millMasters?.department ?? [];
+  useEffect(() => {
+    if (!department && deptOptions.length > 0) {
+      const rfDept = deptOptions.find((d: any) => {
+        const n = typeof d === "string" ? d : d.name;
+        return n.toLowerCase().includes("ring");
+      });
+      const first = rfDept ?? deptOptions[0];
+      const name = typeof first === "string" ? first : first.name;
+      const id = typeof first === "string" ? null : (first.id || null);
+      setDepartment(name);
+      setDepartmentId(id);
+    }
+  }, [deptOptions]);
+
+  // Machines filtered by department for MC From/To dropdowns
+  const mpMachinesQ = useQuery({
+    queryKey: ["machines", departmentId || department, millId, "manpower"],
+    queryFn: () => productionApi.getMachines({
+      ...(departmentId ? { department_id: departmentId } : { department }),
+      mill_id: millId, page_size: 1000, page: 1,
+    }),
+    staleTime: 60_000,
+    enabled: !!millId && !!(departmentId || department),
+  });
+  const mpMachines = (Array.isArray(mpMachinesQ.data) ? mpMachinesQ.data : (mpMachinesQ.data?.data ?? [])) as any[];
 
   const [rows, setRows] = useState<ManpowerRow[]>(() =>
     RF_CATEGORIES.map((c) => ({
@@ -1179,7 +1237,7 @@ function ManpowerGrid() {
     <div className="space-y-4">
       <Card>
         <CardContent className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Date *</Label>
               <Input type="date" value={date} onChange={(e) => { setDate(e.target.value); setErrors((p) => ({ ...p, date: "" })); }}
@@ -1196,6 +1254,22 @@ function ManpowerGrid() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Department *</Label>
+              <Select value={department} onValueChange={(v) => {
+                setDepartment(v);
+                const d = deptOptions.find((x: any) => (typeof x === "string" ? x : x.name) === v);
+                setDepartmentId(d && typeof d !== "string" ? (d.id || null) : null);
+              }}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select dept" /></SelectTrigger>
+                <SelectContent>
+                  {deptOptions.map((d: any) => {
+                    const name = typeof d === "string" ? d : d.name;
+                    return <SelectItem key={name} value={name}>{name}</SelectItem>;
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="rounded-lg border bg-card p-3 flex flex-col justify-center">
               <div className="text-xs text-muted-foreground">Total Headcount</div>
               <div className="text-xl font-semibold mt-0.5">{totalHeadcount} workers</div>
@@ -1208,7 +1282,7 @@ function ManpowerGrid() {
         <CardHeader className="flex flex-row items-center justify-between py-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Users2 className="size-4 text-muted-foreground" />
-            Ring Frame — Common Category Manpower Plan
+            {department} — Manpower Plan
           </CardTitle>
           <Button size="sm" onClick={handleSubmit} disabled={bulkMutation.isPending}>
             <Save className="size-3.5 mr-1.5" />
@@ -1221,8 +1295,8 @@ function ManpowerGrid() {
               <TableHeader>
                 <TableRow className="bg-muted/40">
                   <TableHead className="pl-4 w-52">Category</TableHead>
-                  <TableHead className="w-28">MC From</TableHead>
-                  <TableHead className="w-28">MC To</TableHead>
+                  <TableHead className="w-36">MC From</TableHead>
+                  <TableHead className="w-36">MC To</TableHead>
                   <TableHead className="w-28">Total Machines</TableHead>
                   <TableHead className="w-28">Headcount</TableHead>
                   <TableHead>Supervisor</TableHead>
@@ -1233,12 +1307,28 @@ function ManpowerGrid() {
                   <TableRow key={row.category} className={Number(row.headcount) > 0 ? "bg-primary/5" : undefined}>
                     <TableCell className="pl-4 font-medium text-xs">{row.categoryLabel}</TableCell>
                     <TableCell>
-                      <Input value={row.mcIdFrom} onChange={(e) => updateRow(idx, "mcIdFrom", e.target.value)}
-                        placeholder="RF_001" className="h-7 text-xs w-full" />
+                      <Select value={row.mcIdFrom} onValueChange={(v) => updateRow(idx, "mcIdFrom", v)}>
+                        <SelectTrigger className="h-7 text-xs w-full">
+                          <SelectValue placeholder={mpMachines.length ? "From" : "—"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {mpMachines.map((m: any) => (
+                            <SelectItem key={m.code} value={m.code}>{m.code}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>
-                      <Input value={row.mcIdTo} onChange={(e) => updateRow(idx, "mcIdTo", e.target.value)}
-                        placeholder="RF_010" className="h-7 text-xs w-full" />
+                      <Select value={row.mcIdTo} onValueChange={(v) => updateRow(idx, "mcIdTo", v)}>
+                        <SelectTrigger className="h-7 text-xs w-full">
+                          <SelectValue placeholder={mpMachines.length ? "To" : "—"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {mpMachines.map((m: any) => (
+                            <SelectItem key={m.code} value={m.code}>{m.code}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </TableCell>
                     <TableCell>
                       <Input type="number" min={0} value={row.totalMachines}
