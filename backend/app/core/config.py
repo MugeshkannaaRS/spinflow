@@ -74,8 +74,8 @@ class Settings(BaseSettings):
             "REFRESH_SECRET_KEY": self.REFRESH_SECRET_KEY,
             "REDIS_URL": self.REDIS_URL,
             "QR_SECRET_KEY": self.QR_SECRET_KEY,
-            # Without this, the Razorpay webhook silently rejects all payment events
-            "RAZORPAY_WEBHOOK_SECRET": self.RAZORPAY_WEBHOOK_SECRET,
+            # Payment gateway — integrate later
+            # "RAZORPAY_WEBHOOK_SECRET": self.RAZORPAY_WEBHOOK_SECRET,
         }
         missing = [name for name, val in required.items() if not val]
         if missing:
