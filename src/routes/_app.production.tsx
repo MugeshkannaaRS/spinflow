@@ -1545,8 +1545,14 @@ function ProductionPage() {
   const downColConfig = useColumnConfig("production_downtime");
 
   const todayStr = new Date().toISOString().split("T")[0];
+  // Use most recent date with any entries; fall back to today if no shifts loaded
+  const latestShiftDate = shifts.length > 0
+    ? shifts.reduce((latest: string, s: any) => (s.date > latest ? s.date : latest), "")
+    : todayStr;
+  const kpiDate = latestShiftDate || todayStr;
+  const isLatestDateToday = kpiDate === todayStr;
   const totalProduced = shifts
-    .filter((s: any) => s.date === todayStr && s.status === "approved")
+    .filter((s: any) => s.date === kpiDate)
     .reduce((acc: number, s: any) => acc + (Number(s.produced_kg) || 0), 0);
   const totalTarget = machines.reduce(
     (s: number, m: any) => s + (m.target_kg ?? m.targetKg ?? 0),
@@ -1593,7 +1599,7 @@ function ProductionPage() {
             <Card>
               <CardContent className="p-5">
                 <div className="text-xs uppercase text-muted-foreground font-medium">
-                  Produced Today
+                  {isLatestDateToday ? "Produced Today" : `Produced (${kpiDate})`}
                 </div>
                 <div className="text-2xl font-semibold mt-2">
                   {fmtNumber(totalProduced)} kg

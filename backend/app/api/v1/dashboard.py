@@ -554,9 +554,18 @@ async def get_dashboard_summary(
             today_str = today.isoformat()
             week_ago_str = (today - timedelta(days=6)).isoformat()
 
+            # Find the most recent date with entries — fall back to today when no history
+            q_latest = (
+                select(func.max(ProductionEntry.date))
+                .join(Machine, ProductionEntry.machine_code == Machine.code)
+                .where(*machine_filter)
+            ) if machine_filter else select(func.max(ProductionEntry.date))
+            latest_date_row = (await db.execute(q_latest)).scalar()
+            ref_date = str(latest_date_row) if latest_date_row else today_str
+
             q_output = select(func.coalesce(func.sum(ProductionEntry.produced_kg), 0))
             q_output = q_output.join(Machine, ProductionEntry.machine_code == Machine.code)
-            q_output = q_output.where(ProductionEntry.date == today_str, *machine_filter)
+            q_output = q_output.where(ProductionEntry.date == ref_date, *machine_filter)
             today_output = float((await db.execute(q_output)).scalar() or 0)
 
             q_target = select(func.coalesce(func.sum(Machine.target_kg), 0))
@@ -568,7 +577,7 @@ async def get_dashboard_summary(
                 func.coalesce(func.sum(ProductionEntry.produced_kg), 0),
             )
             q_waste = q_waste.join(Machine, ProductionEntry.machine_code == Machine.code)
-            q_waste = q_waste.where(ProductionEntry.date == today_str, *machine_filter)
+            q_waste = q_waste.where(ProductionEntry.date == ref_date, *machine_filter)
             waste_row = (await db.execute(q_waste)).one()
             waste_kg = float(waste_row[0] or 0)
             input_kg = float(waste_row[1] or 0)
