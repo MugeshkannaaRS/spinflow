@@ -44,3 +44,12 @@ __all__ = [
     "ColumnConfig", "ColumnDropdownOption",
 ]
 from app.models.mill_config import MillMaster, MillCustomField, MillRecordValue
+from app.models.mixing import (
+    MixingRecipe, MixingLayer, MixingChangeLog,
+    LaydownRecord, BaleConsumptionLog,
+    JCPClearance,
+    UtilityBreakdown,
+    WasteStock, WasteTransfer,
+    SpliceQualityLog,
+    ShiftManpowerPlan,
+)

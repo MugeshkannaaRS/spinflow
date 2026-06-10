@@ -25,6 +25,7 @@ from app.api.v1 import auth, production, quality, inventory, dispatch, purchase,
 from app.api.v1.admin import router as admin_router
 from app.api.v1.billing import router as billing_router
 from app.api.v1.mill_config import router as mill_config_router
+from app.api.v1.mixing import router as mixing_router
 from app.ws.notifications import router as ws_router
 
 setup_logging()
@@ -249,6 +250,7 @@ app.include_router(imports_router.router, prefix=API_PREFIX, tags=["Imports"])
 app.include_router(admin_router, prefix=API_PREFIX, tags=["Admin"])
 app.include_router(billing_router, prefix=API_PREFIX, tags=["Billing"])
 app.include_router(mill_config_router, prefix=API_PREFIX, tags=["Mill Config"])
+app.include_router(mixing_router, prefix=API_PREFIX, tags=["Mixing & JCP"])
 app.include_router(ws_router)
 
 

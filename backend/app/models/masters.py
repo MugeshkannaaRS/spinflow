@@ -1,5 +1,6 @@
 from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Enum as SAEnum, Date, Numeric, JSON, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime, date
 from typing import Optional
 from app.db.base import Base, TimestampMixin, SoftDeleteMixin, generate_uuid
@@ -101,11 +102,18 @@ class YarnCount(TimestampMixin, Base):
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     count: Mapped[str] = mapped_column(String(20), nullable=False)
     count_value: Mapped[float] = mapped_column(Float, nullable=False)
-    blend: Mapped[str] = mapped_column(String(200), nullable=True)
-    twist_per_meter: Mapped[float] = mapped_column(Float, nullable=True)
-    standard_csp: Mapped[float] = mapped_column(Float, nullable=True)
-    standard_u_percent: Mapped[float] = mapped_column(Float, nullable=True)
+    blend: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    twist_per_meter: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    standard_csp: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    standard_u_percent: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # v2: blended yarn fields
+    # e.g. {"cotton_cnc": 60, "polyester": 40} or {"cotton": 100}
+    fiber_composition: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    # colour code for dyed/colour yarn e.g. "BLK001", "WHT", "NAT"
+    colour_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    # human-readable blend ratio e.g. "60:40 PC", "80:20 CVC"
+    blend_ratio: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     mill = relationship("Mill", back_populates="yarn_counts")
 
