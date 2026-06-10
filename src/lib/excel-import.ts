@@ -36,6 +36,12 @@ export const FIELD_ALIASES: Record<string, string[]> = {
     "employee no","staff id","staff no","worker id","emp code",
     "employee code","emp code","id","serial no","sr no","sl no","si no",
   ],
+  // v2 key — matches useColumnConfig key for auto-mapping
+  employee_code: [
+    "code","emp id","empid","emp_id","employee id","emp no","emp no.","empno",
+    "employee no","staff id","staff no","worker id","emp code",
+    "employee code","emp code","id",
+  ],
   full_name: ["full name","name","fullname","employee name","staff name","worker name","emp name","person name"],
   date_of_joining: ["doj","date of joining","join date","start date","joining date","joining","date joined"],
   basic: ["basic","basic pay","basic salary","basic wage","base pay","base salary","bs"],
@@ -50,11 +56,15 @@ export const FIELD_ALIASES: Record<string, string[]> = {
   grade: ["grade","pay grade","level","category","class","scale","grade name"],
   gender: ["gender","sex","m/f","male/female","gen"],
   date_of_birth: ["date of birth","dob","birth date","born","dob date"],
+  // v2 key — matches useColumnConfig key
+  dob: ["date of birth","dob","birth date","born","dob date","d.o.b"],
   mobile: ["mobile","phone","mobile no","phone no","contact","contact no","cell"],
   aadhar: ["aadhar","aadhaar","aadhar no","aadhaar number","uid","aadhar number"],
   pf_no: ["pf no","pf number","provident fund no","epf no","pf no."],
   esic_no: ["esi no","esi number","esic no","esic_no"],
   bank_account: ["bank account","account no","bank ac","acc no","account number"],
+  // v2 key — matches useColumnConfig key
+  bank_account_no: ["bank account","account no","bank ac","acc no","account number","bank a/c","bank a/c no","a/c no"],
   bank_ifsc: ["ifsc","ifsc code","bank ifsc","ifsc no"],
   shift: ["shift","shift name","working shift"],
   days_of_month: ["days of month","working days","days","month days"],

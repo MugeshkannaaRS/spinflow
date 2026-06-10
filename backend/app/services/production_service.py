@@ -104,7 +104,7 @@ class ProductionService(BaseService):
             produced_kg=req.produced_kg,
             waste_kg=req.waste_kg,
             count=req.count,
-            status="pending",
+            status="approved",
             entered_by=self.current_user.name,
         )
         self.db.add(entry)
@@ -164,7 +164,7 @@ class ProductionService(BaseService):
                     produced_kg=item.produced_kg,
                     waste_kg=item.waste_kg,
                     count=item.count,
-                    status="pending",
+                    status="approved",
                     entered_by=self.current_user.name,
                 )
                 self.db.add(entry)
@@ -202,11 +202,9 @@ class ProductionService(BaseService):
     async def approve_entry(self, entry_id: str) -> ProductionEntry:
         entry = await self.get_or_404(ProductionEntry, entry_id)
 
+        # already approved — just return without error (idempotent)
         if entry.status == "approved":
-            raise SpinFlowException.bad_request(
-                "Entry is already approved",
-                ErrorCode.CONFLICT,
-            )
+            return entry
 
         entry.status = "approved"
         entry.approved_by = self.current_user.name

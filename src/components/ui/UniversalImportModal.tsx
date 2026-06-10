@@ -583,6 +583,7 @@ export function UniversalImportModal({
 
   const FIELD_MAP: Record<string, Record<string, string>> = {
     hr_employees: {
+      // legacy fallbacks — in case old saved mappings still reference old keys
       name: "full_name",
       employee_id: "employee_code",
       joining_date: "date_of_joining",
@@ -612,7 +613,7 @@ export function UniversalImportModal({
   };
 
   const TABLE_KEY_FIELDS: Record<string, string[]> = {
-    hr_employees: ["name", "employee_id", "sl_no", "full_name", "employee_code"],
+    hr_employees: ["full_name", "employee_code", "sl_no"],
     masters_machines: ["name", "code"],
     masters_customers: ["name", "code"],
     masters_departments: ["name", "code"],

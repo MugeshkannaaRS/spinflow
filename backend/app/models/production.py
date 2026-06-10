@@ -135,3 +135,7 @@ class DowntimeLog(TimestampMixin, Base):
     # FK to utility_breakdowns.id when this stop was caused by utility failure
     utility_ref_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     mill_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    # v2 DATALOG fields (migration 020)
+    datalog_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    stop_from: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+    stop_to: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
