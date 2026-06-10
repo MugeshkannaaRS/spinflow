@@ -76,35 +76,40 @@ export const useAuth = create<AuthState>()(
     }),
     {
       name: "spinflow-auth",
+      // SECURITY: access token is NOT persisted to localStorage.
+      // It lives only in memory (Zustand state) and is re-acquired on
+      // browser refresh via the httponly refresh cookie → /auth/refresh.
+      // XSS cannot steal the access token from storage.
       partialize: (state) => ({
         user: state.user,
-        token: state.token,
         isAuthenticated: state.isAuthenticated,
         activeMill: state.activeMill,
+        // token intentionally excluded
       }),
       merge: (persisted: unknown, current) => {
         const p = persisted as Record<string, unknown> | null;
         if (!p) return current;
         return {
           ...current,
-          ...p,
+          user: (p.user as AuthUser | null) ?? null,
+          isAuthenticated: (p.isAuthenticated as boolean) ?? false,
+          activeMill: (p.activeMill as CompanyMill | null) ?? null,
+          // token and refreshToken are intentionally NOT restored from storage
+          token: null,
           refreshToken: null,
         };
       },
       migrate: (persisted: unknown) => {
         const p = persisted as Record<string, unknown> | null;
         if (!p) return initialState;
-        if (p.data && typeof p.data === "object") {
-          const d = p.data as Record<string, unknown>;
-          return {
-            ...initialState,
-            token: (p.token as string | null) ?? null,
-            refreshToken: null,
-          };
-        }
-        return { ...initialState, ...p, refreshToken: null };
+        // Strip any token that may have been persisted by older versions
+        return {
+          ...initialState,
+          user: (p.user as AuthUser | null) ?? null,
+          activeMill: (p.activeMill as CompanyMill | null) ?? null,
+        };
       },
-      version: 3,
+      version: 4,  // bumped: removes token from localStorage
     },
   ),
 );

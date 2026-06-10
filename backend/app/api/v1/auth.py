@@ -36,7 +36,7 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
         httponly=True,
         secure=secure,
-        samesite="lax",
+        samesite="strict",   # was "lax" — strict prevents CSRF on the refresh endpoint
         path="/api/v1/auth/refresh",
     )
 from app.models.masters import Company, CompanyModule, MillSettings, Mill
@@ -305,6 +305,20 @@ async def change_password(
         current_user.password_hash = hash_password(req.new_password)
         current_user.must_change_password = False
         current_user.updated_at = datetime.now(timezone.utc)
+
+        # Revoke all active sessions so other devices are logged out immediately.
+        # The caller must re-authenticate to get a fresh refresh token.
+        sessions_result = await db.execute(
+            select(UserSession).where(
+                UserSession.user_id == current_user.id,
+                UserSession.is_active == True,
+            )
+        )
+        for session in sessions_result.scalars().all():
+            session.is_active = False
+
+        role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+        await log_audit(db, current_user.id, role_code, "change_password", "auth", current_user.id, "Password changed — all sessions revoked")
         await db.commit()
 
         return {"success": True, "message": "Password changed successfully"}

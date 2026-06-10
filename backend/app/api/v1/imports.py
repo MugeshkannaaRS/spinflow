@@ -15,6 +15,41 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Maps import module names → ERP permission module names.
+# Used to enforce RBAC on parse / validate / execute.
+_IMPORT_TO_ERP_MODULE: dict[str, str] = {
+    "machines":          "production",
+    "employees":         "hr",
+    "yarn_counts":       "masters",
+    "departments":       "masters",
+    "customers":         "dispatch",
+    "suppliers":         "purchase",
+    "cotton_purchases":  "purchase",
+    "inventory_items":   "inventory",
+    "quality_tests":     "quality",
+    "dispatch_orders":   "dispatch",
+    "payroll_entries":   "payroll",
+    "sales_orders":      "sales",
+    "maintenance_logs":  "maintenance",
+}
+
+
+async def _assert_import_permission(
+    module: str,
+    current_user: User,
+    db: AsyncSession,
+    write: bool = False,
+) -> None:
+    """Enforce module-level RBAC for import endpoints.
+
+    Maps the import module name to the corresponding ERP module and
+    calls require_module() so the same role/subscription rules apply.
+    Defaults to 'masters' for unrecognised module names.
+    """
+    erp_module = _IMPORT_TO_ERP_MODULE.get(module, "masters")
+    checker = require_module(erp_module, write=write)
+    await checker(current_user=current_user, db=db)
+
 class MappingItem(BaseModel):
     excel_header: str
     spinflow_field: Optional[str] = None
@@ -206,7 +241,9 @@ class SaveNamedMappingRequest(BaseModel):
 
 
 @router.post("/imports/parse")
+@limiter.limit("20/minute")
 async def parse_import_file(
+    request: Request,
     file: UploadFile = File(...),
     module: str = Form(...),
     db: AsyncSession = Depends(get_db),
@@ -215,7 +252,9 @@ async def parse_import_file(
     """
     Step 1: Parse uploaded file, return headers + smart mapping suggestions + preview.
     Supports .xlsx, .xls, .csv, .pdf
+    Requires read permission on the target module.
     """
+    await _assert_import_permission(module, current_user, db, write=False)
     from app.core.import_mapper import mapper as smart_mapper
 
     content = await file.read()
@@ -317,12 +356,17 @@ class ValidateRequest(BaseModel):
 
 
 @router.post("/imports/validate")
+@limiter.limit("20/minute")
 async def validate_import(
+    request: Request,
     req: ValidateRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Step 2: Validate mapped data, return per-row status."""
+    """Step 2: Validate mapped data, return per-row status.
+    Requires read permission on the target module.
+    """
+    await _assert_import_permission(req.module, current_user, db, write=False)
     content, meta = _read_import_file(req.file_id)
     if content is None:
         raise HTTPException(400, detail="File not found or expired. Please re-upload.")
@@ -426,15 +470,23 @@ class ExecuteRequest(BaseModel):
 
 
 @router.post("/imports/execute")
+@limiter.limit("5/minute")
 async def execute_import(
+    request: Request,
     req: ExecuteRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Step 3: Actually import validated rows."""
+    """Step 3: Actually import validated rows.
+    Requires write permission on the target module.
+    Rate-limited to 5/minute — execute is expensive and writes to the DB.
+    """
+    await _assert_import_permission(req.module, current_user, db, write=True)
+
     # Validate step first to get processed rows
     validate_result = await validate_import(
-        ValidateRequest(file_id=req.file_id, module=req.module, mapping=req.mapping),
+        request=request,
+        req=ValidateRequest(file_id=req.file_id, module=req.module, mapping=req.mapping),
         db=db,
         current_user=current_user,
     )
@@ -538,6 +590,16 @@ async def execute_import(
     # Clean up temp files after successful import
     _delete_import_file(req.file_id)
 
+    role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "0.0.0.0").split(",")[0].strip()
+    await log_audit(
+        db, current_user.id, role_code, "import", req.module,
+        current_user.mill_id or "all",
+        f"Bulk import: module={req.module}, imported={imported}, skipped={skipped}, errors={len(errors_out)}",
+        ip_address=client_ip,
+    )
+    await db.commit()
+
     return {
         "imported": imported,
         "skipped": skipped,
@@ -583,11 +645,15 @@ async def save_named_mapping(
 
 @router.get("/imports/named-mappings")
 async def list_named_mappings(
+    request: Request,
     module: str = Query(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """List saved named mappings for a module."""
+    """List saved named mappings for a module.
+    Requires read permission on the target module.
+    """
+    await _assert_import_permission(module, current_user, db, write=False)
     scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id") or current_user.mill_id
     if not mill_id:
