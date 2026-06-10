@@ -2,11 +2,21 @@ import axios from "axios";
 import { useAuth } from "@/stores/auth";
 import { toast } from "sonner";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://spinflow.onrender.com";
+// VITE_API_BASE_URL must be set in .env (or .env.production for builds).
+// There is intentionally no fallback — a missing env var means the app would
+// silently hit the wrong backend, causing hard-to-debug data corruption.
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+if (!API_BASE) {
+  throw new Error(
+    "[SpinFlow] VITE_API_BASE_URL is not set. " +
+    "Create a .env file with VITE_API_BASE_URL=http://localhost:8000 for local dev, " +
+    "or set it in your deployment environment."
+  );
+}
 export { API_BASE };
 
 export const api = axios.create({
-  baseURL: API_BASE ? `${API_BASE}/api/v1` : "/api/v1",
+  baseURL: `${API_BASE}/api/v1`,
   timeout: 60000,
   headers: { "Content-Type": "application/json" },
   withCredentials: true,

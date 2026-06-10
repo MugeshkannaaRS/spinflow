@@ -133,7 +133,12 @@ async def lifespan(app: FastAPI):
         await asyncio.to_thread(_run_alembic_upgrade)
         logger.info("Database migrations applied successfully")
     except Exception as exc:
-        logger.error(f"Failed to apply database migrations: {exc}", exc_info=True)
+        logger.critical(
+            f"FATAL: Database migration failed — app cannot start safely. "
+            f"Error: {exc}",
+            exc_info=True,
+        )
+        raise SystemExit(1)
 
     try:
         from app.db.session import get_db
@@ -258,6 +263,8 @@ app.include_router(ws_router)
 
 @app.get("/api/health")
 async def health():
+    from fastapi.responses import JSONResponse
+
     db_status = {"status": "not_checked"}
     redis_status = {"status": "not_checked"}
     try:
@@ -272,9 +279,13 @@ async def health():
     except Exception as exc:
         redis_status = {"status": "unhealthy", "error": str(exc)}
     system = collect_system_info()
-    overall = all(s.get("status") == "healthy" for s in [db_status, redis_status] if s.get("status") != "not_configured")
-    return {
-        "status": "healthy" if overall else "degraded",
+    # Database must be healthy for the service to function.
+    # Redis is optional (degrades gracefully to in-memory rate limiting).
+    db_healthy = db_status.get("status") == "healthy"
+    overall_healthy = db_healthy
+
+    payload = {
+        "status": "healthy" if overall_healthy else "unhealthy",
         "app": settings.APP_NAME,
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
@@ -282,3 +293,6 @@ async def health():
         "redis": redis_status,
         "system": system,
     }
+    # Return 503 when DB is unreachable so Render marks the service as unhealthy
+    http_status = 200 if overall_healthy else 503
+    return JSONResponse(content=payload, status_code=http_status)

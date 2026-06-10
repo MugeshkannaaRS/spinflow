@@ -542,24 +542,39 @@ async def get_company_billing_history(
 
 @router.post("/subscription/webhook")
 async def billing_webhook(
-    payload: dict,
     request: "Request",
     db: AsyncSession = Depends(get_db),
 ):
+    import hashlib
+    import hmac
+    import json as _json
     from app.core.config import settings
-    import hashlib, hmac, json
 
+    # Read raw bytes BEFORE any JSON parsing so key ordering is preserved
+    # (Razorpay signs the exact bytes it sends; re-serialising changes key order)
+    raw_body: bytes = await request.body()
     signature = request.headers.get("x-razorpay-signature", "")
-    body = json.dumps(payload, separators=(",", ":"))
+
+    webhook_secret = getattr(settings, "RAZORPAY_WEBHOOK_SECRET", "")
+    if not webhook_secret:
+        logger.error("RAZORPAY_WEBHOOK_SECRET is not configured — rejecting webhook")
+        raise HTTPException(status_code=500, detail="Webhook not configured")
+
     expected = hmac.new(
-        settings.RAZORPAY_WEBHOOK_SECRET.encode(),
-        body.encode(),
+        webhook_secret.encode(),
+        raw_body,
         hashlib.sha256,
     ).hexdigest()
 
     if not hmac.compare_digest(expected, signature):
-        logger.warning("Webhook signature mismatch")
+        logger.warning("Webhook signature mismatch — possible spoofed request")
         raise HTTPException(status_code=400, detail="Invalid signature")
+
+    try:
+        payload = _json.loads(raw_body)
+    except _json.JSONDecodeError as exc:
+        logger.error(f"Webhook body is not valid JSON: {exc}")
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
 
     event = payload.get("event", "")
     logger.info("Billing webhook received: %s", event)

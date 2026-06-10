@@ -120,15 +120,78 @@ async def save_import_mappings(
 # ════════════════════════════════════════════════════════════════════
 
 import io
+import json
+import time
 import uuid as _uuid
 import tempfile
 import os
 from fastapi import UploadFile, File, Form
 from typing import Any
 
-# In-memory file store (keyed by file_id, cleared on process restart)
-_FILE_STORE: dict[str, bytes] = {}
-_FILE_META: dict[str, dict] = {}
+# Disk-backed file store — survives memory pressure, bounded by /tmp space.
+# Each upload writes two files:
+#   /tmp/spinflow_import_{file_id}.bin   — raw bytes
+#   /tmp/spinflow_import_{file_id}.meta  — JSON metadata (module, filename, ts)
+# Files older than _FILE_TTL_SECONDS are silently ignored on read
+# and lazily purged on the next upload.
+_FILE_TTL_SECONDS: int = 1800  # 30 minutes
+_IMPORT_TMP_PREFIX = "spinflow_import_"
+
+
+def _tmp_path(file_id: str, ext: str) -> str:
+    return os.path.join(tempfile.gettempdir(), f"{_IMPORT_TMP_PREFIX}{file_id}.{ext}")
+
+
+def _write_import_file(file_id: str, content: bytes, meta: dict) -> None:
+    with open(_tmp_path(file_id, "bin"), "wb") as fh:
+        fh.write(content)
+    meta["_ts"] = time.time()
+    with open(_tmp_path(file_id, "meta"), "w") as fh:
+        json.dump(meta, fh)
+
+
+def _read_import_file(file_id: str) -> tuple[Optional[bytes], dict]:
+    """Return (content, meta) or (None, {}) if missing/expired."""
+    bin_path = _tmp_path(file_id, "bin")
+    meta_path = _tmp_path(file_id, "meta")
+    if not os.path.exists(bin_path) or not os.path.exists(meta_path):
+        return None, {}
+    try:
+        with open(meta_path) as fh:
+            meta = json.load(fh)
+        if time.time() - meta.get("_ts", 0) > _FILE_TTL_SECONDS:
+            _delete_import_file(file_id)
+            return None, {}
+        with open(bin_path, "rb") as fh:
+            return fh.read(), meta
+    except Exception:
+        return None, {}
+
+
+def _delete_import_file(file_id: str) -> None:
+    for ext in ("bin", "meta"):
+        try:
+            os.unlink(_tmp_path(file_id, ext))
+        except FileNotFoundError:
+            pass
+
+
+def _purge_expired_import_files() -> None:
+    """Lazily remove /tmp files older than TTL. Called on each new upload."""
+    tmp = tempfile.gettempdir()
+    now = time.time()
+    try:
+        for name in os.listdir(tmp):
+            if not name.startswith(_IMPORT_TMP_PREFIX):
+                continue
+            full = os.path.join(tmp, name)
+            try:
+                if now - os.path.getmtime(full) > _FILE_TTL_SECONDS:
+                    os.unlink(full)
+            except OSError:
+                pass
+    except OSError:
+        pass
 
 
 class NamedMappingItem(BaseModel):
@@ -157,8 +220,8 @@ async def parse_import_file(
 
     content = await file.read()
     file_id = str(_uuid.uuid4())
-    _FILE_STORE[file_id] = content
-    _FILE_META[file_id] = {"module": module, "filename": file.filename}
+    _purge_expired_import_files()
+    _write_import_file(file_id, content, {"module": module, "filename": file.filename})
 
     ext = (file.filename or "").lower().split(".")[-1]
 
@@ -260,11 +323,10 @@ async def validate_import(
     current_user: User = Depends(get_current_user),
 ):
     """Step 2: Validate mapped data, return per-row status."""
-    if req.file_id not in _FILE_STORE:
+    content, meta = _read_import_file(req.file_id)
+    if content is None:
         raise HTTPException(400, detail="File not found or expired. Please re-upload.")
 
-    content = _FILE_STORE[req.file_id]
-    meta = _FILE_META.get(req.file_id, {})
     ext = meta.get("filename", "").lower().split(".")[-1] or "xlsx"
 
     rows: list[dict] = []
@@ -473,9 +535,8 @@ async def execute_import(
             await db.rollback()
             errors_out.append({"row": batch_start, "message": f"Batch commit failed: {str(e)}"})
 
-    # Clean up file store
-    _FILE_STORE.pop(req.file_id, None)
-    _FILE_META.pop(req.file_id, None)
+    # Clean up temp files after successful import
+    _delete_import_file(req.file_id)
 
     return {
         "imported": imported,

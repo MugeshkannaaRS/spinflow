@@ -620,7 +620,7 @@ async def get_dashboard_summary(
                 "last_7_days": last_7_days,
             }
         except Exception as e:
-            logger.warning(f"dashboard production section error: {e}")
+            logger.warning(f"dashboard production section error: {e}", exc_info=True)
             out["production"] = {
                 "today_output_kg": 0, "today_target_kg": 0,
                 "efficiency_pct": 0, "waste_pct": 0, "last_7_days": [],
@@ -659,7 +659,7 @@ async def get_dashboard_summary(
                 "maintenance": maint_m,
             }
         except Exception as e:
-            logger.warning(f"dashboard machines section error: {e}")
+            logger.warning(f"dashboard machines section error: {e}", exc_info=True)
             out["machines"] = {"total": 0, "active": 0, "down": 0, "maintenance": 0}
 
     # ── ATTENDANCE ────────────────────────────────────────────────────────────
@@ -737,7 +737,7 @@ async def get_dashboard_summary(
                 "by_department": by_department,
             }
         except Exception as e:
-            logger.warning(f"dashboard attendance section error: {e}")
+            logger.warning(f"dashboard attendance section error: {e}", exc_info=True)
             out["attendance"] = {
                 "today_present": 0, "today_absent": 0, "today_total": 0,
                 "present_pct": 0.0, "by_department": [],
@@ -796,7 +796,7 @@ async def get_dashboard_summary(
                 "revenue_trend": revenue_trend,
             }
         except Exception as e:
-            logger.warning(f"dashboard finance section error: {e}")
+            logger.warning(f"dashboard finance section error: {e}", exc_info=True)
             out["finance"] = {
                 "monthly_revenue": 0, "monthly_purchases": 0,
                 "outstanding": 0, "overdue_count": 0, "revenue_trend": [],
@@ -853,7 +853,7 @@ async def get_dashboard_summary(
                 "defect_rate_pct": defect_rate,
             }
         except Exception as e:
-            logger.warning(f"dashboard quality section error: {e}")
+            logger.warning(f"dashboard quality section error: {e}", exc_info=True)
             out["quality"] = {
                 "tests_today": 0, "pass_rate_pct": 0, "pending_approvals": 0, "defect_rate_pct": 0,
             }
@@ -899,7 +899,7 @@ async def get_dashboard_summary(
                 "low_stock_items": low_stock_items,
             }
         except Exception as e:
-            logger.warning(f"dashboard inventory section error: {e}")
+            logger.warning(f"dashboard inventory section error: {e}", exc_info=True)
             out["inventory"] = {"total_items": 0, "low_stock_count": 0, "low_stock_items": []}
 
     # ── DISPATCH ──────────────────────────────────────────────────────────────
@@ -941,7 +941,7 @@ async def get_dashboard_summary(
                 "delivered_today": delivered_today,
             }
         except Exception as e:
-            logger.warning(f"dashboard dispatch section error: {e}")
+            logger.warning(f"dashboard dispatch section error: {e}", exc_info=True)
             out["dispatch"] = {
                 "today_trips": 0, "today_sacks": 0, "pending_deliveries": 0, "delivered_today": 0,
             }
@@ -999,7 +999,7 @@ async def get_dashboard_summary(
                 "total_payable": total_payable,
             }
         except Exception as e:
-            logger.warning(f"dashboard payroll section error: {e}")
+            logger.warning(f"dashboard payroll section error: {e}", exc_info=True)
             out["payroll"] = {
                 "current_month": today.strftime("%b %Y"),
                 "total_employees": 0, "processed_count": 0,
@@ -1063,7 +1063,7 @@ async def get_dashboard_summary(
             alerts.append({"type": "info", "message": f"{out['quality']['pending_approvals']} quality test(s) pending approval", "module": "quality"})
 
     except Exception as e:
-        logger.warning(f"dashboard alerts error: {e}")
+        logger.warning(f"dashboard alerts error: {e}", exc_info=True)
 
     out["alerts"] = alerts
 
@@ -1119,7 +1119,7 @@ async def get_dashboard_summary(
                 pending_actions.append({"label": "Quality tests pending approval", "count": qual_count, "route": "/quality"})
 
         except Exception as e:
-            logger.warning(f"dashboard pending_actions error: {e}")
+            logger.warning(f"dashboard pending_actions error: {e}", exc_info=True)
 
         out["pending_actions"] = pending_actions
 
@@ -1158,7 +1158,7 @@ async def get_dashboard_summary(
                     "shift_end": "14:00",
                 }
         except Exception as e:
-            logger.warning(f"dashboard schedule error: {e}")
+            logger.warning(f"dashboard schedule error: {e}", exc_info=True)
             out["schedule"] = {"current_shift": "A", "shift_start": "06:00", "shift_end": "14:00"}
 
     # Also include legacy flat fields for backward compatibility with existing
@@ -1222,6 +1222,6 @@ async def get_dashboard_summary(
         out.setdefault("schedule", [])
         out.setdefault("pending_actions", [])
     except Exception as e:
-        logger.warning(f"dashboard compat fields error: {e}")
+        logger.warning(f"dashboard compat fields error: {e}", exc_info=True)
 
     return out

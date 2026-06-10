@@ -34,9 +34,13 @@ services:
       - key: DEBUG
         value: "false"
       - key: CORS_ORIGINS
+        # List ALL legitimate frontend origins explicitly. No wildcards.
         value: "https://spinflow-staging-frontend.onrender.com,https://spinflow.onrender.com,https://spinflow-f.onrender.com"
       - key: CORS_ORIGIN_REGEX
-        value: "^https://(.*\.ngrok(?:-free)?\.dev|.*\.onrender\.com)$"
+        # Restricted to ngrok dev tunnels only — NOT all of onrender.com
+        value: "^https://.*\\.ngrok(?:-free)?\\.dev$"
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
 
   # ── Frontend Static Site ──────────────────────────────────────────────
   - type: web

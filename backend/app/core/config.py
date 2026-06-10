@@ -26,9 +26,12 @@ class Settings(BaseSettings):
     # Redis — no default
     REDIS_URL: str = ""
 
-    # CORS — explicit origins only (no glob/wildcard), wildcard subdomains go in CORS_ORIGIN_REGEX
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173,https://spinflow-f.onrender.com"
-    CORS_ORIGIN_REGEX: str = r"^https://(.*\.ngrok(?:-free)?\.dev|.*\.onrender\.com)$"
+    # CORS — explicit origins only.
+    # CORS_ORIGIN_REGEX is restricted to ngrok dev tunnels only.
+    # Production Render domains must be listed explicitly in CORS_ORIGINS (set via env var).
+    # The default value here is for local development only and must be overridden in production.
+    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173"
+    CORS_ORIGIN_REGEX: str = r"^https://.*\.ngrok(?:-free)?\.dev$"
 
     @property
     def parsed_cors_origins(self) -> List[str]:
@@ -71,6 +74,8 @@ class Settings(BaseSettings):
             "REFRESH_SECRET_KEY": self.REFRESH_SECRET_KEY,
             "REDIS_URL": self.REDIS_URL,
             "QR_SECRET_KEY": self.QR_SECRET_KEY,
+            # Without this, the Razorpay webhook silently rejects all payment events
+            "RAZORPAY_WEBHOOK_SECRET": self.RAZORPAY_WEBHOOK_SECRET,
         }
         missing = [name for name, val in required.items() if not val]
         if missing:

@@ -135,8 +135,8 @@ async def get_machines(
             "custom_field_definitions": custom_field_defs,
         }
     except Exception as e:
-        logger.error(f"production.machines list error: {e}")
-        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": [], "custom_field_definitions": []}
+        logger.error(f"production.machines list error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve machines")
 
 
 @router.post("/production/machines", response_model=MachineResponse)
@@ -188,8 +188,8 @@ async def get_shifts(
         result = await db.execute(query)
         return [ShiftOut.model_validate(item).model_dump() for item in result.scalars().all()]
     except Exception as e:
-        logger.error(f"production.shifts list error: {e}")
-        return []
+        logger.error(f"production.shifts list error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve shifts")
 
 
 @router.post("/production/shifts", response_model=ShiftOut)
@@ -273,8 +273,8 @@ async def get_entries(
             "data": [ProductionEntryResponse.model_validate(item).model_dump() for item in items],
         }
     except Exception as e:
-        logger.error(f"production.entries list error: {e}")
-        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
+        logger.error(f"production.entries list error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve production entries")
 
 
 @router.post("/production/entries", response_model=ProductionEntryResponse)
@@ -365,8 +365,8 @@ async def get_downtime(
             "data": [DowntimeResponse.model_validate(item).model_dump() for item in items],
         }
     except Exception as e:
-        logger.error(f"production.downtime list error: {e}")
-        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
+        logger.error(f"production.downtime list error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve downtime logs")
 
 
 @router.post("/production/downtime", response_model=DowntimeResponse)
@@ -512,13 +512,13 @@ async def production_page_init(
         dept_rows = await db.execute(dept_query.order_by(Department.name))
         result["departments"] = [{"id": r.id, "name": r.name, "code": r.code} for r in dept_rows]
     except Exception as e:
-        logger.error(f"production.page-init departments error: {e}")
+        logger.error(f"production.page-init departments error: {e}", exc_info=True)
         result["departments"] = []
     try:
         shift_rows = await db.execute(select(Shift.id, Shift.code, Shift.name, Shift.start_time, Shift.end_time).order_by(Shift.code))
         result["shifts"] = [{"id": r.id, "code": r.code, "name": r.name, "start_time": r.start_time, "end_time": r.end_time} for r in shift_rows]
     except Exception as e:
-        logger.error(f"production.page-init shifts error: {e}")
+        logger.error(f"production.page-init shifts error: {e}", exc_info=True)
         result["shifts"] = []
     try:
         yc_query = select(YarnCount.id, YarnCount.count, YarnCount.blend).where(YarnCount.is_active == True)
@@ -527,6 +527,6 @@ async def production_page_init(
         yc_rows = await db.execute(yc_query.order_by(YarnCount.count))
         result["yarn_counts"] = [{"id": r.id, "count": r.count, "blend": r.blend} for r in yc_rows]
     except Exception as e:
-        logger.error(f"production.page-init yarn_counts error: {e}")
+        logger.error(f"production.page-init yarn_counts error: {e}", exc_info=True)
         result["yarn_counts"] = []
     return result
