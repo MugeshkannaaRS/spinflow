@@ -416,6 +416,50 @@ async def update_machine_status(
     return await svc.update_machine_status(machine_id, body.get("status", ""))
 
 
+@router.delete("/production/machines/{machine_id}")
+async def delete_machine(
+    machine_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    """Hard-delete a machine. Fails if the machine has production entries."""
+    machine = (await db.execute(select(Machine).where(Machine.id == machine_id))).scalar_one_or_none()
+    if not machine:
+        raise HTTPException(status_code=404, detail="Machine not found")
+    # Safety: check for any production entries referencing this machine code
+    entry_count = (await db.execute(
+        select(func.count()).select_from(ProductionEntry).where(ProductionEntry.machine_code == machine.code)
+    )).scalar() or 0
+    if entry_count > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot delete — machine {machine.code} has {entry_count} production entries. Deactivate instead.",
+        )
+    await db.delete(machine)
+    await db.commit()
+    return {"deleted": True, "machine_code": machine.code}
+
+
+@router.patch("/production/entries/{entry_id}")
+async def update_entry(
+    entry_id: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    """Edit a production entry. Allowed fields: produced_kg, waste_kg, count, operator, remarks."""
+    entry = (await db.execute(select(ProductionEntry).where(ProductionEntry.id == entry_id))).scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    allowed = {"produced_kg", "waste_kg", "count", "operator", "remarks", "stoppage_mins", "stoppage_reason"}
+    for k, v in body.items():
+        if k in allowed:
+            setattr(entry, k, v)
+    await db.commit()
+    await db.refresh(entry)
+    return ProductionEntryResponse.model_validate(entry).model_dump()
+
+
 @router.get("/production/dashboard/summary")
 async def dashboard_summary(
     db: AsyncSession = Depends(get_db),

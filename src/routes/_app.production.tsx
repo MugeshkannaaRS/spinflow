@@ -475,13 +475,13 @@ function ShiftGrid() {
 // WASTE ENTRY TAB
 // ─────────────────────────────────────────────────────────────────
 
-type WasteRow = { machineCode: string; machineName: string; lotNo: string; ratio: string; targetKg: string; wasteKg: string; remarks: string };
+type WasteRow = { machineCode: string; machineName: string; lotNo: string; ratio: string; wasteKg: string; remarks: string };
 
 function buildWasteRows(machines: any[]): WasteRow[] {
   return (machines ?? []).map((m: any) => ({
     machineCode: m.code ?? "",
     machineName: m.name ?? m.code ?? "",
-    lotNo: "", ratio: "", targetKg: "", wasteKg: "", remarks: "",
+    lotNo: "", ratio: "", wasteKg: "", remarks: "",
   }));
 }
 
@@ -544,7 +544,6 @@ function WasteGrid() {
           machine_code: r.machineCode,
           lot_no: r.lotNo || undefined,
           ratio: r.ratio || undefined,
-          target_kg: r.targetKg ? Number(r.targetKg) : undefined,
           waste_kg: Number(r.wasteKg) || 0,
           remarks: r.remarks || undefined,
         })),
@@ -651,7 +650,6 @@ function WasteGrid() {
                     <TableHead className="w-24 pl-4">Machine</TableHead>
                     <TableHead className="w-36">Lot No</TableHead>
                     <TableHead className="w-28">Ratio</TableHead>
-                    <TableHead className="w-28">Target (kg)</TableHead>
                     <TableHead className="w-28">Waste (kg) *</TableHead>
                     <TableHead>Remarks</TableHead>
                   </TableRow>
@@ -667,10 +665,6 @@ function WasteGrid() {
                       <TableCell>
                         <Input value={row.ratio} onChange={(e) => updateWasteRow(idx, "ratio", e.target.value)}
                           placeholder="60:40" className="h-7 text-xs w-full" />
-                      </TableCell>
-                      <TableCell>
-                        <Input type="number" min={0} value={row.targetKg} onChange={(e) => updateWasteRow(idx, "targetKg", e.target.value)}
-                          placeholder="0" className="h-7 text-xs w-full" />
                       </TableCell>
                       <TableCell>
                         <Input type="number" min={0} step="0.01" value={row.wasteKg}
@@ -702,7 +696,7 @@ function WasteGrid() {
                   <TableRow className="bg-muted/40">
                     <TableHead className="pl-4">Machine</TableHead>
                     <TableHead>Lot</TableHead>
-                    <TableHead>Target kg</TableHead>
+                    <TableHead>Ratio</TableHead>
                     <TableHead>Waste kg</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Entered By</TableHead>
@@ -713,7 +707,7 @@ function WasteGrid() {
                     <TableRow key={e.id}>
                       <TableCell className="pl-4 font-mono text-xs">{e.machine_code}</TableCell>
                       <TableCell className="text-xs">{e.lot_no || "—"}</TableCell>
-                      <TableCell className="text-xs">{e.target_kg ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{e.ratio || "—"}</TableCell>
                       <TableCell className="text-xs font-medium">{e.waste_kg} kg</TableCell>
                       <TableCell><StatusBadge status={e.status} size="sm" /></TableCell>
                       <TableCell className="text-xs text-muted-foreground">{e.entered_by}</TableCell>
@@ -751,6 +745,8 @@ function StoppageForm() {
   const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split("T")[0];
   const [date, setDate] = useState(localDate);
   const [shift, setShift] = useState<"A" | "B" | "C">("A");
+  const [department, setDepartment] = useState<string>("");
+  const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -763,6 +759,18 @@ function StoppageForm() {
     setErrors((p) => ({ ...p, [k]: "" }));
   };
 
+  const { data: millMasters } = useMillMasters();
+  const deptOptions = millMasters?.department ?? [];
+  useEffect(() => {
+    if (!department && deptOptions.length > 0) {
+      const first = deptOptions[0];
+      const name = typeof first === "string" ? first : first.name;
+      const id = typeof first === "string" ? null : (first.id || null);
+      setDepartment(name);
+      setDepartmentId(id);
+    }
+  }, [deptOptions]);
+
   const stopCodesQ = useQuery({
     queryKey: ["stop-codes"],
     queryFn: productionApi.getStopCodes,
@@ -771,35 +779,51 @@ function StoppageForm() {
   const stopCodes = (stopCodesQ.data ?? []) as any[];
 
   const filteredCodes = useMemo(() => {
-    if (selectedCategory === "all") return stopCodes;
-    return stopCodes.filter((c) => c.category === selectedCategory);
+    let codes = stopCodes;
+    if (selectedCategory !== "all") codes = codes.filter((c) => c.category === selectedCategory);
+    return codes;
   }, [stopCodes, selectedCategory]);
 
+  // Machines filtered by selected department
   const machinesQ = useQuery({
-    queryKey: ["machines", "all", millId],
-    queryFn: () => productionApi.getMachines({ mill_id: millId, page_size: 1000, page: 1 }),
+    queryKey: ["machines", departmentId || department, millId, "stoppage"],
+    queryFn: () => productionApi.getMachines({
+      ...(departmentId ? { department_id: departmentId } : { department }),
+      mill_id: millId, page_size: 1000, page: 1,
+    }),
     staleTime: 60_000,
-    enabled: !!millId,
+    enabled: !!millId && !!(departmentId || department),
   });
   const machines = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[];
+
+  // Reset machine when department changes
+  useEffect(() => { setField("machine_code", ""); }, [department]);
+
+  // Live stoppage log for today+shift
+  const stoppageLogQ = useQuery({
+    queryKey: ["downtime", date, shift, millId],
+    queryFn: () => productionApi.getDowntimeLogs({ mill_id: millId, page_size: 200 }),
+    staleTime: 20_000,
+    enabled: !!millId,
+  });
+  const stoppageLogs = (Array.isArray(stoppageLogQ.data) ? stoppageLogQ.data : (stoppageLogQ.data?.data ?? [])) as any[];
 
   const logMutation = useMutation({
     mutationFn: () => {
       if (!form.machine_code) throw new Error("Machine is required");
-      if (!form.datalog_code) throw new Error("DATALOG code is required");
+      if (!form.datalog_code) throw new Error("Stop code is required");
       return productionApi.logDatalogDowntime({
         machine_code: form.machine_code,
         datalog_code: Number(form.datalog_code),
         stop_from: form.stop_from || undefined,
         stop_to: form.stop_to || undefined,
-        date,
-        shift,
+        date, shift,
         production_loss_kg: form.production_loss_kg ? Number(form.production_loss_kg) : 0,
         remarks: form.remarks || undefined,
       }, millId ?? "");
     },
     onSuccess: (res: any) => {
-      toast.success(`Stoppage logged — [${res.datalog_code}] ${res.code_name} · ${res.duration_min} min`);
+      toast.success(`Logged — [${res.datalog_code}] ${res.code_name} · ${res.duration_min} min`);
       setForm({ machine_code: "", section: "", datalog_code: "", stop_from: "", stop_to: "", production_loss_kg: "", remarks: "" });
       qc.invalidateQueries({ queryKey: ["downtime"] });
     },
@@ -812,7 +836,7 @@ function StoppageForm() {
   const handleSubmit = () => {
     const errs: Record<string, string> = {};
     if (!form.machine_code) errs.machine_code = "Required";
-    if (!form.datalog_code) errs.datalog_code = "Required";
+    if (!form.datalog_code) errs.datalog_code = "Select a stop code below";
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
     logMutation.mutate();
@@ -827,6 +851,9 @@ function StoppageForm() {
     return diff > 0 ? diff : null;
   }, [form.stop_from, form.stop_to]);
 
+  // Today's summary
+  const todayTotal = useMemo(() => stoppageLogs.reduce((s: number, r: any) => s + (r.duration_min || 0), 0), [stoppageLogs]);
+
   return (
     <div className="space-y-4">
       <Card>
@@ -835,10 +862,15 @@ function StoppageForm() {
             <Clock className="size-4 text-muted-foreground" />
             Log Stoppage — DATALOG Entry
           </CardTitle>
+          {todayTotal > 0 && (
+            <span className="text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1">
+              Today: <strong>{stoppageLogs.length} stops · {todayTotal} min total</strong>
+            </span>
+          )}
         </CardHeader>
         <CardContent className="space-y-5">
-          {/* Header row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Row 1: Date / Shift / Department */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Date</Label>
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-8 text-sm" />
@@ -855,13 +887,36 @@ function StoppageForm() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Machine *</Label>
-              <Select value={form.machine_code} onValueChange={(v) => setField("machine_code", v)}>
+              <Label className="text-xs">Department *</Label>
+              <Select value={department} onValueChange={(v) => {
+                setDepartment(v);
+                const d = deptOptions.find((x: any) => (typeof x === "string" ? x : x.name) === v);
+                setDepartmentId(d && typeof d !== "string" ? (d.id || null) : null);
+              }}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select dept" /></SelectTrigger>
+                <SelectContent>
+                  {deptOptions.map((d: any) => {
+                    const name = typeof d === "string" ? d : d.name;
+                    return <SelectItem key={name} value={name}>{name}</SelectItem>;
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Row 2: Machine / Section */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Machine * {department && <span className="text-muted-foreground">({department})</span>}</Label>
+              <Select value={form.machine_code} onValueChange={(v) => setField("machine_code", v)}
+                disabled={!department}>
                 <SelectTrigger className={["h-8 text-sm", errors.machine_code ? "border-destructive" : ""].filter(Boolean).join(" ")}>
-                  <SelectValue placeholder="Select machine" />
+                  <SelectValue placeholder={department ? "Select machine" : "Select dept first"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {machines.map((m: any) => (
+                  {machines.length === 0 ? (
+                    <SelectItem value="_none" disabled>No machines in {department}</SelectItem>
+                  ) : machines.map((m: any) => (
                     <SelectItem key={m.code} value={m.code}>{m.code}{m.name ? ` — ${m.name}` : ""}</SelectItem>
                   ))}
                 </SelectContent>
@@ -869,16 +924,43 @@ function StoppageForm() {
               {errors.machine_code && <p className="text-xs text-destructive">{errors.machine_code}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Section / Frame</Label>
+              <Label className="text-xs">Section / Frame No</Label>
               <Input value={form.section} onChange={(e) => setField("section", e.target.value)}
-                placeholder="e.g. A1" className="h-8 text-sm" />
+                placeholder="e.g. A1 or Frame 3" className="h-8 text-sm" />
+            </div>
+          </div>
+
+          {/* Row 3: From / To / Total Min / Loss */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">From (HH:MM)</Label>
+              <Input type="time" value={form.stop_from} onChange={(e) => setField("stop_from", e.target.value)} className="h-8 text-sm" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">To (HH:MM)</Label>
+              <Input type="time" value={form.stop_to} onChange={(e) => setField("stop_to", e.target.value)} className="h-8 text-sm" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Total Min</Label>
+              <div className="h-8 flex items-center px-3 rounded-md border bg-muted/40 text-sm font-semibold">
+                {totalMin !== null ? <span className="text-amber-600">{totalMin} min</span> : "—"}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Production Loss (kg)</Label>
+              <Input type="number" min={0} step="0.01" value={form.production_loss_kg}
+                onChange={(e) => setField("production_loss_kg", e.target.value)}
+                placeholder="0" className="h-8 text-sm" />
             </div>
           </div>
 
           {/* DATALOG code picker */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs">DATALOG Stop Code *</Label>
+              <Label className="text-xs font-semibold">
+                DATALOG Stop Code *
+                {errors.datalog_code && <span className="ml-2 text-destructive font-normal">{errors.datalog_code}</span>}
+              </Label>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                 <SelectTrigger className="h-7 text-xs w-52">
                   <SelectValue placeholder="All categories" />
@@ -891,60 +973,42 @@ function StoppageForm() {
                 </SelectContent>
               </Select>
             </div>
-            <div className={["grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 p-3 rounded-lg border",
-              errors.datalog_code ? "border-destructive" : "bg-muted/30"].filter(Boolean).join(" ")}>
+            <div className={["grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-3 rounded-lg border max-h-64 overflow-y-auto",
+              errors.datalog_code ? "border-destructive bg-destructive/5" : "bg-muted/30"].filter(Boolean).join(" ")}>
               {stopCodesQ.isLoading ? (
-                <div className="col-span-4 text-xs text-muted-foreground py-2">Loading codes…</div>
+                <div className="col-span-5 text-xs text-muted-foreground py-3 text-center">Loading DATALOG codes…</div>
+              ) : stopCodes.length === 0 ? (
+                <div className="col-span-5 text-xs text-amber-600 py-3 text-center space-y-1">
+                  <p className="font-medium">No stop codes found.</p>
+                  <p className="text-muted-foreground">Run the seed script: <code className="bg-muted px-1 rounded">python3 -m app.db.seed_datalog</code></p>
+                </div>
               ) : filteredCodes.length === 0 ? (
-                <div className="col-span-4 text-xs text-muted-foreground py-2">No codes in this category</div>
+                <div className="col-span-5 text-xs text-muted-foreground py-3 text-center">No codes in this category</div>
               ) : filteredCodes.map((c: any) => (
                 <button
                   key={c.code}
                   type="button"
-                  onClick={() => setField("datalog_code", String(c.code))}
+                  onClick={() => { setField("datalog_code", String(c.code)); setErrors((p) => ({ ...p, datalog_code: "" })); }}
                   className={[
                     "text-left px-3 py-2 rounded-md border text-xs transition-all",
                     form.datalog_code === String(c.code)
-                      ? "bg-primary text-primary-foreground border-primary font-semibold"
+                      ? "bg-primary text-primary-foreground border-primary font-semibold shadow-sm"
                       : "bg-card hover:bg-accent border-border",
                   ].join(" ")}
                 >
-                  <span className="font-mono font-bold mr-1">{c.code}</span>
-                  <span className="block text-[11px] mt-0.5 opacity-80 truncate">{c.name}</span>
+                  <span className="font-mono font-bold">{c.code}</span>
+                  <span className="block text-[11px] mt-0.5 leading-tight opacity-80">{c.name}</span>
                 </button>
               ))}
             </div>
-            {errors.datalog_code && <p className="text-xs text-destructive">{errors.datalog_code}</p>}
             {selectedCode && (
-              <div className="text-xs text-muted-foreground bg-muted/40 rounded px-3 py-2">
-                Selected: <strong>[{selectedCode.code}] {selectedCode.name}</strong>
+              <div className="text-xs bg-primary/10 border border-primary/20 rounded px-3 py-2 flex items-center gap-2">
+                <CheckCircle2 className="size-3.5 text-primary shrink-0" />
+                <span><strong>[{selectedCode.code}] {selectedCode.name}</strong>
                 {selectedCode.category && <> · <span className="text-primary">{STOP_CATEGORIES[selectedCode.category] ?? selectedCode.category}</span></>}
+                </span>
               </div>
             )}
-          </div>
-
-          {/* Time + loss */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">From (HH:MM)</Label>
-              <Input type="time" value={form.stop_from} onChange={(e) => setField("stop_from", e.target.value)} className="h-8 text-sm" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">To (HH:MM)</Label>
-              <Input type="time" value={form.stop_to} onChange={(e) => setField("stop_to", e.target.value)} className="h-8 text-sm" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Total Min</Label>
-              <div className="h-8 flex items-center px-3 rounded-md border bg-muted/40 text-sm font-medium">
-                {totalMin !== null ? `${totalMin} min` : "—"}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Production Loss (kg)</Label>
-              <Input type="number" min={0} step="0.01" value={form.production_loss_kg}
-                onChange={(e) => setField("production_loss_kg", e.target.value)}
-                placeholder="0" className="h-8 text-sm" />
-            </div>
           </div>
 
           <div className="space-y-1.5">
@@ -961,6 +1025,45 @@ function StoppageForm() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Live stoppage log table */}
+      {stoppageLogs.length > 0 && (
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm">Today's Stoppage Log ({stoppageLogs.length} entries)</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table className="text-sm min-w-[650px]">
+                <TableHeader>
+                  <TableRow className="bg-muted/40">
+                    <TableHead className="pl-4">Machine</TableHead>
+                    <TableHead>Stop Code / Reason</TableHead>
+                    <TableHead>From</TableHead>
+                    <TableHead>To</TableHead>
+                    <TableHead>Min</TableHead>
+                    <TableHead>Loss (kg)</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stoppageLogs.map((r: any) => (
+                    <TableRow key={r.id}>
+                      <TableCell className="pl-4 font-mono text-xs font-medium">{r.machine_code}</TableCell>
+                      <TableCell className="text-xs">{r.reason}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{r.started_at ? new Date(r.started_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{r.ended_at ? new Date(r.ended_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</TableCell>
+                      <TableCell className="text-xs font-medium text-amber-600">{r.duration_min ?? "—"}</TableCell>
+                      <TableCell className="text-xs">{r.production_loss_kg ? `${r.production_loss_kg} kg` : "—"}</TableCell>
+                      <TableCell><StatusBadge status={r.resolved ? "active" : "pending"} label={r.resolved ? "Done" : "Open"} size="sm" /></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
@@ -1306,6 +1409,41 @@ function ProductionPage() {
     }
   };
 
+  // Machine hard delete
+  const deleteMachineMutation = useMutation({
+    mutationFn: (id: string) => productionApi.deleteMachine(id),
+    onSuccess: (_res: any, id: string) => {
+      toast.success(`Machine deleted`);
+      qc.invalidateQueries({ queryKey: ["machines"] });
+    },
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail;
+      toast.error(typeof detail === "string" ? detail : err.message || "Delete failed");
+    },
+  });
+  const handleDeleteMachine = (m: any) => {
+    if (window.confirm(`Permanently DELETE machine ${m.code}? This cannot be undone.`)) {
+      deleteMachineMutation.mutate(m.id);
+    }
+  };
+
+  // Entry inline edit
+  const [entryEditOpen, setEntryEditOpen] = useState(false);
+  const [entryEditId, setEntryEditId] = useState<string | null>(null);
+  const [entryEditForm, setEntryEditForm] = useState<Record<string, any>>({});
+  const updateEntryMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => productionApi.updateEntry(id, data),
+    onSuccess: () => {
+      toast.success("Entry updated");
+      setEntryEditOpen(false);
+      qc.invalidateQueries({ queryKey: ["shifts"] });
+    },
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail;
+      toast.error(typeof detail === "string" ? detail : err.message || "Update failed");
+    },
+  });
+
   const machines = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[];
   const shifts = (Array.isArray(shiftsQ.data) ? shiftsQ.data : (shiftsQ.data?.data ?? [])) as any[];
   const downtime = (Array.isArray(downQ.data) ? downQ.data : (downQ.data?.data ?? [])) as any[];
@@ -1513,10 +1651,19 @@ function ProductionPage() {
                         </Button>
                         <Button
                           size="sm"
-                          variant="destructive"
+                          variant="outline"
                           onClick={() => handleDeactivateMachine(m)}
                         >
                           Deactivate
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleDeleteMachine(m)}
+                          disabled={deleteMachineMutation.isPending}
+                          title="Hard delete from database"
+                        >
+                          <Trash2 className="size-3 mr-1" /> Delete
                         </Button>
                       </div>
                     )}
@@ -1632,31 +1779,68 @@ function ProductionPage() {
                     loading={shiftsQ.isLoading}
                     rowKey={(s: any) => s.id}
                     exportFilename="shift_entries"
-                    actions={(s: any) =>
-                      s.status === "pending" ? (
-                        <div className="flex gap-1">
-                          <Button
-                            size="sm"
-                            variant="default"
-                            onClick={() => approveEntryMutation.mutate(s.id)}
-                            disabled={approveEntryMutation.isPending}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => rejectEntryMutation.mutate(s.id)}
-                            disabled={rejectEntryMutation.isPending}
-                          >
-                            Reject
-                          </Button>
-                        </div>
-                      ) : null
-                    }
+                    actions={(s: any) => (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        title="Edit entry"
+                        onClick={() => {
+                          setEntryEditId(s.id);
+                          setEntryEditForm({
+                            produced_kg: s.produced_kg ?? "",
+                            waste_kg: s.waste_kg ?? "",
+                            count: s.count ?? "",
+                            operator: s.operator ?? "",
+                            remarks: s.remarks ?? "",
+                            stoppage_mins: s.stoppage_mins ?? "",
+                            stoppage_reason: s.stoppage_reason ?? "",
+                          });
+                          setEntryEditOpen(true);
+                        }}
+                      >
+                        <Pencil className="size-3.5" />
+                      </Button>
+                    )}
                   />
                 </CardContent>
               </Card>
+              {/* Entry Edit Sheet */}
+              <Sheet open={entryEditOpen} onOpenChange={setEntryEditOpen}>
+                <SheetContent side="right" className="w-96">
+                  <SheetHeader>
+                    <SheetTitle>Edit Entry</SheetTitle>
+                  </SheetHeader>
+                  <div className="space-y-4 py-4">
+                    {[
+                      { key: "produced_kg", label: "Produced (kg)", type: "number" },
+                      { key: "waste_kg", label: "Waste (kg)", type: "number" },
+                      { key: "count", label: "Count", type: "number" },
+                      { key: "operator", label: "Operator", type: "text" },
+                      { key: "stoppage_mins", label: "Stoppage (min)", type: "number" },
+                      { key: "stoppage_reason", label: "Stoppage Reason", type: "text" },
+                      { key: "remarks", label: "Remarks", type: "text" },
+                    ].map(({ key, label, type }) => (
+                      <div key={key} className="space-y-2">
+                        <Label>{label}</Label>
+                        <Input
+                          type={type}
+                          value={entryEditForm[key] ?? ""}
+                          onChange={(e) => setEntryEditForm((p) => ({ ...p, [key]: e.target.value }))}
+                          placeholder={label}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <SheetFooter>
+                    <Button
+                      onClick={() => entryEditId && updateEntryMutation.mutate({ id: entryEditId, data: entryEditForm })}
+                      disabled={updateEntryMutation.isPending}
+                    >
+                      {updateEntryMutation.isPending ? "Saving…" : "Save Changes"}
+                    </Button>
+                  </SheetFooter>
+                </SheetContent>
+              </Sheet>
             </TabsContent>
 
             <TabsContent value="downtime">

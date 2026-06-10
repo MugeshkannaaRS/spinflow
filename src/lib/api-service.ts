@@ -58,6 +58,8 @@ export const productionApi = {
   updateMachineStatus: (id: string, data: any) => api.patch(`/production/machines/${id}/status`, data).then((r) => r.data),
   getShifts: () => api.get("/production/shifts").then((r: any) => extractList(r.data)),
   createShift: (data: any) => api.post("/production/shifts", data).then((r) => r.data),
+  deleteMachine: (id: string) => api.delete(`/production/machines/${id}`).then((r) => r.data),
+  updateEntry: (id: string, data: any) => api.patch(`/production/entries/${id}`, data).then((r) => r.data),
   // v2 additions
   getStopCodes: () => api.get("/production/datalog-stop-codes").then((r) => r.data?.data ?? []),
   getPageInit: (millId: string) => api.get("/production/v2/page-init", { params: { mill_id: millId } }).then((r) => r.data),
@@ -67,6 +69,7 @@ export const productionApi = {
   logDatalogDowntime: (data: any, millId: string) => api.post(`/production/downtime/datalog?mill_id=${millId}`, data).then((r) => r.data),
   getRFManpower: (params?: Record<string, any>) => api.get("/production/rf-manpower", { params }).then((r) => r.data),
   upsertRFManpowerBulk: (data: any, millId: string) => api.post(`/production/rf-manpower/bulk?mill_id=${millId}`, data).then((r) => r.data),
+  getDowntimeLogs: (params?: Record<string, any>) => api.get("/production/downtime", { params }).then((r: any) => r.data),
 };
 
 // Quality
