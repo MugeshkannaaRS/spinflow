@@ -54,12 +54,14 @@ DATALOG_CODES = [
 
 
 async def seed():
+    import json as _json
     async with async_session_factory() as session:
         for code, name, departments, category in DATALOG_CODES:
+            depts_json = _json.dumps(departments) if departments else None
             await session.execute(
                 text("""
                     INSERT INTO datalog_stop_codes (code, name, departments, category, is_active)
-                    VALUES (:code, :name, :departments::jsonb, :category, TRUE)
+                    VALUES (:code, :name, CAST(:departments AS jsonb), :category, TRUE)
                     ON CONFLICT (code) DO UPDATE
                         SET name        = EXCLUDED.name,
                             departments = EXCLUDED.departments,
@@ -68,9 +70,7 @@ async def seed():
                 {
                     "code": code,
                     "name": name,
-                    "departments": (
-                        __import__("json").dumps(departments) if departments else None
-                    ),
+                    "departments": depts_json,
                     "category": category,
                 },
             )
