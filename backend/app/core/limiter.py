@@ -11,9 +11,16 @@ logger = logging.getLogger(__name__)
 _storage_uri = None
 if settings.REDIS_URL:
     _storage_uri = settings.REDIS_URL
-    logger.info("SlowAPI: using Redis-backed rate limit storage")
+    logger.info(
+        "Rate limiter backend: redis (counters persist across restarts, "
+        "distributed across workers)"
+    )
 else:
-    logger.warning("SlowAPI: REDIS_URL not set — using in-memory rate limiting (resets on restart)")
+    logger.warning(
+        "Rate limiter backend: memory (REDIS_URL not set — counters reset on "
+        "every restart and are NOT shared across workers). "
+        "Set REDIS_URL in Render env vars to enable Redis-backed limiting."
+    )
 
 limiter = Limiter(
     key_func=get_remote_address,

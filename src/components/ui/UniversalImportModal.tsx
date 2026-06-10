@@ -622,7 +622,8 @@ export function UniversalImportModal({
 
   const handleImport = useCallback(async () => {
     try {
-      await api.get("/auth/me");
+      // Note: removed redundant /auth/me session ping — the import endpoints
+      // enforce authentication themselves and the 401 interceptor handles refresh.
       const keyFields = TABLE_KEY_FIELDS[tableName];
       const nonBlank = filterBlankRows(
         previewRecords.map((r) => r.data),
