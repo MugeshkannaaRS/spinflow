@@ -14,7 +14,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.user import User
-from app.models.masters import CompanyModule
+from app.models.masters import CompanyModule, RoleModuleAccess
 from app.core.rbac import (
     can_access as role_can_access,
     can_write as role_can_write,
@@ -92,7 +92,29 @@ async def resolve_access(
                 level="none",
             )
 
-    # ── LAYER 3: User module restrictions ────────────────────────────────────
+    # ── LAYER 3: Per-company role-module overrides ──────────────────────────
+    # SUPER_ADMIN can grant or revoke module access for a specific role within
+    # a company. A missing row = use system default (already evaluated above).
+    if not skip_company_check and user.company_id:
+        override_res = await db.execute(
+            select(RoleModuleAccess).where(
+                RoleModuleAccess.company_id == user.company_id,
+                RoleModuleAccess.role_code == role_code,
+                RoleModuleAccess.module_name == module,
+            )
+        )
+        override = override_res.scalar_one_or_none()
+        if override is not None:
+            if not override.is_allowed:
+                return AccessResult(
+                    granted=False,
+                    reason=f"Module '{module}' has been restricted for your role by your company admin.",
+                    level="none",
+                )
+            # is_allowed=True overrides a role that normally can't access the module
+            access_level = "read"
+
+    # ── LAYER 4: User module restrictions ────────────────────────────────────
     # User-level module restrictions can only REDUCE access.
     # If module_restrictions has an explicit entry for this module, respect it.
     # If no entry exists, role-level access stands.

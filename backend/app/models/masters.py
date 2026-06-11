@@ -195,6 +195,42 @@ class CompanyModule(Base):
         return self.is_enabled
 
 
+class CompanyRoleConfig(Base):
+    """Which roles are available for a company, with optional per-role monthly fee."""
+    __tablename__ = "company_role_config"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    company_id: Mapped[str] = mapped_column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    role_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    monthly_fee: Mapped[float] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    enabled_by: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("company_id", "role_code", name="uq_company_role_config"),
+    )
+
+
+class RoleModuleAccess(Base):
+    """Per-company overrides for which modules a role can access.
+    A missing row means: use system default for that role+module combo."""
+    __tablename__ = "role_module_access"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    company_id: Mapped[str] = mapped_column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    role_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    module_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    is_allowed: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    set_by: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("company_id", "role_code", "module_name", name="uq_role_module_access"),
+    )
+
+
 class MillSettings(Base):
     __tablename__ = "mill_settings"
 

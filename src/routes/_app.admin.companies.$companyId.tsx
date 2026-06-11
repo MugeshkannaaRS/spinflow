@@ -383,6 +383,7 @@ function CompanyDetailPage() {
             <TabsTrigger value="mills">Mills ({millCount})</TabsTrigger>
             <TabsTrigger value="users">Users ({userCount})</TabsTrigger>
             <TabsTrigger value="modules">Modules ({modCount})</TabsTrigger>
+            <TabsTrigger value="roles">Roles</TabsTrigger>
             <TabsTrigger value="billing">Billing</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
           </TabsList>
@@ -438,6 +439,10 @@ function CompanyDetailPage() {
 
         <TabsContent value="modules">
           <ErrorBoundary><ModulesTab companyId={companyId} /></ErrorBoundary>
+        </TabsContent>
+
+        <TabsContent value="roles">
+          <ErrorBoundary><RolesTab companyId={companyId} /></ErrorBoundary>
         </TabsContent>
 
         <TabsContent value="billing">
@@ -741,5 +746,312 @@ function AuditTab({ companyId }: { companyId: string }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/* ── Roles Tab ────────────────────────────────────────── */
+
+const ALL_ROLES = [
+  { code: "MILL_OWNER",          label: "Mill Owner",          protected: true },
+  { code: "GENERAL_MANAGER",     label: "General Manager",     protected: false },
+  { code: "PRODUCTION_MANAGER",  label: "Production Manager",  protected: false },
+  { code: "QUALITY_MANAGER",     label: "Quality Manager",     protected: false },
+  { code: "DISPATCH_MANAGER",    label: "Dispatch Manager",    protected: false },
+  { code: "HR_MANAGER",          label: "HR Manager",          protected: false },
+  { code: "ACCOUNTANT",          label: "Accountant",          protected: false },
+  { code: "MAINTENANCE_MANAGER", label: "Maintenance Manager", protected: false },
+  { code: "STORE_MANAGER",       label: "Store Manager",       protected: false },
+  { code: "SUPERVISOR",          label: "Supervisor",          protected: false },
+  { code: "MACHINE_OPERATOR",    label: "Machine Operator",    protected: false },
+  { code: "SECURITY_GATE",       label: "Security Gate",       protected: false },
+  { code: "AUDITOR",             label: "Auditor",             protected: false },
+];
+
+const ALL_MODULES = [
+  { key: "production",   label: "Production" },
+  { key: "quality",      label: "Quality" },
+  { key: "maintenance",  label: "Maintenance" },
+  { key: "hr",           label: "HR" },
+  { key: "payroll",      label: "Payroll" },
+  { key: "purchase",     label: "Purchase" },
+  { key: "stores",       label: "Stores" },
+  { key: "inventory",    label: "Inventory" },
+  { key: "dispatch",     label: "Dispatch" },
+  { key: "lotrac",       label: "LoTrac" },
+  { key: "accounts",     label: "Accounts" },
+  { key: "reports",      label: "Reports" },
+  { key: "masters",      label: "Masters" },
+  { key: "stock",        label: "Stock" },
+  { key: "dashboard",    label: "Dashboard" },
+];
+
+type RoleConfig = { role_code: string; is_enabled: boolean; monthly_fee: number };
+type ModuleOverrides = Record<string, Record<string, boolean>>; // role_code → module_key → is_allowed
+
+function RolesTab({ companyId }: { companyId: string }) {
+  const qc = useQueryClient();
+  const [dirty, setDirty] = useState(false);
+  const [feeEdits, setFeeEdits] = useState<Record<string, string>>({});
+
+  // Role config (enabled/disabled + monthly fee per role)
+  const roleConfigQ = useQuery<RoleConfig[]>({
+    queryKey: ["company-role-config", companyId],
+    queryFn: () => api.get(`/admin/companies/${companyId}/role-config`).then(r => r.data),
+    staleTime: 60_000,
+  });
+
+  // Role→module overrides matrix
+  const roleModulesQ = useQuery<{ company_id: string; overrides: ModuleOverrides }>({
+    queryKey: ["company-role-modules", companyId],
+    queryFn: () => api.get(`/admin/companies/${companyId}/role-modules`).then(r => r.data),
+    staleTime: 60_000,
+  });
+
+  // Local mutable state derived from server data
+  const [roleEnabled, setRoleEnabled] = useState<Record<string, boolean>>({});
+  const [overrides, setOverrides] = useState<ModuleOverrides>({});
+  const [initialised, setInitialised] = useState(false);
+
+  // Initialise local state once data arrives
+  if (!initialised && roleConfigQ.data && roleModulesQ.data) {
+    const en: Record<string, boolean> = {};
+    for (const rc of roleConfigQ.data) en[rc.role_code] = rc.is_enabled;
+    setRoleEnabled(en);
+    setOverrides(roleModulesQ.data.overrides ?? {});
+    const fees: Record<string, string> = {};
+    for (const rc of roleConfigQ.data) fees[rc.role_code] = String(rc.monthly_fee ?? 0);
+    setFeeEdits(fees);
+    setInitialised(true);
+  }
+
+  const saveRoleConfig = useMutation({
+    mutationFn: () => {
+      const body = ALL_ROLES.map(r => ({
+        role_code: r.code,
+        is_enabled: r.protected ? true : (roleEnabled[r.code] ?? true),
+        monthly_fee: parseFloat(feeEdits[r.code] ?? "0") || 0,
+      }));
+      return api.post(`/admin/companies/${companyId}/role-config`, body);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["company-role-config", companyId] });
+      toast.success("Role config saved");
+    },
+    onError: () => toast.error("Failed to save role config"),
+  });
+
+  const saveModuleOverrides = useMutation({
+    mutationFn: () =>
+      api.post(`/admin/companies/${companyId}/role-modules`, overrides),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["company-role-modules", companyId] });
+      setDirty(false);
+      toast.success("Module access saved");
+    },
+    onError: () => toast.error("Failed to save module access"),
+  });
+
+  function toggleModule(roleCode: string, moduleKey: string) {
+    setOverrides(prev => {
+      const cur = prev[roleCode]?.[moduleKey];
+      // cycle: undefined (default) → false → true → undefined
+      const next = { ...prev };
+      if (!next[roleCode]) next[roleCode] = {};
+      if (cur === undefined) {
+        next[roleCode][moduleKey] = false;
+      } else if (!cur) {
+        next[roleCode][moduleKey] = true;
+      } else {
+        delete next[roleCode][moduleKey];
+        if (Object.keys(next[roleCode]).length === 0) delete next[roleCode];
+      }
+      return next;
+    });
+    setDirty(true);
+  }
+
+  function getCellState(roleCode: string, moduleKey: string): "default" | "denied" | "granted" {
+    const v = overrides[roleCode]?.[moduleKey];
+    if (v === undefined) return "default";
+    return v ? "granted" : "denied";
+  }
+
+  const isLoading = roleConfigQ.isLoading || roleModulesQ.isLoading;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="size-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* ── Role enable/disable + fee ── */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <div>
+            <CardTitle className="text-sm font-semibold">Role Availability & Fees</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Enable or disable roles for this company. Set a monthly fee per role (₹0 = included in plan).
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => saveRoleConfig.mutate()}
+            disabled={saveRoleConfig.isPending}
+            className="shrink-0"
+          >
+            {saveRoleConfig.isPending ? (
+              <span className="size-3.5 border border-white border-t-transparent rounded-full animate-spin mr-1.5 inline-block" />
+            ) : null}
+            Save Roles
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {ALL_ROLES.map(role => (
+              <div
+                key={role.code}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors ${
+                  role.protected
+                    ? "border-[#e2e8f0] bg-[#f8fafc] opacity-70"
+                    : (roleEnabled[role.code] ?? true)
+                    ? "border-green-200 bg-green-50/50"
+                    : "border-red-200 bg-red-50/50"
+                }`}
+              >
+                <button
+                  disabled={role.protected}
+                  onClick={() => {
+                    if (!role.protected) {
+                      setRoleEnabled(p => ({ ...p, [role.code]: !(p[role.code] ?? true) }));
+                    }
+                  }}
+                  className={`w-9 h-5 rounded-full relative transition-colors shrink-0 ${
+                    role.protected || (roleEnabled[role.code] ?? true)
+                      ? "bg-green-500"
+                      : "bg-gray-300"
+                  } ${role.protected ? "cursor-not-allowed" : "cursor-pointer"}`}
+                >
+                  <span
+                    className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-transform ${
+                      role.protected || (roleEnabled[role.code] ?? true) ? "translate-x-4" : "translate-x-0.5"
+                    }`}
+                  />
+                </button>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-medium text-[#0f172a] truncate">{role.label}</p>
+                  {role.protected && (
+                    <p className="text-[10px] text-[#94a3b8]">Always enabled</p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[11px] text-[#94a3b8]">₹</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={100}
+                    value={feeEdits[role.code] ?? "0"}
+                    onChange={e => setFeeEdits(p => ({ ...p, [role.code]: e.target.value }))}
+                    className="w-16 h-6 text-[12px] font-mono text-right rounded border border-[#d1d5db] px-1.5 focus:outline-none focus:border-blue-400"
+                  />
+                  <span className="text-[10px] text-[#94a3b8]">/mo</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Role × Module matrix ── */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <div>
+            <CardTitle className="text-sm font-semibold">Module Access Overrides</CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Click a cell to override module access for a role.{" "}
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block w-3 h-3 rounded-sm bg-gray-100 border border-gray-300" /> default
+                <span className="inline-block w-3 h-3 rounded-sm bg-red-100 border border-red-300 ml-2" /> denied
+                <span className="inline-block w-3 h-3 rounded-sm bg-green-100 border border-green-400 ml-2" /> granted
+              </span>
+            </p>
+          </div>
+          {dirty && (
+            <Button
+              size="sm"
+              onClick={() => saveModuleOverrides.mutate()}
+              disabled={saveModuleOverrides.isPending}
+              className="shrink-0"
+            >
+              {saveModuleOverrides.isPending ? (
+                <span className="size-3.5 border border-white border-t-transparent rounded-full animate-spin mr-1.5 inline-block" />
+              ) : null}
+              Save Overrides
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-[#f8fafc]">
+                  <th className="text-left px-3 py-2 font-semibold text-[#475569] border-b border-r border-[#e2e8f0] sticky left-0 bg-[#f8fafc] min-w-[140px]">
+                    Role
+                  </th>
+                  {ALL_MODULES.map(m => (
+                    <th key={m.key} className="px-2 py-2 font-semibold text-[#475569] border-b border-r border-[#e2e8f0] text-center min-w-[72px]">
+                      <span className="block truncate max-w-[68px]">{m.label}</span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {ALL_ROLES.map(role => {
+                  const isDisabled = !(roleEnabled[role.code] ?? true) && !role.protected;
+                  return (
+                    <tr
+                      key={role.code}
+                      className={`border-b border-[#f1f5f9] hover:bg-[#fafafa] ${isDisabled ? "opacity-40" : ""}`}
+                    >
+                      <td className="px-3 py-2 font-medium text-[#0f172a] border-r border-[#e2e8f0] sticky left-0 bg-white whitespace-nowrap">
+                        {role.label}
+                        {role.protected && <span className="ml-1 text-[9px] text-[#94a3b8] uppercase">core</span>}
+                      </td>
+                      {ALL_MODULES.map(m => {
+                        const state = getCellState(role.code, m.key);
+                        return (
+                          <td key={m.key} className="px-1 py-1 border-r border-[#f1f5f9] text-center">
+                            <button
+                              disabled={isDisabled}
+                              onClick={() => !isDisabled && toggleModule(role.code, m.key)}
+                              title={`${role.label} → ${m.label}: ${state}`}
+                              className={`w-8 h-6 rounded text-[10px] font-bold transition-all ${
+                                state === "denied"
+                                  ? "bg-red-100 text-red-600 border border-red-300 hover:bg-red-200"
+                                  : state === "granted"
+                                  ? "bg-green-100 text-green-700 border border-green-400 hover:bg-green-200"
+                                  : "bg-gray-100 text-gray-400 border border-gray-200 hover:bg-gray-200"
+                              } ${isDisabled ? "cursor-not-allowed" : "cursor-pointer"}`}
+                            >
+                              {state === "denied" ? "✕" : state === "granted" ? "✓" : "·"}
+                            </button>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-2.5 border-t border-[#e2e8f0] bg-[#f8fafc] text-[11px] text-[#64748b]">
+            Overrides only appear for cells you've explicitly changed. Cells showing "·" use the system default for that role.
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

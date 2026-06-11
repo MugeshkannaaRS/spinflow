@@ -16,7 +16,7 @@ from app.core.deps import get_current_user, get_mill_scope, log_audit
 from app.core.limiter import limiter
 from app.core.module_registry import ALL_MODULE_CODES as ALL_MODULE_KEYS
 from app.models.user import User, Role, UserSession
-from app.models.masters import Company, CompanyModule, Mill, MillSettings
+from app.models.masters import Company, CompanyModule, Mill, MillSettings, CompanyRoleConfig, RoleModuleAccess
 from app.models.hr import Employee
 from app.models.billing import CompanySubscription, SubscriptionPlan
 from app.models.audit import AuditLog
@@ -1305,3 +1305,188 @@ async def reactivate_mill(
     ))
     await db.commit()
     return {"id": mill_id, "name": mill.name, "status": "active"}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# ROLE-MODULE CUSTOMISATION  (SUPER_ADMIN)
+# ═══════════════════════════════════════════════════════════════════
+
+ALL_ROLE_CODES = [
+    "SUPER_ADMIN", "MILL_OWNER", "GENERAL_MANAGER",
+    "PRODUCTION_MANAGER", "QUALITY_MANAGER", "DISPATCH_MANAGER",
+    "HR_MANAGER", "ACCOUNTANT", "MAINTENANCE_MANAGER", "STORE_MANAGER",
+    "SUPERVISOR", "MACHINE_OPERATOR", "SECURITY_GATE", "AUDITOR",
+]
+
+
+@router.get("/admin/companies/{company_id}/role-config")
+async def get_company_role_config(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the role config for a company.
+
+    For each of the 14 roles, returns whether it is enabled and its monthly fee.
+    Roles that have no DB row are returned with default values (enabled=True, fee=0).
+    """
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(403, "Super Admin only")
+
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(404, "Company not found")
+
+    rows_res = await db.execute(
+        select(CompanyRoleConfig).where(CompanyRoleConfig.company_id == company_id)
+    )
+    rows = {r.role_code: r for r in rows_res.scalars().all()}
+
+    result = []
+    for rc in ALL_ROLE_CODES:
+        row = rows.get(rc)
+        result.append({
+            "role_code": rc,
+            "is_enabled": row.is_enabled if row else True,
+            "monthly_fee": float(row.monthly_fee) if row else 0.0,
+        })
+    return result
+
+
+@router.post("/admin/companies/{company_id}/role-config")
+async def set_company_role_config(
+    company_id: str,
+    body: list,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Bulk-upsert role config for a company.
+
+    Body: list of {role_code: str, is_enabled: bool, monthly_fee: float}
+    SUPER_ADMIN only. Cannot disable SUPER_ADMIN or MILL_OWNER roles.
+    """
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(403, "Super Admin only")
+
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(404, "Company not found")
+
+    rows_res = await db.execute(
+        select(CompanyRoleConfig).where(CompanyRoleConfig.company_id == company_id)
+    )
+    existing = {r.role_code: r for r in rows_res.scalars().all()}
+
+    updated = []
+    for item in body:
+        rc = item.get("role_code", "")
+        if rc not in ALL_ROLE_CODES:
+            continue
+        # Protect essential roles
+        if rc in ("SUPER_ADMIN", "MILL_OWNER"):
+            is_enabled = True
+        else:
+            is_enabled = bool(item.get("is_enabled", True))
+        monthly_fee = float(item.get("monthly_fee", 0) or 0)
+
+        if rc in existing:
+            existing[rc].is_enabled = is_enabled
+            existing[rc].monthly_fee = monthly_fee
+            existing[rc].enabled_by = current_user.id
+        else:
+            db.add(CompanyRoleConfig(
+                id=str(uuid.uuid4()),
+                company_id=company_id,
+                role_code=rc,
+                is_enabled=is_enabled,
+                monthly_fee=monthly_fee,
+                enabled_by=current_user.id,
+            ))
+        updated.append(rc)
+
+    await db.commit()
+    return {"updated": updated, "company_id": company_id}
+
+
+@router.get("/admin/companies/{company_id}/role-modules")
+async def get_company_role_modules(
+    company_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return the role→module access matrix for a company.
+
+    Returns a dict: {role_code: {module_name: is_allowed}} for all overrides.
+    Roles/modules with no row use system defaults.
+    """
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(403, "Super Admin only")
+
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(404, "Company not found")
+
+    rows_res = await db.execute(
+        select(RoleModuleAccess).where(RoleModuleAccess.company_id == company_id)
+    )
+    matrix: Dict[str, Dict[str, bool]] = {}
+    for row in rows_res.scalars().all():
+        matrix.setdefault(row.role_code, {})[row.module_name] = row.is_allowed
+
+    return {"company_id": company_id, "overrides": matrix}
+
+
+@router.post("/admin/companies/{company_id}/role-modules")
+async def set_company_role_modules(
+    company_id: str,
+    body: Dict[str, Dict[str, bool]],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Bulk-upsert role→module access overrides for a company.
+
+    Body: {role_code: {module_name: is_allowed}}
+    Passing an empty dict for a role clears all its overrides.
+    SUPER_ADMIN only.
+    """
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(403, "Super Admin only")
+
+    company = await db.get(Company, company_id)
+    if not company:
+        raise HTTPException(404, "Company not found")
+
+    # Load existing overrides
+    rows_res = await db.execute(
+        select(RoleModuleAccess).where(RoleModuleAccess.company_id == company_id)
+    )
+    existing: Dict[tuple, RoleModuleAccess] = {
+        (r.role_code, r.module_name): r for r in rows_res.scalars().all()
+    }
+
+    upserted = 0
+    for rc, module_map in body.items():
+        if rc not in ALL_ROLE_CODES:
+            continue
+        for module_name, is_allowed in module_map.items():
+            key = (rc, module_name)
+            if key in existing:
+                existing[key].is_allowed = bool(is_allowed)
+                existing[key].set_by = current_user.id
+            else:
+                db.add(RoleModuleAccess(
+                    id=str(uuid.uuid4()),
+                    company_id=company_id,
+                    role_code=rc,
+                    module_name=module_name,
+                    is_allowed=bool(is_allowed),
+                    set_by=current_user.id,
+                ))
+            upserted += 1
+
+    await db.commit()
+    return {"upserted": upserted, "company_id": company_id}

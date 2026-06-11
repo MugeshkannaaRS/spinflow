@@ -120,11 +120,23 @@ class CORSEnsureMiddleware:
 
 
 def _run_alembic_upgrade() -> None:
+    import sys
     from alembic.config import Config as AlembicConfig
     from alembic import command as alembic_command
     alembic_ini = Path(__file__).parent.parent / "alembic.ini"
     cfg = AlembicConfig(str(alembic_ini))
-    alembic_command.upgrade(cfg, "head")
+    try:
+        alembic_command.upgrade(cfg, "head")
+    except Exception as exc:
+        # Print immediately to stderr — guaranteed to appear in Render logs before process exits.
+        print(
+            f"\n[MIGRATION FATAL] {type(exc).__name__}: {exc}\n"
+            f"Fix: check Supabase for NULL mill_id rows or run "
+            f"'UPDATE alembic_version SET version_num = <revision>' if schema is already applied.\n",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise
 
 
 @asynccontextmanager

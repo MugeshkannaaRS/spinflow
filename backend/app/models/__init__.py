@@ -15,7 +15,7 @@ from app.models.accounts import Invoice, Payment, GSTEntry
 from app.models.attachment import DocumentAttachment
 from app.models.deletion_log import DeletionLog
 from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician
-from app.models.masters import Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route, CompanyModule, MillSettings, DepartmentType, VehicleType
+from app.models.masters import Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route, CompanyModule, MillSettings, DepartmentType, VehicleType, CompanyRoleConfig, RoleModuleAccess
 from app.models.stock import StockLedger, StockBalance, SalesOrder, SalesOrderLine, StockTransfer
 from app.models.ui_config import ColumnConfig, ColumnDropdownOption
 from app.models.import_mapping import ImportMapping
@@ -37,7 +37,7 @@ __all__ = [
     "DeletionLog",
     "MaintenanceLog", "MaintenanceSchedule", "Technician",
     "Company", "Mill", "Department", "YarnCount", "Customer", "MasterVehicle", "Route",
-    "CompanyModule", "MillSettings",
+    "CompanyModule", "MillSettings", "CompanyRoleConfig", "RoleModuleAccess",
     "DepartmentType", "VehicleType",
     "StockLedger", "StockBalance", "SalesOrder", "SalesOrderLine", "StockTransfer",
     "Trip", "TripItem", "TripScanLog",
