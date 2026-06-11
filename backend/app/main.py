@@ -30,6 +30,7 @@ from app.api.v1.production_v2 import router as production_v2_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.alerts import router as alerts_router
 from app.api.v1.customer_success import router as customer_success_router
+from app.api.v1.demo import router as demo_router
 from app.ws.notifications import router as ws_router
 
 setup_logging()
@@ -297,6 +298,20 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.error(f"W5.3 help seed failed (non-fatal): {exc}", exc_info=True)
 
+    # ── Wave 5.4: seed tours + nudges ────────────────────────────────────
+    try:
+        from app.db.session import get_db as _w54_db
+        from app.services.demo_service import TourService, NudgeService
+        async for session in _w54_db():
+            n_tours = await TourService(session).seed_default_tours()
+            n_nudges = await NudgeService(session).seed_default_nudges()
+            if n_tours or n_nudges:
+                await session.commit()
+                logger.info("W5.4: seeded %d tours + %d nudges", n_tours, n_nudges)
+            break
+    except Exception as exc:
+        logger.error(f"W5.4 seed failed (non-fatal): {exc}", exc_info=True)
+
     # ── Wave 4A: enterprise background loop ──────────────────────────────
     enterprise_task = None
     try:
@@ -531,6 +546,7 @@ app.include_router(production_v2_router, prefix=API_PREFIX, tags=["Production v2
 app.include_router(notifications_router, prefix=API_PREFIX, tags=["Notifications"])
 app.include_router(alerts_router, prefix=API_PREFIX, tags=["Alerts"])
 app.include_router(customer_success_router, prefix=API_PREFIX, tags=["Customer Success"])
+app.include_router(demo_router, prefix=API_PREFIX, tags=["Demo & Trial"])
 app.include_router(ws_router)
 
 

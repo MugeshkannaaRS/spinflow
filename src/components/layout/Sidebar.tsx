@@ -43,6 +43,9 @@ import {
   Upload,
   BookOpen,
   Lightbulb,
+  Gauge,
+  UserPlus,
+  TrendingUp as TrendUpIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -109,10 +112,11 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Success",
     items: [
-      { to: "/onboarding",      label: "Setup Wizard",   icon: Rocket,     module: "dashboard" },
-      { to: "/import-hub",      label: "Import Hub",     icon: Upload,     module: "dashboard" },
-      { to: "/recommendations", label: "Recommendations", icon: Lightbulb,  module: "dashboard" },
-      { to: "/help-center",     label: "Help Center",    icon: BookOpen,   module: "dashboard" },
+      { to: "/onboarding",           label: "Setup Wizard",       icon: Rocket,     module: "dashboard" },
+      { to: "/import-hub",           label: "Import Hub",         icon: Upload,     module: "dashboard" },
+      { to: "/recommendations",      label: "Recommendations",    icon: Lightbulb,  module: "dashboard" },
+      { to: "/executive-dashboard",  label: "Executive Dashboard",icon: Gauge,      module: "dashboard" },
+      { to: "/help-center",          label: "Help Center",        icon: BookOpen,   module: "dashboard" },
     ],
   },
 ];
@@ -132,6 +136,7 @@ const ADMIN_SUB_ITEMS = [
   { to: "/admin/health",         label: "Health",          icon: Activity,         exact: false },
   { to: "/admin/archive",        label: "Archive",         icon: Archive,          exact: false },
   { to: "/admin/column-config",  label: "Column Config",   icon: SlidersHorizontal, exact: false },
+  { to: "/admin/sales",          label: "Sales Center",    icon: TrendUpIcon,       exact: false },
 ];
 
 const COMPANY_OWNER_ROLES = new Set(["MILL_OWNER", "SUPER_ADMIN"]);

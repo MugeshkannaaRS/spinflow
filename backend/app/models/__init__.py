@@ -24,6 +24,7 @@ from app.models.governance import PermissionSet, SecurityPolicy, CompanyBranding
 from app.models.retention import RetentionPolicy, BackupJob, BackupRestore, HealthCheckResult, Incident
 from app.models.platform import StorageUsage, ApiUsage
 from app.models.customer_success import SetupProgress, HelpCategory, HelpArticle
+from app.models.demo import DemoEnvironment, ProductTour, TourProgress, Nudge
 
 __all__ = [
     "Base",
@@ -53,6 +54,8 @@ __all__ = [
     "ApprovalWorkflow", "ApprovalStep", "ApprovalRequest", "ApprovalAction",
     "RetentionPolicy", "BackupJob", "BackupRestore", "HealthCheckResult", "Incident",
     "StorageUsage", "ApiUsage",
+    "SetupProgress", "HelpCategory", "HelpArticle",
+    "DemoEnvironment", "ProductTour", "TourProgress", "Nudge",
 ]
 from app.models.mill_config import MillMaster, MillCustomField, MillRecordValue
 from app.models.mixing import (

@@ -11,6 +11,8 @@ import { Topbar } from "@/components/layout/Topbar";
 import { cn } from "@/lib/utils";
 import { Lock } from "lucide-react";
 import { HelpWidget } from "@/components/help/HelpWidget";
+import { TourOverlay } from "@/components/tour/TourOverlay";
+import { NudgeBar } from "@/components/nudge/NudgeBar";
 
 const ALLOWED_DASHBOARD_ONLY_PATHS = ["/dashboard", "/profile", "/login"];
 
@@ -79,7 +81,7 @@ function ModuleAccessGuard({ children }: { children: React.ReactNode }) {
 
   if (!user || user.role === "SUPER_ADMIN") return <>{children}</>;
 
-  const bypassPaths = ["/dashboard", "/profile", "/change-password", "/login", "/company/billing", "/onboarding", "/import-hub", "/help-center", "/recommendations"];
+  const bypassPaths = ["/dashboard", "/profile", "/change-password", "/login", "/company/billing", "/onboarding", "/import-hub", "/help-center", "/recommendations", "/executive-dashboard", "/register"];
   if (bypassPaths.some((p) => location.pathname === p || location.pathname.startsWith(p + "/"))) {
     return <>{children}</>;
   }
@@ -128,11 +130,13 @@ function AppShell() {
       >
         <Topbar />
         <AlertBanner />
+        <NudgeBar />
         <main className="flex-1 overflow-y-auto bg-white lg:bg-gray-50 dark:bg-slate-900 p-4 lg:p-6">
           <DashboardOnlyGuard>
             <ModuleAccessGuard>
               <Outlet />
               <HelpWidget />
+              <TourOverlay />
             </ModuleAccessGuard>
           </DashboardOnlyGuard>
         </main>

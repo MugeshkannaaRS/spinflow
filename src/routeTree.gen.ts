@@ -18,6 +18,7 @@ import { Route as AppStoresRouteImport } from './routes/_app.stores'
 import { Route as AppStockRouteImport } from './routes/_app.stock'
 import { Route as AppSalesRouteImport } from './routes/_app.sales'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
+import { Route as AppRegisterRouteImport } from './routes/_app.register'
 import { Route as AppRecommendationsRouteImport } from './routes/_app.recommendations'
 import { Route as AppQualityRouteImport } from './routes/_app.quality'
 import { Route as AppPurchaseRouteImport } from './routes/_app.purchase'
@@ -33,6 +34,7 @@ import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
 import { Route as AppImportHubRouteImport } from './routes/_app.import-hub'
 import { Route as AppHrRouteImport } from './routes/_app.hr'
 import { Route as AppHelpCenterRouteImport } from './routes/_app.help-center'
+import { Route as AppExecutiveDashboardRouteImport } from './routes/_app.executive-dashboard'
 import { Route as AppDispatchRouteImport } from './routes/_app.dispatch'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppAuditRouteImport } from './routes/_app.audit'
@@ -41,6 +43,7 @@ import { Route as AppAdminRouteImport } from './routes/_app.admin'
 import { Route as AppAccountsRouteImport } from './routes/_app.accounts'
 import { Route as AppCompanyBillingRouteImport } from './routes/_app.company.billing'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
+import { Route as AppAdminSalesRouteImport } from './routes/_app.admin.sales'
 import { Route as AppAdminRolesRouteImport } from './routes/_app.admin.roles'
 import { Route as AppAdminPlansRouteImport } from './routes/_app.admin.plans'
 import { Route as AppAdminOrganizationsRouteImport } from './routes/_app.admin.organizations'
@@ -110,6 +113,11 @@ const AppSalesRoute = AppSalesRouteImport.update({
 const AppReportsRoute = AppReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRegisterRoute = AppRegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
   getParentRoute: () => AppRoute,
 } as any)
 const AppRecommendationsRoute = AppRecommendationsRouteImport.update({
@@ -187,6 +195,11 @@ const AppHelpCenterRoute = AppHelpCenterRouteImport.update({
   path: '/help-center',
   getParentRoute: () => AppRoute,
 } as any)
+const AppExecutiveDashboardRoute = AppExecutiveDashboardRouteImport.update({
+  id: '/executive-dashboard',
+  path: '/executive-dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDispatchRoute = AppDispatchRouteImport.update({
   id: '/dispatch',
   path: '/dispatch',
@@ -225,6 +238,11 @@ const AppCompanyBillingRoute = AppCompanyBillingRouteImport.update({
 const AppAdminUsersRoute = AppAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminSalesRoute = AppAdminSalesRouteImport.update({
+  id: '/sales',
+  path: '/sales',
   getParentRoute: () => AppAdminRoute,
 } as any)
 const AppAdminRolesRoute = AppAdminRolesRouteImport.update({
@@ -373,6 +391,7 @@ export interface FileRoutesByFullPath {
   '/audit': typeof AppAuditRoute
   '/dashboard': typeof AppDashboardRoute
   '/dispatch': typeof AppDispatchRoute
+  '/executive-dashboard': typeof AppExecutiveDashboardRoute
   '/help-center': typeof AppHelpCenterRoute
   '/hr': typeof AppHrRoute
   '/import-hub': typeof AppImportHubRoute
@@ -388,6 +407,7 @@ export interface FileRoutesByFullPath {
   '/purchase': typeof AppPurchaseRoute
   '/quality': typeof AppQualityRoute
   '/recommendations': typeof AppRecommendationsRoute
+  '/register': typeof AppRegisterRoute
   '/reports': typeof AppReportsRoute
   '/sales': typeof AppSalesRoute
   '/stock': typeof AppStockRoute
@@ -411,6 +431,7 @@ export interface FileRoutesByFullPath {
   '/admin/organizations': typeof AppAdminOrganizationsRoute
   '/admin/plans': typeof AppAdminPlansRoute
   '/admin/roles': typeof AppAdminRolesRoute
+  '/admin/sales': typeof AppAdminSalesRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/company/billing': typeof AppCompanyBillingRoute
   '/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
@@ -432,6 +453,7 @@ export interface FileRoutesByTo {
   '/audit': typeof AppAuditRoute
   '/dashboard': typeof AppDashboardRoute
   '/dispatch': typeof AppDispatchRoute
+  '/executive-dashboard': typeof AppExecutiveDashboardRoute
   '/help-center': typeof AppHelpCenterRoute
   '/hr': typeof AppHrRoute
   '/import-hub': typeof AppImportHubRoute
@@ -447,6 +469,7 @@ export interface FileRoutesByTo {
   '/purchase': typeof AppPurchaseRoute
   '/quality': typeof AppQualityRoute
   '/recommendations': typeof AppRecommendationsRoute
+  '/register': typeof AppRegisterRoute
   '/reports': typeof AppReportsRoute
   '/sales': typeof AppSalesRoute
   '/stock': typeof AppStockRoute
@@ -470,6 +493,7 @@ export interface FileRoutesByTo {
   '/admin/organizations': typeof AppAdminOrganizationsRoute
   '/admin/plans': typeof AppAdminPlansRoute
   '/admin/roles': typeof AppAdminRolesRoute
+  '/admin/sales': typeof AppAdminSalesRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/company/billing': typeof AppCompanyBillingRoute
   '/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
@@ -493,6 +517,7 @@ export interface FileRoutesById {
   '/_app/audit': typeof AppAuditRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/dispatch': typeof AppDispatchRoute
+  '/_app/executive-dashboard': typeof AppExecutiveDashboardRoute
   '/_app/help-center': typeof AppHelpCenterRoute
   '/_app/hr': typeof AppHrRoute
   '/_app/import-hub': typeof AppImportHubRoute
@@ -508,6 +533,7 @@ export interface FileRoutesById {
   '/_app/purchase': typeof AppPurchaseRoute
   '/_app/quality': typeof AppQualityRoute
   '/_app/recommendations': typeof AppRecommendationsRoute
+  '/_app/register': typeof AppRegisterRoute
   '/_app/reports': typeof AppReportsRoute
   '/_app/sales': typeof AppSalesRoute
   '/_app/stock': typeof AppStockRoute
@@ -531,6 +557,7 @@ export interface FileRoutesById {
   '/_app/admin/organizations': typeof AppAdminOrganizationsRoute
   '/_app/admin/plans': typeof AppAdminPlansRoute
   '/_app/admin/roles': typeof AppAdminRolesRoute
+  '/_app/admin/sales': typeof AppAdminSalesRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/company/billing': typeof AppCompanyBillingRoute
   '/_app/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
@@ -554,6 +581,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/dashboard'
     | '/dispatch'
+    | '/executive-dashboard'
     | '/help-center'
     | '/hr'
     | '/import-hub'
@@ -569,6 +597,7 @@ export interface FileRouteTypes {
     | '/purchase'
     | '/quality'
     | '/recommendations'
+    | '/register'
     | '/reports'
     | '/sales'
     | '/stock'
@@ -592,6 +621,7 @@ export interface FileRouteTypes {
     | '/admin/organizations'
     | '/admin/plans'
     | '/admin/roles'
+    | '/admin/sales'
     | '/admin/users'
     | '/company/billing'
     | '/admin/billing/analytics'
@@ -613,6 +643,7 @@ export interface FileRouteTypes {
     | '/audit'
     | '/dashboard'
     | '/dispatch'
+    | '/executive-dashboard'
     | '/help-center'
     | '/hr'
     | '/import-hub'
@@ -628,6 +659,7 @@ export interface FileRouteTypes {
     | '/purchase'
     | '/quality'
     | '/recommendations'
+    | '/register'
     | '/reports'
     | '/sales'
     | '/stock'
@@ -651,6 +683,7 @@ export interface FileRouteTypes {
     | '/admin/organizations'
     | '/admin/plans'
     | '/admin/roles'
+    | '/admin/sales'
     | '/admin/users'
     | '/company/billing'
     | '/admin/billing/analytics'
@@ -673,6 +706,7 @@ export interface FileRouteTypes {
     | '/_app/audit'
     | '/_app/dashboard'
     | '/_app/dispatch'
+    | '/_app/executive-dashboard'
     | '/_app/help-center'
     | '/_app/hr'
     | '/_app/import-hub'
@@ -688,6 +722,7 @@ export interface FileRouteTypes {
     | '/_app/purchase'
     | '/_app/quality'
     | '/_app/recommendations'
+    | '/_app/register'
     | '/_app/reports'
     | '/_app/sales'
     | '/_app/stock'
@@ -711,6 +746,7 @@ export interface FileRouteTypes {
     | '/_app/admin/organizations'
     | '/_app/admin/plans'
     | '/_app/admin/roles'
+    | '/_app/admin/sales'
     | '/_app/admin/users'
     | '/_app/company/billing'
     | '/_app/admin/billing/analytics'
@@ -793,6 +829,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof AppReportsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/register': {
+      id: '/_app/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof AppRegisterRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/recommendations': {
@@ -900,6 +943,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppHelpCenterRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/executive-dashboard': {
+      id: '/_app/executive-dashboard'
+      path: '/executive-dashboard'
+      fullPath: '/executive-dashboard'
+      preLoaderRoute: typeof AppExecutiveDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dispatch': {
       id: '/_app/dispatch'
       path: '/dispatch'
@@ -954,6 +1004,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof AppAdminUsersRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/sales': {
+      id: '/_app/admin/sales'
+      path: '/sales'
+      fullPath: '/admin/sales'
+      preLoaderRoute: typeof AppAdminSalesRouteImport
       parentRoute: typeof AppAdminRoute
     }
     '/_app/admin/roles': {
@@ -1195,6 +1252,7 @@ interface AppAdminRouteChildren {
   AppAdminOrganizationsRoute: typeof AppAdminOrganizationsRoute
   AppAdminPlansRoute: typeof AppAdminPlansRoute
   AppAdminRolesRoute: typeof AppAdminRolesRoute
+  AppAdminSalesRoute: typeof AppAdminSalesRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
 }
 
@@ -1217,6 +1275,7 @@ const AppAdminRouteChildren: AppAdminRouteChildren = {
   AppAdminOrganizationsRoute: AppAdminOrganizationsRoute,
   AppAdminPlansRoute: AppAdminPlansRoute,
   AppAdminRolesRoute: AppAdminRolesRoute,
+  AppAdminSalesRoute: AppAdminSalesRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
 }
 
@@ -1231,6 +1290,7 @@ interface AppRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDispatchRoute: typeof AppDispatchRoute
+  AppExecutiveDashboardRoute: typeof AppExecutiveDashboardRoute
   AppHelpCenterRoute: typeof AppHelpCenterRoute
   AppHrRoute: typeof AppHrRoute
   AppImportHubRoute: typeof AppImportHubRoute
@@ -1246,6 +1306,7 @@ interface AppRouteChildren {
   AppPurchaseRoute: typeof AppPurchaseRoute
   AppQualityRoute: typeof AppQualityRoute
   AppRecommendationsRoute: typeof AppRecommendationsRoute
+  AppRegisterRoute: typeof AppRegisterRoute
   AppReportsRoute: typeof AppReportsRoute
   AppSalesRoute: typeof AppSalesRoute
   AppStockRoute: typeof AppStockRoute
@@ -1261,6 +1322,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAuditRoute: AppAuditRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDispatchRoute: AppDispatchRoute,
+  AppExecutiveDashboardRoute: AppExecutiveDashboardRoute,
   AppHelpCenterRoute: AppHelpCenterRoute,
   AppHrRoute: AppHrRoute,
   AppImportHubRoute: AppImportHubRoute,
@@ -1276,6 +1338,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppPurchaseRoute: AppPurchaseRoute,
   AppQualityRoute: AppQualityRoute,
   AppRecommendationsRoute: AppRecommendationsRoute,
+  AppRegisterRoute: AppRegisterRoute,
   AppReportsRoute: AppReportsRoute,
   AppSalesRoute: AppSalesRoute,
   AppStockRoute: AppStockRoute,
