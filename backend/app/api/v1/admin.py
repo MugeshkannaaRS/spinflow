@@ -247,6 +247,51 @@ async def create_user(
         raise HTTPException(500, detail=f"Server error: {str(e)}")
 
 
+@router.get("/admin/user-stats")
+async def get_user_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Cheap aggregate stats for the admin users page header cards."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    try:
+        base = select(User).where(User.deleted_at.is_(None))
+        if role_code == "MILL_OWNER":
+            base = base.where(User.company_id == current_user.company_id)
+
+        total = (await db.execute(
+            select(func.count()).select_from(base.subquery())
+        )).scalar() or 0
+
+        active = (await db.execute(
+            select(func.count()).select_from(base.where(User.is_active == True).subquery())
+        )).scalar() or 0
+
+        inactive = (await db.execute(
+            select(func.count()).select_from(base.where(User.is_active == False).subquery())
+        )).scalar() or 0
+
+        # Mill owners: join with role
+        mill_owner_role = (await db.execute(
+            select(Role.id).where(Role.code == "MILL_OWNER")
+        )).scalar_one_or_none()
+        mill_owners = 0
+        if mill_owner_role:
+            mo_q = base.where(User.role_id == mill_owner_role)
+            mill_owners = (await db.execute(
+                select(func.count()).select_from(mo_q.subquery())
+            )).scalar() or 0
+
+        return {"total": total, "active": active, "inactive": inactive, "mill_owners": mill_owners}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"user-stats error: {e}")
+        raise HTTPException(500, "Failed to load user stats")
+
+
 @router.get("/admin/users")
 async def list_all_users(
     company_id: Optional[str] = None,
