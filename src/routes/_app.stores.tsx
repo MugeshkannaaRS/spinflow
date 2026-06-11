@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { storesApi, uploadApi } from "@/lib/api-service";
+import { storesApi, uploadApi, exportApi } from "@/lib/api-service";
+import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { canWrite } from "@/lib/rbac";
@@ -37,8 +38,9 @@ import { useState, useEffect } from "react";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import { toast } from "sonner";
-import { Plus, Warehouse, AlertTriangle, Package, Pencil, ArrowDown } from "lucide-react";
+import { Plus, Warehouse, AlertTriangle, Package, Pencil, ArrowDown, Trash2 } from "lucide-react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 
 export const Route = createFileRoute("/_app/stores")({
   head: () => ({ meta: [{ title: "Stores — SpinFlow ERP" }] }),
@@ -145,6 +147,16 @@ function StoresPage() {
                       <div className="flex gap-1">
                         <ReceiveStockButton item={row} />
                         <EditSpareSheet item={row} />
+                        {row.is_active && (
+                          <ConfirmDeleteButton
+                            onConfirm={async () => {
+                              await storesApi.deleteSpare(row.id);
+                              qc.invalidateQueries({ queryKey: ["spare-items"] });
+                            }}
+                            label={`Delete ${row.name || row.code}? This will deactivate it.`}
+                            successMessage="Spare deleted"
+                          />
+                        )}
                       </div>
                     ) : undefined}
                   />
@@ -156,10 +168,30 @@ function StoresPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Issue Notes</CardTitle>
-                  {canEdit && <NewIssueNoteDialog items={items} />}
+                  <div className="flex gap-1">
+                    <ExportDateRangeButton label="Export" onExport={(f, t) => exportApi.storesXlsx(f, t)} />
+                    {canEdit && <NewIssueNoteDialog items={items} />}
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <DataTable tableId="stores_issues" columns={issueCols} data={issues} loading={issuesQ.isLoading} rowKey={(n) => n.id} exportFilename="issue_notes" />
+                  <DataTable
+                    tableId="stores_issues"
+                    columns={issueCols}
+                    data={issues}
+                    loading={issuesQ.isLoading}
+                    rowKey={(n) => n.id}
+                    exportFilename="issue_notes"
+                    actions={canEdit ? (n: any) => (
+                      <ConfirmDeleteButton
+                        onConfirm={async () => {
+                          await storesApi.deleteIssue(n.id);
+                          qc.invalidateQueries({ queryKey: ["issue-notes"] });
+                        }}
+                        label="Delete this issue note permanently?"
+                        successMessage="Issue note deleted"
+                      />
+                    ) : undefined}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>

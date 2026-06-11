@@ -321,3 +321,51 @@ async def stores_page_init(
         logger.error(f"stores.page-init error: {e}")
         result["categories"] = []
     return result
+
+
+# ---------------------------------------------------------------------------
+# DELETE endpoints
+# ---------------------------------------------------------------------------
+
+@router.delete("/stores/spares/{spare_id}")
+async def delete_spare(
+    spare_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("stores", write=True)),
+):
+    """Soft-delete a spare item (is_active=False)."""
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(Spare).where(Spare.id == spare_id, Spare.is_active == True)
+    if scope.get("mill_id"):
+        stmt = stmt.where(Spare.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, Spare.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    spare = result.scalar_one_or_none()
+    if not spare:
+        raise HTTPException(status_code=404, detail="Spare item not found")
+    spare.is_active = False
+    await db.flush()
+    return {"message": "Spare deleted", "id": spare_id}
+
+
+@router.delete("/stores/issues/{issue_id}")
+async def delete_issue(
+    issue_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("stores", write=True)),
+):
+    """Delete a spare issue record (hard-delete; only if no downstream impact)."""
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(SpareIssue).where(SpareIssue.id == issue_id)
+    if scope.get("mill_id"):
+        stmt = stmt.join(Spare, SpareIssue.spare_id == Spare.id).where(Spare.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Spare, SpareIssue.spare_id == Spare.id).join(Mill, Spare.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    issue = result.scalar_one_or_none()
+    if not issue:
+        raise HTTPException(status_code=404, detail="Spare issue not found")
+    await db.delete(issue)
+    await db.flush()
+    return {"message": "Issue record deleted", "id": issue_id}

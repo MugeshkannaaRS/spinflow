@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { validateForm } from "@/lib/formValidation";
 import { api } from "@/lib/api";
-import { hrApi, uploadApi } from "@/lib/api-service";
+import { hrApi, uploadApi, exportApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
@@ -81,6 +81,7 @@ import {
   ChevronRight,
   Settings2,
   Eye,
+  Download,
 } from "lucide-react";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { useActiveMill } from "@/hooks/useActiveMill";
@@ -1626,6 +1627,26 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
           </Button>
         )}
         {canEdit && <ImportAttendanceDialog month={month} year={year} onSuccess={refetch} />}
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-9 gap-1.5"
+          onClick={async () => {
+            const pad = (n: number) => String(n).padStart(2, "0");
+            const dateFrom = `${year}-${pad(month)}-01`;
+            const lastDay = new Date(year, month, 0).getDate();
+            const dateTo = `${year}-${pad(month)}-${pad(lastDay)}`;
+            try {
+              await exportApi.attendanceXlsx(dateFrom, dateTo);
+              toast.success("Attendance exported");
+            } catch {
+              toast.error("Export failed");
+            }
+          }}
+        >
+          <Download className="size-3.5" />
+          Export Month
+        </Button>
       </div>
 
       {/* Desktop table */}

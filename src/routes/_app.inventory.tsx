@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { inventoryApi } from "@/lib/api-service";
+import { inventoryApi, exportApi } from "@/lib/api-service";
+import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { canWrite } from "@/lib/rbac";
@@ -26,6 +27,7 @@ import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import { toast } from "sonner";
 import { Plus, Boxes, ArrowRightLeft, AlertTriangle, Package } from "lucide-react";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/inventory")({
@@ -110,9 +112,33 @@ function InventoryPage() {
 
             <TabsContent value="lots">
               <Card>
-                <CardHeader><CardTitle className="text-base">Inventory Lots</CardTitle></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">Inventory Lots</CardTitle>
+                  <ExportDateRangeButton label="Export" onExport={(f, t) => exportApi.inventoryXlsx(f, t)} />
+                </CardHeader>
                 <CardContent>
-                  <DataTable tableId="inventory_lots" columns={lotCols} data={lots} loading={lotsQ.isLoading} rowKey={(l) => l.id} exportFilename="inventory_lots" />
+                  <DataTable
+                    tableId="inventory_lots"
+                    columns={lotCols}
+                    data={lots}
+                    loading={lotsQ.isLoading}
+                    rowKey={(l) => l.id}
+                    exportFilename="inventory_lots"
+                    actions={canEdit ? (l: any) => (
+                      l.status !== "cancelled" && l.status !== "dispatched" ? (
+                        <ConfirmDeleteButton
+                          onConfirm={async () => {
+                            await inventoryApi.deleteLot(l.id);
+                            qc.invalidateQueries({ queryKey: ["inventory-lots"] });
+                          }}
+                          label={`Cancel lot ${l.lotNo}? Only possible if no stock movements exist.`}
+                          title="Cancel Lot?"
+                          confirmText="Cancel Lot"
+                          successMessage="Lot cancelled"
+                        />
+                      ) : <></>
+                    ) : undefined}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>

@@ -252,3 +252,59 @@ async def create_warehouse(
     await log_audit(db, current_user.id, role_code, "create", "Warehouse", wh.id,
                     f"Warehouse {wh.name} created")
     return wh
+
+
+# ---------------------------------------------------------------------------
+# DELETE endpoints
+# ---------------------------------------------------------------------------
+
+from fastapi import HTTPException as _HTTPException
+
+@router.delete("/inventory/lots/{lot_id}")
+async def delete_lot(
+    lot_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("inventory", write=True)),
+):
+    """Cancel an inventory lot (status=cancelled). Only in-stock lots with no movements."""
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(Lot).where(Lot.id == lot_id)
+    if scope.get("mill_id"):
+        stmt = stmt.where(Lot.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    lot = result.scalar_one_or_none()
+    if not lot:
+        raise HTTPException(status_code=404, detail="Lot not found")
+    # Check no stock movements
+    movement_count = (await db.execute(
+        select(func.count()).where(StockMovement.lot_id == lot_id)
+    )).scalar() or 0
+    if movement_count > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete lot with stock movements")
+    lot.status = "cancelled"
+    await db.flush()
+    return {"message": "Lot cancelled", "id": lot_id}
+
+
+@router.delete("/inventory/warehouses/{warehouse_id}")
+async def delete_warehouse(
+    warehouse_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("inventory", write=True)),
+):
+    """Deactivate a warehouse (is_active=False)."""
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(Warehouse).where(Warehouse.id == warehouse_id, Warehouse.is_active == True)
+    if scope.get("mill_id"):
+        stmt = stmt.where(Warehouse.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, Warehouse.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    wh = result.scalar_one_or_none()
+    if not wh:
+        raise HTTPException(status_code=404, detail="Warehouse not found")
+    wh.is_active = False
+    await db.flush()
+    return {"message": "Warehouse deactivated", "id": warehouse_id}

@@ -76,6 +76,7 @@ export const productionApi = {
 export const qualityApi = {
   getTests: () => api.get("/quality/tests").then((r: any) => extractList(r.data)),
   createTest: (data: any) => api.post("/quality/tests", data).then((r) => r.data),
+  deleteTest: (id: string) => api.delete(`/quality/tests/${id}`).then((r) => r.data),
   getApprovals: () => api.get("/quality/approvals").then((r: any) => extractList(r.data)),
   approveOrReject: (data: any) => api.post("/quality/approvals/action", data).then((r) => r.data),
   getRejections: () => api.get("/quality/rejections").then((r: any) => extractList(r.data)),
@@ -85,16 +86,19 @@ export const qualityApi = {
 // Inventory
 export const inventoryApi = {
   getLots: () => api.get("/inventory/lots").then((r: any) => extractList(r.data)),
+  deleteLot: (id: string) => api.delete(`/inventory/lots/${id}`).then((r) => r.data),
   getTransfers: () => api.get("/inventory/transfers").then((r: any) => extractList(r.data)),
   createTransfer: (data: any) => api.post("/inventory/transfers", data).then((r) => r.data),
   getWarehouses: () => api.get("/inventory/warehouses").then((r: any) => extractList(r.data)),
   createWarehouse: (data: any) => api.post("/inventory/warehouses", data).then((r) => r.data),
+  deleteWarehouse: (id: string) => api.delete(`/inventory/warehouses/${id}`).then((r) => r.data),
 };
 
 // Dispatch
 export const dispatchApi = {
   getOrders: () => api.get("/dispatch/orders").then((r: any) => extractList(r.data)),
   createOrder: (data: any) => api.post("/dispatch/orders", data).then((r) => r.data),
+  deleteOrder: (id: string) => api.delete(`/dispatch/orders/${id}`).then((r) => r.data),
   updateStatus: (id: string, data: any) =>
     api.put(`/dispatch/orders/${id}/status`, data).then((r) => r.data),
   getTrips: (params?: Record<string, string | number>) =>
@@ -108,7 +112,9 @@ export const dispatchApi = {
 export const purchaseApi = {
   getPurchases: () => api.get("/purchase/purchases").then((r: any) => extractList(r.data)),
   createPurchase: (data: any) => api.post("/purchase/purchases", data).then((r) => r.data),
+  deletePurchase: (id: string) => api.delete(`/purchase/purchases/${id}`).then((r) => r.data),
   getSuppliers: () => api.get("/purchase/suppliers").then((r: any) => extractList(r.data)),
+  deleteSupplier: (id: string) => api.delete(`/purchase/suppliers/${id}`).then((r) => r.data),
   getGRNs: () => api.get("/purchase/grns").then((r: any) => extractList(r.data)),
 };
 
@@ -123,7 +129,9 @@ export const baleApi = {
 // Stores
 export const storesApi = {
   getSpares: () => api.get("/stores/spares").then((r: any) => extractList(r.data)),
+  deleteSpare: (id: string) => api.delete(`/stores/spares/${id}`).then((r) => r.data),
   getIssues: () => api.get("/stores/issues").then((r: any) => extractList(r.data)),
+  deleteIssue: (id: string) => api.delete(`/stores/issues/${id}`).then((r) => r.data),
   createIssue: (data: any) => api.post("/stores/issues", data).then((r) => r.data),
   createSpare: (data: any) => api.post("/stores/spares", data).then((r) => r.data),
   updateSpare: (id: string, data: any) => api.put(`/stores/spares/${id}`, data).then((r) => r.data),
@@ -183,7 +191,9 @@ export const maintenanceApi = {
   getTasks: () => api.get("/maintenance/tasks").then((r: any) => extractList(r.data)),
   updateStatus: (id: string, data: any) =>
     api.put(`/maintenance/tasks/${id}/status`, data).then((r) => r.data),
+  deleteTask: (id: string) => api.delete(`/maintenance/tasks/${id}`).then((r) => r.data),
   getSchedules: () => api.get("/maintenance/schedules").then((r: any) => extractList(r.data)),
+  deleteSchedule: (id: string) => api.delete(`/maintenance/schedules/${id}`).then((r) => r.data),
   bulkCreateSchedules: (data: any) =>
     api.post("/maintenance/schedules/bulk", data).then((r) => r.data),
   getParameters: () => api.get("/maintenance/parameters").then((r: any) => extractList(r.data)),
@@ -379,6 +389,7 @@ export const mastersApi = {
   createDepartment: (data: any) => api.post("/masters/departments", data).then((r) => r.data),
   updateDepartment: (id: string, data: any) =>
     api.patch(`/masters/departments/${id}`, data).then((r) => r.data),
+  deleteDepartment: (id: string) => api.delete(`/masters/departments/${id}`).then((r) => r.data),
 
   getYarnCounts: (millId?: string, page = 1, pageSize = 1000) =>
     api
@@ -388,6 +399,7 @@ export const mastersApi = {
   createYarnCount: (data: any) => api.post("/masters/yarn-counts", data).then((r) => r.data),
   updateYarnCount: (id: string, data: any) =>
     api.patch(`/masters/yarn-counts/${id}`, data).then((r) => r.data),
+  deleteYarnCount: (id: string) => api.delete(`/masters/yarn-counts/${id}`).then((r) => r.data),
 
   getCustomers: (millId?: string, page = 1, pageSize = 1000) =>
     api
@@ -407,6 +419,7 @@ export const mastersApi = {
   createVehicle: (data: any) => api.post("/masters/vehicles", data).then((r) => r.data),
   updateVehicle: (id: string, data: any) =>
     api.patch(`/masters/vehicles/${id}`, data).then((r) => r.data),
+  deleteVehicle: (id: string) => api.delete(`/masters/vehicles/${id}`).then((r) => r.data),
 
   getRoutes: (millId?: string, page = 1, pageSize = 1000) =>
     api
@@ -416,6 +429,7 @@ export const mastersApi = {
   createRoute: (data: any) => api.post("/masters/routes", data).then((r) => r.data),
   updateRoute: (id: string, data: any) =>
     api.patch(`/masters/routes/${id}`, data).then((r) => r.data),
+  deleteRoute: (id: string) => api.delete(`/masters/routes/${id}`).then((r) => r.data),
 };
 
 function downloadBlob(url: string, filename: string) {
@@ -491,6 +505,55 @@ export const exportApi = {
       `/exports/gst/xlsx?month=${month}&year=${year}`,
       `gst_${year}_${String(month).padStart(2, "0")}.xlsx`,
     );
+  },
+  qualityXlsx: (dateFrom?: string, dateTo?: string) => {
+    const params = new URLSearchParams();
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    const qs = params.toString();
+    return exportDownload(`/exports/quality/xlsx${qs ? `?${qs}` : ""}`, `quality_tests_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  },
+  maintenanceXlsx: (dateFrom?: string, dateTo?: string) => {
+    const params = new URLSearchParams();
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    const qs = params.toString();
+    return exportDownload(`/exports/maintenance/xlsx${qs ? `?${qs}` : ""}`, `maintenance_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  },
+  purchaseXlsx: (dateFrom?: string, dateTo?: string) => {
+    const params = new URLSearchParams();
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    const qs = params.toString();
+    return exportDownload(`/exports/purchase/xlsx${qs ? `?${qs}` : ""}`, `purchase_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  },
+  dispatchXlsx: (dateFrom?: string, dateTo?: string) => {
+    const params = new URLSearchParams();
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    const qs = params.toString();
+    return exportDownload(`/exports/dispatch/xlsx${qs ? `?${qs}` : ""}`, `dispatch_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  },
+  storesXlsx: (dateFrom?: string, dateTo?: string) => {
+    const params = new URLSearchParams();
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    const qs = params.toString();
+    return exportDownload(`/exports/stores/xlsx${qs ? `?${qs}` : ""}`, `spare_issues_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  },
+  inventoryXlsx: (dateFrom?: string, dateTo?: string) => {
+    const params = new URLSearchParams();
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    const qs = params.toString();
+    return exportDownload(`/exports/inventory/xlsx${qs ? `?${qs}` : ""}`, `inventory_lots_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  },
+  attendanceXlsx: (dateFrom?: string, dateTo?: string) => {
+    const params = new URLSearchParams();
+    if (dateFrom) params.set("date_from", dateFrom);
+    if (dateTo) params.set("date_to", dateTo);
+    const qs = params.toString();
+    return exportDownload(`/exports/attendance/xlsx${qs ? `?${qs}` : ""}`, `attendance_${new Date().toISOString().slice(0, 10)}.xlsx`);
   },
 };
 

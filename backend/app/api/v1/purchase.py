@@ -503,3 +503,55 @@ async def create_grn(
         grn_date=datetime.strptime(grn.date, "%Y-%m-%d").date() if grn.date else None,
         created_at=grn.created_at,
     )
+
+
+# ---------------------------------------------------------------------------
+# DELETE endpoints
+# ---------------------------------------------------------------------------
+
+from fastapi import status as http_status
+
+@router.delete("/purchase/purchases/{purchase_id}")
+async def delete_purchase(
+    purchase_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("purchase", write=True)),
+):
+    """Cancel a cotton purchase (status=cancelled). Only pending purchases can be cancelled."""
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(CottonPurchase).where(CottonPurchase.id == purchase_id)
+    if scope.get("mill_id"):
+        stmt = stmt.join(Mill, CottonPurchase.mill_id == Mill.id).where(CottonPurchase.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, CottonPurchase.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    purchase = result.scalar_one_or_none()
+    if not purchase:
+        raise HTTPException(status_code=404, detail="Purchase not found")
+    if purchase.status not in ("pending", "draft"):
+        raise HTTPException(status_code=400, detail="Only pending purchases can be cancelled")
+    purchase.status = "cancelled"
+    await db.flush()
+    return {"message": "Purchase cancelled", "id": purchase_id}
+
+
+@router.delete("/purchase/suppliers/{supplier_id}")
+async def delete_supplier(
+    supplier_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("purchase", write=True)),
+):
+    """Deactivate a supplier (status=False)."""
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(Supplier).where(Supplier.id == supplier_id)
+    if scope.get("mill_id"):
+        stmt = stmt.where(Supplier.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, Supplier.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    supplier = result.scalar_one_or_none()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    supplier.status = False
+    await db.flush()
+    return {"message": "Supplier deactivated", "id": supplier_id}

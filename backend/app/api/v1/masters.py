@@ -1246,3 +1246,91 @@ async def mill_owner_create_mill(
     await db.commit()
     await db.refresh(mill)
     return MillOut.model_validate(mill).model_dump()
+
+
+# ---------------------------------------------------------------------------
+# DELETE endpoints (soft-delete via is_active=False)
+# ---------------------------------------------------------------------------
+
+@router.delete("/masters/departments/{dept_id}")
+async def delete_department(
+    dept_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("masters", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(Department).where(Department.id == dept_id)
+    if scope.get("mill_id"):
+        stmt = stmt.where(Department.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, Department.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    dept = result.scalar_one_or_none()
+    if not dept:
+        raise HTTPException(status_code=404, detail="Department not found")
+    dept.is_active = False
+    await db.commit()
+    return {"message": "Department deactivated", "id": dept_id}
+
+
+@router.delete("/masters/yarn-counts/{yarn_id}")
+async def delete_yarn_count(
+    yarn_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("masters", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(YarnCount).where(YarnCount.id == yarn_id)
+    if scope.get("mill_id"):
+        stmt = stmt.where(YarnCount.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, YarnCount.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    yc = result.scalar_one_or_none()
+    if not yc:
+        raise HTTPException(status_code=404, detail="Yarn count not found")
+    yc.is_active = False
+    await db.commit()
+    return {"message": "Yarn count deactivated", "id": yarn_id}
+
+
+@router.delete("/masters/vehicles/{vehicle_id}")
+async def delete_vehicle(
+    vehicle_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("masters", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(MasterVehicle).where(MasterVehicle.id == vehicle_id)
+    if scope.get("mill_id"):
+        stmt = stmt.where(MasterVehicle.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, MasterVehicle.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    vehicle = result.scalar_one_or_none()
+    if not vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle not found")
+    vehicle.is_active = False
+    await db.commit()
+    return {"message": "Vehicle deactivated", "id": vehicle_id}
+
+
+@router.delete("/masters/routes/{route_id}")
+async def delete_route(
+    route_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("masters", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(Route).where(Route.id == route_id)
+    if scope.get("mill_id"):
+        stmt = stmt.where(Route.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, Route.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    route = result.scalar_one_or_none()
+    if not route:
+        raise HTTPException(status_code=404, detail="Route not found")
+    route.is_active = False
+    await db.commit()
+    return {"message": "Route deactivated", "id": route_id}

@@ -414,3 +414,60 @@ async def maintenance_page_init(
         logger.error(f"maintenance.page-init technicians error: {e}")
         result["technicians"] = []
     return result
+
+
+# ---------------------------------------------------------------------------
+# DELETE endpoints
+# ---------------------------------------------------------------------------
+
+@router.delete("/maintenance/tasks/{task_id}")
+async def delete_maintenance_task(
+    task_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance", write=True)),
+):
+    """Soft-delete a maintenance task (sets status=cancelled) with scope check."""
+    scope = await get_mill_scope(current_user, db)
+    # Join Machine to enforce mill scope (MaintenanceLog uses machine_code, not mill_id)
+    stmt = (
+        select(MaintenanceLog)
+        .join(Machine, MaintenanceLog.machine_code == Machine.code)
+        .where(MaintenanceLog.id == task_id)
+    )
+    if scope.get("mill_id"):
+        stmt = stmt.where(Machine.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    task = result.scalar_one_or_none()
+    if not task:
+        raise HTTPException(status_code=404, detail="Maintenance task not found")
+    task.status = "cancelled"
+    await db.flush()
+    return {"message": "Maintenance task deleted", "id": task_id}
+
+
+@router.delete("/maintenance/schedules/{schedule_id}")
+async def delete_maintenance_schedule(
+    schedule_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance", write=True)),
+):
+    """Deactivate a maintenance schedule (is_active=False)."""
+    # Schedules use machine_code; SUPER_ADMIN can delete any, others rely on machine scope
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(MaintenanceSchedule).where(MaintenanceSchedule.id == schedule_id)
+    if scope.get("mill_id") or scope.get("company_id"):
+        # Validate the schedule's machine is in scope
+        stmt = stmt.join(Machine, MaintenanceSchedule.machine_code == Machine.code)
+        if scope.get("mill_id"):
+            stmt = stmt.where(Machine.mill_id == scope["mill_id"])
+        elif scope.get("company_id"):
+            stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    schedule = result.scalar_one_or_none()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Maintenance schedule not found")
+    schedule.is_active = False
+    await db.flush()
+    return {"message": "Maintenance schedule deleted", "id": schedule_id}

@@ -463,3 +463,31 @@ async def list_rejections(
             "noted_by": t.tested_by or "",
         })
     return {"items": out, "total": total, "page": page, "page_size": page_size}
+
+
+# ---------------------------------------------------------------------------
+# DELETE endpoints
+# ---------------------------------------------------------------------------
+
+@router.delete("/quality/tests/{test_id}")
+async def delete_quality_test(
+    test_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("quality", write=True)),
+):
+    """Cancel a quality test (only if status is pending)."""
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(QualityTest).where(QualityTest.id == test_id)
+    if scope.get("mill_id"):
+        stmt = stmt.join(Lot, QualityTest.lot_id == Lot.id).where(Lot.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Lot, QualityTest.lot_id == Lot.id).join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    test = result.scalar_one_or_none()
+    if not test:
+        raise HTTPException(status_code=404, detail="Quality test not found")
+    if test.status not in ("pending", "draft"):
+        raise HTTPException(status_code=400, detail="Only pending tests can be deleted")
+    test.status = "cancelled"
+    await db.flush()
+    return {"message": "Quality test cancelled", "id": test_id}

@@ -412,3 +412,31 @@ async def dispatch_page_init(
         logger.error(f"dispatch.page-init vehicles error: {e}")
         result["vehicles"] = []
     return result
+
+
+# ---------------------------------------------------------------------------
+# DELETE endpoints
+# ---------------------------------------------------------------------------
+
+@router.delete("/dispatch/orders/{dispatch_id}")
+async def delete_dispatch_order(
+    dispatch_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("dispatch", write=True)),
+):
+    """Cancel a dispatch order (status=cancelled). Only pending/draft orders."""
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(Dispatch).where(Dispatch.id == dispatch_id)
+    if scope.get("mill_id"):
+        stmt = stmt.where(Dispatch.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, Dispatch.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Dispatch order not found")
+    if order.status not in ("pending", "draft", "created"):
+        raise HTTPException(status_code=400, detail="Only pending orders can be cancelled")
+    order.status = "cancelled"
+    await db.flush()
+    return {"message": "Dispatch order cancelled", "id": dispatch_id}

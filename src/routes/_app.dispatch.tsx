@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { dispatchApi, mastersApi } from "@/lib/api-service";
+import { dispatchApi, mastersApi, exportApi } from "@/lib/api-service";
+import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { canWrite } from "@/lib/rbac";
@@ -27,6 +28,7 @@ import type { ColDef } from "@/components/ui/DataTable";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Truck, ClipboardList, Loader2, MapPin, Plus } from "lucide-react";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 
 export const Route = createFileRoute("/_app/dispatch")({
@@ -247,6 +249,21 @@ function DispatchPage() {
                 loading={ordersQ.isLoading}
                 rowKey={(o) => o.id}
                 exportFilename="dispatch_orders"
+                toolbar={<ExportDateRangeButton label="Export" onExport={(f, t) => exportApi.dispatchXlsx(f, t)} />}
+                actions={canEdit ? (o: any) => (
+                  (o.status === "pending" || o.status === "draft" || o.status === "created") ? (
+                    <ConfirmDeleteButton
+                      onConfirm={async () => {
+                        await dispatchApi.deleteOrder(o.id);
+                        queryClient.invalidateQueries({ queryKey: ["dispatch-orders"] });
+                      }}
+                      label={`Cancel order ${o.order_no}? This cannot be undone.`}
+                      title="Cancel Order?"
+                      confirmText="Cancel Order"
+                      successMessage="Order cancelled"
+                    />
+                  ) : <></>
+                ) : undefined}
               />
             </TabsContent>
           </Tabs>

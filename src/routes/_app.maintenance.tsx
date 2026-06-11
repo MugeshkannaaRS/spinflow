@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { mastersApi, maintenanceApi, productionApi } from "@/lib/api-service";
+import { mastersApi, maintenanceApi, productionApi, exportApi } from "@/lib/api-service";
+import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { canWrite } from "@/lib/rbac";
@@ -51,12 +52,14 @@ import {
   Plus,
   Pencil,
   ArrowDown,
+  Trash2,
 } from "lucide-react";
 import type { MaintenanceTask, MasterMachine } from "@/lib/types";
 import * as XLSX from "xlsx";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useMillMasterCategory } from "@/hooks/useMillConfig";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/maintenance")({
@@ -471,7 +474,10 @@ function MaintenancePage() {
             {/* ── Tasks tab ── */}
             <TabsContent value="tasks">
               <Card>
-                <CardHeader><CardTitle className="text-base">Maintenance Tasks</CardTitle></CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-base">Maintenance Tasks</CardTitle>
+                  <ExportDateRangeButton label="Export" onExport={(f, t) => exportApi.maintenanceXlsx(f, t)} />
+                </CardHeader>
                 <CardContent>
                   <DataTable
                     tableId="maintenance_tasks"
@@ -490,7 +496,21 @@ function MaintenancePage() {
                     loading={maintQ.isLoading}
                     rowKey={(t: any) => t.id}
                     exportFilename="maintenance_tasks"
-                    actions={canEdit ? (t: any) => t.status !== "completed" ? <StatusSelect taskId={t.id} currentStatus={t.status} /> : null : undefined}
+                    actions={canEdit ? (t: any) => (
+                      <div className="flex gap-1 items-center">
+                        {t.status !== "completed" && <StatusSelect taskId={t.id} currentStatus={t.status} />}
+                        {t.status !== "completed" && (
+                          <ConfirmDeleteButton
+                            onConfirm={async () => {
+                              await maintenanceApi.deleteTask(t.id);
+                              qc.invalidateQueries({ queryKey: ["maintenance-tasks"] });
+                            }}
+                            label={`Delete maintenance task for ${t.machine_code}?`}
+                            successMessage="Task deleted"
+                          />
+                        )}
+                      </div>
+                    ) : undefined}
                   />
                 </CardContent>
               </Card>
@@ -520,6 +540,16 @@ function MaintenancePage() {
                     rowKey={(s: any) => s.id}
                     exportFilename="pm_schedules"
                     emptyMessage='No schedules yet. Use "Import Schedule" to upload from Excel.'
+                    actions={canEdit ? (s: any) => s.is_active ? (
+                      <ConfirmDeleteButton
+                        onConfirm={async () => {
+                          await maintenanceApi.deleteSchedule(s.id);
+                          qc.invalidateQueries({ queryKey: ["maintenance-schedules"] });
+                        }}
+                        label={`Remove PM schedule for ${s.machine_code}?`}
+                        successMessage="Schedule removed"
+                      />
+                    ) : null : undefined}
                   />
                 </CardContent>
               </Card>

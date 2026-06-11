@@ -1,7 +1,8 @@
 import * as XLSX from "xlsx";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { purchaseApi, baleApi, uploadApi } from "@/lib/api-service";
+import { purchaseApi, baleApi, uploadApi, exportApi } from "@/lib/api-service";
+import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import {
   BarChart,
   Bar,
@@ -66,6 +67,7 @@ import {
   TrendingUp,
   AlertTriangle,
 } from "lucide-react";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 
 export const Route = createFileRoute("/_app/purchase")({
   head: () => ({ meta: [{ title: "Cotton Purchase — SpinFlow ERP" }] }),
@@ -232,6 +234,7 @@ function PurchasePage() {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Bale Purchase Entries</CardTitle>
                   <div className="flex gap-1">
+                    <ExportDateRangeButton label="Export" onExport={(f, t) => exportApi.purchaseXlsx(f, t)} />
                     {isAdmin && <ColumnConfigurator module="purchase" tableKey="purchases" />}
                     {canEdit && <NewPurchaseDialog />}
                   </div>
@@ -256,6 +259,7 @@ function PurchasePage() {
                           <TableHead className="text-right">Moisture</TableHead>
                           <TableHead>Grade</TableHead>
                           <TableHead>Status</TableHead>
+                          {canEdit && <TableHead className="w-12" />}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -287,6 +291,22 @@ function PurchasePage() {
                                 {p.status}
                               </Badge>
                             </TableCell>
+                            {canEdit && (
+                              <TableCell>
+                                {(p.status === "pending" || p.status === "draft") && (
+                                  <ConfirmDeleteButton
+                                    onConfirm={async () => {
+                                      await purchaseApi.deletePurchase(p.id);
+                                      qc.invalidateQueries({ queryKey: ["purchases"] });
+                                    }}
+                                    label={`Cancel purchase ${p.invoice_no}? This cannot be undone.`}
+                                    title="Cancel Purchase?"
+                                    confirmText="Cancel Purchase"
+                                    successMessage="Purchase cancelled"
+                                  />
+                                )}
+                              </TableCell>
+                            )}
                           </TableRow>
                         ))}
                       </TableBody>
@@ -318,6 +338,7 @@ function PurchasePage() {
                           <TableHead>City</TableHead>
                           <TableHead>Grade</TableHead>
                           <TableHead>Status</TableHead>
+                          {canEdit && <TableHead className="w-12" />}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -345,6 +366,22 @@ function PurchasePage() {
                                 {s.status}
                               </Badge>
                             </TableCell>
+                            {canEdit && (
+                              <TableCell>
+                                {s.status !== false && s.status !== "inactive" && (
+                                  <ConfirmDeleteButton
+                                    onConfirm={async () => {
+                                      await purchaseApi.deleteSupplier(s.id);
+                                      qc.invalidateQueries({ queryKey: ["suppliers"] });
+                                    }}
+                                    label={`Deactivate supplier ${s.name}?`}
+                                    title="Deactivate Supplier?"
+                                    confirmText="Deactivate"
+                                    successMessage="Supplier deactivated"
+                                  />
+                                )}
+                              </TableCell>
+                            )}
                           </TableRow>
                         ))}
                       </TableBody>

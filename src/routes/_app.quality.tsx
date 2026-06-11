@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { qualityApi } from "@/lib/api-service";
+import { qualityApi, exportApi } from "@/lib/api-service";
+import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { canWrite } from "@/lib/rbac";
@@ -40,9 +41,10 @@ import {
 } from "@/components/ui/sheet";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, CheckCircle2, XCircle, FlaskConical, AlertTriangle, ArrowDown } from "lucide-react";
+import { Plus, CheckCircle2, XCircle, FlaskConical, AlertTriangle, ArrowDown, Trash2 } from "lucide-react";
 import type { QualityTest } from "@/lib/types";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 
 export const Route = createFileRoute("/_app/quality")({
   head: () => ({ meta: [{ title: "Quality — SpinFlow ERP" }] }),
@@ -169,6 +171,7 @@ function QualityPage() {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Quality Test Results</CardTitle>
                   <div className="flex gap-1">
+                    <ExportDateRangeButton label="Export" onExport={(f, t) => exportApi.qualityXlsx(f, t)} />
                     {canEdit && <NewTestSlideOver />}
                   </div>
                 </CardHeader>
@@ -193,6 +196,16 @@ function QualityPage() {
                     toolbar={
                       canEdit ? <ImportTestsDialog /> : undefined
                     }
+                    actions={canEdit ? (t: any) => t.status === "pending" ? (
+                      <ConfirmDeleteButton
+                        onConfirm={async () => {
+                          await qualityApi.deleteTest(t.id);
+                          qc.invalidateQueries({ queryKey: ["quality-tests"] });
+                        }}
+                        label={`Cancel quality test for lot ${t.lot_id || "—"}?`}
+                        successMessage="Quality test cancelled"
+                      />
+                    ) : null : undefined}
                   />
                 </CardContent>
               </Card>

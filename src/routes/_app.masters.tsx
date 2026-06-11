@@ -99,6 +99,36 @@ function MastersPage() {
       .catch(() => toast.error("Failed to deactivate customer"));
   }
 
+  function deactivateDepartment(id: string) {
+    mastersApi.deleteDepartment(id)
+      .then(() => { toast.success("Department deactivated"); qcMasters.invalidateQueries({ queryKey: ["masters", "departments"] }); })
+      .catch(() => toast.error("Failed to deactivate department"));
+  }
+
+  function deactivateYarnCount(id: string) {
+    mastersApi.deleteYarnCount(id)
+      .then(() => { toast.success("Yarn count deactivated"); qcMasters.invalidateQueries({ queryKey: ["masters", "yarn-counts"] }); })
+      .catch(() => toast.error("Failed to deactivate yarn count"));
+  }
+
+  function deactivateVehicle(id: string) {
+    mastersApi.deleteVehicle(id)
+      .then(() => { toast.success("Vehicle deactivated"); qcMasters.invalidateQueries({ queryKey: ["masters", "vehicles"] }); })
+      .catch(() => toast.error("Failed to deactivate vehicle"));
+  }
+
+  function deactivateRoute(id: string) {
+    mastersApi.deleteRoute(id)
+      .then(() => { toast.success("Route deactivated"); qcMasters.invalidateQueries({ queryKey: ["masters", "routes"] }); })
+      .catch(() => toast.error("Failed to deactivate route"));
+  }
+
+  function deactivateWarehouse(id: string) {
+    inventoryApi.deleteWarehouse(id)
+      .then(() => { toast.success("Warehouse deactivated"); qcMasters.invalidateQueries({ queryKey: ["masters", "warehouses"] }); })
+      .catch(() => toast.error("Failed to deactivate warehouse"));
+  }
+
   const companiesQ = useQuery({
     queryKey: ["masters", "companies"],
     queryFn: () => mastersApi.getCompanies(),
@@ -306,6 +336,7 @@ function MastersPage() {
                 canEdit={canEdit}
                 onAdd={<DepartmentForm mills={millsData} />}
                 onEdit={(item) => <DepartmentForm item={item} mills={millsData} />}
+                onDeactivate={canEdit ? deactivateDepartment : undefined}
               />
             </TabsContent>
 
@@ -323,6 +354,7 @@ function MastersPage() {
                 canEdit={canEdit}
                 onAdd={<YarnCountForm mills={millsData} />}
                 onEdit={(item) => <YarnCountForm item={item} mills={millsData} />}
+                onDeactivate={canEdit ? deactivateYarnCount : undefined}
               />
             </TabsContent>
 
@@ -361,6 +393,7 @@ function MastersPage() {
                 canEdit={canEdit}
                 onAdd={<VehicleForm mills={millsData} />}
                 onEdit={(item) => <VehicleForm item={item} mills={millsData} />}
+                onDeactivate={canEdit ? deactivateVehicle : undefined}
               />
             </TabsContent>
 
@@ -379,6 +412,7 @@ function MastersPage() {
                 canEdit={canEdit}
                 onAdd={<RouteForm mills={millsData} />}
                 onEdit={(item) => <RouteForm item={item} mills={millsData} />}
+                onDeactivate={canEdit ? deactivateRoute : undefined}
               />
             </TabsContent>
 
@@ -413,6 +447,7 @@ function MastersPage() {
                 canEdit={canEdit}
                 onAdd={<WarehouseForm />}
                 onEdit={(item) => <WarehouseForm item={item} />}
+                onDeactivate={canEdit ? deactivateWarehouse : undefined}
               />
             </TabsContent>
           </Tabs>
