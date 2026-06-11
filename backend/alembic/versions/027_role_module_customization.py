@@ -22,35 +22,41 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing_tables = set(inspector.get_table_names())
+
     # ── 1. company_role_config ──────────────────────────────────────────
     # Tracks which roles are enabled per company and their optional monthly fee
-    op.create_table(
-        "company_role_config",
-        sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("company_id", sa.String(36), sa.ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True),
-        sa.Column("role_code", sa.String(50), nullable=False),
-        sa.Column("is_enabled", sa.Boolean(), nullable=False, server_default=sa.text("TRUE")),
-        sa.Column("monthly_fee", sa.Numeric(12, 2), nullable=False, server_default=sa.text("0")),
-        sa.Column("enabled_by", sa.String(36), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now(), nullable=False),
-        sa.UniqueConstraint("company_id", "role_code", name="uq_company_role_config"),
-    )
+    if "company_role_config" not in existing_tables:
+        op.create_table(
+            "company_role_config",
+            sa.Column("id", sa.String(36), primary_key=True),
+            sa.Column("company_id", sa.String(36), sa.ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True),
+            sa.Column("role_code", sa.String(50), nullable=False),
+            sa.Column("is_enabled", sa.Boolean(), nullable=False, server_default=sa.text("TRUE")),
+            sa.Column("monthly_fee", sa.Numeric(12, 2), nullable=False, server_default=sa.text("0")),
+            sa.Column("enabled_by", sa.String(36), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now(), nullable=False),
+            sa.UniqueConstraint("company_id", "role_code", name="uq_company_role_config"),
+        )
 
     # ── 2. role_module_access ───────────────────────────────────────────
     # Per-company overrides for which modules a role can access.
     # A missing row means "use system default for this role+module".
-    op.create_table(
-        "role_module_access",
-        sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("company_id", sa.String(36), sa.ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True),
-        sa.Column("role_code", sa.String(50), nullable=False),
-        sa.Column("module_name", sa.String(100), nullable=False),
-        sa.Column("is_allowed", sa.Boolean(), nullable=False, server_default=sa.text("TRUE")),
-        sa.Column("set_by", sa.String(36), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.UniqueConstraint("company_id", "role_code", "module_name", name="uq_role_module_access"),
-    )
+    if "role_module_access" not in existing_tables:
+        op.create_table(
+            "role_module_access",
+            sa.Column("id", sa.String(36), primary_key=True),
+            sa.Column("company_id", sa.String(36), sa.ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True),
+            sa.Column("role_code", sa.String(50), nullable=False),
+            sa.Column("module_name", sa.String(100), nullable=False),
+            sa.Column("is_allowed", sa.Boolean(), nullable=False, server_default=sa.text("TRUE")),
+            sa.Column("set_by", sa.String(36), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+            sa.UniqueConstraint("company_id", "role_code", "module_name", name="uq_role_module_access"),
+        )
 
 
 def downgrade() -> None:

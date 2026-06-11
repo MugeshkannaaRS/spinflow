@@ -150,6 +150,16 @@ async def log_audit(
     old_value: Optional[str] = None,
     new_value: Optional[str] = None,
     ip_address: Optional[str] = None,
+    # Wave 4A — enrichment params (all optional, backward-compatible)
+    category: Optional[str] = None,
+    severity: Optional[str] = None,
+    entity_name: Optional[str] = None,
+    mill_name: Optional[str] = None,
+    company_name: Optional[str] = None,
+    company_id: Optional[str] = None,
+    mill_id: Optional[str] = None,
+    module: Optional[str] = None,
+    metadata_json: Optional[dict] = None,
 ) -> AuditLog:
     log = AuditLog(
         user_id=user_id,
@@ -161,6 +171,15 @@ async def log_audit(
         old_value=old_value,
         new_value=new_value,
         ip_address=ip_address or "0.0.0.0",
+        category=category or "USER_ACTIVITY",
+        severity=severity or "INFO",
+        entity_name=entity_name,
+        mill_name=mill_name,
+        company_name=company_name,
+        company_id=company_id,
+        mill_id=mill_id,
+        module=module,
+        metadata_json=metadata_json,
     )
     db.add(log)
     await db.flush()

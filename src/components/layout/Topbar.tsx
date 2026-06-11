@@ -3,6 +3,7 @@ import { useAuth } from "@/stores/auth";
 import { useTheme } from "@/hooks/useTheme";
 import { useSidebar } from "@/components/layout/SidebarContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { useNotifications } from "@/hooks/useNotifications";
 import { useNavigate, Link, useLocation } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -61,6 +62,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   "/company/billing":    { title: "Billing",           subtitle: "Subscription & payments" },
   "/profile":            { title: "My Profile",        subtitle: "Account settings" },
   "/reports":            { title: "Reports",           subtitle: "Analytics & exports" },
+  "/notifications":      { title: "Notifications",     subtitle: "Alerts & system messages" },
   "/stock":              { title: "Stock",             subtitle: "Lot & warehouse tracking" },
 };
 
@@ -71,8 +73,15 @@ const TYPE_COLORS: Record<string, string> = {
   error:   "bg-red-500",
 };
 
+const SEVERITY_DOT: Record<string, string> = {
+  EMERGENCY: "bg-red-600",
+  CRITICAL:  "bg-red-500",
+  WARNING:   "bg-amber-500",
+  INFO:      "bg-blue-500",
+};
+
 function NotificationsDropdown() {
-  const { unreadCount, notifications, markAllRead } = useWebSocket();
+  const { unreadCount, notifications, markAllRead, markRead } = useNotifications({ limit: 10 });
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -86,10 +95,7 @@ function NotificationsDropdown() {
   }, [open]);
 
   const handleToggle = () => {
-    setOpen((prev) => {
-      if (!prev) markAllRead();
-      return !prev;
-    });
+    setOpen((prev) => !prev);
   };
 
   return (
@@ -110,28 +116,49 @@ function NotificationsDropdown() {
         <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
           <div className="px-4 py-2.5 text-xs font-semibold text-gray-500 border-b border-gray-100 flex items-center justify-between">
             <span>Notifications</span>
-            {unreadCount > 0 && (
-              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>
-            )}
+            <div className="flex items-center gap-2">
+              {unreadCount > 0 && (
+                <>
+                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>
+                  <button
+                    onClick={() => markAllRead()}
+                    className="text-[11px] text-blue-600 hover:underline"
+                  >
+                    Mark all read
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           {notifications.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-8 text-gray-400">
               <BellOff className="w-8 h-8" />
-              <span className="text-sm">No new alerts</span>
+              <span className="text-sm">No notifications</span>
             </div>
           ) : (
             <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
-              {notifications.slice(0, 10).map((n) => (
+              {notifications.map((n) => (
                 <div
                   key={n.id}
-                  className="flex items-start gap-3 px-4 py-3 text-sm hover:bg-gray-50 transition-colors"
+                  onClick={() => { if (!n.is_read) markRead(n.id); }}
+                  className={cn(
+                    "flex items-start gap-3 px-4 py-3 text-sm hover:bg-gray-50 transition-colors cursor-pointer",
+                    !n.is_read && "bg-blue-50/40"
+                  )}
                 >
-                  <span className={cn("mt-1.5 w-2 h-2 shrink-0 rounded-full", TYPE_COLORS[n.type] || "bg-gray-300")} />
+                  <span className={cn(
+                    "mt-1.5 w-2 h-2 shrink-0 rounded-full",
+                    SEVERITY_DOT[n.severity] || "bg-gray-300"
+                  )} />
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{n.title}</p>
-                    <p className="text-xs text-gray-500 truncate mt-0.5">
-                      {n.message.length > 60 ? n.message.slice(0, 60) + "…" : n.message}
+                    <p className={cn("text-[13px] truncate", n.is_read ? "text-gray-700" : "font-semibold text-gray-900")}>
+                      {n.title}
                     </p>
+                    {n.message && (
+                      <p className="text-xs text-gray-500 truncate mt-0.5">
+                        {n.message.length > 60 ? n.message.slice(0, 60) + "…" : n.message}
+                      </p>
+                    )}
                   </div>
                   <span className="shrink-0 text-xs text-gray-400 whitespace-nowrap">
                     {formatRelativeTime(n.created_at)}
@@ -140,6 +167,15 @@ function NotificationsDropdown() {
               ))}
             </div>
           )}
+          <div className="border-t border-gray-100 px-4 py-2 text-center">
+            <Link
+              to="/notifications"
+              onClick={() => setOpen(false)}
+              className="text-xs text-blue-600 hover:underline font-medium"
+            >
+              See all notifications →
+            </Link>
+          </div>
         </div>
       )}
     </div>

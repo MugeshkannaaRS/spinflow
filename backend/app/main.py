@@ -27,6 +27,8 @@ from app.api.v1.billing import router as billing_router
 from app.api.v1.mill_config import router as mill_config_router
 from app.api.v1.mixing import router as mixing_router
 from app.api.v1.production_v2 import router as production_v2_router
+from app.api.v1.notifications import router as notifications_router
+from app.api.v1.alerts import router as alerts_router
 from app.ws.notifications import router as ws_router
 
 setup_logging()
@@ -182,10 +184,104 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.error(f"Failed to start expiry automation: {exc}", exc_info=True)
 
+    # ── Wave 4A: enterprise background loop ──────────────────────────────
+    enterprise_task = None
+    try:
+        from app.db.session import get_db
+
+        async def _enterprise_loop():
+            """
+            Runs two recurring jobs:
+              - Alert evaluation: every 5 minutes
+              - Usage snapshot:   every 60 minutes
+            """
+            alert_interval = 300    # 5 min
+            snapshot_interval = 3600  # 60 min
+            last_snapshot = 0.0
+
+            while True:
+                now = asyncio.get_event_loop().time()
+                try:
+                    async for session in get_db():
+                        # Check for overdue escalations (OPEN alerts past next_escalation_at)
+                        from datetime import datetime as _dt
+                        from sqlalchemy import select as _select
+                        from app.models.alerts import AlertEvent as _AlertEvent, AlertStatus as _AlertStatus
+
+                        overdue = (await session.execute(
+                            _select(_AlertEvent).where(
+                                _AlertEvent.status.in_([_AlertStatus.OPEN, _AlertStatus.ESCALATED]),
+                                _AlertEvent.next_escalation_at <= _dt.utcnow(),
+                                _AlertEvent.next_escalation_at.isnot(None),
+                            )
+                        )).scalars().all()
+
+                        for event in overdue:
+                            event.escalation_level += 1
+                            event.status = _AlertStatus.ESCALATED
+                            event.next_escalation_at = _dt.utcnow().replace(
+                                second=0, microsecond=0
+                            ).__class__.utcnow()
+                            # Optionally notify next escalation level via notification_service
+                            try:
+                                from app.services.notification_service import notify_role
+                                from app.models.alerts import EscalationPolicy as _EP
+                                policy = (await session.execute(
+                                    _select(_EP).where(
+                                        _EP.category == event.category,
+                                        _EP.severity == event.severity,
+                                        _EP.step == event.escalation_level,
+                                        _EP.is_active == True,
+                                    ).order_by(_EP.company_id.nulls_last())
+                                )).scalar_one_or_none()
+                                if policy and event.company_id:
+                                    await notify_role(
+                                        session,
+                                        company_id=event.company_id,
+                                        role_code=policy.target_role,
+                                        title=f"[ESCALATED] {event.title}",
+                                        message=f"Alert escalated to level {event.escalation_level}",
+                                        severity=event.severity,
+                                        category=event.category,
+                                        priority="URGENT",
+                                        source_type="alert_event",
+                                        source_id=event.id,
+                                    )
+                            except Exception as ne:
+                                logger.debug("Escalation notify failed: %s", ne)
+
+                        if overdue:
+                            await session.commit()
+                            logger.info("Escalated %d overdue alerts", len(overdue))
+                        break
+                except Exception as exc:
+                    logger.error(f"Alert eval loop error: {exc}", exc_info=True)
+
+                # Usage snapshot — run once per hour
+                if now - last_snapshot >= snapshot_interval:
+                    try:
+                        async for session in get_db():
+                            from app.services.alert_service import take_usage_snapshot
+                            n = await take_usage_snapshot(session)
+                            logger.info("Usage snapshot taken for %d companies", n)
+                            break
+                    except Exception as exc:
+                        logger.error(f"Usage snapshot failed: {exc}", exc_info=True)
+                    last_snapshot = asyncio.get_event_loop().time()
+
+                await asyncio.sleep(alert_interval)
+
+        enterprise_task = asyncio.create_task(_enterprise_loop())
+        logger.info("Enterprise background loop started (alert_eval=5min, snapshot=60min)")
+    except Exception as exc:
+        logger.error(f"Failed to start enterprise loop: {exc}", exc_info=True)
+
     yield
 
     if expiry_task:
         expiry_task.cancel()
+    if enterprise_task:
+        enterprise_task.cancel()
     await engine.dispose()
 
 
@@ -270,6 +366,8 @@ app.include_router(billing_router, prefix=API_PREFIX, tags=["Billing"])
 app.include_router(mill_config_router, prefix=API_PREFIX, tags=["Mill Config"])
 app.include_router(mixing_router, prefix=API_PREFIX, tags=["Mixing & JCP"])
 app.include_router(production_v2_router, prefix=API_PREFIX, tags=["Production v2"])
+app.include_router(notifications_router, prefix=API_PREFIX, tags=["Notifications"])
+app.include_router(alerts_router, prefix=API_PREFIX, tags=["Alerts"])
 app.include_router(ws_router)
 
 

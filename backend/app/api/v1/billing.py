@@ -398,13 +398,28 @@ async def create_change_request(
         select(CompanySubscription).where(CompanySubscription.company_id == company_id)
     )
     sub = current_sub.scalar_one_or_none()
-    if not sub:
-        raise HTTPException(status_code=400, detail="Company has no active subscription")
+    if sub:
+        current_plan_id = sub.plan_id
+    else:
+        # Company has no subscription row yet (free/trial). Resolve current plan from
+        # company.plan code so the change request FK is satisfied.
+        fallback_res = await db.execute(
+            select(SubscriptionPlan).where(SubscriptionPlan.code == (company.plan or "starter"))
+        )
+        fallback_plan = fallback_res.scalar_one_or_none()
+        if not fallback_plan:
+            any_plan_res = await db.execute(
+                select(SubscriptionPlan).where(SubscriptionPlan.is_active == True).limit(1)
+            )
+            fallback_plan = any_plan_res.scalar_one_or_none()
+        if not fallback_plan:
+            raise HTTPException(status_code=400, detail="No subscription plans configured. Contact SpinFlow support.")
+        current_plan_id = fallback_plan.id
 
     change_request = SubscriptionChangeRequest(
         company_id=company_id,
         requested_by=current_user.id,
-        current_plan_id=sub.plan_id,
+        current_plan_id=current_plan_id,
         requested_plan_id=req.requested_plan_id,
         change_type=req.change_type,
         reason=req.reason,
@@ -1910,3 +1925,110 @@ async def company_billing_detail_enriched(
     ]
 
     return detail
+
+
+# ---------------------------------------------------------------------------
+# GET /billing/usage  — current company usage snapshot
+# ---------------------------------------------------------------------------
+
+@router.get("/billing/usage")
+async def get_billing_usage(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return live usage metrics for the current user's company.
+
+    Counts active users, employees, machines, and mills in real-time.
+    SUPER_ADMIN gets platform-wide totals.
+    """
+    from app.models.production import Machine
+
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    company_id = str(current_user.company_id) if current_user.company_id else None
+
+    if role_code == "SUPER_ADMIN":
+        users_count = (await db.execute(
+            select(func.count(User.id)).where(User.is_active == True, User.deleted_at.is_(None))
+        )).scalar() or 0
+        mills_count = (await db.execute(select(func.count(Mill.id)))).scalar() or 0
+        machines_count = (await db.execute(select(func.count(Machine.id)))).scalar() or 0
+        employees_count = (await db.execute(
+            select(func.count(Employee.id)).where(Employee.is_active == True)
+        )).scalar() or 0
+        companies_count = (await db.execute(select(func.count(Company.id)))).scalar() or 0
+        return {
+            "scope": "platform",
+            "active_users": users_count,
+            "total_employees": employees_count,
+            "total_machines": machines_count,
+            "total_mills": mills_count,
+            "total_companies": companies_count,
+        }
+
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company context")
+
+    users_res = await db.execute(
+        select(func.count(User.id)).where(
+            User.company_id == company_id,
+            User.is_active == True,
+            User.deleted_at.is_(None),
+        )
+    )
+    mills_res = await db.execute(
+        select(func.count(Mill.id)).where(Mill.company_id == company_id)
+    )
+    machines_res = await db.execute(
+        select(func.count(Machine.id)).join(Mill, Mill.id == Machine.mill_id).where(
+            Mill.company_id == company_id
+        )
+    )
+    employees_res = await db.execute(
+        select(func.count(Employee.id)).join(Mill, Mill.id == Employee.mill_id).where(
+            Mill.company_id == company_id,
+            Employee.is_active == True,
+        )
+    )
+
+    sub_res = await db.execute(
+        select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+    )
+    sub = sub_res.scalar_one_or_none()
+    plan_limits = {}
+    if sub:
+        plan_res = await db.execute(
+            select(SubscriptionPlan).where(SubscriptionPlan.id == sub.plan_id)
+        )
+        plan = plan_res.scalar_one_or_none()
+        if plan:
+            plan_limits = {
+                "plan_name": plan.name,
+                "max_users": plan.max_users,
+                "max_employees": plan.max_employees,
+                "max_machines": plan.max_machines,
+                "max_mills": plan.max_mills,
+            }
+
+    active_users = int(users_res.scalar() or 0)
+    total_mills = int(mills_res.scalar() or 0)
+    total_machines = int(machines_res.scalar() or 0)
+    total_employees = int(employees_res.scalar() or 0)
+
+    result = {
+        "scope": "company",
+        "company_id": company_id,
+        "active_users": active_users,
+        "total_employees": total_employees,
+        "total_machines": total_machines,
+        "total_mills": total_mills,
+    }
+    result.update(plan_limits)
+
+    warnings = []
+    if plan_limits.get("max_users") and active_users >= plan_limits["max_users"] * 0.9:
+        warnings.append(f"User limit at {active_users}/{plan_limits['max_users']}")
+    if plan_limits.get("max_employees") and total_employees >= plan_limits["max_employees"] * 0.9:
+        warnings.append(f"Employee limit at {total_employees}/{plan_limits['max_employees']}")
+    result["warnings"] = warnings
+
+    return result

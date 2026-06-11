@@ -16,6 +16,7 @@ from app.models.attachment import DocumentAttachment
 from app.models.deletion_log import DeletionLog
 from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician
 from app.models.masters import Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route, CompanyModule, MillSettings, DepartmentType, VehicleType, CompanyRoleConfig, RoleModuleAccess
+from app.models.alerts import Notification, AlertRule, AlertEvent, AlertAcknowledgement, EscalationPolicy, UsageSnapshot
 from app.models.stock import StockLedger, StockBalance, SalesOrder, SalesOrderLine, StockTransfer
 from app.models.ui_config import ColumnConfig, ColumnDropdownOption
 from app.models.import_mapping import ImportMapping
@@ -39,6 +40,7 @@ __all__ = [
     "Company", "Mill", "Department", "YarnCount", "Customer", "MasterVehicle", "Route",
     "CompanyModule", "MillSettings", "CompanyRoleConfig", "RoleModuleAccess",
     "DepartmentType", "VehicleType",
+    "Notification", "AlertRule", "AlertEvent", "AlertAcknowledgement", "EscalationPolicy", "UsageSnapshot",
     "StockLedger", "StockBalance", "SalesOrder", "SalesOrderLine", "StockTransfer",
     "Trip", "TripItem", "TripScanLog",
     "ColumnConfig", "ColumnDropdownOption",
