@@ -349,6 +349,8 @@ async def reject_entry(
 @router.get("/production/downtime")
 async def get_downtime(
     mill_id: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
@@ -376,6 +378,21 @@ async def get_downtime(
         query = query.where(Machine.mill_id == effective_mill_id)
     elif scope["company_id"]:
         query = query.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+
+    if date_from:
+        try:
+            from datetime import datetime as _dt
+            query = query.where(DowntimeLog.started_at >= _dt.fromisoformat(date_from))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            from datetime import datetime as _dt, timedelta as _td
+            end = _dt.fromisoformat(date_to) + _td(days=1)
+            query = query.where(DowntimeLog.started_at < end)
+        except ValueError:
+            pass
+
     query = query.order_by(DowntimeLog.started_at.desc())
     try:
         count_stmt = select(func.count()).select_from(query.subquery())
@@ -419,6 +436,35 @@ async def resolve_downtime(
 ):
     svc = ProductionService(db, current_user)
     return await svc.resolve_downtime(downtime_id)
+
+
+@router.delete("/production/downtime/{downtime_id}", status_code=204)
+async def delete_downtime(
+    downtime_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    role_code = scope.get("role", "")
+    stmt = select(DowntimeLog).where(DowntimeLog.id == downtime_id)
+    result = await db.execute(stmt)
+    log = result.scalar_one_or_none()
+    if not log:
+        raise HTTPException(status_code=404, detail="Downtime log not found")
+    # Scope check — non-super admins must own the mill
+    if role_code != "SUPER_ADMIN":
+        machine_result = await db.execute(select(Machine).where(Machine.code == log.machine_code))
+        machine = machine_result.scalar_one_or_none()
+        effective_mill_id = scope.get("mill_id")
+        company_id = scope.get("company_id")
+        if machine and effective_mill_id and str(machine.mill_id) != str(effective_mill_id):
+            raise HTTPException(status_code=403, detail="Not authorised to delete this record")
+        if machine and company_id and not effective_mill_id:
+            mill_result = await db.execute(select(Mill).where(Mill.id == machine.mill_id, Mill.company_id == company_id))
+            if not mill_result.scalar_one_or_none():
+                raise HTTPException(status_code=403, detail="Not authorised to delete this record")
+    await db.delete(log)
+    await db.commit()
 
 
 @router.put("/production/machines/{machine_id}", response_model=MachineResponse)

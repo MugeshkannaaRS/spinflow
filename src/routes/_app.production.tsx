@@ -815,10 +815,14 @@ function StoppageForm() {
   // Reset machine when department changes
   useEffect(() => { setField("machine_code", ""); }, [department]);
 
-  // Live stoppage log for today+shift
+  // Stoppage log date range filter (defaults to today)
+  const [logDateFrom, setLogDateFrom] = useState(localDate);
+  const [logDateTo, setLogDateTo] = useState(localDate);
+
+  // Live stoppage log
   const stoppageLogQ = useQuery({
-    queryKey: ["downtime", date, shift, millId],
-    queryFn: () => productionApi.getDowntimeLogs({ mill_id: millId, page_size: 200 }),
+    queryKey: ["downtime", millId, logDateFrom, logDateTo],
+    queryFn: () => productionApi.getDowntimeLogs({ mill_id: millId, page_size: 500, date_from: logDateFrom, date_to: logDateTo }),
     staleTime: 20_000,
     enabled: !!millId,
   });
@@ -1042,15 +1046,41 @@ function StoppageForm() {
         </CardContent>
       </Card>
 
+      {/* Stoppage log date range filter */}
+      <div className="flex flex-wrap items-center gap-2 mt-2">
+        <span className="text-xs text-muted-foreground font-medium">Filter log:</span>
+        <input
+          type="date"
+          value={logDateFrom}
+          onChange={(e) => setLogDateFrom(e.target.value)}
+          className="border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        <span className="text-xs text-muted-foreground">to</span>
+        <input
+          type="date"
+          value={logDateTo}
+          onChange={(e) => setLogDateTo(e.target.value)}
+          className="border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        {(logDateFrom !== localDate || logDateTo !== localDate) && (
+          <button
+            onClick={() => { setLogDateFrom(localDate); setLogDateTo(localDate); }}
+            className="text-xs text-muted-foreground underline hover:text-foreground"
+          >
+            Reset to today
+          </button>
+        )}
+      </div>
+
       {/* Live stoppage log table */}
       {stoppageLogs.length > 0 && (
         <Card>
           <CardHeader className="py-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm">Today's Stoppage Log ({stoppageLogs.length} entries · {todayTotal} min)</CardTitle>
+            <CardTitle className="text-sm">Stoppage Log ({stoppageLogs.length} entries · {todayTotal} min)</CardTitle>
             <ExportMenu
-              filename={`stoppage_log_${date}`}
+              filename={`stoppage_log_${logDateFrom}_${logDateTo}`}
               title="Stoppage Log"
-              subtitle={`Date: ${date}  Shift: ${shift}`}
+              subtitle={logDateFrom === logDateTo ? `Date: ${logDateFrom}` : `Date: ${logDateFrom} to ${logDateTo}`}
               columns={[
                 { key: "machine_code", label: "Machine" },
                 { key: "datalog_code", label: "Code" },
@@ -1077,6 +1107,7 @@ function StoppageForm() {
                     <TableHead>Min</TableHead>
                     <TableHead>Loss (kg)</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1090,6 +1121,18 @@ function StoppageForm() {
                       <TableCell className="text-xs font-medium text-amber-600">{r.duration_min ?? "—"}</TableCell>
                       <TableCell className="text-xs">{r.production_loss_kg ? `${r.production_loss_kg} kg` : "—"}</TableCell>
                       <TableCell><StatusBadge status={r.resolved ? "active" : "pending"} label={r.resolved ? "Done" : "Open"} size="sm" /></TableCell>
+                      <TableCell>
+                        <ConfirmDeleteButton
+                          onConfirm={async () => {
+                            await productionApi.deleteDowntime(r.id);
+                            qc.invalidateQueries({ queryKey: ["downtime"] });
+                          }}
+                          label={`Delete stoppage record for ${r.machine_code}?`}
+                          title="Delete Stoppage Log?"
+                          confirmText="Delete"
+                          successMessage="Record deleted"
+                        />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

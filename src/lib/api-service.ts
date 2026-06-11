@@ -71,6 +71,7 @@ export const productionApi = {
   getRFManpower: (params?: Record<string, any>) => api.get("/production/rf-manpower", { params }).then((r) => r.data),
   upsertRFManpowerBulk: (data: any, millId: string) => api.post(`/production/rf-manpower/bulk?mill_id=${millId}`, data).then((r) => r.data),
   getDowntimeLogs: (params?: Record<string, any>) => api.get("/production/downtime", { params }).then((r: any) => r.data),
+  deleteDowntime: (id: string) => api.delete(`/production/downtime/${id}`).then((r) => r.data),
 };
 
 // Quality
