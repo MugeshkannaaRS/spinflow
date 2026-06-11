@@ -230,12 +230,14 @@ async def lifespan(app: FastAPI):
               - 1st of month: generate monthly invoices
               - Daily: generate past-due invoices
             """
+            from datetime import datetime, timezone
+
             _BILLING_SERVICE = None
             _OVERDUE_SERVICE = None
             _INVOICE_SERVICE = None
 
             while True:
-                now_dt = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+                now_dt = datetime.now(timezone.utc)
                 try:
                     async for session in _billing_db():
                         # Lazy-import services once
@@ -304,7 +306,7 @@ async def lifespan(app: FastAPI):
                 # ── 1. Escalation check (every 5 min) ────────────────────
                 try:
                     async for session in get_db():
-                        from datetime import datetime as _dt
+                        from datetime import datetime as _dt, timedelta as _td
                         from sqlalchemy import select as _select, or_ as _or
                         from app.models.alerts import (
                             AlertEvent as _AlertEvent,
@@ -344,7 +346,7 @@ async def lifespan(app: FastAPI):
 
                                 if policy:
                                     # Set next escalation time based on policy delay
-                                    event.next_escalation_at = _dt.utcnow() + __import__('datetime').timedelta(
+                                    event.next_escalation_at = _dt.utcnow() + _td(
                                         minutes=policy.delay_minutes
                                     )
                                     if event.company_id:

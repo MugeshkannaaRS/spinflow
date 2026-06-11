@@ -68,10 +68,10 @@ interface AlertEvent {
 }
 
 interface TimelineEntry {
-  event: string;
+  action: string;
   timestamp: string;
   notes: string | null;
-  user_name: string | null;
+  user_id: string | null;
 }
 
 interface AlertRule {
@@ -239,9 +239,9 @@ function TimelineDrawer({
                     <span className="absolute -left-[1.45rem] top-1 w-3 h-3 rounded-full bg-white border-2 border-gray-400" />
                     <p className="text-[11px] text-muted-foreground">
                       {new Date(t.timestamp).toLocaleString("en-IN")}
-                      {t.user_name && ` · ${t.user_name}`}
+                      {t.user_id && ` · ${t.user_id.slice(0, 8)}…`}
                     </p>
-                    <p className="text-sm font-medium capitalize">{t.event.replace(/_/g, " ")}</p>
+                    <p className="text-sm font-medium capitalize">{t.action.replace(/_/g, " ")}</p>
                     {t.notes && <p className="text-xs text-gray-500 mt-0.5">{t.notes}</p>}
                   </div>
                 ))}
@@ -821,7 +821,7 @@ function AlertRules() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["alert-rules"] }),
   });
 
-  const canManage = user && ["SUPER_ADMIN", "MILL_OWNER", "GENERAL_MANAGER"].includes(user.role);
+  const canManage = user && ["SUPER_ADMIN", "MILL_OWNER"].includes(user.role);
 
   const ruleList: AlertRule[] = Array.isArray(rules) ? rules : (rules as any)?.data ?? [];
 

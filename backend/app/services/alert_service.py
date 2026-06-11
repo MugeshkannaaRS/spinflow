@@ -283,6 +283,7 @@ async def check_and_fire_billing_alerts(db: AsyncSession) -> int:
     from app.models.billing import Subscription, SubscriptionPlan
     from app.models.masters import Company
     from app.models.alerts import UsageSnapshot
+    from sqlalchemy import or_
 
     fired = 0
     try:
@@ -292,6 +293,22 @@ async def check_and_fire_billing_alerts(db: AsyncSession) -> int:
             select(Subscription).where(Subscription.status == "active")
         )
         subscriptions = subs_res.scalars().all()
+
+        # Cache billing rule lookups by company
+        _rule_cache: dict = {}
+
+        async def _get_billing_rule(cid: str, condition: str) -> Optional[str]:
+            if (cid, condition) in _rule_cache:
+                return _rule_cache[(cid, condition)]
+            rule_res = await db.execute(
+                select(AlertRule.id).where(
+                    AlertRule.condition_type == condition,
+                    or_(AlertRule.company_id == cid, AlertRule.company_id.is_(None)),
+                ).order_by(AlertRule.company_id.nulls_last()).limit(1)
+            )
+            rule_id = rule_res.scalar_one_or_none()
+            _rule_cache[(cid, condition)] = rule_id
+            return rule_id
 
         for sub in subscriptions:
             try:
@@ -325,6 +342,7 @@ async def check_and_fire_billing_alerts(db: AsyncSession) -> int:
                         (80, AlertSeverity.INFO,     "80%"),
                     ]:
                         if usage_pct >= threshold:
+                            rule_id = await _get_billing_rule(company_id, "billing.usage_100" if threshold >= 100 else ("billing.usage_90" if threshold >= 90 else "billing.usage_80"))
                             await create_alert(
                                 db,
                                 company_id=company_id,
@@ -332,13 +350,40 @@ async def check_and_fire_billing_alerts(db: AsyncSession) -> int:
                                 message=f"Your plan allows {max_users} users. You have {snap.active_users} active users ({usage_pct:.0f}% of limit).",
                                 category=AlertCategory.BILLING,
                                 severity=severity,
+                                rule_id=rule_id,
                                 source_type="usage_snapshot",
-                                source_id=str(snap.id),
+                                source_id=company_id,
                                 target_role="MILL_OWNER",
                                 escalation_delay_minutes=0,
                             )
                             fired += 1
                             break  # Only fire highest threshold
+
+                # Check employee limit
+                if max_employees > 0:
+                    emp_pct = (snap.total_employees / max_employees) * 100
+                    for threshold, severity, label in [
+                        (100, AlertSeverity.CRITICAL, "100%"),
+                        (90, AlertSeverity.WARNING,  "90%"),
+                        (80, AlertSeverity.INFO,     "80%"),
+                    ]:
+                        if emp_pct >= threshold:
+                            rule_id = await _get_billing_rule(company_id, "billing.usage_100" if threshold >= 100 else ("billing.usage_90" if threshold >= 90 else "billing.usage_80"))
+                            await create_alert(
+                                db,
+                                company_id=company_id,
+                                title=f"Employee Limit {label} Reached ({snap.total_employees}/{max_employees})",
+                                message=f"Your plan allows {max_employees} employees. You have {snap.total_employees} active employees ({emp_pct:.0f}% of limit).",
+                                category=AlertCategory.BILLING,
+                                severity=severity,
+                                rule_id=rule_id,
+                                source_type="usage_snapshot",
+                                source_id=company_id,
+                                target_role="MILL_OWNER",
+                                escalation_delay_minutes=0,
+                            )
+                            fired += 1
+                            break
 
             except Exception as e:
                 logger.debug("Billing alert check for sub %s failed: %s", sub.id, e)
@@ -495,7 +540,7 @@ _DEFAULT_RULES = [
     # ── Quality ──────────────────────────────────────────────────────────────
     {
         "name": "Lot Rejected",
-        "category": "MACHINE",
+        "category": "QUALITY",
         "condition_type": "quality.lot_rejected",
         "severity": "WARNING",
         "target_roles": ["QUALITY_MANAGER", "PRODUCTION_MANAGER"],

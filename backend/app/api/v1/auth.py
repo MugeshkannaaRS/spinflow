@@ -93,6 +93,7 @@ def _track_failed_login_and_alert(db, client_ip: str, email: str, user) -> None:
     # Only fire alert if we have a company to scope to
     company_id = str(user.company_id) if user and user.company_id else None
     if not company_id:
+        logger.warning("Security burst from unknown user — %d failed logins for '%s' from IP %s (no company context, alert skipped)", count, email, client_ip)
         return
 
     async def _fire():

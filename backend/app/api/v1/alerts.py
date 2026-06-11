@@ -15,7 +15,7 @@ Endpoints:
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc, and_
+from sqlalchemy import select, func, desc, and_, extract
 from typing import Optional, List
 from pydantic import BaseModel
 from datetime import datetime, timedelta
@@ -122,7 +122,9 @@ async def list_alerts(
         query = query.where(AlertEvent.mill_id == scope["mill_id"])
 
     if status:
-        query = query.where(AlertEvent.status == status)
+        statuses = [s.strip() for s in status.split(",") if s.strip()]
+        if statuses:
+            query = query.where(AlertEvent.status.in_(statuses))
     if category:
         query = query.where(AlertEvent.category == category)
     if severity:
@@ -157,7 +159,7 @@ async def ops_center_summary(
     """Returns KPI summary for the operations center dashboard."""
     scope = await get_mill_scope(current_user, db)
     role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
-    company_id = scope.get("company_id") or str(current_user.company_id or "")
+    company_id = scope.get("company_id") or (str(current_user.company_id) if current_user.company_id else None)
     mill_id = scope.get("mill_id")
 
     def _base(status_filter=None):
@@ -199,24 +201,22 @@ async def ops_center_summary(
         breakdown_q = breakdown_q.where(AlertEvent.mill_id == mill_id)
     breakdown_count = (await db.execute(breakdown_q)).scalar() or 0
 
-    # Average resolution time (last 30 days, resolved alerts)
-    resolved_q = select(AlertEvent).where(
+    # Average resolution time (last 30 days, resolved alerts) — SQL AVG
+    avg_q = select(
+        func.count(AlertEvent.id).label("cnt"),
+        func.avg(
+            extract("epoch", AlertEvent.resolved_at) - extract("epoch", AlertEvent.created_at)
+        ).label("avg_seconds"),
+    ).where(
         AlertEvent.status == AlertStatus.RESOLVED,
         AlertEvent.resolved_at.isnot(None),
         AlertEvent.created_at >= (datetime.utcnow() - timedelta(days=30)),
     )
     if role_code != "SUPER_ADMIN" and company_id:
-        resolved_q = resolved_q.where(AlertEvent.company_id == company_id)
-    resolved_events = (await db.execute(resolved_q)).scalars().all()
-
-    avg_resolution_min = None
-    if resolved_events:
-        total_min = sum(
-            (e.resolved_at - e.created_at).total_seconds() / 60
-            for e in resolved_events
-            if e.resolved_at and e.created_at
-        )
-        avg_resolution_min = round(total_min / len(resolved_events), 1)
+        avg_q = avg_q.where(AlertEvent.company_id == company_id)
+    avg_row = (await db.execute(avg_q)).one()
+    resolved_last_30d = avg_row.cnt or 0
+    avg_resolution_min = round((avg_row.avg_seconds or 0) / 60, 1) if avg_row.avg_seconds else None
 
     # Recent alerts (last 10 unresolved for quick view)
     recent_q = select(AlertEvent).where(
@@ -234,7 +234,7 @@ async def ops_center_summary(
         "escalated_count": escalated_count,
         "breakdown_count_today": breakdown_count,
         "avg_resolution_min": avg_resolution_min,
-        "resolved_last_30d": len(resolved_events),
+        "resolved_last_30d": resolved_last_30d,
         "recent_alerts": [_event_to_resp(e) for e in recent_events],
     }
 
@@ -355,6 +355,14 @@ async def acknowledge(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    event = await db.get(AlertEvent, alert_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        caller_company = str(current_user.company_id or "")
+        if not caller_company or event.company_id != caller_company:
+            raise HTTPException(status_code=403, detail="Not authorised to acknowledge this alert")
     ok = await acknowledge_alert(
         db,
         alert_event_id=alert_id,
@@ -378,6 +386,14 @@ async def resolve(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    event = await db.get(AlertEvent, alert_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        caller_company = str(current_user.company_id or "")
+        if not caller_company or event.company_id != caller_company:
+            raise HTTPException(status_code=403, detail="Not authorised to resolve this alert")
     ok = await resolve_alert(
         db,
         alert_event_id=alert_id,
