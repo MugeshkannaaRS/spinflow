@@ -515,7 +515,7 @@ async def execute_import(
                     if not code:
                         skipped += 1
                         continue
-                    existing = await db.execute(select(Machine).where(Machine.code == code))
+                    existing = await db.execute(select(Machine).where(Machine.code == code, Machine.mill_id == mill_id))
                     ex = existing.scalar_one_or_none()
                     if ex and req.duplicate_handling == "skip":
                         skipped += 1

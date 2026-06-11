@@ -5,6 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from typing import Dict, Optional
 from datetime import datetime
 from passlib.context import CryptContext
@@ -1508,6 +1509,9 @@ async def command_center_kpi(
     db: AsyncSession = Depends(get_db),
 ):
     """Single endpoint returning all Command Center KPI values."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can access command center")
     svc = CommandCenterService(db)
     return await svc.kpi()
 
@@ -1518,6 +1522,9 @@ async def command_center_fastest_growing(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can access command center")
     svc = CommandCenterService(db)
     return await svc.fastest_growing(limit)
 
@@ -1528,6 +1535,9 @@ async def command_center_active_mills(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can access command center")
     svc = CommandCenterService(db)
     return await svc.active_mills(limit)
 
@@ -1538,6 +1548,9 @@ async def command_center_inactive_customers(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can access command center")
     svc = CommandCenterService(db)
     return await svc.inactive_customers(days)
 
@@ -1547,6 +1560,9 @@ async def command_center_health_scores(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can access command center")
     svc = CommandCenterService(db)
     return await svc.health_scores()
 
@@ -1556,6 +1572,9 @@ async def command_center_upgrade_funnel(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can access command center")
     svc = CommandCenterService(db)
     return await svc.upgrade_funnel()
 
@@ -1565,6 +1584,9 @@ async def command_center_active_sessions(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can access command center")
     from sqlalchemy import text
     result = await db.execute(text("SELECT COUNT(*) FROM user_sessions WHERE is_active = true"))
     return {"active_sessions": result.scalar() or 0}
@@ -1577,6 +1599,9 @@ async def command_center_active_sessions(
 
 @router.get("/admin/companies/{company_id}/permission-sets")
 async def list_permission_sets(company_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage permission sets")
     result = await db.execute(
         select(PermissionSet).where(PermissionSet.company_id == company_id, PermissionSet.is_active == True).order_by(PermissionSet.name)
     )
@@ -1585,6 +1610,9 @@ async def list_permission_sets(company_id: str, current_user: User = Depends(get
 
 @router.post("/admin/companies/{company_id}/permission-sets")
 async def create_permission_set(company_id: str, body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage permission sets")
     ps = PermissionSet(
         company_id=company_id,
         name=body["name"],
@@ -1601,6 +1629,9 @@ async def create_permission_set(company_id: str, body: dict, current_user: User 
 
 @router.put("/admin/companies/{company_id}/permission-sets/{ps_id}")
 async def update_permission_set(company_id: str, ps_id: str, body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage permission sets")
     ps = await db.get(PermissionSet, ps_id)
     if not ps or ps.company_id != company_id:
         raise HTTPException(status_code=404, detail="Permission set not found")
@@ -1623,6 +1654,9 @@ async def update_permission_set(company_id: str, ps_id: str, body: dict, current
 
 @router.get("/admin/companies/{company_id}/security-policy")
 async def get_security_policy(company_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage security policies")
     result = await db.execute(select(SecurityPolicy).where(SecurityPolicy.company_id == company_id))
     policy = result.scalar_one_or_none()
     if not policy:
@@ -1644,6 +1678,9 @@ async def get_security_policy(company_id: str, current_user: User = Depends(get_
 
 @router.put("/admin/companies/{company_id}/security-policy")
 async def update_security_policy(company_id: str, body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage security policies")
     result = await db.execute(select(SecurityPolicy).where(SecurityPolicy.company_id == company_id))
     policy = result.scalar_one_or_none()
     if not policy:
@@ -1664,6 +1701,9 @@ async def update_security_policy(company_id: str, body: dict, current_user: User
 
 @router.get("/admin/companies/{company_id}/branding")
 async def get_company_branding(company_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage branding")
     result = await db.execute(select(CompanyBranding).where(CompanyBranding.company_id == company_id))
     b = result.scalar_one_or_none()
     if not b:
@@ -1682,6 +1722,9 @@ async def get_company_branding(company_id: str, current_user: User = Depends(get
 
 @router.put("/admin/companies/{company_id}/branding")
 async def update_company_branding(company_id: str, body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage branding")
     result = await db.execute(select(CompanyBranding).where(CompanyBranding.company_id == company_id))
     b = result.scalar_one_or_none()
     if not b:
@@ -1705,19 +1748,20 @@ async def update_company_branding(company_id: str, body: dict, current_user: Use
 
 @router.get("/admin/companies/{company_id}/approval-workflows")
 async def list_approval_workflows(company_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage approval workflows")
     result = await db.execute(
         select(ApprovalWorkflow).where(ApprovalWorkflow.company_id == company_id, ApprovalWorkflow.is_active == True)
+        .options(selectinload(ApprovalWorkflow.steps))
         .order_by(ApprovalWorkflow.name)
     )
     workflows = []
     for w in result.scalars().all():
-        steps_res = await db.execute(
-            select(ApprovalStep).where(ApprovalStep.workflow_id == w.id).order_by(ApprovalStep.step_order)
-        )
         steps = [{"id": s.id, "step_order": s.step_order, "label": s.label, "assignee_role": s.assignee_role,
                    "assignee_user_id": s.assignee_user_id, "timeout_hours": s.timeout_hours,
                    "escalation_role": s.escalation_role, "action_if_timeout": s.action_if_timeout}
-                 for s in steps_res.scalars().all()]
+                 for s in (w.steps or [])]
         workflows.append({
             "id": w.id, "name": w.name, "description": w.description, "entity_type": w.entity_type,
             "module": w.module, "steps": steps,
@@ -1727,6 +1771,9 @@ async def list_approval_workflows(company_id: str, current_user: User = Depends(
 
 @router.post("/admin/companies/{company_id}/approval-workflows")
 async def create_approval_workflow(company_id: str, body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage approval workflows")
     wf = ApprovalWorkflow(
         company_id=company_id,
         name=body["name"],
@@ -1760,6 +1807,9 @@ async def create_approval_request(body: dict, current_user: User = Depends(get_c
     wf = await db.get(ApprovalWorkflow, body["workflow_id"])
     if not wf or not wf.is_active:
         raise HTTPException(status_code=404, detail="Workflow not found")
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN" and str(wf.company_id) != str(current_user.company_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-company access denied")
     req = ApprovalRequest(
         company_id=wf.company_id,
         workflow_id=wf.id,
@@ -1783,14 +1833,20 @@ async def action_approval_request(request_id: str, body: dict, current_user: Use
     req = await db.get(ApprovalRequest, request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Approval request not found")
+    if str(req.company_id) != str(current_user.company_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-company access denied")
     if req.status != "pending":
         raise HTTPException(status_code=400, detail=f"Request already {req.status}")
 
     action_str = body.get("action", "approve")
     comment = body.get("comment", "")
-    wf = await db.get(ApprovalWorkflow, req.workflow_id)
-    steps_res = await db.execute(select(ApprovalStep).where(ApprovalStep.workflow_id == wf.id).order_by(ApprovalStep.step_order))
-    steps = steps_res.scalars().all()
+    wf_res = await db.execute(
+        select(ApprovalWorkflow)
+        .where(ApprovalWorkflow.id == req.workflow_id)
+        .options(selectinload(ApprovalWorkflow.steps))
+    )
+    wf = wf_res.scalar_one_or_none()
+    steps = wf.steps if wf else []
 
     action = ApprovalAction(
         request_id=req.id,
@@ -1844,6 +1900,9 @@ async def list_pending_approvals(current_user: User = Depends(get_current_user),
 
 @router.get("/admin/retention-policies")
 async def list_retention_policies(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage retention policies")
     result = await db.execute(select(RetentionPolicy).order_by(RetentionPolicy.entity_type, RetentionPolicy.severity))
     return [{
         "id": p.id, "company_id": p.company_id, "entity_type": p.entity_type,
@@ -1854,6 +1913,9 @@ async def list_retention_policies(current_user: User = Depends(get_current_user)
 
 @router.post("/admin/retention-policies")
 async def create_retention_policy(body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage retention policies")
     p = RetentionPolicy(
         company_id=body.get("company_id"),
         entity_type=body["entity_type"],
@@ -1873,6 +1935,9 @@ async def create_retention_policy(body: dict, current_user: User = Depends(get_c
 @router.post("/admin/audit/archive")
 async def archive_old_audit_logs(body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Move audit logs older than N days to archive table."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can archive audit logs")
     from sqlalchemy import text
     days = body.get("days", 90)
     result = await db.execute(text("""
@@ -1900,7 +1965,11 @@ async def archive_old_audit_logs(body: dict, current_user: User = Depends(get_cu
 @router.post("/admin/backup")
 async def trigger_backup(body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Trigger a backup job."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can trigger backups")
     from datetime import datetime, timezone
+    from app.services.backup_service import BackupService
     job = BackupJob(
         company_id=body.get("company_id"),
         backup_type=body.get("backup_type", "full"),
@@ -1911,11 +1980,14 @@ async def trigger_backup(body: dict, current_user: User = Depends(get_current_us
     db.add(job)
     await db.flush()
     try:
-        from app.services.deletion_service import CompanyDeletionService
-        if body.get("company_id"):
-            dsvc = CompanyDeletionService(db)
-            backup_path = await dsvc.generate_backup(body["company_id"])
-            job.file_path = str(backup_path) if backup_path else None
+        bsvc = BackupService(db)
+        backup_id, file_path, file_size, rows = await bsvc.generate_backup(
+            company_id=body.get("company_id"),
+            backup_type=body.get("backup_type", "full"),
+        )
+        job.file_path = file_path
+        job.file_size_bytes = file_size
+        job.rows_backed_up = rows
         job.status = "completed"
         job.completed_at = datetime.now(timezone.utc)
     except Exception as exc:
@@ -1929,6 +2001,9 @@ async def trigger_backup(body: dict, current_user: User = Depends(get_current_us
 
 @router.get("/admin/backups")
 async def list_backups(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can list backups")
     result = await db.execute(
         select(BackupJob).order_by(BackupJob.created_at.desc()).limit(50)
     )
@@ -1943,26 +2018,14 @@ async def list_backups(current_user: User = Depends(get_current_user), db: Async
 
 @router.post("/admin/backup/{backup_id}/restore")
 async def restore_backup(backup_id: str, body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Restore from a backup (dry-run or execute)."""
-    job = await db.get(BackupJob, backup_id)
-    if not job or job.status != "completed":
-        raise HTTPException(status_code=404, detail="Completed backup not found")
-    is_dry_run = body.get("dry_run", True)
-    restore = BackupRestore(
-        backup_job_id=backup_id,
-        company_id=job.company_id,
-        status="dry_run" if is_dry_run else "running",
-        is_dry_run=is_dry_run,
-        requested_by=current_user.id,
+    """Restore from a backup — NOT YET IMPLEMENTED."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can restore backups")
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Backup restore is not yet implemented. This endpoint is planned for a future release.",
     )
-    db.add(restore)
-    if not is_dry_run:
-        restore.status = "completed"
-        restore.completed_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
-    await db.commit()
-    await log_audit(db, current_user.id, "SUPER_ADMIN", "backup_restore", "backup", restore.id,
-                    f"Restore from backup {backup_id} (dry_run={is_dry_run})", module="admin")
-    return {"success": True, "id": restore.id, "status": restore.status}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1972,6 +2035,9 @@ async def restore_backup(backup_id: str, body: dict, current_user: User = Depend
 
 @router.get("/admin/analytics/company-growth")
 async def analytics_company_growth(period: str = "monthly", current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can access analytics")
     from sqlalchemy import text
     interval = "month" if period == "monthly" else "year"
     result = await db.execute(text(f"""
@@ -1988,6 +2054,9 @@ async def analytics_company_growth(period: str = "monthly", current_user: User =
 
 @router.get("/admin/analytics/module-adoption")
 async def analytics_module_adoption(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can access analytics")
     from sqlalchemy import text
     result = await db.execute(text("""
         SELECT module_name, COUNT(*) AS company_count,
@@ -2002,6 +2071,9 @@ async def analytics_module_adoption(current_user: User = Depends(get_current_use
 
 @router.get("/admin/analytics/retention-cohort")
 async def analytics_retention_cohort(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can access analytics")
     from sqlalchemy import text
     result = await db.execute(text("""
         WITH cohorts AS (
@@ -2042,6 +2114,9 @@ async def analytics_retention_cohort(current_user: User = Depends(get_current_us
 
 @router.get("/admin/analytics/mrr-breakdown")
 async def analytics_mrr_breakdown(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can access analytics")
     from sqlalchemy import text
     result = await db.execute(text("""
         WITH current_month AS (
@@ -2074,6 +2149,9 @@ async def analytics_mrr_breakdown(current_user: User = Depends(get_current_user)
 @router.get("/admin/health/status")
 async def platform_health_status(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Return health status for all platform components."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can view platform health")
     from app.core.observability import check_database, check_redis
     from datetime import datetime, timezone
 
@@ -2136,6 +2214,9 @@ async def platform_health_status(current_user: User = Depends(get_current_user),
 @router.get("/admin/health/history")
 async def platform_health_history(days: int = 7, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Return health check history for the last N days."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can view platform health")
     from sqlalchemy import text
     result = await db.execute(text("""
         SELECT component, status, checked_at
@@ -2149,6 +2230,9 @@ async def platform_health_history(days: int = 7, current_user: User = Depends(ge
 
 @router.get("/admin/incidents")
 async def list_incidents(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage incidents")
     result = await db.execute(select(Incident).order_by(Incident.started_at.desc()).limit(50))
     return [{
         "id": i.id, "component": i.component, "severity": i.severity, "title": i.title,
@@ -2160,6 +2244,9 @@ async def list_incidents(current_user: User = Depends(get_current_user), db: Asy
 
 @router.post("/admin/incidents")
 async def create_incident(body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can manage incidents")
     from datetime import datetime, timezone
     inc = Incident(
         component=body["component"],

@@ -29,6 +29,13 @@ def _table_exists(table: str) -> bool:
     return result
 
 
+def _execute_ddl_block(ddl: str) -> None:
+    for statement in ddl.split(";"):
+        statement = statement.strip()
+        if statement:
+            op.execute(statement)
+
+
 def upgrade() -> None:
     tables = [
         ("permission_sets", """
@@ -256,7 +263,7 @@ def upgrade() -> None:
 
     for table_name, ddl in tables:
         if not _table_exists(table_name):
-            op.execute(ddl)
+            _execute_ddl_block(ddl)
 
 
 def downgrade() -> None:
