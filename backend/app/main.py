@@ -21,6 +21,10 @@ from app.core.limiter import limiter
 from app.core.logging_config import setup_logging
 from app.core.observability import init_sentry, install_slow_query_logging, check_database, check_redis, collect_system_info
 from app.db.session import engine
+
+_app_started = False
+_app_init_error: Optional[str] = None
+
 from app.api.v1 import auth, production, quality, inventory, dispatch, purchase, stores, hr, accounts, maintenance, dashboard, qr_system, reports, users, audit, masters, stock as stock_router, sales as sales_router, lotrac as lotrac_router, payroll as payroll_router, uploads as uploads_router, exports as exports_router, ui_config as ui_config_router, imports as imports_router
 from app.api.v1.admin import router as admin_router
 from app.api.v1.billing import router as billing_router
@@ -145,321 +149,228 @@ def _run_alembic_upgrade() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Yield immediately so uvicorn binds the port before Render's scan times out.
+    All initialization (migrations, seeding, background loops) runs in
+    _background_init(). The /api/health endpoint reflects init status."""
+    init_task = asyncio.create_task(_background_init())
+    yield
+    init_task.cancel()
     try:
-        await asyncio.to_thread(_run_alembic_upgrade)
-        logger.info("Database migrations applied successfully")
-    except Exception as exc:
-        logger.critical(
-            f"FATAL: Database migration failed — app cannot start safely. "
-            f"Error: {exc}",
-            exc_info=True,
-        )
-        raise SystemExit(1)
+        await init_task
+    except (asyncio.CancelledError, Exception):
+        pass
+    await engine.dispose()
 
+
+async def _background_init():
+    global _app_started, _app_init_error
     try:
+        # ── Step 1: Alembic migration ───────────────────────────────────
+        logger.info("START step 1: Alembic migration")
+        await asyncio.to_thread(_run_alembic_upgrade)
+        logger.info("END step 1: Alembic migration")
+
         from app.db.session import get_db
         from app.services.pricing_service import PricingService
-        async for session in get_db():
-            await PricingService(session).seed_default_plans()
-            await PricingService(session).seed_default_addons()
-            break
-        logger.info("Default plans and add-ons seeded")
-    except Exception as exc:
-        logger.error(f"Failed to seed default plans/addons: {exc}", exc_info=True)
-
-    expiry_task = None
-    try:
-        from app.db.session import get_db
-
-        async def _expiry_loop():
-            while True:
-                try:
-                    async for session in get_db():
-                        await PricingService(session).process_expirations()
-                        await session.commit()
-                        break
-                except Exception as exc:
-                    logger.error(f"Expiry check failed: {exc}", exc_info=True)
-                await asyncio.sleep(3600)
-
-        expiry_task = asyncio.create_task(_expiry_loop())
-        logger.info("Expiry automation started (3600s interval)")
-    except Exception as exc:
-        logger.error(f"Failed to start expiry automation: {exc}", exc_info=True)
-
-    # ── Wave 4B: seed alert rules + escalation policies ──────────────────
-    try:
-        from app.db.session import get_db as _get_db
         from app.services.alert_service import seed_default_rules, seed_escalation_policies
-        from app.models.masters import Company
-        from sqlalchemy import select as _sa_select
-
-        async for session in _get_db():
-            # Seed global escalation policies (company_id=None)
-            n_esc = await seed_escalation_policies(session, company_id=None)
-            if n_esc:
-                logger.info("Seeded %d global escalation policies", n_esc)
-                await session.commit()
-
-            # Seed per-company rules for all active companies
-            companies = (await session.execute(
-                _sa_select(Company).where(Company.status == "active")
-            )).scalars().all()
-            total_rules = 0
-            total_esc = 0
-            for company in companies:
-                cid = str(company.id)
-                n_rules = await seed_default_rules(session, company_id=cid)
-                n_pol = await seed_escalation_policies(session, company_id=cid)
-                total_rules += n_rules
-                total_esc += n_pol
-            if total_rules or total_esc:
-                await session.commit()
-                logger.info("W4B seed: %d rules + %d escalation policies seeded", total_rules, total_esc)
-            break
-    except Exception as exc:
-        logger.error(f"W4B rule seed failed (non-fatal): {exc}", exc_info=True)
-
-    # ── Billing Commerce Scheduler ───────────────────────────────────────
-    billing_task = None
-    try:
-        from app.db.session import get_db as _billing_db
-
-        async def _billing_loop():
-            """
-            Scheduled billing tasks:
-              - Every hour: process_expirations, process_overdue
-              - 1st of month: generate monthly invoices
-              - Daily: generate past-due invoices
-            """
-            from datetime import datetime, timezone
-
-            _BILLING_SERVICE = None
-            _OVERDUE_SERVICE = None
-            _INVOICE_SERVICE = None
-
-            while True:
-                now_dt = datetime.now(timezone.utc)
-                try:
-                    async for session in _billing_db():
-                        # Lazy-import services once
-                        if _BILLING_SERVICE is None:
-                            from app.services.pricing_service import PricingService as _PS
-                            _BILLING_SERVICE = _PS
-                            from app.services.overdue_service import OverdueService as _OS
-                            _OVERDUE_SERVICE = _OS
-                            from app.services.billing_invoice_service import InvoiceService as _IS
-                            _INVOICE_SERVICE = _IS
-
-                        # Hourly: check expirations
-                        svc_exp = _BILLING_SERVICE(session)
-                        await svc_exp.process_expirations()
-                        await session.commit()
-
-                        # Daily: process overdue workflow
-                        svc_od = _OVERDUE_SERVICE(session)
-                        await svc_od.process_overdue_workflow()
-                        await session.commit()
-
-                        # 1st of month: generate monthly invoices
-                        if now_dt.day == 1 and now_dt.hour == 2:
-                            inv_svc = _INVOICE_SERVICE(session)
-                            result = await inv_svc.generate_all_monthly_invoices()
-                            await session.commit()
-                            if result.get("generated", 0):
-                                logger.info("Monthly billing: %d invoices generated", result["generated"])
-
-                        # Daily: past-due invoice generation
-                        inv_svc = _INVOICE_SERVICE(session)
-                        await inv_svc.generate_past_due_invoices()
-                        await session.commit()
-
-                        break
-                except Exception as exc:
-                    logger.error(f"Billing scheduler error: {exc}", exc_info=True)
-
-                await asyncio.sleep(3600)  # every hour
-
-        billing_task = asyncio.create_task(_billing_loop())
-        logger.info("Billing commerce scheduler started (hourly interval)")
-    except Exception as exc:
-        logger.error(f"Failed to start billing scheduler: {exc}", exc_info=True)
-
-    # ── Wave 5.3: seed help content ──────────────────────────────────────
-    try:
-        from app.db.session import get_db as _cs_db
         from app.services.customer_success_service import seed_help_content
-        async for session in _cs_db():
-            n = await seed_help_content(session)
-            if n:
-                await session.commit()
-                logger.info("W5.3: seeded %d help articles + categories", n)
-            break
-    except Exception as exc:
-        logger.error(f"W5.3 help seed failed (non-fatal): {exc}", exc_info=True)
-
-    # ── Wave 5.4: seed tours + nudges ────────────────────────────────────
-    try:
-        from app.db.session import get_db as _w54_db
         from app.services.demo_service import TourService, NudgeService
-        async for session in _w54_db():
-            n_tours = await TourService(session).seed_default_tours()
-            n_nudges = await NudgeService(session).seed_default_nudges()
-            if n_tours or n_nudges:
-                await session.commit()
-                logger.info("W5.4: seeded %d tours + %d nudges", n_tours, n_nudges)
+        from app.models.masters import Company
+        from sqlalchemy import select
+
+        async for session in get_db():
+            try:
+                # ── Step 2: Seed plans + addons ─────────────────────────
+                logger.info("START step 2: Seed plans/addons")
+                ps = PricingService(session)
+                await ps.seed_default_plans()
+                await ps.seed_default_addons()
+                logger.info("END step 2: Seed plans/addons")
+
+                # ── Step 3: Seed alert rules ────────────────────────────
+                logger.info("START step 3: Seed alert rules/policies")
+                n_esc = await seed_escalation_policies(session, company_id=None)
+                if n_esc:
+                    await session.commit()
+
+                companies = (await session.execute(
+                    select(Company).where(Company.status == "active")
+                )).scalars().all()
+                total_rules = total_esc = 0
+                for company in companies:
+                    cid = str(company.id)
+                    total_rules += await seed_default_rules(session, company_id=cid)
+                    total_esc += await seed_escalation_policies(session, company_id=cid)
+                if total_rules or total_esc:
+                    await session.commit()
+                    logger.info("W4B seed: %d rules + %d policies", total_rules, total_esc)
+                logger.info("END step 3: Seed alert rules/policies")
+
+                # ── Step 4: Seed help content ──────────────────────────
+                logger.info("START step 4: Seed help content")
+                n = await seed_help_content(session)
+                if n:
+                    await session.commit()
+                    logger.info("W5.3: seeded %d help articles + categories", n)
+                logger.info("END step 4: Seed help content")
+
+                # ── Step 5: Seed tours + nudges ────────────────────────
+                logger.info("START step 5: Seed tours/nudges")
+                n_tours = await TourService(session).seed_default_tours()
+                n_nudges = await NudgeService(session).seed_default_nudges()
+                if n_tours or n_nudges:
+                    await session.commit()
+                    logger.info("W5.4: seeded %d tours + %d nudges", n_tours, n_nudges)
+                logger.info("END step 5: Seed tours/nudges")
+            except Exception as exc:
+                logger.error("Non-fatal seed error (continuing): %s", exc, exc_info=True)
             break
-    except Exception as exc:
-        logger.error(f"W5.4 seed failed (non-fatal): {exc}", exc_info=True)
 
-    # ── Wave 4A: enterprise background loop ──────────────────────────────
-    enterprise_task = None
-    try:
-        from app.db.session import get_db
-
-        async def _enterprise_loop():
-            """
-            Runs recurring jobs:
-              - Escalation check:  every 5 minutes
-              - Usage snapshot:    every 60 minutes
-              - Billing alerts:    every 60 minutes (after snapshot)
-              - Maintenance due:   every 60 minutes
-            """
-            alert_interval = 300      # 5 min
-            snapshot_interval = 3600  # 60 min
-            last_snapshot = 0.0
-
-            while True:
-                now = asyncio.get_event_loop().time()
-
-                # ── 1. Escalation check (every 5 min) ────────────────────
-                try:
-                    async for session in get_db():
-                        from datetime import datetime as _dt, timedelta as _td
-                        from sqlalchemy import select as _select, or_ as _or
-                        from app.models.alerts import (
-                            AlertEvent as _AlertEvent,
-                            AlertStatus as _AlertStatus,
-                            EscalationPolicy as _EP,
-                        )
-
-                        overdue = (await session.execute(
-                            _select(_AlertEvent).where(
-                                _AlertEvent.status.in_([_AlertStatus.OPEN, _AlertStatus.ESCALATED]),
-                                _AlertEvent.next_escalation_at <= _dt.utcnow(),
-                                _AlertEvent.next_escalation_at.isnot(None),
-                            )
-                        )).scalars().all()
-
-                        for event in overdue:
-                            next_level = event.escalation_level + 1
-                            try:
-                                from app.services.notification_service import notify_role
-                                # Find the matching escalation policy for this level
-                                policy = (await session.execute(
-                                    _select(_EP).where(
-                                        _EP.category == event.category,
-                                        _EP.severity == event.severity,
-                                        _EP.step == next_level,
-                                        _EP.is_active == True,
-                                        _or(
-                                            _EP.company_id == event.company_id,
-                                            _EP.company_id.is_(None),
-                                        ),
-                                    ).order_by(_EP.company_id.nulls_last()).limit(1)
-                                )).scalar_one_or_none()
-
-                                # Advance escalation state
-                                event.escalation_level = next_level
-                                event.status = _AlertStatus.ESCALATED
-
-                                if policy:
-                                    # Set next escalation time based on policy delay
-                                    event.next_escalation_at = _dt.utcnow() + _td(
-                                        minutes=policy.delay_minutes
-                                    )
-                                    if event.company_id:
-                                        await notify_role(
-                                            session,
-                                            company_id=event.company_id,
-                                            role_code=policy.target_role,
-                                            title=f"[ESCALATED L{next_level}] {event.title}",
-                                            message=f"Alert unresolved — escalated to {policy.target_role} (level {next_level}).",
-                                            severity=event.severity,
-                                            category=event.category,
-                                            priority="URGENT",
-                                            source_type="alert_event",
-                                            source_id=event.id,
-                                        )
-                                else:
-                                    # No further escalation policy — stop escalating
-                                    event.next_escalation_at = None
-
-                            except Exception as ne:
-                                logger.debug("Escalation notify failed: %s", ne)
-                                event.escalation_level = next_level
-                                event.status = _AlertStatus.ESCALATED
-                                event.next_escalation_at = None
-
-                        if overdue:
-                            await session.commit()
-                            logger.info("Escalated %d overdue alerts", len(overdue))
-                        break
-                except Exception as exc:
-                    logger.error(f"Alert eval loop error: {exc}", exc_info=True)
-
-                # ── 2. Hourly jobs: snapshot + billing + maintenance ───────
-                if now - last_snapshot >= snapshot_interval:
-                    # Usage snapshot
-                    try:
-                        async for session in get_db():
-                            from app.services.alert_service import take_usage_snapshot
-                            n = await take_usage_snapshot(session)
-                            logger.info("Usage snapshot taken for %d companies", n)
-                            break
-                    except Exception as exc:
-                        logger.error(f"Usage snapshot failed: {exc}", exc_info=True)
-
-                    # Billing alerts
-                    try:
-                        async for session in get_db():
-                            from app.services.alert_service import check_and_fire_billing_alerts
-                            n = await check_and_fire_billing_alerts(session)
-                            if n:
-                                logger.info("Fired %d billing alerts", n)
-                            break
-                    except Exception as exc:
-                        logger.error(f"Billing alert check failed: {exc}", exc_info=True)
-
-                    # Maintenance due alerts
-                    try:
-                        async for session in get_db():
-                            from app.services.alert_service import check_maintenance_due_alerts
-                            n = await check_maintenance_due_alerts(session)
-                            if n:
-                                logger.info("Fired %d maintenance due alerts", n)
-                            break
-                    except Exception as exc:
-                        logger.error(f"Maintenance alert check failed: {exc}", exc_info=True)
-
-                    last_snapshot = asyncio.get_event_loop().time()
-
-                await asyncio.sleep(alert_interval)
-
+        # ── Step 6: Start background loops ─────────────────────────────
+        logger.info("START step 6: Background loops")
+        expiry_task = asyncio.create_task(_expiry_loop())
+        billing_task = asyncio.create_task(_billing_loop())
         enterprise_task = asyncio.create_task(_enterprise_loop())
-        logger.info("Enterprise background loop started (alert_eval=5min, snapshot=60min)")
+        logger.info("END step 6: Background loops (expiry, billing, enterprise)")
+
+        _app_started = True
+        logger.info("Application startup complete — all initialization done")
     except Exception as exc:
-        logger.error(f"Failed to start enterprise loop: {exc}", exc_info=True)
+        _app_init_error = str(exc)
+        logger.critical("FATAL: App init failed: %s", exc, exc_info=True)
 
-    yield
 
-    if expiry_task:
-        expiry_task.cancel()
-    if billing_task:
-        billing_task.cancel()
-    if enterprise_task:
-        enterprise_task.cancel()
-    await engine.dispose()
+async def _expiry_loop():
+    from app.db.session import get_db
+    from app.services.pricing_service import PricingService
+    while True:
+        try:
+            async for session in get_db():
+                await PricingService(session).process_expirations()
+                await session.commit()
+                break
+        except Exception as exc:
+            logger.error("Expiry check failed: %s", exc, exc_info=True)
+        await asyncio.sleep(3600)
+
+
+async def _billing_loop():
+    from app.db.session import get_db
+    from datetime import datetime, timezone
+    _PS = _OS = _IS = None
+    while True:
+        now_dt = datetime.now(timezone.utc)
+        try:
+            async for session in get_db():
+                if _PS is None:
+                    from app.services.pricing_service import PricingService
+                    _PS = PricingService
+                    from app.services.overdue_service import OverdueService
+                    _OS = OverdueService
+                    from app.services.billing_invoice_service import InvoiceService
+                    _IS = InvoiceService
+
+                await _PS(session).process_expirations()
+                await session.commit()
+                await _OS(session).process_overdue_workflow()
+                await session.commit()
+
+                if now_dt.day == 1 and now_dt.hour == 2:
+                    result = await _IS(session).generate_all_monthly_invoices()
+                    await session.commit()
+                    if result.get("generated", 0):
+                        logger.info("Monthly billing: %d invoices generated", result["generated"])
+
+                await _IS(session).generate_past_due_invoices()
+                await session.commit()
+                break
+        except Exception as exc:
+            logger.error("Billing scheduler: %s", exc, exc_info=True)
+        await asyncio.sleep(3600)
+
+
+async def _enterprise_loop():
+    from app.db.session import get_db
+    alert_interval = 300
+    snapshot_interval = 3600
+    last_snapshot = 0.0
+    while True:
+        now = asyncio.get_event_loop().time()
+        try:
+            async for session in get_db():
+                from datetime import datetime as _dt, timedelta as _td
+                from sqlalchemy import select as _select, or_ as _or
+                from app.models.alerts import AlertEvent, AlertStatus, EscalationPolicy
+
+                overdue = (await session.execute(
+                    _select(AlertEvent).where(
+                        AlertEvent.status.in_([AlertStatus.OPEN, AlertStatus.ESCALATED]),
+                        AlertEvent.next_escalation_at <= _dt.utcnow(),
+                        AlertEvent.next_escalation_at.isnot(None),
+                    )
+                )).scalars().all()
+
+                for event in overdue:
+                    next_level = event.escalation_level + 1
+                    try:
+                        from app.services.notification_service import notify_role
+                        policy = (await session.execute(
+                            _select(EscalationPolicy).where(
+                                EscalationPolicy.category == event.category,
+                                EscalationPolicy.severity == event.severity,
+                                EscalationPolicy.step == next_level,
+                                EscalationPolicy.is_active == True,
+                                _or(
+                                    EscalationPolicy.company_id == event.company_id,
+                                    EscalationPolicy.company_id.is_(None),
+                                ),
+                            ).order_by(EscalationPolicy.company_id.nulls_last()).limit(1)
+                        )).scalar_one_or_none()
+                        event.escalation_level = next_level
+                        event.status = AlertStatus.ESCALATED
+                        if policy:
+                            event.next_escalation_at = _dt.utcnow() + _td(minutes=policy.delay_minutes)
+                            if event.company_id:
+                                await notify_role(
+                                    session, company_id=event.company_id,
+                                    role_code=policy.target_role,
+                                    title=f"[ESCALATED L{next_level}] {event.title}",
+                                    message=f"Alert unresolved — escalated to {policy.target_role} (level {next_level}).",
+                                    severity=event.severity, category=event.category,
+                                    priority="URGENT", source_type="alert_event", source_id=event.id,
+                                )
+                        else:
+                            event.next_escalation_at = None
+                    except Exception as ne:
+                        logger.debug("Escalation notify failed: %s", ne)
+                        event.escalation_level = next_level
+                        event.status = AlertStatus.ESCALATED
+                        event.next_escalation_at = None
+                if overdue:
+                    await session.commit()
+                    logger.info("Escalated %d overdue alerts", len(overdue))
+                break
+        except Exception as exc:
+            logger.error("Alert eval loop: %s", exc, exc_info=True)
+
+        if now - last_snapshot >= snapshot_interval:
+            try:
+                async for session in get_db():
+                    from app.services.alert_service import take_usage_snapshot, check_and_fire_billing_alerts, check_maintenance_due_alerts
+                    n = await take_usage_snapshot(session)
+                    logger.info("Usage snapshot taken for %d companies", n)
+                    n = await check_and_fire_billing_alerts(session)
+                    if n:
+                        logger.info("Fired %d billing alerts", n)
+                    n = await check_maintenance_due_alerts(session)
+                    if n:
+                        logger.info("Fired %d maintenance due alerts", n)
+                    break
+            except Exception as exc:
+                logger.error("Hourly jobs failed: %s", exc, exc_info=True)
+            last_snapshot = asyncio.get_event_loop().time()
+
+        await asyncio.sleep(alert_interval)
 
 
 app = FastAPI(
@@ -554,6 +465,20 @@ app.include_router(ws_router)
 async def health():
     from fastapi.responses import JSONResponse
 
+    if _app_init_error:
+        return JSONResponse(
+            content={"status": "unhealthy", "error": _app_init_error,
+                     "app": settings.APP_NAME, "version": settings.VERSION,
+                     "environment": settings.ENVIRONMENT},
+            status_code=503,
+        )
+    if not _app_started:
+        return JSONResponse(
+            content={"status": "initializing", "app": settings.APP_NAME,
+                     "version": settings.VERSION, "environment": settings.ENVIRONMENT},
+            status_code=503,
+        )
+
     db_status = {"status": "not_checked"}
     redis_status = {"status": "not_checked"}
     try:
@@ -568,8 +493,6 @@ async def health():
     except Exception as exc:
         redis_status = {"status": "unhealthy", "error": str(exc)}
     system = collect_system_info()
-    # Database must be healthy for the service to function.
-    # Redis is optional (degrades gracefully to in-memory rate limiting).
     db_healthy = db_status.get("status") == "healthy"
     overall_healthy = db_healthy
 
@@ -582,6 +505,5 @@ async def health():
         "redis": redis_status,
         "system": system,
     }
-    # Return 503 when DB is unreachable so Render marks the service as unhealthy
     http_status = 200 if overall_healthy else 503
     return JSONResponse(content=payload, status_code=http_status)
