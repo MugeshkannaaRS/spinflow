@@ -1,26 +1,29 @@
-"""Alert API — Wave 4A.
+"""Alert API — Wave 4A foundation + Wave 4B operational endpoints.
 
 Endpoints:
-  GET    /alerts                     — list alert events (scoped)
-  GET    /alerts/{id}                — get one alert event
-  POST   /alerts/{id}/acknowledge    — acknowledge an open alert
-  POST   /alerts/{id}/resolve        — resolve an alert
-  GET    /alerts/rules               — list alert rules
-  POST   /alerts/rules               — create a rule (MILL_OWNER / SUPER_ADMIN)
-  PATCH  /alerts/rules/{id}          — update a rule
-  DELETE /alerts/rules/{id}          — delete a rule
+  GET    /alerts                          — list alert events (scoped)
+  GET    /alerts/ops-center               — KPI summary for operations dashboard
+  GET    /alerts/{id}                     — get one alert event
+  GET    /alerts/{id}/timeline            — full ACK history for one alert
+  POST   /alerts/{id}/acknowledge         — acknowledge an open alert
+  POST   /alerts/{id}/resolve             — resolve an alert
+  GET    /alerts/rules                    — list alert rules
+  POST   /alerts/rules                    — create a rule (MILL_OWNER / SUPER_ADMIN)
+  PATCH  /alerts/rules/{id}              — update a rule
+  DELETE /alerts/rules/{id}              — delete a rule
+  POST   /alerts/seed                    — reseed default rules (SUPER_ADMIN / MILL_OWNER)
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
-from typing import Optional
+from sqlalchemy import select, func, desc, and_
+from typing import Optional, List
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.db.session import get_db
 from app.core.deps import get_current_user, get_mill_scope
 from app.models.user import User
-from app.models.alerts import AlertEvent, AlertRule, AlertStatus
+from app.models.alerts import AlertEvent, AlertRule, AlertStatus, AlertAcknowledgement
 from app.services.alert_service import acknowledge_alert, resolve_alert
 
 router = APIRouter()
@@ -138,6 +141,180 @@ async def list_alerts(
         "page_size": page_size,
         "data": [_event_to_resp(e) for e in events],
     }
+
+
+# ---------------------------------------------------------------------------
+# GET /alerts/ops-center  — KPI summary (W4B)
+# NOTE: This route must come BEFORE /alerts/{alert_id} to avoid capturing
+# the literal string "ops-center" as alert_id.
+# ---------------------------------------------------------------------------
+
+@router.get("/alerts/ops-center")
+async def ops_center_summary(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns KPI summary for the operations center dashboard."""
+    scope = await get_mill_scope(current_user, db)
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    company_id = scope.get("company_id") or str(current_user.company_id or "")
+    mill_id = scope.get("mill_id")
+
+    def _base(status_filter=None):
+        q = select(AlertEvent)
+        if role_code != "SUPER_ADMIN":
+            if not company_id:
+                return None
+            q = q.where(AlertEvent.company_id == company_id)
+        if mill_id:
+            q = q.where(AlertEvent.mill_id == mill_id)
+        if status_filter:
+            q = q.where(AlertEvent.status == status_filter)
+        return q
+
+    # Counts
+    open_q = _base(AlertStatus.OPEN)
+    escalated_q = _base(AlertStatus.ESCALATED)
+    critical_q = _base()
+    if critical_q is not None:
+        critical_q = critical_q.where(
+            AlertEvent.severity == "CRITICAL",
+            AlertEvent.status.notin_(["RESOLVED"]),
+        )
+
+    open_count      = (await db.execute(select(func.count()).select_from(open_q.subquery()))).scalar() or 0 if open_q is not None else 0
+    escalated_count = (await db.execute(select(func.count()).select_from(escalated_q.subquery()))).scalar() or 0 if escalated_q is not None else 0
+    critical_count  = (await db.execute(select(func.count()).select_from(critical_q.subquery()))).scalar() or 0 if critical_q is not None else 0
+
+    # Breakdown count (today)
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    breakdown_q = select(func.count(AlertEvent.id)).where(
+        AlertEvent.category == "MACHINE",
+        AlertEvent.source_type.contains("machine"),
+        AlertEvent.created_at >= today_start,
+    )
+    if role_code != "SUPER_ADMIN" and company_id:
+        breakdown_q = breakdown_q.where(AlertEvent.company_id == company_id)
+    if mill_id:
+        breakdown_q = breakdown_q.where(AlertEvent.mill_id == mill_id)
+    breakdown_count = (await db.execute(breakdown_q)).scalar() or 0
+
+    # Average resolution time (last 30 days, resolved alerts)
+    resolved_q = select(AlertEvent).where(
+        AlertEvent.status == AlertStatus.RESOLVED,
+        AlertEvent.resolved_at.isnot(None),
+        AlertEvent.created_at >= (datetime.utcnow() - timedelta(days=30)),
+    )
+    if role_code != "SUPER_ADMIN" and company_id:
+        resolved_q = resolved_q.where(AlertEvent.company_id == company_id)
+    resolved_events = (await db.execute(resolved_q)).scalars().all()
+
+    avg_resolution_min = None
+    if resolved_events:
+        total_min = sum(
+            (e.resolved_at - e.created_at).total_seconds() / 60
+            for e in resolved_events
+            if e.resolved_at and e.created_at
+        )
+        avg_resolution_min = round(total_min / len(resolved_events), 1)
+
+    # Recent alerts (last 10 unresolved for quick view)
+    recent_q = select(AlertEvent).where(
+        AlertEvent.status.notin_([AlertStatus.RESOLVED]),
+    ).order_by(desc(AlertEvent.created_at)).limit(10)
+    if role_code != "SUPER_ADMIN" and company_id:
+        recent_q = recent_q.where(AlertEvent.company_id == company_id)
+    if mill_id:
+        recent_q = recent_q.where(AlertEvent.mill_id == mill_id)
+    recent_events = (await db.execute(recent_q)).scalars().all()
+
+    return {
+        "critical_count": critical_count,
+        "open_count": open_count,
+        "escalated_count": escalated_count,
+        "breakdown_count_today": breakdown_count,
+        "avg_resolution_min": avg_resolution_min,
+        "resolved_last_30d": len(resolved_events),
+        "recent_alerts": [_event_to_resp(e) for e in recent_events],
+    }
+
+
+# ---------------------------------------------------------------------------
+# GET /alerts/{id}/timeline  — ACK history (W4B)
+# ---------------------------------------------------------------------------
+
+@router.get("/alerts/{alert_id}/timeline")
+async def alert_timeline(
+    alert_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns ordered list of acknowledgement/action records for one alert."""
+    event = await db.get(AlertEvent, alert_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code != "SUPER_ADMIN":
+        company_id = str(current_user.company_id or "")
+        if event.company_id != company_id:
+            raise HTTPException(status_code=403, detail="Not in your company scope")
+
+    acks_res = await db.execute(
+        select(AlertAcknowledgement)
+        .where(AlertAcknowledgement.alert_event_id == alert_id)
+        .order_by(AlertAcknowledgement.created_at)
+    )
+    acks = acks_res.scalars().all()
+
+    # Build timeline: CREATED (from event) + each ACK record
+    timeline = [
+        {
+            "action": "CREATED",
+            "user_id": None,
+            "notes": event.message,
+            "timestamp": event.created_at.isoformat() if event.created_at else None,
+            "severity": event.severity,
+        }
+    ]
+    for ack in acks:
+        timeline.append({
+            "action": ack.action,
+            "user_id": ack.user_id,
+            "notes": ack.notes,
+            "timestamp": ack.created_at.isoformat() if ack.created_at else None,
+        })
+
+    return {
+        "alert": _event_to_resp(event),
+        "timeline": timeline,
+    }
+
+
+# ---------------------------------------------------------------------------
+# POST /alerts/seed  — reseed rules (W4B)
+# ---------------------------------------------------------------------------
+
+@router.post("/alerts/seed")
+async def seed_alert_rules(
+    company_id: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reseed default alert rules + escalation policies for a company."""
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(status_code=403, detail="Insufficient permission")
+
+    target_company = company_id or str(current_user.company_id or "")
+    if not target_company:
+        raise HTTPException(status_code=400, detail="company_id required")
+
+    from app.services.alert_service import seed_default_rules, seed_escalation_policies
+    n_rules = await seed_default_rules(db, company_id=target_company)
+    n_pol   = await seed_escalation_policies(db, company_id=target_company)
+    await db.commit()
+    return {"rules_seeded": n_rules, "policies_seeded": n_pol}
 
 
 # ---------------------------------------------------------------------------

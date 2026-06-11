@@ -48,12 +48,82 @@ from pydantic import BaseModel, Field
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_MINUTES = 30
 
+# W4B: In-memory failed login tracker for security burst alerts
+# Structure: { ip: [(timestamp, email), ...] }
+# Purged lazily on each access — no background thread needed.
+import collections
+_FAILED_LOGIN_TRACKER: dict = collections.defaultdict(list)
+_SECURITY_ALERT_COOLDOWN: dict = {}  # ip → last_alert_timestamp
+_FAILED_LOGIN_WINDOW_SEC = 300   # 5-minute window
+_FAILED_LOGIN_BURST_THRESHOLD = 5  # failures before alert fires
+
 router = APIRouter()
 
 
 class ForceChangePasswordRequest(BaseModel):
     user_id: str
     new_password: str = Field(..., min_length=8)
+
+
+def _track_failed_login_and_alert(db, client_ip: str, email: str, user) -> None:
+    """Track failed login attempts and schedule a security alert if burst threshold crossed.
+
+    Uses asyncio.create_task so the DB write is non-blocking and auth latency is unaffected.
+    """
+    import asyncio
+    now = datetime.now(timezone.utc).timestamp()
+
+    # Purge old entries outside the window
+    window_cutoff = now - _FAILED_LOGIN_WINDOW_SEC
+    _FAILED_LOGIN_TRACKER[client_ip] = [
+        t for t in _FAILED_LOGIN_TRACKER[client_ip] if t[0] > window_cutoff
+    ]
+    _FAILED_LOGIN_TRACKER[client_ip].append((now, email))
+
+    count = len(_FAILED_LOGIN_TRACKER[client_ip])
+    if count < _FAILED_LOGIN_BURST_THRESHOLD:
+        return
+
+    # Check cooldown to avoid alert spam
+    last_alert = _SECURITY_ALERT_COOLDOWN.get(client_ip, 0)
+    if now - last_alert < 1800:  # 30-min cooldown
+        return
+    _SECURITY_ALERT_COOLDOWN[client_ip] = now
+
+    # Only fire alert if we have a company to scope to
+    company_id = str(user.company_id) if user and user.company_id else None
+    if not company_id:
+        return
+
+    async def _fire():
+        try:
+            from app.db.session import get_db as _get_db
+            from app.services.alert_service import create_alert
+            async for session in _get_db():
+                await create_alert(
+                    session,
+                    company_id=company_id,
+                    title=f"Security: {count} failed logins from {client_ip}",
+                    message=f"{count} failed login attempts for '{email}' from IP {client_ip} in the last 5 minutes.",
+                    category="SECURITY",
+                    severity="WARNING",
+                    source_type="auth",
+                    source_id=client_ip,
+                    source_data={"ip": client_ip, "email": email, "count": count},
+                    target_role="MILL_OWNER",
+                    escalation_delay_minutes=15,
+                )
+                await session.commit()
+                break
+        except Exception as e:
+            logger.debug("Security alert fire failed: %s", e)
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.create_task(_fire())
+    except Exception:
+        pass
 
 
 @router.post("/auth/login", response_model=LoginResponse)
@@ -88,6 +158,13 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
             await db.commit()
         else:
             await log_audit(db, None, "UNKNOWN", "failed_login", "auth", "", "Failed login attempt for unknown email", ip_address=client_ip)
+
+        # W4B: Track burst and fire security alert
+        try:
+            _track_failed_login_and_alert(db, client_ip, form_data.username, user)
+        except Exception:
+            pass  # Never let alert logic break auth
+
         raise SpinFlowException(
             status_code=401,
             code=ErrorCode.INVALID_CREDENTIALS,

@@ -610,6 +610,77 @@ export const adminApi = {
     api.get("/admin/billing/analytics").then((r) => r.data),
 };
 
+// ---------------------------------------------------------------------------
+// Notifications API
+// ---------------------------------------------------------------------------
+export const notificationsApi = {
+  getAll: (params?: { page?: number; page_size?: number; unread_only?: boolean }) =>
+    api.get("/notifications", { params }).then((r) => r.data),
+  getUnreadCount: () => api.get("/notifications/unread-count").then((r) => r.data),
+  markRead: (id: string) => api.post(`/notifications/${id}/read`).then((r) => r.data),
+  markAllRead: () => api.post("/notifications/mark-all-read").then((r) => r.data),
+  archive: (id: string) => api.post(`/notifications/${id}/archive`).then((r) => r.data),
+};
+
+// ---------------------------------------------------------------------------
+// Alerts API (Wave 4B Operations Center)
+// ---------------------------------------------------------------------------
+export const alertsApi = {
+  // Alert events
+  getAlerts: (params?: {
+    page?: number;
+    page_size?: number;
+    status?: string;
+    category?: string;
+    severity?: string;
+  }) => api.get("/alerts", { params }).then((r) => r.data),
+
+  getAlert: (id: string) => api.get(`/alerts/${id}`).then((r) => r.data),
+
+  getTimeline: (id: string) => api.get(`/alerts/${id}/timeline`).then((r) => r.data),
+
+  getOpsCenterSummary: () => api.get("/alerts/ops-center").then((r) => r.data),
+
+  acknowledge: (id: string, notes?: string) =>
+    api.post(`/alerts/${id}/acknowledge`, { notes }).then((r) => r.data),
+
+  resolve: (id: string, notes?: string) =>
+    api.post(`/alerts/${id}/resolve`, { notes }).then((r) => r.data),
+
+  // Alert rules
+  getRules: (activeOnly = true) =>
+    api.get("/alerts/rules", { params: { active_only: activeOnly } }).then((r) => r.data),
+
+  createRule: (data: {
+    name: string;
+    category: string;
+    condition_type: string;
+    severity?: string;
+    threshold_value?: number;
+    threshold_unit?: string;
+    target_roles?: string[];
+    cooldown_minutes?: number;
+    description?: string;
+  }) => api.post("/alerts/rules", data).then((r) => r.data),
+
+  updateRule: (id: string, data: {
+    name?: string;
+    is_active?: boolean;
+    severity?: string;
+    threshold_value?: number;
+    cooldown_minutes?: number;
+  }) => api.patch(`/alerts/rules/${id}`, data).then((r) => r.data),
+
+  deleteRule: (id: string) => api.delete(`/alerts/rules/${id}`).then((r) => r.data),
+
+  seedRules: (companyId?: string) =>
+    api.post("/alerts/seed", null, { params: companyId ? { company_id: companyId } : undefined })
+      .then((r) => r.data),
+};
+
+// ---------------------------------------------------------------------------
+// Upload API
+// ---------------------------------------------------------------------------
 export const uploadApi = {
   upload: (entityType: string, entityId: string, file: File) => {
     const fd = new FormData();

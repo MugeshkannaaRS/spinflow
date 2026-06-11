@@ -8,9 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func
 from sqlalchemy.orm import selectinload
 
-from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription
+from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, AddonPricing
 from app.models.masters import Company, CompanyModule, Mill
 from app.models.user import User, UserSession
+from app.models.hr import Employee
 from app.core.module_registry import ALL_MODULE_CODES, SYSTEM_MODULE_CODES
 
 
@@ -419,10 +420,13 @@ class PricingService:
         """Check for subscriptions that need status updates.
 
         - Active subscriptions past expires_at → mark as expired
-        - Expired subscriptions past 30-day grace period → mark as suspended
+        - Expired subs within 30 days → grace_period (visible status)
+        - Expired subs past 30-day grace period → mark as suspended
+        - Trial past trial_ends_at → expired
         """
         now = datetime.now(timezone.utc)
 
+        # Active → expired
         expired = await self.db.execute(
             select(CompanySubscription).where(
                 CompanySubscription.status == "active",
@@ -433,25 +437,62 @@ class PricingService:
         for sub in expired.scalars().all():
             sub.status = "expired"
 
+        # Trial → expired
+        trial_expired = await self.db.execute(
+            select(CompanySubscription).where(
+                CompanySubscription.status == "trial",
+                CompanySubscription.trial_ends_at.isnot(None),
+                CompanySubscription.trial_ends_at <= now,
+            )
+        )
+        for sub in trial_expired.scalars().all():
+            sub.status = "expired"
+
+        # Cancelled (end of billing cycle) → suspended
+        cancelled_due = await self.db.execute(
+            select(CompanySubscription).where(
+                CompanySubscription.status == "cancelled",
+                CompanySubscription.cancellation_effective.isnot(None),
+                CompanySubscription.cancellation_effective <= now,
+            )
+        )
+        for sub in cancelled_due.scalars().all():
+            sub.status = "suspended"
+            company = await self.db.get(Company, sub.company_id)
+            if company:
+                company.is_active = False
+                company.status = "suspended"
+                company.suspended_at = now
+
+        # Expired (within 30 days) → grace_period (if not already)
         grace_date = now - timedelta(days=30)
-        expired_subs = await self.db.execute(
+        expired_to_grace = await self.db.execute(
+            select(CompanySubscription).where(
+                CompanySubscription.status == "expired",
+                CompanySubscription.expires_at.isnot(None),
+                CompanySubscription.expires_at > grace_date,
+            )
+        )
+        for sub in expired_to_grace.scalars().all():
+            sub.status = "grace_period"
+
+        # Expired (past 30-day grace) → suspended with cascade
+        expired_to_suspend = await self.db.execute(
             select(CompanySubscription).where(
                 CompanySubscription.status == "expired",
                 CompanySubscription.expires_at.isnot(None),
                 CompanySubscription.expires_at <= grace_date,
             )
         )
-        for sub in expired_subs.scalars().all():
+        has_suspensions = False
+        for sub in expired_to_suspend.scalars().all():
             sub.status = "suspended"
-            # Cascade: suspend company, mills, users, and invalidate sessions
+            has_suspensions = True
             company = await self.db.get(Company, sub.company_id)
             if company:
                 company.is_active = False
                 company.status = "suspended"
                 company.suspended_at = now
-            await self.db.execute(
-                select(Mill).where(Mill.company_id == sub.company_id)
-            )
             await self.db.execute(
                 update(Mill).where(Mill.company_id == sub.company_id).values(is_active=False)
             )
@@ -461,5 +502,35 @@ class PricingService:
             await self.db.execute(
                 update(UserSession).where(UserSession.company_id == sub.company_id).values(is_active=False)
             )
+
+        # Grace period past 30 days → suspended with cascade
+        grace_to_suspend = await self.db.execute(
+            select(CompanySubscription).where(
+                CompanySubscription.status == "grace_period",
+                CompanySubscription.expires_at.isnot(None),
+                CompanySubscription.expires_at <= grace_date,
+            )
+        )
+        for sub in grace_to_suspend.scalars().all():
+            sub.status = "suspended"
+            has_suspensions = True
+            company = await self.db.get(Company, sub.company_id)
+            if company:
+                company.is_active = False
+                company.status = "suspended"
+                company.suspended_at = now
+            await self.db.execute(
+                update(Mill).where(Mill.company_id == sub.company_id).values(is_active=False)
+            )
+            await self.db.execute(
+                update(User).where(User.company_id == sub.company_id).values(is_active=False)
+            )
+            await self.db.execute(
+                update(UserSession).where(UserSession.company_id == sub.company_id).values(is_active=False)
+            )
+
+        if has_suspensions:
+            logger = __import__("logging").getLogger(__name__)
+            logger.warning("Subscription suspensions applied via process_expirations")
 
         await self.db.flush()

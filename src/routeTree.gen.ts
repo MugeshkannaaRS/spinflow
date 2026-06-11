@@ -33,6 +33,7 @@ import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppAuditRouteImport } from './routes/_app.audit'
 import { Route as AppAdminRouteImport } from './routes/_app.admin'
 import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
+import { Route as AppAlertsRouteImport } from './routes/_app.alerts'
 import { Route as AppAccountsRouteImport } from './routes/_app.accounts'
 import { Route as AppCompanyBillingRouteImport } from './routes/_app.company.billing'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
@@ -174,6 +175,11 @@ const AppNotificationsRoute = AppNotificationsRouteImport.update({
   path: '/notifications',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAlertsRoute = AppAlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAccountsRoute = AppAccountsRouteImport.update({
   id: '/accounts',
   path: '/accounts',
@@ -292,6 +298,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AppAdminRouteWithChildren
   '/audit': typeof AppAuditRoute
   '/notifications': typeof AppNotificationsRoute
+  '/alerts': typeof AppAlertsRoute
   '/dashboard': typeof AppDashboardRoute
   '/dispatch': typeof AppDispatchRoute
   '/hr': typeof AppHrRoute
@@ -338,6 +345,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AppAdminRouteWithChildren
   '/audit': typeof AppAuditRoute
   '/notifications': typeof AppNotificationsRoute
+  '/alerts': typeof AppAlertsRoute
   '/dashboard': typeof AppDashboardRoute
   '/dispatch': typeof AppDispatchRoute
   '/hr': typeof AppHrRoute
@@ -386,6 +394,7 @@ export interface FileRoutesById {
   '/_app/admin': typeof AppAdminRouteWithChildren
   '/_app/audit': typeof AppAuditRoute
   '/_app/notifications': typeof AppNotificationsRoute
+  '/_app/alerts': typeof AppAlertsRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/dispatch': typeof AppDispatchRoute
   '/_app/hr': typeof AppHrRoute
@@ -434,6 +443,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/audit'
     | '/notifications'
+    | '/alerts'
     | '/dashboard'
     | '/dispatch'
     | '/hr'
@@ -480,6 +490,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/audit'
     | '/notifications'
+    | '/alerts'
     | '/dashboard'
     | '/dispatch'
     | '/hr'
@@ -527,6 +538,7 @@ export interface FileRouteTypes {
     | '/_app/admin'
     | '/_app/audit'
     | '/_app/notifications'
+    | '/_app/alerts'
     | '/_app/dashboard'
     | '/_app/dispatch'
     | '/_app/hr'
@@ -741,6 +753,13 @@ declare module '@tanstack/react-router' {
       path: '/notifications'
       fullPath: '/notifications'
       preLoaderRoute: typeof AppNotificationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/alerts': {
+      id: '/_app/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof AppAlertsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/accounts': {
@@ -965,6 +984,7 @@ interface AppRouteChildren {
   AppAdminRoute: typeof AppAdminRouteWithChildren
   AppAuditRoute: typeof AppAuditRoute
   AppNotificationsRoute: typeof AppNotificationsRoute
+  AppAlertsRoute: typeof AppAlertsRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDispatchRoute: typeof AppDispatchRoute
   AppHrRoute: typeof AppHrRoute
@@ -990,6 +1010,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminRoute: AppAdminRouteWithChildren,
   AppAuditRoute: AppAuditRoute,
   AppNotificationsRoute: AppNotificationsRoute,
+  AppAlertsRoute: AppAlertsRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDispatchRoute: AppDispatchRoute,
   AppHrRoute: AppHrRoute,

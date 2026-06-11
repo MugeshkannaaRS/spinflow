@@ -184,6 +184,39 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.error(f"Failed to start expiry automation: {exc}", exc_info=True)
 
+    # ── Wave 4B: seed alert rules + escalation policies ──────────────────
+    try:
+        from app.db.session import get_db as _get_db
+        from app.services.alert_service import seed_default_rules, seed_escalation_policies
+        from app.models.masters import Company
+        from sqlalchemy import select as _sa_select
+
+        async for session in _get_db():
+            # Seed global escalation policies (company_id=None)
+            n_esc = await seed_escalation_policies(session, company_id=None)
+            if n_esc:
+                logger.info("Seeded %d global escalation policies", n_esc)
+                await session.commit()
+
+            # Seed per-company rules for all active companies
+            companies = (await session.execute(
+                _sa_select(Company).where(Company.status == "active")
+            )).scalars().all()
+            total_rules = 0
+            total_esc = 0
+            for company in companies:
+                cid = str(company.id)
+                n_rules = await seed_default_rules(session, company_id=cid)
+                n_pol = await seed_escalation_policies(session, company_id=cid)
+                total_rules += n_rules
+                total_esc += n_pol
+            if total_rules or total_esc:
+                await session.commit()
+                logger.info("W4B seed: %d rules + %d escalation policies seeded", total_rules, total_esc)
+            break
+    except Exception as exc:
+        logger.error(f"W4B rule seed failed (non-fatal): {exc}", exc_info=True)
+
     # ── Wave 4A: enterprise background loop ──────────────────────────────
     enterprise_task = None
     try:
@@ -191,22 +224,29 @@ async def lifespan(app: FastAPI):
 
         async def _enterprise_loop():
             """
-            Runs two recurring jobs:
-              - Alert evaluation: every 5 minutes
-              - Usage snapshot:   every 60 minutes
+            Runs recurring jobs:
+              - Escalation check:  every 5 minutes
+              - Usage snapshot:    every 60 minutes
+              - Billing alerts:    every 60 minutes (after snapshot)
+              - Maintenance due:   every 60 minutes
             """
-            alert_interval = 300    # 5 min
+            alert_interval = 300      # 5 min
             snapshot_interval = 3600  # 60 min
             last_snapshot = 0.0
 
             while True:
                 now = asyncio.get_event_loop().time()
+
+                # ── 1. Escalation check (every 5 min) ────────────────────
                 try:
                     async for session in get_db():
-                        # Check for overdue escalations (OPEN alerts past next_escalation_at)
                         from datetime import datetime as _dt
-                        from sqlalchemy import select as _select
-                        from app.models.alerts import AlertEvent as _AlertEvent, AlertStatus as _AlertStatus
+                        from sqlalchemy import select as _select, or_ as _or
+                        from app.models.alerts import (
+                            AlertEvent as _AlertEvent,
+                            AlertStatus as _AlertStatus,
+                            EscalationPolicy as _EP,
+                        )
 
                         overdue = (await session.execute(
                             _select(_AlertEvent).where(
@@ -217,38 +257,54 @@ async def lifespan(app: FastAPI):
                         )).scalars().all()
 
                         for event in overdue:
-                            event.escalation_level += 1
-                            event.status = _AlertStatus.ESCALATED
-                            event.next_escalation_at = _dt.utcnow().replace(
-                                second=0, microsecond=0
-                            ).__class__.utcnow()
-                            # Optionally notify next escalation level via notification_service
+                            next_level = event.escalation_level + 1
                             try:
                                 from app.services.notification_service import notify_role
-                                from app.models.alerts import EscalationPolicy as _EP
+                                # Find the matching escalation policy for this level
                                 policy = (await session.execute(
                                     _select(_EP).where(
                                         _EP.category == event.category,
                                         _EP.severity == event.severity,
-                                        _EP.step == event.escalation_level,
+                                        _EP.step == next_level,
                                         _EP.is_active == True,
-                                    ).order_by(_EP.company_id.nulls_last())
+                                        _or(
+                                            _EP.company_id == event.company_id,
+                                            _EP.company_id.is_(None),
+                                        ),
+                                    ).order_by(_EP.company_id.nulls_last()).limit(1)
                                 )).scalar_one_or_none()
-                                if policy and event.company_id:
-                                    await notify_role(
-                                        session,
-                                        company_id=event.company_id,
-                                        role_code=policy.target_role,
-                                        title=f"[ESCALATED] {event.title}",
-                                        message=f"Alert escalated to level {event.escalation_level}",
-                                        severity=event.severity,
-                                        category=event.category,
-                                        priority="URGENT",
-                                        source_type="alert_event",
-                                        source_id=event.id,
+
+                                # Advance escalation state
+                                event.escalation_level = next_level
+                                event.status = _AlertStatus.ESCALATED
+
+                                if policy:
+                                    # Set next escalation time based on policy delay
+                                    event.next_escalation_at = _dt.utcnow() + __import__('datetime').timedelta(
+                                        minutes=policy.delay_minutes
                                     )
+                                    if event.company_id:
+                                        await notify_role(
+                                            session,
+                                            company_id=event.company_id,
+                                            role_code=policy.target_role,
+                                            title=f"[ESCALATED L{next_level}] {event.title}",
+                                            message=f"Alert unresolved — escalated to {policy.target_role} (level {next_level}).",
+                                            severity=event.severity,
+                                            category=event.category,
+                                            priority="URGENT",
+                                            source_type="alert_event",
+                                            source_id=event.id,
+                                        )
+                                else:
+                                    # No further escalation policy — stop escalating
+                                    event.next_escalation_at = None
+
                             except Exception as ne:
                                 logger.debug("Escalation notify failed: %s", ne)
+                                event.escalation_level = next_level
+                                event.status = _AlertStatus.ESCALATED
+                                event.next_escalation_at = None
 
                         if overdue:
                             await session.commit()
@@ -257,8 +313,9 @@ async def lifespan(app: FastAPI):
                 except Exception as exc:
                     logger.error(f"Alert eval loop error: {exc}", exc_info=True)
 
-                # Usage snapshot — run once per hour
+                # ── 2. Hourly jobs: snapshot + billing + maintenance ───────
                 if now - last_snapshot >= snapshot_interval:
+                    # Usage snapshot
                     try:
                         async for session in get_db():
                             from app.services.alert_service import take_usage_snapshot
@@ -267,6 +324,29 @@ async def lifespan(app: FastAPI):
                             break
                     except Exception as exc:
                         logger.error(f"Usage snapshot failed: {exc}", exc_info=True)
+
+                    # Billing alerts
+                    try:
+                        async for session in get_db():
+                            from app.services.alert_service import check_and_fire_billing_alerts
+                            n = await check_and_fire_billing_alerts(session)
+                            if n:
+                                logger.info("Fired %d billing alerts", n)
+                            break
+                    except Exception as exc:
+                        logger.error(f"Billing alert check failed: {exc}", exc_info=True)
+
+                    # Maintenance due alerts
+                    try:
+                        async for session in get_db():
+                            from app.services.alert_service import check_maintenance_due_alerts
+                            n = await check_maintenance_due_alerts(session)
+                            if n:
+                                logger.info("Fired %d maintenance due alerts", n)
+                            break
+                    except Exception as exc:
+                        logger.error(f"Maintenance alert check failed: {exc}", exc_info=True)
+
                     last_snapshot = asyncio.get_event_loop().time()
 
                 await asyncio.sleep(alert_interval)

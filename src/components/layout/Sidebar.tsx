@@ -30,6 +30,7 @@ import {
   Archive,
   X,
   LogOut,
+  Siren,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -58,6 +59,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
       { to: "/production", label: "Production",   icon: Factory,     module: "production" },
       { to: "/quality",    label: "Quality",       icon: BadgeCheck,  module: "quality" },
       { to: "/maintenance",label: "Maintenance",   icon: Wrench,      module: "maintenance" },
+      { to: "/alerts",     label: "Alerts",        icon: Siren,       module: "alerts" },
     ],
   },
   {

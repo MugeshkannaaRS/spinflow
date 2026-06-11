@@ -63,6 +63,7 @@ const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
   "/profile":            { title: "My Profile",        subtitle: "Account settings" },
   "/reports":            { title: "Reports",           subtitle: "Analytics & exports" },
   "/notifications":      { title: "Notifications",     subtitle: "Alerts & system messages" },
+  "/alerts":             { title: "Operations Center", subtitle: "Live alerts, escalations & rules" },
   "/stock":              { title: "Stock",             subtitle: "Lot & warehouse tracking" },
 };
 

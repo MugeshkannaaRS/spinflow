@@ -284,7 +284,34 @@ async def create_entry(
     current_user: User = Depends(require_module("production", write=True)),
 ):
     svc = ProductionService(db, current_user)
-    return await svc.create_entry(req)
+    result = await svc.create_entry(req)
+
+    # W4B: Check production thresholds and fire alerts
+    try:
+        from app.services.alert_service import check_production_thresholds
+        from app.core.deps import get_mill_scope
+        scope = await get_mill_scope(current_user, db)
+        company_id = scope.get("company_id") or str(current_user.company_id or "")
+        mill_id = scope.get("mill_id")
+        entry_id = result.get("id") if isinstance(result, dict) else getattr(result, "id", None)
+        if company_id and entry_id:
+            produced = float(req.produced_kg or 0)
+            waste = float(req.waste_kg or 0)
+            await check_production_thresholds(
+                db,
+                company_id=company_id,
+                mill_id=mill_id or "",
+                entry_id=str(entry_id),
+                machine_code=req.machine_code or "",
+                produced_kg=produced,
+                waste_kg=waste,
+                shift=getattr(req, "shift", None),
+            )
+            await db.commit()
+    except Exception as _ae:
+        logger.warning("Production threshold check failed (non-fatal): %s", _ae)
+
+    return result
 
 
 @router.post("/production/entries/bulk", response_model=ProductionBulkResponse)
@@ -413,7 +440,40 @@ async def update_machine_status(
     current_user: User = Depends(require_module("production", write=True)),
 ):
     svc = ProductionService(db, current_user)
-    return await svc.update_machine_status(machine_id, body.get("status", ""))
+    new_status = body.get("status", "")
+    result = await svc.update_machine_status(machine_id, new_status)
+
+    # W4B: Fire CRITICAL alert when machine breaks down
+    if new_status == "breakdown":
+        try:
+            from app.services.alert_service import create_alert
+            from app.core.deps import get_mill_scope
+            scope = await get_mill_scope(current_user, db)
+            company_id = scope.get("company_id") or str(current_user.company_id or "")
+            mill_id = scope.get("mill_id")
+            machine = (await db.execute(select(Machine).where(Machine.id == machine_id))).scalar_one_or_none()
+            machine_code = machine.code if machine else machine_id
+            reason = body.get("reason", "Not specified")
+            if company_id:
+                await create_alert(
+                    db,
+                    company_id=company_id,
+                    mill_id=mill_id,
+                    source_type="machine",
+                    source_id=machine_id,
+                    source_data={"machine_code": machine_code, "reason": reason},
+                    title=f"Machine Breakdown: {machine_code}",
+                    message=f"Machine {machine_code} reported as broken down. Reason: {reason}",
+                    severity="CRITICAL",
+                    category="MACHINE",
+                    target_role="SUPERVISOR",
+                    escalation_delay_minutes=15,
+                )
+                await db.commit()
+        except Exception as _ae:
+            logger.warning("Breakdown alert failed (non-fatal): %s", _ae)
+
+    return result
 
 
 @router.delete("/production/machines/{machine_id}")

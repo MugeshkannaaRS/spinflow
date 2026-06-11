@@ -49,6 +49,9 @@ class CompanySubscription(TimestampMixin, Base):
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancellation_reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    cancellation_effective: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    cancelled_by: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     addon_modules: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
     extra_mills: Mapped[int] = mapped_column(Integer, default=0)
     extra_users: Mapped[int] = mapped_column(Integer, default=0)
@@ -104,6 +107,21 @@ class BillingPayment(TimestampMixin, Base):
     paid_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     entered_by: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
+
+
+class AddonPricing(TimestampMixin, Base):
+    """Marketplace add-on modules that MILL_OWNER can purchase self-service."""
+    __tablename__ = "addon_pricing"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    module_code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    monthly_price: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    yearly_price: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    category: Mapped[str] = mapped_column(String(50), default="addon")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class OveragePricing(TimestampMixin, Base):
