@@ -25,8 +25,12 @@ class InventoryItem(TimestampMixin, Base):
 class Lot(TimestampMixin, Base):
     __tablename__ = "lots"
 
+    __table_args__ = (
+        UniqueConstraint("mill_id", "lot_no", name="uq_lots_mill_lot_no"),
+    )
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
-    lot_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    lot_no: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     department: Mapped[str] = mapped_column(String(100), nullable=True)
@@ -82,8 +86,12 @@ class InventoryBag(Base):
 class Warehouse(Base):
     __tablename__ = "warehouses"
 
+    __table_args__ = (
+        UniqueConstraint("mill_id", "code", name="uq_warehouses_mill_code"),
+    )
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
-    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
     location: Mapped[str] = mapped_column(String(200), nullable=True)

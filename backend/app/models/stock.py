@@ -55,9 +55,13 @@ class StockBalance(Base):
 class SalesOrder(Base):
     __tablename__ = "sales_orders"
 
+    __table_args__ = (
+        UniqueConstraint("mill_id", "so_no", name="uq_sales_orders_mill_so_no"),
+    )
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    so_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    so_no: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     customer_id: Mapped[str] = mapped_column(String(36), ForeignKey("customers.id"), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(30), default="draft")
     order_date: Mapped[str] = mapped_column(String(10), nullable=False)
@@ -99,9 +103,13 @@ class SalesOrderLine(Base):
 class StockTransfer(Base):
     __tablename__ = "stock_transfers"
 
+    __table_args__ = (
+        UniqueConstraint("mill_id", "transfer_no", name="uq_stock_transfers_mill_transfer_no"),
+    )
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    transfer_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    transfer_no: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     from_warehouse_id: Mapped[str] = mapped_column(String(36), ForeignKey("warehouses.id"), nullable=False)
     to_warehouse_id: Mapped[str] = mapped_column(String(36), ForeignKey("warehouses.id"), nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="draft")

@@ -1,4 +1,4 @@
-from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, func, JSON
+from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, func, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from app.db.base import Base, generate_uuid
@@ -7,9 +7,13 @@ from app.db.base import Base, generate_uuid
 class Trip(Base):
     __tablename__ = "trips"
 
+    __table_args__ = (
+        UniqueConstraint("mill_id", "trip_no", name="uq_trips_mill_trip_no"),
+    )
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    trip_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    trip_no: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     sales_order_id: Mapped[str] = mapped_column(String(36), ForeignKey("sales_orders.id"), nullable=True)
     vehicle_id: Mapped[str] = mapped_column(String(36), ForeignKey("master_vehicles.id"), nullable=True)
     vehicle_no: Mapped[str] = mapped_column(String(50), nullable=True)

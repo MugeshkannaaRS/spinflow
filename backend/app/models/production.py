@@ -40,8 +40,12 @@ class StopType(str, enum.Enum):
 class Machine(Base):
     __tablename__ = "machines"
 
+    __table_args__ = (
+        UniqueConstraint("mill_id", "code", name="uq_machines_mill_code"),
+    )
+
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
-    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     machine_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     department: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
@@ -73,7 +77,9 @@ class ProductionEntry(TimestampMixin, Base):
     shift: Mapped[str] = mapped_column(String(1), nullable=False)
     # v2: hour block within shift e.g. "08:00", "10:00", "12:00", "14:00"
     hour_block: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
-    machine_code: Mapped[str] = mapped_column(String(50), ForeignKey("machines.code"), nullable=False, index=True)
+    # machine_code: string reference to machines.code; DB FK dropped in migration 023
+    # (machines.code is now unique per mill, not globally — Wave 3B will add machine_id UUID FK)
+    machine_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     department: Mapped[str] = mapped_column(String(100), nullable=False)
     operator: Mapped[str] = mapped_column(String(200), nullable=False)
     # v2: lot linkage
@@ -106,7 +112,7 @@ class Shift(Base):
     __tablename__ = "shifts"
 
     __table_args__ = (
-        UniqueConstraint("mill_id", "code", name="uq_shift_mill_code"),
+        UniqueConstraint("mill_id", "code", name="uq_shifts_mill_code"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
@@ -121,7 +127,8 @@ class DowntimeLog(TimestampMixin, Base):
     __tablename__ = "downtime_logs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
-    machine_code: Mapped[str] = mapped_column(String(50), ForeignKey("machines.code"), nullable=False, index=True)
+    # machine_code: string reference to machines.code; DB FK dropped in migration 023
+    machine_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
