@@ -234,7 +234,7 @@ function PurchasePage() {
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Bale Purchase Entries</CardTitle>
                   <div className="flex gap-1">
-                    <ExportDateRangeButton label="Export" onExport={(f, t) => exportApi.purchaseXlsx(f, t)} />
+                    <ExportDateRangeButton onExportXlsx={(f, t) => exportApi.purchaseXlsx(f, t)} />
                     {isAdmin && <ColumnConfigurator module="purchase" tableKey="purchases" />}
                     {canEdit && <NewPurchaseDialog />}
                   </div>

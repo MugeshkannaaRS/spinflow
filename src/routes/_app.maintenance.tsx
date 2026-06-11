@@ -474,9 +474,8 @@ function MaintenancePage() {
             {/* ── Tasks tab ── */}
             <TabsContent value="tasks">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader>
                   <CardTitle className="text-base">Maintenance Tasks</CardTitle>
-                  <ExportDateRangeButton label="Export" onExport={(f, t) => exportApi.maintenanceXlsx(f, t)} />
                 </CardHeader>
                 <CardContent>
                   <DataTable
@@ -496,6 +495,8 @@ function MaintenancePage() {
                     loading={maintQ.isLoading}
                     rowKey={(t: any) => t.id}
                     exportFilename="maintenance_tasks"
+                    disableExport={true}
+                    toolbar={<ExportDateRangeButton onExportXlsx={(f, t) => exportApi.maintenanceXlsx(f, t)} />}
                     actions={canEdit ? (t: any) => (
                       <div className="flex gap-1 items-center">
                         {t.status !== "completed" && <StatusSelect taskId={t.id} currentStatus={t.status} />}

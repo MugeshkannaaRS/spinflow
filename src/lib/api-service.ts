@@ -59,6 +59,7 @@ export const productionApi = {
   getShifts: () => api.get("/production/shifts").then((r: any) => extractList(r.data)),
   createShift: (data: any) => api.post("/production/shifts", data).then((r) => r.data),
   deleteMachine: (id: string) => api.delete(`/production/machines/${id}`).then((r) => r.data),
+  deleteEntry: (id: string) => api.delete(`/production/entries/${id}`).then((r) => r.data),
   updateEntry: (id: string, data: any) => api.patch(`/production/entries/${id}`, data).then((r) => r.data),
   // v2 additions
   getStopCodes: () => api.get("/production/datalog-stop-codes").then((r) => r.data?.data ?? []),

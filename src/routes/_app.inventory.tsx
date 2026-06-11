@@ -112,9 +112,8 @@ function InventoryPage() {
 
             <TabsContent value="lots">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader>
                   <CardTitle className="text-base">Inventory Lots</CardTitle>
-                  <ExportDateRangeButton label="Export" onExport={(f, t) => exportApi.inventoryXlsx(f, t)} />
                 </CardHeader>
                 <CardContent>
                   <DataTable
@@ -124,6 +123,8 @@ function InventoryPage() {
                     loading={lotsQ.isLoading}
                     rowKey={(l) => l.id}
                     exportFilename="inventory_lots"
+                    disableExport={true}
+                    toolbar={<ExportDateRangeButton onExportXlsx={(f, t) => exportApi.inventoryXlsx(f, t)} />}
                     actions={canEdit ? (l: any) => (
                       l.status !== "cancelled" && l.status !== "dispatched" ? (
                         <ConfirmDeleteButton

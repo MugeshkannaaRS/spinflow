@@ -249,7 +249,8 @@ function DispatchPage() {
                 loading={ordersQ.isLoading}
                 rowKey={(o) => o.id}
                 exportFilename="dispatch_orders"
-                toolbar={<ExportDateRangeButton label="Export" onExport={(f, t) => exportApi.dispatchXlsx(f, t)} />}
+                disableExport={true}
+                toolbar={<ExportDateRangeButton onExportXlsx={(f, t) => exportApi.dispatchXlsx(f, t)} />}
                 actions={canEdit ? (o: any) => (
                   (o.status === "pending" || o.status === "draft" || o.status === "created") ? (
                     <ConfirmDeleteButton

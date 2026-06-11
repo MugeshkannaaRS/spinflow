@@ -168,10 +168,7 @@ function StoresPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Issue Notes</CardTitle>
-                  <div className="flex gap-1">
-                    <ExportDateRangeButton label="Export" onExport={(f, t) => exportApi.storesXlsx(f, t)} />
-                    {canEdit && <NewIssueNoteDialog items={items} />}
-                  </div>
+                  {canEdit && <NewIssueNoteDialog items={items} />}
                 </CardHeader>
                 <CardContent>
                   <DataTable
@@ -181,6 +178,8 @@ function StoresPage() {
                     loading={issuesQ.isLoading}
                     rowKey={(n) => n.id}
                     exportFilename="issue_notes"
+                    disableExport={true}
+                    toolbar={<ExportDateRangeButton onExportXlsx={(f, t) => exportApi.storesXlsx(f, t)} />}
                     actions={canEdit ? (n: any) => (
                       <ConfirmDeleteButton
                         onConfirm={async () => {

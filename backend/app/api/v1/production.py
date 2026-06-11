@@ -460,6 +460,28 @@ async def update_entry(
     return ProductionEntryResponse.model_validate(entry).model_dump()
 
 
+@router.delete("/production/entries/{entry_id}")
+async def delete_production_entry(
+    entry_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    """Soft-delete (cancel) a production entry. Only allowed if status is pending."""
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id")
+    stmt = select(ProductionEntry).where(ProductionEntry.id == entry_id)
+    if mill_id:
+        stmt = stmt.where(ProductionEntry.mill_id == mill_id)
+    entry = (await db.execute(stmt)).scalar_one_or_none()
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    if entry.status == "approved":
+        raise HTTPException(status_code=409, detail="Cannot cancel an approved entry")
+    entry.status = "cancelled"
+    await db.commit()
+    return {"ok": True, "id": entry_id}
+
+
 @router.get("/production/dashboard/summary")
 async def dashboard_summary(
     db: AsyncSession = Depends(get_db),

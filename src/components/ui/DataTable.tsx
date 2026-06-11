@@ -91,6 +91,7 @@ interface DataTableProps<T = any> {
   toolbar?: React.ReactNode;
   emptyMessage?: string;
   exportFilename?: string;
+  disableExport?: boolean;
   rowKey?: (row: T) => string;
 }
 
@@ -213,6 +214,7 @@ export function DataTable<T = any>({
   toolbar,
   emptyMessage = "No records found.",
   exportFilename,
+  disableExport = false,
   rowKey: rowKeyProp,
 }: DataTableProps<T>) {
   const loading = isLoading ?? loadingProp;
@@ -392,7 +394,7 @@ export function DataTable<T = any>({
           {toolbar}
 
           {/* Export */}
-          <DropdownMenu open={exportOpen} onOpenChange={setExportOpen}>
+          {!disableExport && <DropdownMenu open={exportOpen} onOpenChange={setExportOpen}>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
                 <ArrowUpFromLine className="size-3.5" />
@@ -425,7 +427,7 @@ export function DataTable<T = any>({
                 Export PDF
               </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+          </DropdownMenu>}
 
           {/* Column visibility */}
           <DropdownMenu>

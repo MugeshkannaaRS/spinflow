@@ -170,10 +170,7 @@ function QualityPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Quality Test Results</CardTitle>
-                  <div className="flex gap-1">
-                    <ExportDateRangeButton label="Export" onExport={(f, t) => exportApi.qualityXlsx(f, t)} />
-                    {canEdit && <NewTestSlideOver />}
-                  </div>
+                  {canEdit && <NewTestSlideOver />}
                 </CardHeader>
                 <CardContent>
                   <DataTable
@@ -193,8 +190,12 @@ function QualityPage() {
                     loading={testsQ.isLoading}
                     rowKey={(t) => t.id}
                     exportFilename="quality_tests"
+                    disableExport={true}
                     toolbar={
-                      canEdit ? <ImportTestsDialog /> : undefined
+                      <div className="flex gap-1">
+                        <ExportDateRangeButton onExportXlsx={(f, t) => exportApi.qualityXlsx(f, t)} />
+                        {canEdit && <ImportTestsDialog />}
+                      </div>
                     }
                     actions={canEdit ? (t: any) => t.status === "pending" ? (
                       <ConfirmDeleteButton

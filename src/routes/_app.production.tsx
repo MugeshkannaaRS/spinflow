@@ -1,6 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { productionApi } from "@/lib/api-service";
+import { productionApi, exportApi } from "@/lib/api-service";
+import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { useAuth } from "@/stores/auth";
 import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
@@ -1879,28 +1881,49 @@ function ProductionPage() {
                     loading={shiftsQ.isLoading}
                     rowKey={(s: any) => s.id}
                     exportFilename="shift_entries"
-                    actions={(s: any) => (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        title="Edit entry"
-                        onClick={() => {
-                          setEntryEditId(s.id);
-                          setEntryEditForm({
-                            produced_kg: s.produced_kg ?? "",
-                            waste_kg: s.waste_kg ?? "",
-                            count: s.count ?? "",
-                            operator: s.operator ?? "",
-                            remarks: s.remarks ?? "",
-                            stoppage_mins: s.stoppage_mins ?? "",
-                            stoppage_reason: s.stoppage_reason ?? "",
-                          });
-                          setEntryEditOpen(true);
-                        }}
-                      >
-                        <Pencil className="size-3.5" />
-                      </Button>
-                    )}
+                    disableExport={true}
+                    toolbar={
+                      <ExportDateRangeButton
+                        onExportXlsx={(f, t) => exportApi.productionXlsx(f, t)}
+                        onExportPdf={(f, t) => exportApi.productionPdf(f, t)}
+                      />
+                    }
+                    actions={canEdit ? (s: any) => (
+                      <div className="flex gap-1 items-center">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Edit entry"
+                          onClick={() => {
+                            setEntryEditId(s.id);
+                            setEntryEditForm({
+                              produced_kg: s.produced_kg ?? "",
+                              waste_kg: s.waste_kg ?? "",
+                              count: s.count ?? "",
+                              operator: s.operator ?? "",
+                              remarks: s.remarks ?? "",
+                              stoppage_mins: s.stoppage_mins ?? "",
+                              stoppage_reason: s.stoppage_reason ?? "",
+                            });
+                            setEntryEditOpen(true);
+                          }}
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                        {s.status !== "approved" && (
+                          <ConfirmDeleteButton
+                            onConfirm={async () => {
+                              await productionApi.deleteEntry(s.id);
+                              qc.invalidateQueries({ queryKey: ["production-entries"] });
+                            }}
+                            label={`Cancel this entry for machine ${s.machine_code}?`}
+                            title="Cancel Entry?"
+                            confirmText="Cancel Entry"
+                            successMessage="Entry cancelled"
+                          />
+                        )}
+                      </div>
+                    ) : undefined}
                   />
                 </CardContent>
               </Card>
