@@ -458,14 +458,14 @@ async def log_downtime_from_datalog(
         if date_str and stop_from_str:
             try:
                 started_at = datetime.fromisoformat(f"{date_str}T{stop_from_str}:00+00:00")
-            except Exception:
-                pass
+            except ValueError:
+                logger.warning("Could not parse stop_from time: %s %s", date_str, stop_from_str)
         if date_str and stop_to_str:
             try:
                 ended_at = datetime.fromisoformat(f"{date_str}T{stop_to_str}:00+00:00")
                 duration_min = max(0, int((ended_at - started_at).total_seconds() / 60))
-            except Exception:
-                pass
+            except ValueError:
+                logger.warning("Could not parse stop_to time: %s %s", date_str, stop_to_str)
 
         # Verify machine exists (avoids FK violation 500)
         from app.models.production import Machine

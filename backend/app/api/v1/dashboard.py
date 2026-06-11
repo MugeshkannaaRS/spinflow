@@ -403,40 +403,43 @@ async def get_admin_summary(
     try:
         r1 = await db.execute(text("SELECT COUNT(*) FROM companies WHERE is_active = true"))
         result["total_companies"] = r1.scalar() or 0
-    except Exception:
+    except Exception as e:
+        logger.warning("Admin stat: active company count failed (%s), trying fallback", e)
         try:
             r1b = await db.execute(text("SELECT COUNT(*) FROM companies"))
             result["total_companies"] = r1b.scalar() or 0
-        except Exception:
-            pass
+        except Exception as e2:
+            logger.warning("Admin stat: company count fallback failed: %s", e2)
 
     try:
         r2 = await db.execute(text("SELECT COUNT(*) FROM mills WHERE is_active = true"))
         result["total_mills"] = r2.scalar() or 0
-    except Exception:
+    except Exception as e:
+        logger.warning("Admin stat: active mill count failed (%s), trying fallback", e)
         try:
             r2b = await db.execute(text("SELECT COUNT(*) FROM mills"))
             result["total_mills"] = r2b.scalar() or 0
-        except Exception:
-            pass
+        except Exception as e2:
+            logger.warning("Admin stat: mill count fallback failed: %s", e2)
 
     try:
         r3 = await db.execute(text(
             "SELECT COUNT(*) FROM users WHERE is_active = true AND deleted_at IS NULL"
         ))
         result["total_users"] = r3.scalar() or 0
-    except Exception:
+    except Exception as e:
+        logger.warning("Admin stat: user count with deleted_at failed (%s), trying fallback", e)
         try:
             r3b = await db.execute(text("SELECT COUNT(*) FROM users WHERE is_active = true"))
             result["total_users"] = r3b.scalar() or 0
-        except Exception:
-            pass
+        except Exception as e2:
+            logger.warning("Admin stat: user count fallback failed: %s", e2)
 
     try:
         r4 = await db.execute(text("SELECT COUNT(*) FROM employees"))
         result["total_employees"] = r4.scalar() or 0
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Admin stat: employee count failed: %s", e)
 
     try:
         r5 = await db.execute(text(
@@ -450,8 +453,8 @@ async def get_admin_summary(
              "created_at": row[3].isoformat() if row[3] else None}
             for row in rows
         ]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Admin stat: company list failed: %s", e)
 
     return result
 
@@ -520,8 +523,8 @@ async def get_dashboard_summary(
             if mo:
                 mill_name = mo.name
                 effective_company_id = effective_company_id or str(mo.company_id)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not fetch mill name for %s: %s", effective_mill_id, e)
 
     if not company_name and effective_company_id:
         try:
@@ -529,8 +532,8 @@ async def get_dashboard_summary(
             co = cr.scalar_one_or_none()
             if co:
                 company_name = co.name
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("Could not fetch company name for %s: %s", effective_company_id, e)
 
     # Build machine scope filters used by production/machines queries
     if effective_mill_id:
@@ -1141,8 +1144,8 @@ async def get_dashboard_summary(
                     h = now_local.hour
                     if sh <= h < eh or (sh > eh and (h >= sh or h < eh)):
                         current_shift_name = s.code
-                except Exception:
-                    pass
+                except (ValueError, AttributeError):
+                    logger.debug("Could not parse shift times for shift %s", getattr(s, "code", "?"))
 
             if shifts:
                 s0 = shifts[0]
