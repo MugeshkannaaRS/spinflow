@@ -14,6 +14,7 @@ import {
   Blocks, Shield, Users, TrendingUp, DollarSign, AlertTriangle,
   CheckCircle2, ArrowUpRight, Loader2, ShoppingCart,
   UserPlus, Activity, Bell, ChevronDown, UserCog,
+  Server, CheckSquare, Flag, Database, BarChart3,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/admin")({
@@ -47,9 +48,10 @@ const SECTION_GROUPS = [
     icon: UserCog,
     color: "bg-green-50 text-green-600 border-green-100",
     items: [
-      { id: "users",   label: "Users",       icon: Users,             desc: "Provision, manage and enforce user limits" },
-      { id: "limits",  label: "User Limits", icon: SlidersHorizontal, desc: "Monitor and adjust user limits" },
-      { id: "modules", label: "Modules",     icon: Blocks,            desc: "Toggle module access per company" },
+      { id: "users",   label: "Users",           icon: Users,             desc: "Provision, manage and enforce user limits" },
+      { id: "limits",  label: "User Limits",     icon: SlidersHorizontal, desc: "Monitor and adjust user limits" },
+      { id: "modules", label: "Modules",         icon: Blocks,            desc: "Toggle module access per company" },
+      { id: "roles",   label: "Role Permissions", icon: Shield,           desc: "Role-module permission matrix" },
     ],
   },
   {
@@ -58,8 +60,30 @@ const SECTION_GROUPS = [
     icon: CreditCard,
     color: "bg-teal-50 text-teal-600 border-teal-100",
     items: [
-      { id: "billing", label: "Billing",      icon: CreditCard, desc: "Subscriptions, invoicing, plans, revenue" },
-      { id: "alerts",  label: "Alert Center", icon: Bell,        desc: "Overdue invoices, limits, expiring subs" },
+      { id: "billing",               label: "Billing",          icon: CreditCard,    desc: "Subscriptions, invoicing, plans, revenue" },
+      { id: "billing/command-center", label: "Command Center",  icon: BarChart3,     desc: "Unified billing command center" },
+      { id: "alerts",                label: "Alert Center",     icon: Bell,          desc: "Overdue invoices, limits, expiring subs" },
+    ],
+  },
+  {
+    id: "operations",
+    label: "Operations Center",
+    icon: Activity,
+    color: "bg-purple-50 text-purple-600 border-purple-100",
+    items: [
+      { id: "alert-ops", label: "Alert Ops",    icon: Bell,      desc: "Alert operations with timeline, escalation, heatmaps" },
+      { id: "approvals", label: "Approvals",     icon: CheckSquare, desc: "Approval workflow inbox and management" },
+      { id: "incidents", label: "Incidents",     icon: Flag,       desc: "Incident management and resolution tracking" },
+    ],
+  },
+  {
+    id: "platform",
+    label: "Platform & Infrastructure",
+    icon: Server,
+    color: "bg-rose-50 text-rose-600 border-rose-100",
+    items: [
+      { id: "health",  label: "Health Center", icon: Activity, desc: "Platform health, services, and uptime monitoring" },
+      { id: "backups", label: "Backup Center", icon: Database, desc: "Backup management, restore, and retention policies" },
     ],
   },
   {
@@ -68,8 +92,9 @@ const SECTION_GROUPS = [
     icon: SlidersHorizontal,
     color: "bg-orange-50 text-orange-600 border-orange-100",
     items: [
-      { id: "audit",         label: "Audit Logs",    icon: FileText,          desc: "Full audit trail across all companies" },
-      { id: "column-config", label: "Column Config", icon: SlidersHorizontal, desc: "Configure table column visibility" },
+      { id: "analytics",     label: "Analytics Center", icon: BarChart3,        desc: "Revenue, growth, retention, and adoption analytics" },
+      { id: "audit",         label: "Audit Logs",       icon: FileText,          desc: "Full audit trail across all companies" },
+      { id: "column-config", label: "Column Config",    icon: SlidersHorizontal, desc: "Configure table column visibility" },
     ],
   },
 ];

@@ -23,6 +23,7 @@ import { Route as AppPurchaseRouteImport } from './routes/_app.purchase'
 import { Route as AppProfileRouteImport } from './routes/_app.profile'
 import { Route as AppProductionRouteImport } from './routes/_app.production'
 import { Route as AppPayrollRouteImport } from './routes/_app.payroll'
+import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
 import { Route as AppMastersRouteImport } from './routes/_app.masters'
 import { Route as AppMaintenanceRouteImport } from './routes/_app.maintenance'
 import { Route as AppLotracRouteImport } from './routes/_app.lotrac'
@@ -31,29 +32,36 @@ import { Route as AppHrRouteImport } from './routes/_app.hr'
 import { Route as AppDispatchRouteImport } from './routes/_app.dispatch'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppAuditRouteImport } from './routes/_app.audit'
-import { Route as AppAdminRouteImport } from './routes/_app.admin'
-import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
 import { Route as AppAlertsRouteImport } from './routes/_app.alerts'
+import { Route as AppAdminRouteImport } from './routes/_app.admin'
 import { Route as AppAccountsRouteImport } from './routes/_app.accounts'
 import { Route as AppCompanyBillingRouteImport } from './routes/_app.company.billing'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
+import { Route as AppAdminRolesRouteImport } from './routes/_app.admin.roles'
 import { Route as AppAdminPlansRouteImport } from './routes/_app.admin.plans'
 import { Route as AppAdminOrganizationsRouteImport } from './routes/_app.admin.organizations'
 import { Route as AppAdminModulesRouteImport } from './routes/_app.admin.modules'
 import { Route as AppAdminMillsRouteImport } from './routes/_app.admin.mills'
 import { Route as AppAdminLimitsRouteImport } from './routes/_app.admin.limits'
+import { Route as AppAdminIncidentsRouteImport } from './routes/_app.admin.incidents'
+import { Route as AppAdminHealthRouteImport } from './routes/_app.admin.health'
 import { Route as AppAdminCompaniesRouteImport } from './routes/_app.admin.companies'
 import { Route as AppAdminColumnConfigRouteImport } from './routes/_app.admin.column-config'
 import { Route as AppAdminBillingRouteImport } from './routes/_app.admin.billing'
+import { Route as AppAdminBackupsRouteImport } from './routes/_app.admin.backups'
 import { Route as AppAdminAuditRouteImport } from './routes/_app.admin.audit'
 import { Route as AppAdminArchiveRouteImport } from './routes/_app.admin.archive'
+import { Route as AppAdminApprovalsRouteImport } from './routes/_app.admin.approvals'
+import { Route as AppAdminAnalyticsRouteImport } from './routes/_app.admin.analytics'
 import { Route as AppAdminAlertsRouteImport } from './routes/_app.admin.alerts'
+import { Route as AppAdminAlertOpsRouteImport } from './routes/_app.admin.alert-ops'
 import { Route as AppAdminCompaniesOnboardRouteImport } from './routes/_app.admin.companies.onboard'
 import { Route as AppAdminCompaniesCompanyIdRouteImport } from './routes/_app.admin.companies.$companyId'
 import { Route as AppAdminBillingSubscriptionsRouteImport } from './routes/_app.admin.billing.subscriptions'
 import { Route as AppAdminBillingPlansRouteImport } from './routes/_app.admin.billing.plans'
 import { Route as AppAdminBillingPaymentsRouteImport } from './routes/_app.admin.billing.payments'
 import { Route as AppAdminBillingInvoicesRouteImport } from './routes/_app.admin.billing.invoices'
+import { Route as AppAdminBillingCommandCenterRouteImport } from './routes/_app.admin.billing.command-center'
 import { Route as AppAdminBillingAnalyticsRouteImport } from './routes/_app.admin.billing.analytics'
 
 const LoginRoute = LoginRouteImport.update({
@@ -125,6 +133,11 @@ const AppPayrollRoute = AppPayrollRouteImport.update({
   path: '/payroll',
   getParentRoute: () => AppRoute,
 } as any)
+const AppNotificationsRoute = AppNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppMastersRoute = AppMastersRouteImport.update({
   id: '/masters',
   path: '/masters',
@@ -165,19 +178,14 @@ const AppAuditRoute = AppAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => AppRoute,
 } as any)
-const AppAdminRoute = AppAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppNotificationsRoute = AppNotificationsRouteImport.update({
-  id: '/notifications',
-  path: '/notifications',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppAlertsRoute = AppAlertsRouteImport.update({
   id: '/alerts',
   path: '/alerts',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminRoute = AppAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAccountsRoute = AppAccountsRouteImport.update({
@@ -193,6 +201,11 @@ const AppCompanyBillingRoute = AppCompanyBillingRouteImport.update({
 const AppAdminUsersRoute = AppAdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminRolesRoute = AppAdminRolesRouteImport.update({
+  id: '/roles',
+  path: '/roles',
   getParentRoute: () => AppAdminRoute,
 } as any)
 const AppAdminPlansRoute = AppAdminPlansRouteImport.update({
@@ -220,6 +233,16 @@ const AppAdminLimitsRoute = AppAdminLimitsRouteImport.update({
   path: '/limits',
   getParentRoute: () => AppAdminRoute,
 } as any)
+const AppAdminIncidentsRoute = AppAdminIncidentsRouteImport.update({
+  id: '/incidents',
+  path: '/incidents',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminHealthRoute = AppAdminHealthRouteImport.update({
+  id: '/health',
+  path: '/health',
+  getParentRoute: () => AppAdminRoute,
+} as any)
 const AppAdminCompaniesRoute = AppAdminCompaniesRouteImport.update({
   id: '/companies',
   path: '/companies',
@@ -235,6 +258,11 @@ const AppAdminBillingRoute = AppAdminBillingRouteImport.update({
   path: '/billing',
   getParentRoute: () => AppAdminRoute,
 } as any)
+const AppAdminBackupsRoute = AppAdminBackupsRouteImport.update({
+  id: '/backups',
+  path: '/backups',
+  getParentRoute: () => AppAdminRoute,
+} as any)
 const AppAdminAuditRoute = AppAdminAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
@@ -245,9 +273,24 @@ const AppAdminArchiveRoute = AppAdminArchiveRouteImport.update({
   path: '/archive',
   getParentRoute: () => AppAdminRoute,
 } as any)
+const AppAdminApprovalsRoute = AppAdminApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminAnalyticsRoute = AppAdminAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AppAdminRoute,
+} as any)
 const AppAdminAlertsRoute = AppAdminAlertsRouteImport.update({
   id: '/alerts',
   path: '/alerts',
+  getParentRoute: () => AppAdminRoute,
+} as any)
+const AppAdminAlertOpsRoute = AppAdminAlertOpsRouteImport.update({
+  id: '/alert-ops',
+  path: '/alert-ops',
   getParentRoute: () => AppAdminRoute,
 } as any)
 const AppAdminCompaniesOnboardRoute =
@@ -283,6 +326,12 @@ const AppAdminBillingInvoicesRoute = AppAdminBillingInvoicesRouteImport.update({
   path: '/invoices',
   getParentRoute: () => AppAdminBillingRoute,
 } as any)
+const AppAdminBillingCommandCenterRoute =
+  AppAdminBillingCommandCenterRouteImport.update({
+    id: '/command-center',
+    path: '/command-center',
+    getParentRoute: () => AppAdminBillingRoute,
+  } as any)
 const AppAdminBillingAnalyticsRoute =
   AppAdminBillingAnalyticsRouteImport.update({
     id: '/analytics',
@@ -296,9 +345,8 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/accounts': typeof AppAccountsRoute
   '/admin': typeof AppAdminRouteWithChildren
-  '/audit': typeof AppAuditRoute
-  '/notifications': typeof AppNotificationsRoute
   '/alerts': typeof AppAlertsRoute
+  '/audit': typeof AppAuditRoute
   '/dashboard': typeof AppDashboardRoute
   '/dispatch': typeof AppDispatchRoute
   '/hr': typeof AppHrRoute
@@ -306,6 +354,7 @@ export interface FileRoutesByFullPath {
   '/lotrac': typeof AppLotracRoute
   '/maintenance': typeof AppMaintenanceRoute
   '/masters': typeof AppMastersRoute
+  '/notifications': typeof AppNotificationsRoute
   '/payroll': typeof AppPayrollRoute
   '/production': typeof AppProductionRoute
   '/profile': typeof AppProfileRoute
@@ -316,20 +365,28 @@ export interface FileRoutesByFullPath {
   '/stock': typeof AppStockRoute
   '/stores': typeof AppStoresRoute
   '/users': typeof AppUsersRoute
+  '/admin/alert-ops': typeof AppAdminAlertOpsRoute
   '/admin/alerts': typeof AppAdminAlertsRoute
+  '/admin/analytics': typeof AppAdminAnalyticsRoute
+  '/admin/approvals': typeof AppAdminApprovalsRoute
   '/admin/archive': typeof AppAdminArchiveRoute
   '/admin/audit': typeof AppAdminAuditRoute
+  '/admin/backups': typeof AppAdminBackupsRoute
   '/admin/billing': typeof AppAdminBillingRouteWithChildren
   '/admin/column-config': typeof AppAdminColumnConfigRoute
   '/admin/companies': typeof AppAdminCompaniesRouteWithChildren
+  '/admin/health': typeof AppAdminHealthRoute
+  '/admin/incidents': typeof AppAdminIncidentsRoute
   '/admin/limits': typeof AppAdminLimitsRoute
   '/admin/mills': typeof AppAdminMillsRoute
   '/admin/modules': typeof AppAdminModulesRoute
   '/admin/organizations': typeof AppAdminOrganizationsRoute
   '/admin/plans': typeof AppAdminPlansRoute
+  '/admin/roles': typeof AppAdminRolesRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/company/billing': typeof AppCompanyBillingRoute
   '/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
+  '/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
   '/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
   '/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
   '/admin/billing/plans': typeof AppAdminBillingPlansRoute
@@ -343,9 +400,8 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/accounts': typeof AppAccountsRoute
   '/admin': typeof AppAdminRouteWithChildren
-  '/audit': typeof AppAuditRoute
-  '/notifications': typeof AppNotificationsRoute
   '/alerts': typeof AppAlertsRoute
+  '/audit': typeof AppAuditRoute
   '/dashboard': typeof AppDashboardRoute
   '/dispatch': typeof AppDispatchRoute
   '/hr': typeof AppHrRoute
@@ -353,6 +409,7 @@ export interface FileRoutesByTo {
   '/lotrac': typeof AppLotracRoute
   '/maintenance': typeof AppMaintenanceRoute
   '/masters': typeof AppMastersRoute
+  '/notifications': typeof AppNotificationsRoute
   '/payroll': typeof AppPayrollRoute
   '/production': typeof AppProductionRoute
   '/profile': typeof AppProfileRoute
@@ -363,20 +420,28 @@ export interface FileRoutesByTo {
   '/stock': typeof AppStockRoute
   '/stores': typeof AppStoresRoute
   '/users': typeof AppUsersRoute
+  '/admin/alert-ops': typeof AppAdminAlertOpsRoute
   '/admin/alerts': typeof AppAdminAlertsRoute
+  '/admin/analytics': typeof AppAdminAnalyticsRoute
+  '/admin/approvals': typeof AppAdminApprovalsRoute
   '/admin/archive': typeof AppAdminArchiveRoute
   '/admin/audit': typeof AppAdminAuditRoute
+  '/admin/backups': typeof AppAdminBackupsRoute
   '/admin/billing': typeof AppAdminBillingRouteWithChildren
   '/admin/column-config': typeof AppAdminColumnConfigRoute
   '/admin/companies': typeof AppAdminCompaniesRouteWithChildren
+  '/admin/health': typeof AppAdminHealthRoute
+  '/admin/incidents': typeof AppAdminIncidentsRoute
   '/admin/limits': typeof AppAdminLimitsRoute
   '/admin/mills': typeof AppAdminMillsRoute
   '/admin/modules': typeof AppAdminModulesRoute
   '/admin/organizations': typeof AppAdminOrganizationsRoute
   '/admin/plans': typeof AppAdminPlansRoute
+  '/admin/roles': typeof AppAdminRolesRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/company/billing': typeof AppCompanyBillingRoute
   '/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
+  '/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
   '/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
   '/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
   '/admin/billing/plans': typeof AppAdminBillingPlansRoute
@@ -392,9 +457,8 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_app/accounts': typeof AppAccountsRoute
   '/_app/admin': typeof AppAdminRouteWithChildren
-  '/_app/audit': typeof AppAuditRoute
-  '/_app/notifications': typeof AppNotificationsRoute
   '/_app/alerts': typeof AppAlertsRoute
+  '/_app/audit': typeof AppAuditRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/dispatch': typeof AppDispatchRoute
   '/_app/hr': typeof AppHrRoute
@@ -402,6 +466,7 @@ export interface FileRoutesById {
   '/_app/lotrac': typeof AppLotracRoute
   '/_app/maintenance': typeof AppMaintenanceRoute
   '/_app/masters': typeof AppMastersRoute
+  '/_app/notifications': typeof AppNotificationsRoute
   '/_app/payroll': typeof AppPayrollRoute
   '/_app/production': typeof AppProductionRoute
   '/_app/profile': typeof AppProfileRoute
@@ -412,20 +477,28 @@ export interface FileRoutesById {
   '/_app/stock': typeof AppStockRoute
   '/_app/stores': typeof AppStoresRoute
   '/_app/users': typeof AppUsersRoute
+  '/_app/admin/alert-ops': typeof AppAdminAlertOpsRoute
   '/_app/admin/alerts': typeof AppAdminAlertsRoute
+  '/_app/admin/analytics': typeof AppAdminAnalyticsRoute
+  '/_app/admin/approvals': typeof AppAdminApprovalsRoute
   '/_app/admin/archive': typeof AppAdminArchiveRoute
   '/_app/admin/audit': typeof AppAdminAuditRoute
+  '/_app/admin/backups': typeof AppAdminBackupsRoute
   '/_app/admin/billing': typeof AppAdminBillingRouteWithChildren
   '/_app/admin/column-config': typeof AppAdminColumnConfigRoute
   '/_app/admin/companies': typeof AppAdminCompaniesRouteWithChildren
+  '/_app/admin/health': typeof AppAdminHealthRoute
+  '/_app/admin/incidents': typeof AppAdminIncidentsRoute
   '/_app/admin/limits': typeof AppAdminLimitsRoute
   '/_app/admin/mills': typeof AppAdminMillsRoute
   '/_app/admin/modules': typeof AppAdminModulesRoute
   '/_app/admin/organizations': typeof AppAdminOrganizationsRoute
   '/_app/admin/plans': typeof AppAdminPlansRoute
+  '/_app/admin/roles': typeof AppAdminRolesRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/company/billing': typeof AppCompanyBillingRoute
   '/_app/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
+  '/_app/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
   '/_app/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
   '/_app/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
   '/_app/admin/billing/plans': typeof AppAdminBillingPlansRoute
@@ -441,9 +514,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/accounts'
     | '/admin'
-    | '/audit'
-    | '/notifications'
     | '/alerts'
+    | '/audit'
     | '/dashboard'
     | '/dispatch'
     | '/hr'
@@ -451,6 +523,7 @@ export interface FileRouteTypes {
     | '/lotrac'
     | '/maintenance'
     | '/masters'
+    | '/notifications'
     | '/payroll'
     | '/production'
     | '/profile'
@@ -461,20 +534,28 @@ export interface FileRouteTypes {
     | '/stock'
     | '/stores'
     | '/users'
+    | '/admin/alert-ops'
     | '/admin/alerts'
+    | '/admin/analytics'
+    | '/admin/approvals'
     | '/admin/archive'
     | '/admin/audit'
+    | '/admin/backups'
     | '/admin/billing'
     | '/admin/column-config'
     | '/admin/companies'
+    | '/admin/health'
+    | '/admin/incidents'
     | '/admin/limits'
     | '/admin/mills'
     | '/admin/modules'
     | '/admin/organizations'
     | '/admin/plans'
+    | '/admin/roles'
     | '/admin/users'
     | '/company/billing'
     | '/admin/billing/analytics'
+    | '/admin/billing/command-center'
     | '/admin/billing/invoices'
     | '/admin/billing/payments'
     | '/admin/billing/plans'
@@ -488,9 +569,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/accounts'
     | '/admin'
-    | '/audit'
-    | '/notifications'
     | '/alerts'
+    | '/audit'
     | '/dashboard'
     | '/dispatch'
     | '/hr'
@@ -498,6 +578,7 @@ export interface FileRouteTypes {
     | '/lotrac'
     | '/maintenance'
     | '/masters'
+    | '/notifications'
     | '/payroll'
     | '/production'
     | '/profile'
@@ -508,20 +589,28 @@ export interface FileRouteTypes {
     | '/stock'
     | '/stores'
     | '/users'
+    | '/admin/alert-ops'
     | '/admin/alerts'
+    | '/admin/analytics'
+    | '/admin/approvals'
     | '/admin/archive'
     | '/admin/audit'
+    | '/admin/backups'
     | '/admin/billing'
     | '/admin/column-config'
     | '/admin/companies'
+    | '/admin/health'
+    | '/admin/incidents'
     | '/admin/limits'
     | '/admin/mills'
     | '/admin/modules'
     | '/admin/organizations'
     | '/admin/plans'
+    | '/admin/roles'
     | '/admin/users'
     | '/company/billing'
     | '/admin/billing/analytics'
+    | '/admin/billing/command-center'
     | '/admin/billing/invoices'
     | '/admin/billing/payments'
     | '/admin/billing/plans'
@@ -536,9 +625,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/_app/accounts'
     | '/_app/admin'
-    | '/_app/audit'
-    | '/_app/notifications'
     | '/_app/alerts'
+    | '/_app/audit'
     | '/_app/dashboard'
     | '/_app/dispatch'
     | '/_app/hr'
@@ -546,6 +634,7 @@ export interface FileRouteTypes {
     | '/_app/lotrac'
     | '/_app/maintenance'
     | '/_app/masters'
+    | '/_app/notifications'
     | '/_app/payroll'
     | '/_app/production'
     | '/_app/profile'
@@ -556,20 +645,28 @@ export interface FileRouteTypes {
     | '/_app/stock'
     | '/_app/stores'
     | '/_app/users'
+    | '/_app/admin/alert-ops'
     | '/_app/admin/alerts'
+    | '/_app/admin/analytics'
+    | '/_app/admin/approvals'
     | '/_app/admin/archive'
     | '/_app/admin/audit'
+    | '/_app/admin/backups'
     | '/_app/admin/billing'
     | '/_app/admin/column-config'
     | '/_app/admin/companies'
+    | '/_app/admin/health'
+    | '/_app/admin/incidents'
     | '/_app/admin/limits'
     | '/_app/admin/mills'
     | '/_app/admin/modules'
     | '/_app/admin/organizations'
     | '/_app/admin/plans'
+    | '/_app/admin/roles'
     | '/_app/admin/users'
     | '/_app/company/billing'
     | '/_app/admin/billing/analytics'
+    | '/_app/admin/billing/command-center'
     | '/_app/admin/billing/invoices'
     | '/_app/admin/billing/payments'
     | '/_app/admin/billing/plans'
@@ -685,6 +782,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPayrollRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/notifications': {
+      id: '/_app/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof AppNotificationsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/masters': {
       id: '/_app/masters'
       path: '/masters'
@@ -741,25 +845,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAuditRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/admin': {
-      id: '/_app/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AppAdminRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/notifications': {
-      id: '/_app/notifications'
-      path: '/notifications'
-      fullPath: '/notifications'
-      preLoaderRoute: typeof AppNotificationsRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/alerts': {
       id: '/_app/alerts'
       path: '/alerts'
       fullPath: '/alerts'
       preLoaderRoute: typeof AppAlertsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin': {
+      id: '/_app/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AppAdminRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/accounts': {
@@ -781,6 +878,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof AppAdminUsersRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/roles': {
+      id: '/_app/admin/roles'
+      path: '/roles'
+      fullPath: '/admin/roles'
+      preLoaderRoute: typeof AppAdminRolesRouteImport
       parentRoute: typeof AppAdminRoute
     }
     '/_app/admin/plans': {
@@ -818,6 +922,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminLimitsRouteImport
       parentRoute: typeof AppAdminRoute
     }
+    '/_app/admin/incidents': {
+      id: '/_app/admin/incidents'
+      path: '/incidents'
+      fullPath: '/admin/incidents'
+      preLoaderRoute: typeof AppAdminIncidentsRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/health': {
+      id: '/_app/admin/health'
+      path: '/health'
+      fullPath: '/admin/health'
+      preLoaderRoute: typeof AppAdminHealthRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
     '/_app/admin/companies': {
       id: '/_app/admin/companies'
       path: '/companies'
@@ -839,6 +957,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminBillingRouteImport
       parentRoute: typeof AppAdminRoute
     }
+    '/_app/admin/backups': {
+      id: '/_app/admin/backups'
+      path: '/backups'
+      fullPath: '/admin/backups'
+      preLoaderRoute: typeof AppAdminBackupsRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
     '/_app/admin/audit': {
       id: '/_app/admin/audit'
       path: '/audit'
@@ -853,11 +978,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminArchiveRouteImport
       parentRoute: typeof AppAdminRoute
     }
+    '/_app/admin/approvals': {
+      id: '/_app/admin/approvals'
+      path: '/approvals'
+      fullPath: '/admin/approvals'
+      preLoaderRoute: typeof AppAdminApprovalsRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/analytics': {
+      id: '/_app/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AppAdminAnalyticsRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
     '/_app/admin/alerts': {
       id: '/_app/admin/alerts'
       path: '/alerts'
       fullPath: '/admin/alerts'
       preLoaderRoute: typeof AppAdminAlertsRouteImport
+      parentRoute: typeof AppAdminRoute
+    }
+    '/_app/admin/alert-ops': {
+      id: '/_app/admin/alert-ops'
+      path: '/alert-ops'
+      fullPath: '/admin/alert-ops'
+      preLoaderRoute: typeof AppAdminAlertOpsRouteImport
       parentRoute: typeof AppAdminRoute
     }
     '/_app/admin/companies/onboard': {
@@ -902,6 +1048,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminBillingInvoicesRouteImport
       parentRoute: typeof AppAdminBillingRoute
     }
+    '/_app/admin/billing/command-center': {
+      id: '/_app/admin/billing/command-center'
+      path: '/command-center'
+      fullPath: '/admin/billing/command-center'
+      preLoaderRoute: typeof AppAdminBillingCommandCenterRouteImport
+      parentRoute: typeof AppAdminBillingRoute
+    }
     '/_app/admin/billing/analytics': {
       id: '/_app/admin/billing/analytics'
       path: '/analytics'
@@ -914,6 +1067,7 @@ declare module '@tanstack/react-router' {
 
 interface AppAdminBillingRouteChildren {
   AppAdminBillingAnalyticsRoute: typeof AppAdminBillingAnalyticsRoute
+  AppAdminBillingCommandCenterRoute: typeof AppAdminBillingCommandCenterRoute
   AppAdminBillingInvoicesRoute: typeof AppAdminBillingInvoicesRoute
   AppAdminBillingPaymentsRoute: typeof AppAdminBillingPaymentsRoute
   AppAdminBillingPlansRoute: typeof AppAdminBillingPlansRoute
@@ -922,6 +1076,7 @@ interface AppAdminBillingRouteChildren {
 
 const AppAdminBillingRouteChildren: AppAdminBillingRouteChildren = {
   AppAdminBillingAnalyticsRoute: AppAdminBillingAnalyticsRoute,
+  AppAdminBillingCommandCenterRoute: AppAdminBillingCommandCenterRoute,
   AppAdminBillingInvoicesRoute: AppAdminBillingInvoicesRoute,
   AppAdminBillingPaymentsRoute: AppAdminBillingPaymentsRoute,
   AppAdminBillingPlansRoute: AppAdminBillingPlansRoute,
@@ -946,32 +1101,46 @@ const AppAdminCompaniesRouteWithChildren =
   AppAdminCompaniesRoute._addFileChildren(AppAdminCompaniesRouteChildren)
 
 interface AppAdminRouteChildren {
+  AppAdminAlertOpsRoute: typeof AppAdminAlertOpsRoute
   AppAdminAlertsRoute: typeof AppAdminAlertsRoute
+  AppAdminAnalyticsRoute: typeof AppAdminAnalyticsRoute
+  AppAdminApprovalsRoute: typeof AppAdminApprovalsRoute
   AppAdminArchiveRoute: typeof AppAdminArchiveRoute
   AppAdminAuditRoute: typeof AppAdminAuditRoute
+  AppAdminBackupsRoute: typeof AppAdminBackupsRoute
   AppAdminBillingRoute: typeof AppAdminBillingRouteWithChildren
   AppAdminColumnConfigRoute: typeof AppAdminColumnConfigRoute
   AppAdminCompaniesRoute: typeof AppAdminCompaniesRouteWithChildren
+  AppAdminHealthRoute: typeof AppAdminHealthRoute
+  AppAdminIncidentsRoute: typeof AppAdminIncidentsRoute
   AppAdminLimitsRoute: typeof AppAdminLimitsRoute
   AppAdminMillsRoute: typeof AppAdminMillsRoute
   AppAdminModulesRoute: typeof AppAdminModulesRoute
   AppAdminOrganizationsRoute: typeof AppAdminOrganizationsRoute
   AppAdminPlansRoute: typeof AppAdminPlansRoute
+  AppAdminRolesRoute: typeof AppAdminRolesRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
 }
 
 const AppAdminRouteChildren: AppAdminRouteChildren = {
+  AppAdminAlertOpsRoute: AppAdminAlertOpsRoute,
   AppAdminAlertsRoute: AppAdminAlertsRoute,
+  AppAdminAnalyticsRoute: AppAdminAnalyticsRoute,
+  AppAdminApprovalsRoute: AppAdminApprovalsRoute,
   AppAdminArchiveRoute: AppAdminArchiveRoute,
   AppAdminAuditRoute: AppAdminAuditRoute,
+  AppAdminBackupsRoute: AppAdminBackupsRoute,
   AppAdminBillingRoute: AppAdminBillingRouteWithChildren,
   AppAdminColumnConfigRoute: AppAdminColumnConfigRoute,
   AppAdminCompaniesRoute: AppAdminCompaniesRouteWithChildren,
+  AppAdminHealthRoute: AppAdminHealthRoute,
+  AppAdminIncidentsRoute: AppAdminIncidentsRoute,
   AppAdminLimitsRoute: AppAdminLimitsRoute,
   AppAdminMillsRoute: AppAdminMillsRoute,
   AppAdminModulesRoute: AppAdminModulesRoute,
   AppAdminOrganizationsRoute: AppAdminOrganizationsRoute,
   AppAdminPlansRoute: AppAdminPlansRoute,
+  AppAdminRolesRoute: AppAdminRolesRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
 }
 
@@ -982,9 +1151,8 @@ const AppAdminRouteWithChildren = AppAdminRoute._addFileChildren(
 interface AppRouteChildren {
   AppAccountsRoute: typeof AppAccountsRoute
   AppAdminRoute: typeof AppAdminRouteWithChildren
-  AppAuditRoute: typeof AppAuditRoute
-  AppNotificationsRoute: typeof AppNotificationsRoute
   AppAlertsRoute: typeof AppAlertsRoute
+  AppAuditRoute: typeof AppAuditRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDispatchRoute: typeof AppDispatchRoute
   AppHrRoute: typeof AppHrRoute
@@ -992,6 +1160,7 @@ interface AppRouteChildren {
   AppLotracRoute: typeof AppLotracRoute
   AppMaintenanceRoute: typeof AppMaintenanceRoute
   AppMastersRoute: typeof AppMastersRoute
+  AppNotificationsRoute: typeof AppNotificationsRoute
   AppPayrollRoute: typeof AppPayrollRoute
   AppProductionRoute: typeof AppProductionRoute
   AppProfileRoute: typeof AppProfileRoute
@@ -1008,9 +1177,8 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAccountsRoute: AppAccountsRoute,
   AppAdminRoute: AppAdminRouteWithChildren,
-  AppAuditRoute: AppAuditRoute,
-  AppNotificationsRoute: AppNotificationsRoute,
   AppAlertsRoute: AppAlertsRoute,
+  AppAuditRoute: AppAuditRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDispatchRoute: AppDispatchRoute,
   AppHrRoute: AppHrRoute,
@@ -1018,6 +1186,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppLotracRoute: AppLotracRoute,
   AppMaintenanceRoute: AppMaintenanceRoute,
   AppMastersRoute: AppMastersRoute,
+  AppNotificationsRoute: AppNotificationsRoute,
   AppPayrollRoute: AppPayrollRoute,
   AppProductionRoute: AppProductionRoute,
   AppProfileRoute: AppProfileRoute,

@@ -31,6 +31,14 @@ import {
   X,
   LogOut,
   Siren,
+  Server,
+  Bell,
+  CheckSquare,
+  AlertTriangle,
+  Flag,
+  Database,
+  Activity,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -98,12 +106,19 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
 
 // Admin sub-items shown inside the collapsible Admin group (SUPER_ADMIN only)
 const ADMIN_SUB_ITEMS = [
-  { to: "/admin",                label: "Dashboard",     icon: LayoutDashboard,  exact: true },
-  { to: "/admin/companies",      label: "Companies",     icon: Building2,        exact: false },
-  { to: "/admin/users",          label: "Users",         icon: Users,            exact: false },
-  { to: "/admin/archive",        label: "Archive",       icon: Archive,          exact: false },
-  { to: "/admin/billing",        label: "Billing",       icon: CreditCard,       exact: false },
-  { to: "/admin/column-config",  label: "Column Config", icon: SlidersHorizontal, exact: false },
+  { to: "/admin",                label: "Dashboard",       icon: LayoutDashboard,  exact: true },
+  { to: "/admin/companies",      label: "Companies",       icon: Building2,        exact: false },
+  { to: "/admin/users",          label: "Users",           icon: Users,            exact: false },
+  { to: "/admin/roles",          label: "Role Permissions", icon: Shield,          exact: false },
+  { to: "/admin/analytics",      label: "Analytics",       icon: BarChart3,        exact: false },
+  { to: "/admin/billing",        label: "Billing",         icon: CreditCard,       exact: false },
+  { to: "/admin/approvals",      label: "Approvals",       icon: CheckSquare,      exact: false },
+  { to: "/admin/alert-ops",      label: "Alert Ops",       icon: Bell,             exact: false },
+  { to: "/admin/incidents",      label: "Incidents",       icon: Flag,             exact: false },
+  { to: "/admin/backups",        label: "Backups",         icon: Database,         exact: false },
+  { to: "/admin/health",         label: "Health",          icon: Activity,         exact: false },
+  { to: "/admin/archive",        label: "Archive",         icon: Archive,          exact: false },
+  { to: "/admin/column-config",  label: "Column Config",   icon: SlidersHorizontal, exact: false },
 ];
 
 const COMPANY_OWNER_ROLES = new Set(["MILL_OWNER", "SUPER_ADMIN"]);
