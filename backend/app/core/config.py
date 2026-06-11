@@ -1,16 +1,35 @@
-import json
 from typing import List
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings
-import os
-import secrets
+
+
+DEFAULT_CORS_ORIGINS = ",".join(
+    [
+        "http://localhost:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:5173",
+        # Known Render production origins. These keep the hosted app usable if
+        # Render env vars are missing or the service starts from backend/.env.
+        "https://spinflow-f.onrender.com",
+        "https://spinflow.onrender.com",
+    ]
+)
 
 
 class Settings(BaseSettings):
     APP_NAME: str = "SpinFlow ERP"
     VERSION: str = "1.0.0"
     DEBUG: bool = False
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, value):
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"release", "prod", "production"}:
+                return False
+        return value
 
     # Database — no defaults; must be set via .env or env vars
     DATABASE_URL: str = ""
@@ -29,8 +48,8 @@ class Settings(BaseSettings):
     # CORS — explicit origins only.
     # CORS_ORIGIN_REGEX is restricted to ngrok dev tunnels only.
     # Production Render domains must be listed explicitly in CORS_ORIGINS (set via env var).
-    # The default value here is for local development only and must be overridden in production.
-    CORS_ORIGINS: str = "http://localhost:5173,http://localhost:4173,http://127.0.0.1:5173"
+    # Defaults include local development and the known Render production deployment.
+    CORS_ORIGINS: str = DEFAULT_CORS_ORIGINS
     CORS_ORIGIN_REGEX: str = r"^https://.*\.ngrok(?:-free)?\.dev$"
 
     @property
@@ -39,6 +58,22 @@ class Settings(BaseSettings):
 
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
+
+    # Empty means auto:
+    # - DEBUG=true: lax for local HTTP development
+    # - DEBUG=false: none so Render frontend/backend cross-site refresh works
+    REFRESH_COOKIE_SAMESITE: str = ""
+
+    @property
+    def refresh_cookie_samesite(self) -> str:
+        value = self.REFRESH_COOKIE_SAMESITE.strip().lower()
+        if value:
+            if value not in {"strict", "lax", "none"}:
+                raise RuntimeError(
+                    "REFRESH_COOKIE_SAMESITE must be one of: strict, lax, none"
+                )
+            return value
+        return "lax" if self.DEBUG else "none"
 
     # QR — no default
     QR_SECRET_KEY: str = ""

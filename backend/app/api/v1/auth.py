@@ -29,14 +29,15 @@ from app.schemas.auth import (
 
 
 def _set_refresh_cookie(response: Response, token: str) -> None:
-    secure = not settings.DEBUG
+    samesite = settings.refresh_cookie_samesite
+    secure = not settings.DEBUG or samesite == "none"
     response.set_cookie(
         key="refresh_token",
         value=token,
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
         httponly=True,
         secure=secure,
-        samesite="strict",   # was "lax" — strict prevents CSRF on the refresh endpoint
+        samesite=samesite,
         path="/api/v1/auth/refresh",
     )
 from app.models.masters import Company, CompanyModule, MillSettings, Mill
