@@ -250,6 +250,9 @@ async def create_user(
 @router.get("/admin/users")
 async def list_all_users(
     company_id: Optional[str] = None,
+    role: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    search: Optional[str] = None,
     page: int = 1,
     page_size: int = 500,
     db: AsyncSession = Depends(get_db),
@@ -259,7 +262,9 @@ async def list_all_users(
     if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN or MILL_OWNER can list users")
     try:
-        query = select(User).where(User.deleted_at.is_(None), User.is_active == True)
+        # Base query — include ALL users (active + inactive) so stats are correct
+        query = select(User).where(User.deleted_at.is_(None))
+
         if company_id:
             if role_code == "MILL_OWNER":
                 if str(company_id) != str(current_user.company_id):
@@ -267,6 +272,17 @@ async def list_all_users(
             query = query.where(User.company_id == company_id)
         elif role_code == "MILL_OWNER":
             query = query.where(User.company_id == current_user.company_id)
+
+        if status_filter == "active":
+            query = query.where(User.is_active == True)
+        elif status_filter == "inactive":
+            query = query.where(User.is_active == False)
+
+        if search:
+            q = f"%{search.strip()}%"
+            from sqlalchemy import or_
+            query = query.where(or_(User.name.ilike(q), User.email.ilike(q)))
+
         query = query.order_by(User.created_at.desc())
 
         count_q = select(func.count()).select_from(query.subquery())
@@ -276,11 +292,24 @@ async def list_all_users(
         result = await db.execute(query)
         users = result.scalars().all()
 
+        # Batch-load roles
         role_ids = [u.role_id for u in users if u.role_id]
         roles = {}
         if role_ids:
             roles_result = await db.execute(select(Role).where(Role.id.in_(role_ids)))
             roles = {r.id: r.code for r in roles_result.scalars().all()}
+
+        # Filter by role after resolving role codes
+        if role:
+            users = [u for u in users if roles.get(u.role_id) == role]
+            total = len(users)
+
+        # Batch-load company names
+        company_ids = list({u.company_id for u in users if u.company_id})
+        company_names: dict[str, str] = {}
+        if company_ids:
+            co_res = await db.execute(select(Company).where(Company.id.in_(company_ids)))
+            company_names = {c.id: c.name for c in co_res.scalars().all()}
 
         return {
             "items": [
@@ -290,11 +319,13 @@ async def list_all_users(
                     "email": u.email,
                     "role": roles.get(u.role_id, "unknown"),
                     "company_id": str(u.company_id) if u.company_id else None,
+                    "company_name": company_names.get(u.company_id) if u.company_id else None,
                     "mill_id": str(u.mill_id) if u.mill_id else None,
                     "mill_name": u.mill_name,
                     "is_active": u.is_active,
                     "last_login": u.last_login.isoformat() if u.last_login else None,
                     "must_change_password": u.must_change_password,
+                    "created_at": u.created_at.isoformat() if u.created_at else None,
                 }
                 for u in users
             ],
@@ -302,6 +333,8 @@ async def list_all_users(
             "page": page,
             "pages": -(-total // page_size) if page_size else 0,
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"admin list users error: {e}")
         return {"items": [], "total": 0, "page": 1, "pages": 0}
