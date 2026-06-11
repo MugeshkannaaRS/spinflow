@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 
@@ -116,7 +116,6 @@ export function useMillSubscription() {
 /** Mutation helper to update currency */
 export function useUpdateCurrency() {
   const qc = useQueryClient();
-  const { useMutation } = require("@tanstack/react-query");
   return useMutation({
     mutationFn: (symbol: string) =>
       api.patch("/mill-config/subscription/currency", { symbol }).then(r => r.data),
