@@ -89,11 +89,11 @@ class OnboardingProgressService:
         steps["roles"] = users > 1
 
         # billing — subscription active
-        from app.models.billing import Subscription
+        from app.models.billing import CompanySubscription
         sub = (await self.db.execute(
-            select(func.count(Subscription.id)).where(
-                Subscription.company_id == company_id,
-                Subscription.status == "active",
+            select(func.count(CompanySubscription.id)).where(
+                CompanySubscription.company_id == company_id,
+                CompanySubscription.status == "active",
             )
         )).scalar() or 0
         steps["billing"] = sub > 0

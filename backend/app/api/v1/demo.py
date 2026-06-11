@@ -26,7 +26,7 @@ from app.core.deps import get_current_user
 from app.core.security import hash_password
 from app.models.user import User
 from app.models.masters import Company
-from app.models.billing import Subscription
+from app.models.billing import CompanySubscription
 from app.models.demo import DemoEnvironment, ProductTour, TourProgress, Nudge
 from app.services.demo_service import DemoService, TourService, EngagementService, JourneyService, NudgeService
 from app.services.customer_success_service import OnboardingProgressService
@@ -258,25 +258,25 @@ async def sales_overview(
 
     # Trial counts
     trial_total = (await db.execute(
-        select(func.count(Subscription.id)).where(Subscription.status == "trial")
+        select(func.count(CompanySubscription.id)).where(CompanySubscription.status == "trial")
     )).scalar() or 0
     trial_active_30d = (await db.execute(
-        select(func.count(Subscription.id)).where(
-            Subscription.status == "trial",
-            Subscription.started_at >= thirty_days_ago,
+        select(func.count(CompanySubscription.id)).where(
+            CompanySubscription.status == "trial",
+            CompanySubscription.started_at >= thirty_days_ago,
         )
     )).scalar() or 0
     trial_expired = (await db.execute(
-        select(func.count(Subscription.id)).where(
-            Subscription.status == "trial",
-            Subscription.trial_ends_at < now,
+        select(func.count(CompanySubscription.id)).where(
+            CompanySubscription.status == "trial",
+            CompanySubscription.trial_ends_at < now,
         )
     )).scalar() or 0
 
     # Conversion
     total_companies = (await db.execute(select(func.count(Company.id)))).scalar() or 0
     active_subs = (await db.execute(
-        select(func.count(Subscription.id)).where(Subscription.status == "active")
+        select(func.count(CompanySubscription.id)).where(CompanySubscription.status == "active")
     )).scalar() or 0
 
     # Command center KPI for MRR/ARR

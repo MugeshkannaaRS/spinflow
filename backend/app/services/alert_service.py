@@ -280,7 +280,7 @@ async def check_production_thresholds(
 async def check_and_fire_billing_alerts(db: AsyncSession) -> int:
     """Compare each company's current usage to plan limits.
     Fires alerts at 80%, 90%, 100% thresholds. Returns count fired."""
-    from app.models.billing import Subscription, SubscriptionPlan
+    from app.models.billing import CompanySubscription, SubscriptionPlan
     from app.models.masters import Company
     from app.models.alerts import UsageSnapshot
     from sqlalchemy import or_
@@ -290,7 +290,7 @@ async def check_and_fire_billing_alerts(db: AsyncSession) -> int:
         today = date.today()
         # Get all active subscriptions with plan info
         subs_res = await db.execute(
-            select(Subscription).where(Subscription.status == "active")
+            select(CompanySubscription).where(CompanySubscription.status == "active")
         )
         subscriptions = subs_res.scalars().all()
 

@@ -24,7 +24,7 @@ from app.models.production import Machine, Shift, ProductionEntry
 from app.models.inventory import InventoryItem, Lot
 from app.models.quality import QualityTest
 from app.models.dispatch import Dispatch
-from app.models.billing import Subscription, SubscriptionPlan
+from app.models.billing import CompanySubscription, SubscriptionPlan
 from app.models.alerts import AlertEvent
 
 logger = logging.getLogger(__name__)
@@ -478,9 +478,9 @@ class EngagementService:
     async def get_trial_summary(self, company_id: str) -> dict:
         """Trial-specific engagement metrics."""
         sub = (await self.db.execute(
-            select(Subscription).where(
-                Subscription.company_id == company_id,
-                Subscription.status == "trial",
+            select(CompanySubscription).where(
+                CompanySubscription.company_id == company_id,
+                CompanySubscription.status == "trial",
             )
         )).scalar_one_or_none()
 
@@ -537,7 +537,7 @@ class NudgeService:
             await self.db.flush()
         return seeded
 
-    async def get_active_nudges(self, company_id: str, dismissed_ids: list[str] | None = None) -> list[dict]:
+    async def get_active_nudges(self, company_id: str, dismissed_ids: Optional[list[str]] = None) -> list[dict]:
         """Return nudges relevant to this company's current state."""
         dismissed = set(dismissed_ids or [])
         all_nudges = (await self.db.execute(
@@ -694,8 +694,8 @@ class JourneyService:
             if qt > 0: with_quality += 1
 
             sub = (await self.db.execute(
-                select(func.count(Subscription.id)).where(
-                    Subscription.company_id == cid, Subscription.status == "active"
+                select(func.count(CompanySubscription.id)).where(
+                    CompanySubscription.company_id == cid, CompanySubscription.status == "active"
                 )
             )).scalar() or 0
             if sub > 0: active_subs += 1
