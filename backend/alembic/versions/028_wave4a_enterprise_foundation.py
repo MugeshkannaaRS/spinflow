@@ -21,16 +21,20 @@ depends_on: Union[str, Sequence[str], None] = None
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _col_exists(table: str, column: str) -> str:
-    """Return a DO block that adds a column only if it does not already exist."""
+def _col_exists(table: str, col_name: str, col_def: str) -> str:
+    """Return a DO block that adds a column only if it does not already exist.
+
+    col_name — bare column name for the information_schema check
+    col_def  — full type + constraints appended after col_name in ADD COLUMN
+    """
     return f"""
         DO $$
         BEGIN
             IF NOT EXISTS (
                 SELECT 1 FROM information_schema.columns
-                WHERE table_name = '{table}' AND column_name = '{column}'
+                WHERE table_name = '{table}' AND column_name = '{col_name}'
             ) THEN
-                ALTER TABLE {table} ADD COLUMN {column};
+                ALTER TABLE {table} ADD COLUMN {col_name} {col_def};
             END IF;
         END $$;
     """
@@ -43,18 +47,18 @@ def _col_exists(table: str, column: str) -> str:
 def upgrade() -> None:
 
     # ── 1. Extend audit_logs ─────────────────────────────────────────────
-    op.execute(_col_exists("audit_logs", "category     VARCHAR(50)  DEFAULT 'USER_ACTIVITY'"))
-    op.execute(_col_exists("audit_logs", "severity     VARCHAR(20)  DEFAULT 'INFO'"))
-    op.execute(_col_exists("audit_logs", "entity_name  VARCHAR(200)"))
-    op.execute(_col_exists("audit_logs", "mill_name    VARCHAR(200)"))
-    op.execute(_col_exists("audit_logs", "company_name VARCHAR(200)"))
-    op.execute(_col_exists("audit_logs", "company_id   VARCHAR(36)"))
-    op.execute(_col_exists("audit_logs", "mill_id      VARCHAR(36)"))
-    op.execute(_col_exists("audit_logs", "module       VARCHAR(100)"))
-    op.execute(_col_exists("audit_logs", "metadata_json JSONB"))
-    op.execute(_col_exists("audit_logs", "archived_at  TIMESTAMPTZ"))
-    op.execute(_col_exists("audit_logs", "deleted_at   TIMESTAMPTZ"))
-    op.execute(_col_exists("audit_logs", "deleted_by   VARCHAR(36)"))
+    op.execute(_col_exists("audit_logs", "category",      "VARCHAR(50)  DEFAULT 'USER_ACTIVITY'"))
+    op.execute(_col_exists("audit_logs", "severity",      "VARCHAR(20)  DEFAULT 'INFO'"))
+    op.execute(_col_exists("audit_logs", "entity_name",   "VARCHAR(200)"))
+    op.execute(_col_exists("audit_logs", "mill_name",     "VARCHAR(200)"))
+    op.execute(_col_exists("audit_logs", "company_name",  "VARCHAR(200)"))
+    op.execute(_col_exists("audit_logs", "company_id",    "VARCHAR(36)"))
+    op.execute(_col_exists("audit_logs", "mill_id",       "VARCHAR(36)"))
+    op.execute(_col_exists("audit_logs", "module",        "VARCHAR(100)"))
+    op.execute(_col_exists("audit_logs", "metadata_json", "JSONB"))
+    op.execute(_col_exists("audit_logs", "archived_at",   "TIMESTAMPTZ"))
+    op.execute(_col_exists("audit_logs", "deleted_at",    "TIMESTAMPTZ"))
+    op.execute(_col_exists("audit_logs", "deleted_by",    "VARCHAR(36)"))
 
     op.execute("CREATE INDEX IF NOT EXISTS ix_audit_logs_category   ON audit_logs (category)")
     op.execute("CREATE INDEX IF NOT EXISTS ix_audit_logs_severity   ON audit_logs (severity)")
