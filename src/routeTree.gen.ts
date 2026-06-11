@@ -18,17 +18,21 @@ import { Route as AppStoresRouteImport } from './routes/_app.stores'
 import { Route as AppStockRouteImport } from './routes/_app.stock'
 import { Route as AppSalesRouteImport } from './routes/_app.sales'
 import { Route as AppReportsRouteImport } from './routes/_app.reports'
+import { Route as AppRecommendationsRouteImport } from './routes/_app.recommendations'
 import { Route as AppQualityRouteImport } from './routes/_app.quality'
 import { Route as AppPurchaseRouteImport } from './routes/_app.purchase'
 import { Route as AppProfileRouteImport } from './routes/_app.profile'
 import { Route as AppProductionRouteImport } from './routes/_app.production'
 import { Route as AppPayrollRouteImport } from './routes/_app.payroll'
+import { Route as AppOnboardingRouteImport } from './routes/_app.onboarding'
 import { Route as AppNotificationsRouteImport } from './routes/_app.notifications'
 import { Route as AppMastersRouteImport } from './routes/_app.masters'
 import { Route as AppMaintenanceRouteImport } from './routes/_app.maintenance'
 import { Route as AppLotracRouteImport } from './routes/_app.lotrac'
 import { Route as AppInventoryRouteImport } from './routes/_app.inventory'
+import { Route as AppImportHubRouteImport } from './routes/_app.import-hub'
 import { Route as AppHrRouteImport } from './routes/_app.hr'
+import { Route as AppHelpCenterRouteImport } from './routes/_app.help-center'
 import { Route as AppDispatchRouteImport } from './routes/_app.dispatch'
 import { Route as AppDashboardRouteImport } from './routes/_app.dashboard'
 import { Route as AppAuditRouteImport } from './routes/_app.audit'
@@ -108,6 +112,11 @@ const AppReportsRoute = AppReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => AppRoute,
 } as any)
+const AppRecommendationsRoute = AppRecommendationsRouteImport.update({
+  id: '/recommendations',
+  path: '/recommendations',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppQualityRoute = AppQualityRouteImport.update({
   id: '/quality',
   path: '/quality',
@@ -131,6 +140,11 @@ const AppProductionRoute = AppProductionRouteImport.update({
 const AppPayrollRoute = AppPayrollRouteImport.update({
   id: '/payroll',
   path: '/payroll',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppOnboardingRoute = AppOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => AppRoute,
 } as any)
 const AppNotificationsRoute = AppNotificationsRouteImport.update({
@@ -158,9 +172,19 @@ const AppInventoryRoute = AppInventoryRouteImport.update({
   path: '/inventory',
   getParentRoute: () => AppRoute,
 } as any)
+const AppImportHubRoute = AppImportHubRouteImport.update({
+  id: '/import-hub',
+  path: '/import-hub',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppHrRoute = AppHrRouteImport.update({
   id: '/hr',
   path: '/hr',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHelpCenterRoute = AppHelpCenterRouteImport.update({
+  id: '/help-center',
+  path: '/help-center',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDispatchRoute = AppDispatchRouteImport.update({
@@ -349,17 +373,21 @@ export interface FileRoutesByFullPath {
   '/audit': typeof AppAuditRoute
   '/dashboard': typeof AppDashboardRoute
   '/dispatch': typeof AppDispatchRoute
+  '/help-center': typeof AppHelpCenterRoute
   '/hr': typeof AppHrRoute
+  '/import-hub': typeof AppImportHubRoute
   '/inventory': typeof AppInventoryRoute
   '/lotrac': typeof AppLotracRoute
   '/maintenance': typeof AppMaintenanceRoute
   '/masters': typeof AppMastersRoute
   '/notifications': typeof AppNotificationsRoute
+  '/onboarding': typeof AppOnboardingRoute
   '/payroll': typeof AppPayrollRoute
   '/production': typeof AppProductionRoute
   '/profile': typeof AppProfileRoute
   '/purchase': typeof AppPurchaseRoute
   '/quality': typeof AppQualityRoute
+  '/recommendations': typeof AppRecommendationsRoute
   '/reports': typeof AppReportsRoute
   '/sales': typeof AppSalesRoute
   '/stock': typeof AppStockRoute
@@ -404,17 +432,21 @@ export interface FileRoutesByTo {
   '/audit': typeof AppAuditRoute
   '/dashboard': typeof AppDashboardRoute
   '/dispatch': typeof AppDispatchRoute
+  '/help-center': typeof AppHelpCenterRoute
   '/hr': typeof AppHrRoute
+  '/import-hub': typeof AppImportHubRoute
   '/inventory': typeof AppInventoryRoute
   '/lotrac': typeof AppLotracRoute
   '/maintenance': typeof AppMaintenanceRoute
   '/masters': typeof AppMastersRoute
   '/notifications': typeof AppNotificationsRoute
+  '/onboarding': typeof AppOnboardingRoute
   '/payroll': typeof AppPayrollRoute
   '/production': typeof AppProductionRoute
   '/profile': typeof AppProfileRoute
   '/purchase': typeof AppPurchaseRoute
   '/quality': typeof AppQualityRoute
+  '/recommendations': typeof AppRecommendationsRoute
   '/reports': typeof AppReportsRoute
   '/sales': typeof AppSalesRoute
   '/stock': typeof AppStockRoute
@@ -461,17 +493,21 @@ export interface FileRoutesById {
   '/_app/audit': typeof AppAuditRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/dispatch': typeof AppDispatchRoute
+  '/_app/help-center': typeof AppHelpCenterRoute
   '/_app/hr': typeof AppHrRoute
+  '/_app/import-hub': typeof AppImportHubRoute
   '/_app/inventory': typeof AppInventoryRoute
   '/_app/lotrac': typeof AppLotracRoute
   '/_app/maintenance': typeof AppMaintenanceRoute
   '/_app/masters': typeof AppMastersRoute
   '/_app/notifications': typeof AppNotificationsRoute
+  '/_app/onboarding': typeof AppOnboardingRoute
   '/_app/payroll': typeof AppPayrollRoute
   '/_app/production': typeof AppProductionRoute
   '/_app/profile': typeof AppProfileRoute
   '/_app/purchase': typeof AppPurchaseRoute
   '/_app/quality': typeof AppQualityRoute
+  '/_app/recommendations': typeof AppRecommendationsRoute
   '/_app/reports': typeof AppReportsRoute
   '/_app/sales': typeof AppSalesRoute
   '/_app/stock': typeof AppStockRoute
@@ -518,17 +554,21 @@ export interface FileRouteTypes {
     | '/audit'
     | '/dashboard'
     | '/dispatch'
+    | '/help-center'
     | '/hr'
+    | '/import-hub'
     | '/inventory'
     | '/lotrac'
     | '/maintenance'
     | '/masters'
     | '/notifications'
+    | '/onboarding'
     | '/payroll'
     | '/production'
     | '/profile'
     | '/purchase'
     | '/quality'
+    | '/recommendations'
     | '/reports'
     | '/sales'
     | '/stock'
@@ -573,17 +613,21 @@ export interface FileRouteTypes {
     | '/audit'
     | '/dashboard'
     | '/dispatch'
+    | '/help-center'
     | '/hr'
+    | '/import-hub'
     | '/inventory'
     | '/lotrac'
     | '/maintenance'
     | '/masters'
     | '/notifications'
+    | '/onboarding'
     | '/payroll'
     | '/production'
     | '/profile'
     | '/purchase'
     | '/quality'
+    | '/recommendations'
     | '/reports'
     | '/sales'
     | '/stock'
@@ -629,17 +673,21 @@ export interface FileRouteTypes {
     | '/_app/audit'
     | '/_app/dashboard'
     | '/_app/dispatch'
+    | '/_app/help-center'
     | '/_app/hr'
+    | '/_app/import-hub'
     | '/_app/inventory'
     | '/_app/lotrac'
     | '/_app/maintenance'
     | '/_app/masters'
     | '/_app/notifications'
+    | '/_app/onboarding'
     | '/_app/payroll'
     | '/_app/production'
     | '/_app/profile'
     | '/_app/purchase'
     | '/_app/quality'
+    | '/_app/recommendations'
     | '/_app/reports'
     | '/_app/sales'
     | '/_app/stock'
@@ -747,6 +795,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppReportsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/recommendations': {
+      id: '/_app/recommendations'
+      path: '/recommendations'
+      fullPath: '/recommendations'
+      preLoaderRoute: typeof AppRecommendationsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/quality': {
       id: '/_app/quality'
       path: '/quality'
@@ -780,6 +835,13 @@ declare module '@tanstack/react-router' {
       path: '/payroll'
       fullPath: '/payroll'
       preLoaderRoute: typeof AppPayrollRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/onboarding': {
+      id: '/_app/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof AppOnboardingRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/notifications': {
@@ -817,11 +879,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppInventoryRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/import-hub': {
+      id: '/_app/import-hub'
+      path: '/import-hub'
+      fullPath: '/import-hub'
+      preLoaderRoute: typeof AppImportHubRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/hr': {
       id: '/_app/hr'
       path: '/hr'
       fullPath: '/hr'
       preLoaderRoute: typeof AppHrRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/help-center': {
+      id: '/_app/help-center'
+      path: '/help-center'
+      fullPath: '/help-center'
+      preLoaderRoute: typeof AppHelpCenterRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/dispatch': {
@@ -1155,17 +1231,21 @@ interface AppRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppDispatchRoute: typeof AppDispatchRoute
+  AppHelpCenterRoute: typeof AppHelpCenterRoute
   AppHrRoute: typeof AppHrRoute
+  AppImportHubRoute: typeof AppImportHubRoute
   AppInventoryRoute: typeof AppInventoryRoute
   AppLotracRoute: typeof AppLotracRoute
   AppMaintenanceRoute: typeof AppMaintenanceRoute
   AppMastersRoute: typeof AppMastersRoute
   AppNotificationsRoute: typeof AppNotificationsRoute
+  AppOnboardingRoute: typeof AppOnboardingRoute
   AppPayrollRoute: typeof AppPayrollRoute
   AppProductionRoute: typeof AppProductionRoute
   AppProfileRoute: typeof AppProfileRoute
   AppPurchaseRoute: typeof AppPurchaseRoute
   AppQualityRoute: typeof AppQualityRoute
+  AppRecommendationsRoute: typeof AppRecommendationsRoute
   AppReportsRoute: typeof AppReportsRoute
   AppSalesRoute: typeof AppSalesRoute
   AppStockRoute: typeof AppStockRoute
@@ -1181,17 +1261,21 @@ const AppRouteChildren: AppRouteChildren = {
   AppAuditRoute: AppAuditRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppDispatchRoute: AppDispatchRoute,
+  AppHelpCenterRoute: AppHelpCenterRoute,
   AppHrRoute: AppHrRoute,
+  AppImportHubRoute: AppImportHubRoute,
   AppInventoryRoute: AppInventoryRoute,
   AppLotracRoute: AppLotracRoute,
   AppMaintenanceRoute: AppMaintenanceRoute,
   AppMastersRoute: AppMastersRoute,
   AppNotificationsRoute: AppNotificationsRoute,
+  AppOnboardingRoute: AppOnboardingRoute,
   AppPayrollRoute: AppPayrollRoute,
   AppProductionRoute: AppProductionRoute,
   AppProfileRoute: AppProfileRoute,
   AppPurchaseRoute: AppPurchaseRoute,
   AppQualityRoute: AppQualityRoute,
+  AppRecommendationsRoute: AppRecommendationsRoute,
   AppReportsRoute: AppReportsRoute,
   AppSalesRoute: AppSalesRoute,
   AppStockRoute: AppStockRoute,

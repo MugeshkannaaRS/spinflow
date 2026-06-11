@@ -29,6 +29,7 @@ from app.api.v1.mixing import router as mixing_router
 from app.api.v1.production_v2 import router as production_v2_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.alerts import router as alerts_router
+from app.api.v1.customer_success import router as customer_success_router
 from app.ws.notifications import router as ws_router
 
 setup_logging()
@@ -283,6 +284,19 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.error(f"Failed to start billing scheduler: {exc}", exc_info=True)
 
+    # ── Wave 5.3: seed help content ──────────────────────────────────────
+    try:
+        from app.db.session import get_db as _cs_db
+        from app.services.customer_success_service import seed_help_content
+        async for session in _cs_db():
+            n = await seed_help_content(session)
+            if n:
+                await session.commit()
+                logger.info("W5.3: seeded %d help articles + categories", n)
+            break
+    except Exception as exc:
+        logger.error(f"W5.3 help seed failed (non-fatal): {exc}", exc_info=True)
+
     # ── Wave 4A: enterprise background loop ──────────────────────────────
     enterprise_task = None
     try:
@@ -516,6 +530,7 @@ app.include_router(mixing_router, prefix=API_PREFIX, tags=["Mixing & JCP"])
 app.include_router(production_v2_router, prefix=API_PREFIX, tags=["Production v2"])
 app.include_router(notifications_router, prefix=API_PREFIX, tags=["Notifications"])
 app.include_router(alerts_router, prefix=API_PREFIX, tags=["Alerts"])
+app.include_router(customer_success_router, prefix=API_PREFIX, tags=["Customer Success"])
 app.include_router(ws_router)
 
 

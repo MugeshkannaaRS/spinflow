@@ -23,6 +23,7 @@ from app.models.import_mapping import ImportMapping
 from app.models.governance import PermissionSet, SecurityPolicy, CompanyBranding, ApprovalWorkflow, ApprovalStep, ApprovalRequest, ApprovalAction
 from app.models.retention import RetentionPolicy, BackupJob, BackupRestore, HealthCheckResult, Incident
 from app.models.platform import StorageUsage, ApiUsage
+from app.models.customer_success import SetupProgress, HelpCategory, HelpArticle
 
 __all__ = [
     "Base",

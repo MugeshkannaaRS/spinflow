@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { Topbar } from "@/components/layout/Topbar";
 import { cn } from "@/lib/utils";
 import { Lock } from "lucide-react";
+import { HelpWidget } from "@/components/help/HelpWidget";
 
 const ALLOWED_DASHBOARD_ONLY_PATHS = ["/dashboard", "/profile", "/login"];
 
@@ -78,7 +79,7 @@ function ModuleAccessGuard({ children }: { children: React.ReactNode }) {
 
   if (!user || user.role === "SUPER_ADMIN") return <>{children}</>;
 
-  const bypassPaths = ["/dashboard", "/profile", "/change-password", "/login", "/company/billing"];
+  const bypassPaths = ["/dashboard", "/profile", "/change-password", "/login", "/company/billing", "/onboarding", "/import-hub", "/help-center", "/recommendations"];
   if (bypassPaths.some((p) => location.pathname === p || location.pathname.startsWith(p + "/"))) {
     return <>{children}</>;
   }
@@ -131,6 +132,7 @@ function AppShell() {
           <DashboardOnlyGuard>
             <ModuleAccessGuard>
               <Outlet />
+              <HelpWidget />
             </ModuleAccessGuard>
           </DashboardOnlyGuard>
         </main>

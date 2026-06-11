@@ -39,6 +39,10 @@ import {
   Database,
   Activity,
   BarChart3,
+  Rocket,
+  Upload,
+  BookOpen,
+  Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -100,6 +104,15 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
       { to: "/masters", label: "Masters",       icon: Settings2,  module: "masters" },
       { to: "/users",   label: "Users & Roles", icon: UserCog,    module: "users" },
       { to: "/audit",   label: "Audit Logs",    icon: ClipboardList, module: "audit" },
+    ],
+  },
+  {
+    label: "Success",
+    items: [
+      { to: "/onboarding",      label: "Setup Wizard",   icon: Rocket,     module: "dashboard" },
+      { to: "/import-hub",      label: "Import Hub",     icon: Upload,     module: "dashboard" },
+      { to: "/recommendations", label: "Recommendations", icon: Lightbulb,  module: "dashboard" },
+      { to: "/help-center",     label: "Help Center",    icon: BookOpen,   module: "dashboard" },
     ],
   },
 ];
