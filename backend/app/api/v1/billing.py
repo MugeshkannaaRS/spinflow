@@ -6,16 +6,16 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from typing import List, Dict, Optional
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, log_audit
+from app.core.deps import get_current_user, log_audit, require_module
 from app.core.module_registry import ALL_MODULE_CODES as ALL_MODULES, get_module_label
 from app.core.limiter import limiter
 from app.models.user import User
 from app.models.masters import Company, CompanyModule, Mill
 from app.models.hr import Employee
-from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest, BillingPayment, OveragePricing
+from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest, BillingPayment, OveragePricing, AddonPricing
 from app.services.pricing_service import PricingService
 from app.services.billing_service import BillingService
 from app.services.billing_invoice_service import InvoiceService
@@ -1340,6 +1340,310 @@ async def download_invoice_pdf(
             "Content-Length": str(len(pdf_bytes)),
         },
     )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# MILL OWNER: Cancel subscription
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.post("/billing/cancel")
+async def cancel_subscription(
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancel subscription at end of current billing cycle. MILL_OWNER only."""
+    role = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role not in ("MILL_OWNER", "SUPER_ADMIN"):
+        raise HTTPException(status_code=403, detail="Mill Owner or Super Admin only")
+
+    company_id = current_user.company_id
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company associated with user")
+
+    sub_res = await db.execute(
+        select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+    )
+    sub = sub_res.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=400, detail="No subscription found")
+    if sub.status in ("cancelled", "suspended", "expired"):
+        raise HTTPException(status_code=400, detail=f"Subscription already {sub.status}")
+
+    reason = body.get("reason", "")
+    effective = sub.expires_at or datetime.now(timezone.utc)
+
+    sub.status = "cancelled"
+    sub.cancelled_at = datetime.now(timezone.utc)
+    sub.cancellation_reason = reason
+    sub.cancellation_effective = effective
+    sub.cancelled_by = current_user.id
+
+    await db.commit()
+    await log_audit(db, current_user.id, role, "subscription_cancelled", "billing", company_id,
+                    f"Subscription cancelled. Reason: {reason}. Effective: {effective.isoformat()}",
+                    company_id=company_id, module="billing")
+    return {
+        "success": True,
+        "status": "cancelled",
+        "effective": effective.isoformat(),
+        "message": "Subscription will remain active until the end of the current billing period.",
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# MILL OWNER: Reactivate cancelled subscription
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.post("/billing/reactivate")
+async def reactivate_subscription(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reactivate a cancelled or expired subscription."""
+    role = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role not in ("MILL_OWNER", "SUPER_ADMIN"):
+        raise HTTPException(status_code=403, detail="Mill Owner or Super Admin only")
+
+    company_id = current_user.company_id
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company associated with user")
+
+    sub_res = await db.execute(
+        select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+    )
+    sub = sub_res.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=400, detail="No subscription found")
+    if sub.status not in ("cancelled", "expired", "grace_period"):
+        raise HTTPException(status_code=400, detail=f"Cannot reactivate subscription with status '{sub.status}'")
+
+    # Reset to active
+    sub.status = "active"
+    sub.cancelled_at = None
+    sub.cancellation_reason = None
+    sub.cancellation_effective = None
+    sub.cancelled_by = None
+    # Extend expiry by one billing cycle
+    cycle_days = 30 if sub.billing_cycle == "monthly" else 365
+    sub.expires_at = datetime.now(timezone.utc) + timedelta(days=cycle_days)
+
+    # Reactivate company
+    company = await db.get(Company, company_id)
+    if company and company.status == "suspended":
+        company.is_active = True
+        company.status = "active"
+        company.suspended_at = None
+
+    await db.commit()
+    await log_audit(db, current_user.id, role, "subscription_reactivated", "billing", company_id,
+                    "Subscription reactivated by MILL_OWNER",
+                    company_id=company_id, module="billing")
+    return {
+        "success": True,
+        "status": "active",
+        "expires_at": sub.expires_at.isoformat(),
+        "message": "Subscription reactivated successfully.",
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# MILL OWNER: Add-on marketplace — list available addons
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.get("/billing/addons")
+async def list_addons(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List available marketplace add-on modules with pricing."""
+    role = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role not in ("MILL_OWNER", "SUPER_ADMIN"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    result = await db.execute(
+        select(AddonPricing).where(AddonPricing.is_active == True).order_by(AddonPricing.sort_order)
+    )
+    addons = result.scalars().all()
+
+    company_id = current_user.company_id
+    enabled_addons = []
+    if company_id:
+        sub_res = await db.execute(
+            select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+        )
+        sub = sub_res.scalar_one_or_none()
+        if sub and sub.addon_modules:
+            enabled_addons = [k for k, v in sub.addon_modules.items() if v]
+
+    return [
+        {
+            "id": a.id,
+            "module_code": a.module_code,
+            "label": a.label,
+            "description": a.description,
+            "monthly_price": float(a.monthly_price),
+            "yearly_price": float(a.yearly_price),
+            "category": a.category,
+            "is_enabled": a.module_code in enabled_addons,
+        }
+        for a in addons
+    ]
+
+
+@router.post("/billing/addons/{module_code}/subscribe")
+async def purchase_addon(
+    module_code: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Purchase an add-on module. Generates prorated invoice."""
+    role = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role not in ("MILL_OWNER", "SUPER_ADMIN"):
+        raise HTTPException(status_code=403, detail="Mill Owner or Super Admin only")
+
+    company_id = current_user.company_id
+    if not company_id:
+        raise HTTPException(status_code=400, detail="No company associated with user")
+
+    # Find addon pricing
+    addon_res = await db.execute(
+        select(AddonPricing).where(
+            AddonPricing.module_code == module_code,
+            AddonPricing.is_active == True,
+        )
+    )
+    addon = addon_res.scalar_one_or_none()
+    if not addon:
+        raise HTTPException(status_code=404, detail="Add-on not found")
+
+    # Get subscription
+    sub_res = await db.execute(
+        select(CompanySubscription).where(CompanySubscription.company_id == company_id)
+    )
+    sub = sub_res.scalar_one_or_none()
+    if not sub:
+        raise HTTPException(status_code=400, detail="No subscription found")
+    if sub.status in ("cancelled", "suspended", "expired"):
+        raise HTTPException(status_code=400, detail=f"Cannot purchase add-on: subscription is {sub.status}")
+
+    # Check if already enabled
+    addon_modules = dict(sub.addon_modules or {})
+    if addon_modules.get(module_code, False):
+        raise HTTPException(status_code=400, detail="Add-on already enabled")
+
+    # Enable addon
+    addon_modules[module_code] = True
+    sub.addon_modules = addon_modules
+
+    # Enable the module for this company
+    mod_res = await db.execute(
+        select(CompanyModule).where(
+            CompanyModule.company_id == company_id,
+            CompanyModule.module_name == module_code,
+        )
+    )
+    company_module = mod_res.scalar_one_or_none()
+    if company_module:
+        company_module.is_enabled = True
+    else:
+        cm = CompanyModule(
+            company_id=company_id,
+            module_name=module_code,
+            is_enabled=True,
+            enabled_by=current_user.id,
+        )
+        db.add(cm)
+
+    # Generate prorated invoice for the addon
+    now = datetime.now(timezone.utc)
+    period_start = datetime(now.year, now.month, 1, tzinfo=timezone.utc)
+    if now.month == 12:
+        period_end = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc) - timedelta(seconds=1)
+    else:
+        period_end = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc) - timedelta(seconds=1)
+
+    svc = InvoiceService(db)
+    invoice = await svc.generate_overage_invoice(
+        company_id=company_id,
+        resource_type=f"addon_{module_code}",
+        quantity=1,
+        unit_price=float(addon.monthly_price),
+        period_start=period_start,
+        period_end=period_end,
+    )
+
+    await db.commit()
+    await log_audit(db, current_user.id, role, "addon_purchased", "billing", company_id,
+                    f"Purchased add-on module: {addon.label} ({module_code}). Invoice {invoice.invoice_number}",
+                    company_id=company_id, module="billing")
+    return {
+        "success": True,
+        "module_code": module_code,
+        "label": addon.label,
+        "invoice_id": invoice.id,
+        "invoice_number": invoice.invoice_number,
+        "amount": float(invoice.amount),
+        "message": f"Add-on '{addon.label}' enabled. Invoice {invoice.invoice_number} generated.",
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# SUPER ADMIN: Manage add-on pricing
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.get("/admin/billing/addons", dependencies=[Depends(require_module("billing", write=False))])
+async def admin_list_addons(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """SUPER_ADMIN: List all add-on pricing records."""
+    result = await db.execute(
+        select(AddonPricing).order_by(AddonPricing.sort_order)
+    )
+    return [
+        {
+            "id": a.id,
+            "module_code": a.module_code,
+            "label": a.label,
+            "description": a.description,
+            "monthly_price": float(a.monthly_price),
+            "yearly_price": float(a.yearly_price),
+            "category": a.category,
+            "is_active": a.is_active,
+            "sort_order": a.sort_order,
+        }
+        for a in result.scalars().all()
+    ]
+
+
+@router.post("/admin/billing/addons", dependencies=[Depends(require_module("billing", write=True))])
+async def admin_create_addon(
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """SUPER_ADMIN: Create an add-on pricing entry."""
+    addon = AddonPricing(
+        module_code=body["module_code"],
+        label=body.get("label", body["module_code"]),
+        description=body.get("description"),
+        monthly_price=body.get("monthly_price", 0),
+        yearly_price=body.get("yearly_price", 0),
+        category=body.get("category", "addon"),
+        is_active=body.get("is_active", True),
+        sort_order=body.get("sort_order", 0),
+    )
+    db.add(addon)
+    await db.commit()
+    await log_audit(db, current_user.id, "SUPER_ADMIN", "addon_created", "billing", addon.id,
+                    f"Created add-on pricing: {addon.label} ({addon.module_code})",
+                    company_id=body.get("company_id"), module="billing")
+    return {"success": True, "id": addon.id}
 
 
 # ═══════════════════════════════════════════════════════════════════

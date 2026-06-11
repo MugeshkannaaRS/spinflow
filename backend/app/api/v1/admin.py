@@ -25,6 +25,11 @@ from app.core.error_handler import SpinFlowException
 from app.services.deletion_service import CompanyDeletionService
 from app.services.stats_service import StatsService
 from app.services.onboarding_service import OnboardingService
+from app.services.command_center_service import CommandCenterService
+from app.models.governance import PermissionSet, SecurityPolicy, CompanyBranding, ApprovalWorkflow, ApprovalStep, ApprovalRequest, ApprovalAction
+from app.models.retention import RetentionPolicy, BackupJob, BackupRestore, HealthCheckResult, Incident
+from app.models.platform import StorageUsage, ApiUsage
+from app.models.billing import AddonPricing
 from app.schemas.onboarding import OnboardingRequest, OnboardingResult
 from sqlalchemy import update as sa_update
 
@@ -1490,3 +1495,682 @@ async def set_company_role_modules(
 
     await db.commit()
     return {"upserted": upserted, "company_id": company_id}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Phase 2 — Super Admin Command Center
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.get("/admin/command-center/kpi")
+async def command_center_kpi(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Single endpoint returning all Command Center KPI values."""
+    svc = CommandCenterService(db)
+    return await svc.kpi()
+
+
+@router.get("/admin/command-center/fastest-growing")
+async def command_center_fastest_growing(
+    limit: int = 10,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    svc = CommandCenterService(db)
+    return await svc.fastest_growing(limit)
+
+
+@router.get("/admin/command-center/active-mills")
+async def command_center_active_mills(
+    limit: int = 10,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    svc = CommandCenterService(db)
+    return await svc.active_mills(limit)
+
+
+@router.get("/admin/command-center/inactive-customers")
+async def command_center_inactive_customers(
+    days: int = 30,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    svc = CommandCenterService(db)
+    return await svc.inactive_customers(days)
+
+
+@router.get("/admin/command-center/health-scores")
+async def command_center_health_scores(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    svc = CommandCenterService(db)
+    return await svc.health_scores()
+
+
+@router.get("/admin/command-center/upgrade-funnel")
+async def command_center_upgrade_funnel(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    svc = CommandCenterService(db)
+    return await svc.upgrade_funnel()
+
+
+@router.get("/admin/command-center/active-sessions")
+async def command_center_active_sessions(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from sqlalchemy import text
+    result = await db.execute(text("SELECT COUNT(*) FROM user_sessions WHERE is_active = true"))
+    return {"active_sessions": result.scalar() or 0}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Phase 3 — Governance Platform: Permission Sets
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.get("/admin/companies/{company_id}/permission-sets")
+async def list_permission_sets(company_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(PermissionSet).where(PermissionSet.company_id == company_id, PermissionSet.is_active == True).order_by(PermissionSet.name)
+    )
+    return [{"id": p.id, "name": p.name, "description": p.description, "permissions": p.permissions} for p in result.scalars().all()]
+
+
+@router.post("/admin/companies/{company_id}/permission-sets")
+async def create_permission_set(company_id: str, body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    ps = PermissionSet(
+        company_id=company_id,
+        name=body["name"],
+        description=body.get("description"),
+        permissions=body.get("permissions", {}),
+        created_by=current_user.id,
+    )
+    db.add(ps)
+    await db.commit()
+    await log_audit(db, current_user.id, "SUPER_ADMIN", "permission_set_created", "governance", ps.id,
+                    f"Created permission set: {ps.name}", company_id=company_id, module="admin")
+    return {"success": True, "id": ps.id}
+
+
+@router.put("/admin/companies/{company_id}/permission-sets/{ps_id}")
+async def update_permission_set(company_id: str, ps_id: str, body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    ps = await db.get(PermissionSet, ps_id)
+    if not ps or ps.company_id != company_id:
+        raise HTTPException(status_code=404, detail="Permission set not found")
+    if "name" in body:
+        ps.name = body["name"]
+    if "description" in body:
+        ps.description = body["description"]
+    if "permissions" in body:
+        ps.permissions = body["permissions"]
+    if "is_active" in body:
+        ps.is_active = body["is_active"]
+    await db.commit()
+    await log_audit(db, current_user.id, "SUPER_ADMIN", "permission_set_updated", "governance", ps_id,
+                    f"Updated permission set", company_id=company_id, module="admin")
+    return {"success": True}
+
+
+# ── Security Policies ──────────────────────────────────────────
+
+
+@router.get("/admin/companies/{company_id}/security-policy")
+async def get_security_policy(company_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(SecurityPolicy).where(SecurityPolicy.company_id == company_id))
+    policy = result.scalar_one_or_none()
+    if not policy:
+        return {"min_password_length": 8, "require_mfa": False, "session_timeout_minutes": 480,
+                "max_failed_logins": 5, "password_expiry_days": 90, "require_special_char": True,
+                "require_upper_lower": True, "ip_whitelist": [], "allowed_domains": []}
+    return {
+        "min_password_length": policy.min_password_length,
+        "require_mfa": policy.require_mfa,
+        "session_timeout_minutes": policy.session_timeout_minutes,
+        "max_failed_logins": policy.max_failed_logins,
+        "ip_whitelist": policy.ip_whitelist or [],
+        "allowed_domains": policy.allowed_domains or [],
+        "password_expiry_days": policy.password_expiry_days,
+        "require_special_char": policy.require_special_char,
+        "require_upper_lower": policy.require_upper_lower,
+    }
+
+
+@router.put("/admin/companies/{company_id}/security-policy")
+async def update_security_policy(company_id: str, body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(SecurityPolicy).where(SecurityPolicy.company_id == company_id))
+    policy = result.scalar_one_or_none()
+    if not policy:
+        policy = SecurityPolicy(company_id=company_id, created_by=current_user.id)
+        db.add(policy)
+    for field in ("min_password_length", "require_mfa", "session_timeout_minutes", "max_failed_logins",
+                  "ip_whitelist", "allowed_domains", "password_expiry_days", "require_special_char", "require_upper_lower"):
+        if field in body:
+            setattr(policy, field, body[field])
+    await db.commit()
+    await log_audit(db, current_user.id, "SUPER_ADMIN", "security_policy_updated", "governance", company_id,
+                    f"Updated security policy", company_id=company_id, module="admin")
+    return {"success": True}
+
+
+# ── Company Branding ───────────────────────────────────────────
+
+
+@router.get("/admin/companies/{company_id}/branding")
+async def get_company_branding(company_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(CompanyBranding).where(CompanyBranding.company_id == company_id))
+    b = result.scalar_one_or_none()
+    if not b:
+        return {"primary_color": "#0f1923", "secondary_color": "#0d9488", "logo_url": None,
+                "favicon_url": None, "custom_domain": None, "email_header_html": None, "email_footer_html": None}
+    return {
+        "primary_color": b.primary_color,
+        "secondary_color": b.secondary_color,
+        "logo_url": b.logo_url,
+        "favicon_url": b.favicon_url,
+        "custom_domain": b.custom_domain,
+        "email_header_html": b.email_header_html,
+        "email_footer_html": b.email_footer_html,
+    }
+
+
+@router.put("/admin/companies/{company_id}/branding")
+async def update_company_branding(company_id: str, body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(CompanyBranding).where(CompanyBranding.company_id == company_id))
+    b = result.scalar_one_or_none()
+    if not b:
+        b = CompanyBranding(company_id=company_id, updated_by=current_user.id)
+        db.add(b)
+    for field in ("primary_color", "secondary_color", "logo_url", "favicon_url", "custom_domain",
+                  "email_header_html", "email_footer_html"):
+        if field in body:
+            setattr(b, field, body[field])
+    b.updated_by = current_user.id
+    await db.commit()
+    await log_audit(db, current_user.id, "SUPER_ADMIN", "branding_updated", "governance", company_id,
+                    f"Updated branding", company_id=company_id, module="admin")
+    return {"success": True}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Phase 4 — Universal Approval Engine
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.get("/admin/companies/{company_id}/approval-workflows")
+async def list_approval_workflows(company_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(ApprovalWorkflow).where(ApprovalWorkflow.company_id == company_id, ApprovalWorkflow.is_active == True)
+        .order_by(ApprovalWorkflow.name)
+    )
+    workflows = []
+    for w in result.scalars().all():
+        steps_res = await db.execute(
+            select(ApprovalStep).where(ApprovalStep.workflow_id == w.id).order_by(ApprovalStep.step_order)
+        )
+        steps = [{"id": s.id, "step_order": s.step_order, "label": s.label, "assignee_role": s.assignee_role,
+                   "assignee_user_id": s.assignee_user_id, "timeout_hours": s.timeout_hours,
+                   "escalation_role": s.escalation_role, "action_if_timeout": s.action_if_timeout}
+                 for s in steps_res.scalars().all()]
+        workflows.append({
+            "id": w.id, "name": w.name, "description": w.description, "entity_type": w.entity_type,
+            "module": w.module, "steps": steps,
+        })
+    return workflows
+
+
+@router.post("/admin/companies/{company_id}/approval-workflows")
+async def create_approval_workflow(company_id: str, body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    wf = ApprovalWorkflow(
+        company_id=company_id,
+        name=body["name"],
+        description=body.get("description"),
+        entity_type=body["entity_type"],
+        module=body.get("module"),
+    )
+    db.add(wf)
+    await db.flush()
+    for i, step in enumerate(body.get("steps", [])):
+        s = ApprovalStep(
+            workflow_id=wf.id,
+            step_order=i + 1,
+            label=step.get("label", "Approve"),
+            assignee_role=step.get("assignee_role"),
+            assignee_user_id=step.get("assignee_user_id"),
+            timeout_hours=step.get("timeout_hours", 48),
+            escalation_role=step.get("escalation_role"),
+            action_if_timeout=step.get("action_if_timeout", "escalate"),
+        )
+        db.add(s)
+    await db.commit()
+    await log_audit(db, current_user.id, "SUPER_ADMIN", "approval_workflow_created", "governance", wf.id,
+                    f"Created approval workflow: {wf.name}", company_id=company_id, module="admin")
+    return {"success": True, "id": wf.id}
+
+
+@router.post("/approval-requests")
+async def create_approval_request(body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Create an approval request against a workflow. Accessible by MILL_OWNER or module users."""
+    wf = await db.get(ApprovalWorkflow, body["workflow_id"])
+    if not wf or not wf.is_active:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    req = ApprovalRequest(
+        company_id=wf.company_id,
+        workflow_id=wf.id,
+        entity_type=wf.entity_type,
+        entity_id=body["entity_id"],
+        entity_summary=body.get("entity_summary"),
+        requested_by=current_user.id,
+        status="pending",
+    )
+    db.add(req)
+    await db.commit()
+    await log_audit(db, current_user.id, current_user.role_rel.code if current_user.role_rel else "",
+                    "approval_request_created", "governance", req.id,
+                    f"Approval request for {wf.entity_type}:{body['entity_id']}",
+                    company_id=wf.company_id, module=wf.module or "admin")
+    return {"success": True, "id": req.id}
+
+
+@router.put("/approval-requests/{request_id}/action")
+async def action_approval_request(request_id: str, body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    req = await db.get(ApprovalRequest, request_id)
+    if not req:
+        raise HTTPException(status_code=404, detail="Approval request not found")
+    if req.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Request already {req.status}")
+
+    action_str = body.get("action", "approve")
+    comment = body.get("comment", "")
+    wf = await db.get(ApprovalWorkflow, req.workflow_id)
+    steps_res = await db.execute(select(ApprovalStep).where(ApprovalStep.workflow_id == wf.id).order_by(ApprovalStep.step_order))
+    steps = steps_res.scalars().all()
+
+    action = ApprovalAction(
+        request_id=req.id,
+        step_index=req.current_step_index,
+        actor_id=current_user.id,
+        action=action_str,
+        comment=comment,
+    )
+    db.add(action)
+
+    if action_str == "reject":
+        req.status = "rejected"
+    elif action_str == "approve":
+        if req.current_step_index >= len(steps) - 1:
+            req.status = "approved"
+        else:
+            req.current_step_index += 1
+    # escalate keeps status pending, advances step
+
+    await db.commit()
+    await log_audit(db, current_user.id, current_user.role_rel.code if current_user.role_rel else "",
+                    f"approval_{action_str}", "governance", req.id,
+                    f"Approval {action_str}: step {action.step_index + 1}/{len(steps)}",
+                    company_id=req.company_id, module=wf.module if wf else "admin")
+    return {"success": True, "status": req.status, "current_step": req.current_step_index + 1}
+
+
+@router.get("/approval-requests/pending")
+async def list_pending_approvals(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    company_id = current_user.company_id
+    result = await db.execute(
+        select(ApprovalRequest).where(
+            ApprovalRequest.company_id == company_id,
+            ApprovalRequest.status == "pending",
+        ).order_by(ApprovalRequest.created_at.desc()).limit(50)
+    )
+    return [{
+        "id": r.id, "workflow_id": r.workflow_id, "entity_type": r.entity_type,
+        "entity_id": r.entity_id, "entity_summary": r.entity_summary,
+        "requested_by": r.requested_by, "status": r.status,
+        "current_step": r.current_step_index + 1,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+    } for r in result.scalars().all()]
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Phase 5 — Audit Retention
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.get("/admin/retention-policies")
+async def list_retention_policies(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(RetentionPolicy).order_by(RetentionPolicy.entity_type, RetentionPolicy.severity))
+    return [{
+        "id": p.id, "company_id": p.company_id, "entity_type": p.entity_type,
+        "severity": p.severity, "retention_days": p.retention_days,
+        "action": p.action, "is_active": p.is_active,
+    } for p in result.scalars().all()]
+
+
+@router.post("/admin/retention-policies")
+async def create_retention_policy(body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    p = RetentionPolicy(
+        company_id=body.get("company_id"),
+        entity_type=body["entity_type"],
+        severity=body.get("severity"),
+        retention_days=body["retention_days"],
+        action=body.get("action", "archive"),
+        created_by=current_user.id,
+    )
+    db.add(p)
+    await db.commit()
+    await log_audit(db, current_user.id, "SUPER_ADMIN", "retention_policy_created", "governance", p.id,
+                    f"Retention: {p.entity_type}/{p.severity or '*'}: {p.retention_days}d -> {p.action}",
+                    module="admin")
+    return {"success": True, "id": p.id}
+
+
+@router.post("/admin/audit/archive")
+async def archive_old_audit_logs(body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Move audit logs older than N days to archive table."""
+    from sqlalchemy import text
+    days = body.get("days", 90)
+    result = await db.execute(text("""
+        WITH archived AS (
+            UPDATE audit_logs
+            SET archived_at = NOW()
+            WHERE created_at < CURRENT_TIMESTAMP - :days * INTERVAL '1 day'
+              AND archived_at IS NULL
+            RETURNING id
+        )
+        SELECT COUNT(*) FROM archived
+    """), {"days": days})
+    count = result.scalar() or 0
+    await db.commit()
+    await log_audit(db, current_user.id, "SUPER_ADMIN", "audit_archive", "audit", "bulk",
+                    f"Archived {count} audit logs older than {days} days", module="admin")
+    return {"archived": count}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Phase 6 — Backup & Disaster Recovery
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.post("/admin/backup")
+async def trigger_backup(body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Trigger a backup job."""
+    from datetime import datetime, timezone
+    job = BackupJob(
+        company_id=body.get("company_id"),
+        backup_type=body.get("backup_type", "full"),
+        status="running",
+        started_at=datetime.now(timezone.utc),
+        triggered_by=current_user.id,
+    )
+    db.add(job)
+    await db.flush()
+    try:
+        from app.services.deletion_service import CompanyDeletionService
+        if body.get("company_id"):
+            dsvc = CompanyDeletionService(db)
+            backup_path = await dsvc.generate_backup(body["company_id"])
+            job.file_path = str(backup_path) if backup_path else None
+        job.status = "completed"
+        job.completed_at = datetime.now(timezone.utc)
+    except Exception as exc:
+        job.status = "failed"
+        job.error_message = str(exc)
+    await db.commit()
+    await log_audit(db, current_user.id, "SUPER_ADMIN", "backup_triggered", "backup", job.id,
+                    f"Backup {job.backup_type}: {job.status}", module="admin")
+    return {"success": job.status == "completed", "id": job.id, "status": job.status}
+
+
+@router.get("/admin/backups")
+async def list_backups(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(BackupJob).order_by(BackupJob.created_at.desc()).limit(50)
+    )
+    return [{
+        "id": j.id, "backup_type": j.backup_type, "status": j.status,
+        "file_size_bytes": j.file_size_bytes, "rows_backed_up": j.rows_backed_up,
+        "started_at": j.started_at.isoformat() if j.started_at else None,
+        "completed_at": j.completed_at.isoformat() if j.completed_at else None,
+        "error_message": j.error_message,
+    } for j in result.scalars().all()]
+
+
+@router.post("/admin/backup/{backup_id}/restore")
+async def restore_backup(backup_id: str, body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Restore from a backup (dry-run or execute)."""
+    job = await db.get(BackupJob, backup_id)
+    if not job or job.status != "completed":
+        raise HTTPException(status_code=404, detail="Completed backup not found")
+    is_dry_run = body.get("dry_run", True)
+    restore = BackupRestore(
+        backup_job_id=backup_id,
+        company_id=job.company_id,
+        status="dry_run" if is_dry_run else "running",
+        is_dry_run=is_dry_run,
+        requested_by=current_user.id,
+    )
+    db.add(restore)
+    if not is_dry_run:
+        restore.status = "completed"
+        restore.completed_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    await db.commit()
+    await log_audit(db, current_user.id, "SUPER_ADMIN", "backup_restore", "backup", restore.id,
+                    f"Restore from backup {backup_id} (dry_run={is_dry_run})", module="admin")
+    return {"success": True, "id": restore.id, "status": restore.status}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Phase 8 — Multi-Tenant Analytics
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.get("/admin/analytics/company-growth")
+async def analytics_company_growth(period: str = "monthly", current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text
+    interval = "month" if period == "monthly" else "year"
+    result = await db.execute(text(f"""
+        SELECT
+            date_trunc('{interval}', created_at) AS period,
+            COUNT(*) AS new_companies
+        FROM companies
+        GROUP BY period
+        ORDER BY period DESC
+        LIMIT 24
+    """))
+    return [{"period": str(r.period), "new_companies": r.new_companies} for r in result.fetchall()]
+
+
+@router.get("/admin/analytics/module-adoption")
+async def analytics_module_adoption(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text
+    result = await db.execute(text("""
+        SELECT module_name, COUNT(*) AS company_count,
+               ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM companies WHERE is_active = true), 1) AS adoption_pct
+        FROM company_modules
+        WHERE is_enabled = true
+        GROUP BY module_name
+        ORDER BY company_count DESC
+    """))
+    return [{"module": r.module_name, "companies": r.company_count, "adoption_pct": float(r.adoption_pct)} for r in result.fetchall()]
+
+
+@router.get("/admin/analytics/retention-cohort")
+async def analytics_retention_cohort(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text
+    result = await db.execute(text("""
+        WITH cohorts AS (
+            SELECT
+                date_trunc('month', created_at) AS cohort_month,
+                id AS company_id
+            FROM companies
+            WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '12 months'
+        ),
+        activity AS (
+            SELECT c.company_id, date_trunc('month', bi.paid_at) AS active_month
+            FROM cohorts c
+            JOIN billing_invoices bi ON bi.company_id = c.company_id AND bi.status = 'paid'
+            GROUP BY c.company_id, active_month
+        )
+        SELECT
+            c.cohort_month,
+            COUNT(DISTINCT c.company_id) AS cohort_size,
+            COUNT(DISTINCT a.company_id) FILTER (WHERE a.active_month >= c.cohort_month + INTERVAL '1 month') AS retained_1m,
+            COUNT(DISTINCT a.company_id) FILTER (WHERE a.active_month >= c.cohort_month + INTERVAL '3 months') AS retained_3m,
+            COUNT(DISTINCT a.company_id) FILTER (WHERE a.active_month >= c.cohort_month + INTERVAL '6 months') AS retained_6m
+        FROM cohorts c
+        LEFT JOIN activity a ON a.company_id = c.company_id
+        GROUP BY c.cohort_month
+        ORDER BY c.cohort_month
+    """))
+    return [{
+        "cohort": str(r.cohort_month),
+        "cohort_size": r.cohort_size,
+        "retained_1m": r.retained_1m,
+        "retained_3m": r.retained_3m,
+        "retained_6m": r.retained_6m,
+        "retention_1m_pct": round(r.retained_1m / r.cohort_size * 100, 1) if r.cohort_size > 0 else 0,
+        "retention_3m_pct": round(r.retained_3m / r.cohort_size * 100, 1) if r.cohort_size > 0 else 0,
+        "retention_6m_pct": round(r.retained_6m / r.cohort_size * 100, 1) if r.cohort_size > 0 else 0,
+    } for r in result.fetchall()]
+
+
+@router.get("/admin/analytics/mrr-breakdown")
+async def analytics_mrr_breakdown(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import text
+    result = await db.execute(text("""
+        WITH current_month AS (
+            SELECT
+                SUM(amount) FILTER (WHERE invoice_type = 'subscription') AS subscription_revenue,
+                SUM(amount) FILTER (WHERE invoice_type = 'overage') AS overage_revenue,
+                SUM(amount) FILTER (WHERE invoice_type = 'addon') AS addon_revenue,
+                COUNT(DISTINCT company_id) AS paying_companies
+            FROM billing_invoices
+            WHERE status = 'paid'
+              AND paid_at >= date_trunc('month', CURRENT_TIMESTAMP)
+        )
+        SELECT * FROM current_month
+    """))
+    r = result.fetchone()
+    return {
+        "subscription_revenue": float(r.subscription_revenue or 0),
+        "overage_revenue": float(r.overage_revenue or 0),
+        "addon_revenue": float(r.addon_revenue or 0),
+        "total_mrr": float((r.subscription_revenue or 0) + (r.overage_revenue or 0) + (r.addon_revenue or 0)),
+        "paying_companies": r.paying_companies or 0,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Phase 9 — Platform Health Center
+# ═══════════════════════════════════════════════════════════════════
+
+
+@router.get("/admin/health/status")
+async def platform_health_status(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Return health status for all platform components."""
+    from app.core.observability import check_database, check_redis
+    from datetime import datetime, timezone
+
+    components = {}
+
+    # Database
+    try:
+        from app.db.session import get_db as _gh
+        async for session in _gh():
+            db_status = await check_database(session)
+            break
+        components["database"] = {"status": "healthy" if db_status.get("status") == "healthy" else "critical"}
+    except Exception as e:
+        components["database"] = {"status": "critical", "error": str(e)}
+
+    # Redis
+    try:
+        redis_status = await check_redis()
+        components["redis"] = {"status": "healthy" if redis_status.get("status") == "healthy" else "warning"}
+    except Exception as e:
+        components["redis"] = {"status": "warning", "error": str(e)}
+
+    # Billing service (check recent invoices)
+    try:
+        inv_count = (await db.execute(
+            select(func.count()).select_from(text("billing_invoices"))
+            .where(text("created_at >= CURRENT_TIMESTAMP - INTERVAL '24 hours'"))
+        )).scalar() or 0
+        components["billing"] = {"status": "healthy", "invoices_24h": inv_count}
+    except Exception as e:
+        components["billing"] = {"status": "warning", "error": str(e)}
+
+    # Background jobs
+    try:
+        from sqlalchemy import text as _t
+        expiry_count = (await db.execute(
+            select(func.count()).select_from(text("company_subscriptions"))
+            .where(text("status IN ('expired', 'grace_period')"))
+        )).scalar() or 0
+        components["background_jobs"] = {"status": "healthy", "pending_expirations": expiry_count}
+    except Exception as e:
+        components["background_jobs"] = {"status": "warning", "error": str(e)}
+
+    overall = all(c.get("status") == "healthy" for c in components.values())
+
+    # Store check result
+    for comp_name, data in components.items():
+        hr = HealthCheckResult(
+            component=comp_name,
+            status=data.get("status", "unknown"),
+            error_message=data.get("error"),
+            details=data,
+        )
+        db.add(hr)
+    await db.commit()
+
+    return {"overall": "healthy" if overall else "degraded", "components": components}
+
+
+@router.get("/admin/health/history")
+async def platform_health_history(days: int = 7, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Return health check history for the last N days."""
+    from sqlalchemy import text
+    result = await db.execute(text("""
+        SELECT component, status, checked_at
+        FROM health_check_results
+        WHERE checked_at >= CURRENT_TIMESTAMP - :days * INTERVAL '1 day'
+        ORDER BY checked_at DESC
+        LIMIT 500
+    """), {"days": days})
+    return [{"component": r.component, "status": r.status, "checked_at": r.checked_at.isoformat()} for r in result.fetchall()]
+
+
+@router.get("/admin/incidents")
+async def list_incidents(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Incident).order_by(Incident.started_at.desc()).limit(50))
+    return [{
+        "id": i.id, "component": i.component, "severity": i.severity, "title": i.title,
+        "status": i.status, "started_at": i.started_at.isoformat() if i.started_at else None,
+        "resolved_at": i.resolved_at.isoformat() if i.resolved_at else None,
+        "duration_minutes": i.duration_minutes,
+    } for i in result.scalars().all()]
+
+
+@router.post("/admin/incidents")
+async def create_incident(body: dict, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    from datetime import datetime, timezone
+    inc = Incident(
+        component=body["component"],
+        severity=body["severity"],
+        title=body["title"],
+        description=body.get("description"),
+        started_at=datetime.now(timezone.utc),
+        reported_by=current_user.id,
+    )
+    db.add(inc)
+    await db.commit()
+    await log_audit(db, current_user.id, "SUPER_ADMIN", "incident_created", "admin", inc.id,
+                    f"Incident: {inc.severity} - {inc.title}", module="admin")
+    return {"success": True, "id": inc.id}

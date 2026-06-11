@@ -45,6 +45,26 @@ async def get_current_user(
         company = await db.get(Company, user.company_id)
         if company and company.status == "suspended":
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Company account is suspended")
+        # Check subscription health — expired / grace require payment
+        if company and company.status == "active":
+            from app.models.billing import CompanySubscription
+            sub_res = await db.execute(
+                select(CompanySubscription).where(CompanySubscription.company_id == user.company_id)
+            )
+            sub = sub_res.scalar_one_or_none()
+            if sub and sub.status in ("expired", "grace_period", "cancelled"):
+                # Allow only billing and auth endpoints for expired/grace subscriptions
+                allowed_prefixes = ("/auth/", "/billing/", "/admin/")
+                path = request.url.path
+                if not any(path.startswith(p) for p in allowed_prefixes):
+                    raise HTTPException(
+                        status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                        detail={
+                            "code": "SUBSCRIPTION_REQUIRED",
+                            "status": sub.status,
+                            "message": "Your subscription is " + sub.status + ". Please renew to continue.",
+                        },
+                    )
 
     allowed_paths = ("/auth/change-password", "/auth/me", "/auth/logout")
     if user.must_change_password and not any(request.url.path.endswith(p) for p in allowed_paths):

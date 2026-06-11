@@ -1,7 +1,7 @@
 from app.db.base import Base
 from app.models.user import User, Role, UserSession
 from app.models.audit import AuditLog
-from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest
+from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest, AddonPricing, OveragePricing
 from app.models.production import Machine, ProductionEntry, Shift, DowntimeLog
 from app.models.quality import QualityTest, LabReport, QualityApproval
 from app.models.inventory import InventoryItem, Lot, StockMovement, InventoryBag, Warehouse
@@ -20,6 +20,9 @@ from app.models.alerts import Notification, AlertRule, AlertEvent, AlertAcknowle
 from app.models.stock import StockLedger, StockBalance, SalesOrder, SalesOrderLine, StockTransfer
 from app.models.ui_config import ColumnConfig, ColumnDropdownOption
 from app.models.import_mapping import ImportMapping
+from app.models.governance import PermissionSet, SecurityPolicy, CompanyBranding, ApprovalWorkflow, ApprovalStep, ApprovalRequest, ApprovalAction
+from app.models.retention import RetentionPolicy, BackupJob, BackupRestore, HealthCheckResult, Incident
+from app.models.platform import StorageUsage, ApiUsage
 
 __all__ = [
     "Base",
@@ -44,6 +47,11 @@ __all__ = [
     "StockLedger", "StockBalance", "SalesOrder", "SalesOrderLine", "StockTransfer",
     "Trip", "TripItem", "TripScanLog",
     "ColumnConfig", "ColumnDropdownOption",
+    "AddonPricing", "OveragePricing",
+    "PermissionSet", "SecurityPolicy", "CompanyBranding",
+    "ApprovalWorkflow", "ApprovalStep", "ApprovalRequest", "ApprovalAction",
+    "RetentionPolicy", "BackupJob", "BackupRestore", "HealthCheckResult", "Incident",
+    "StorageUsage", "ApiUsage",
 ]
 from app.models.mill_config import MillMaster, MillCustomField, MillRecordValue
 from app.models.mixing import (

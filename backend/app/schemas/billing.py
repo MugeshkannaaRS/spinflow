@@ -19,6 +19,7 @@ class SubscriptionPlanOut(BaseModel):
     yearly_price: float
     included_mills: int
     included_users: int
+    included_machines: int = 50
     additional_mill_cost: float
     additional_user_cost: float
     additional_employee_cost: float
@@ -38,6 +39,7 @@ class PlanCreate(BaseModel):
     yearly_price: float = 0
     included_mills: int = 1
     included_users: int = 25
+    included_machines: int = 50
     additional_mill_cost: float = 0
     additional_user_cost: float = 0
     additional_employee_cost: float = 0
@@ -52,6 +54,7 @@ class PlanUpdate(BaseModel):
     yearly_price: Optional[float] = None
     included_mills: Optional[int] = None
     included_users: Optional[int] = None
+    included_machines: Optional[int] = None
     additional_mill_cost: Optional[float] = None
     additional_user_cost: Optional[float] = None
     additional_employee_cost: Optional[float] = None

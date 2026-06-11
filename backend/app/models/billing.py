@@ -16,6 +16,7 @@ class SubscriptionPlan(TimestampMixin, Base):
     yearly_price: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     included_mills: Mapped[int] = mapped_column(Integer, default=1)
     included_users: Mapped[int] = mapped_column(Integer, default=25)
+    included_machines: Mapped[int] = mapped_column(Integer, default=50)
     additional_mill_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     additional_user_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
     additional_employee_cost: Mapped[float] = mapped_column(Numeric(12, 2), default=0)

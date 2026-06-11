@@ -295,6 +295,39 @@ class PricingService:
             return False, "Subscription limit reached. Upgrade required to add more users."
         return True, ""
 
+    async def can_create_employee(self, company_id: str) -> Tuple[bool, str]:
+        company = await self.db.get(Company, company_id)
+        if not company:
+            return False, "Company not found"
+        limits = await self.get_effective_limits(company)
+        emp_count_res = await self.db.execute(
+            select(func.count(Employee.id))
+            .join(Mill, Mill.id == Employee.mill_id)
+            .where(Mill.company_id == company_id, Employee.is_active == True)
+        )
+        emp_count = emp_count_res.scalar() or 0
+        if emp_count >= limits.employee_limit:
+            return False, "Employee limit reached. Purchase extra employee capacity to add more."
+        return True, ""
+
+    async def can_create_machine(self, company_id: str) -> Tuple[bool, str]:
+        company = await self.db.get(Company, company_id)
+        if not company:
+            return False, "Company not found"
+        from app.models.production import Machine
+        limits = await self.get_effective_limits(company)
+        mach_count_res = await self.db.execute(
+            select(func.count(Machine.id))
+            .join(Mill, Mill.id == Machine.mill_id)
+            .where(Mill.company_id == company_id, Machine.status == True)
+        )
+        mach_count = mach_count_res.scalar() or 0
+        plan = await self.get_plan_by_code(company.plan or "starter")
+        machine_limit = plan.included_machines if plan else 999
+        if mach_count >= machine_limit:
+            return False, "Machine limit reached. Upgrade your plan to add more machines."
+        return True, ""
+
     async def _get_company_subscription(self, company_id: str) -> Optional[CompanySubscription]:
         result = await self.db.execute(
             select(CompanySubscription).where(CompanySubscription.company_id == company_id)
@@ -316,6 +349,7 @@ class PricingService:
                 yearly_price=49990,
                 included_mills=1,
                 included_users=25,
+                included_machines=50,
                 additional_mill_cost=1999,
                 additional_user_cost=199,
                 additional_employee_cost=49,
@@ -330,6 +364,7 @@ class PricingService:
                 yearly_price=149990,
                 included_mills=3,
                 included_users=100,
+                included_machines=200,
                 additional_mill_cost=1499,
                 additional_user_cost=149,
                 additional_employee_cost=39,
@@ -344,6 +379,7 @@ class PricingService:
                 yearly_price=299990,
                 included_mills=5,
                 included_users=250,
+                included_machines=500,
                 additional_mill_cost=999,
                 additional_user_cost=99,
                 additional_employee_cost=29,
@@ -358,6 +394,7 @@ class PricingService:
                 yearly_price=499990,
                 included_mills=999,
                 included_users=9999,
+                included_machines=9999,
                 additional_mill_cost=0,
                 additional_user_cost=0,
                 additional_employee_cost=0,
@@ -372,6 +409,7 @@ class PricingService:
                 yearly_price=999990,
                 included_mills=999,
                 included_users=9999,
+                included_machines=9999,
                 additional_mill_cost=0,
                 additional_user_cost=0,
                 additional_employee_cost=0,
@@ -414,6 +452,34 @@ class PricingService:
                     is_included=is_included,
                 )
                 self.db.add(mp)
+        await self.db.flush()
+
+    async def seed_default_addons(self):
+        """Seed default marketplace add-ons if they don't exist."""
+        existing = await self.db.execute(select(AddonPricing).limit(1))
+        if existing.scalar_one_or_none():
+            return
+        addons = [
+            AddonPricing(module_code="whatsapp", label="WhatsApp Alerts",
+                         description="Real-time WhatsApp notifications for production, dispatch, and quality events.",
+                         monthly_price=499, yearly_price=4990, category="addon", sort_order=1),
+            AddonPricing(module_code="analytics", label="Advanced Analytics",
+                         description="Interactive dashboards with drill-down, custom reports, and trend analysis.",
+                         monthly_price=999, yearly_price=9990, category="addon", sort_order=2),
+            AddonPricing(module_code="lc_tracking", label="LC Tracking",
+                         description="Letter of Credit tracking with expiry alerts and document management.",
+                         monthly_price=699, yearly_price=6990, category="addon", sort_order=3),
+            AddonPricing(module_code="payroll", label="Payroll",
+                         description="Automated payroll processing with tax calculations and compliance reports.",
+                         monthly_price=799, yearly_price=7990, category="addon", sort_order=4),
+            AddonPricing(module_code="reports", label="Advanced Reports",
+                         description="Custom report builder with scheduled email delivery.",
+                         monthly_price=599, yearly_price=5990, category="addon", sort_order=5),
+            AddonPricing(module_code="uploads", label="Document Manager",
+                         description="Secure document upload, storage, and version control.",
+                         monthly_price=399, yearly_price=3990, category="addon", sort_order=6),
+        ]
+        self.db.add_all(addons)
         await self.db.flush()
 
     async def process_expirations(self):

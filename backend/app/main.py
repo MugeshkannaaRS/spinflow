@@ -159,10 +159,11 @@ async def lifespan(app: FastAPI):
         from app.services.pricing_service import PricingService
         async for session in get_db():
             await PricingService(session).seed_default_plans()
+            await PricingService(session).seed_default_addons()
             break
-        logger.info("Default plans seeded")
+        logger.info("Default plans and add-ons seeded")
     except Exception as exc:
-        logger.error(f"Failed to seed default plans: {exc}", exc_info=True)
+        logger.error(f"Failed to seed default plans/addons: {exc}", exc_info=True)
 
     expiry_task = None
     try:
@@ -216,6 +217,69 @@ async def lifespan(app: FastAPI):
             break
     except Exception as exc:
         logger.error(f"W4B rule seed failed (non-fatal): {exc}", exc_info=True)
+
+    # ── Billing Commerce Scheduler ───────────────────────────────────────
+    billing_task = None
+    try:
+        from app.db.session import get_db as _billing_db
+
+        async def _billing_loop():
+            """
+            Scheduled billing tasks:
+              - Every hour: process_expirations, process_overdue
+              - 1st of month: generate monthly invoices
+              - Daily: generate past-due invoices
+            """
+            _BILLING_SERVICE = None
+            _OVERDUE_SERVICE = None
+            _INVOICE_SERVICE = None
+
+            while True:
+                now_dt = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+                try:
+                    async for session in _billing_db():
+                        # Lazy-import services once
+                        if _BILLING_SERVICE is None:
+                            from app.services.pricing_service import PricingService as _PS
+                            _BILLING_SERVICE = _PS
+                            from app.services.overdue_service import OverdueService as _OS
+                            _OVERDUE_SERVICE = _OS
+                            from app.services.billing_invoice_service import InvoiceService as _IS
+                            _INVOICE_SERVICE = _IS
+
+                        # Hourly: check expirations
+                        svc_exp = _BILLING_SERVICE(session)
+                        await svc_exp.process_expirations()
+                        await session.commit()
+
+                        # Daily: process overdue workflow
+                        svc_od = _OVERDUE_SERVICE(session)
+                        await svc_od.process_overdue_workflow()
+                        await session.commit()
+
+                        # 1st of month: generate monthly invoices
+                        if now_dt.day == 1 and now_dt.hour == 2:
+                            inv_svc = _INVOICE_SERVICE(session)
+                            result = await inv_svc.generate_all_monthly_invoices()
+                            await session.commit()
+                            if result.get("generated", 0):
+                                logger.info("Monthly billing: %d invoices generated", result["generated"])
+
+                        # Daily: past-due invoice generation
+                        inv_svc = _INVOICE_SERVICE(session)
+                        await inv_svc.generate_past_due_invoices()
+                        await session.commit()
+
+                        break
+                except Exception as exc:
+                    logger.error(f"Billing scheduler error: {exc}", exc_info=True)
+
+                await asyncio.sleep(3600)  # every hour
+
+        billing_task = asyncio.create_task(_billing_loop())
+        logger.info("Billing commerce scheduler started (hourly interval)")
+    except Exception as exc:
+        logger.error(f"Failed to start billing scheduler: {exc}", exc_info=True)
 
     # ── Wave 4A: enterprise background loop ──────────────────────────────
     enterprise_task = None
@@ -360,6 +424,8 @@ async def lifespan(app: FastAPI):
 
     if expiry_task:
         expiry_task.cancel()
+    if billing_task:
+        billing_task.cancel()
     if enterprise_task:
         enterprise_task.cancel()
     await engine.dispose()
