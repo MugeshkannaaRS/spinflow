@@ -163,5 +163,5 @@ async def log_audit(
         ip_address=ip_address or "0.0.0.0",
     )
     db.add(log)
-    await db.commit()
+    await db.flush()
     return log
