@@ -1699,9 +1699,13 @@ function ProductionPage() {
   const [entriesDateTo, setEntriesDateTo] = useState(todayStrInit);
   const [entriesShift, setEntriesShift] = useState<"all" | "A" | "B" | "C">("all");
 
+  const dateRx = /^\d{4}-\d{2}-\d{2}$/;
+  const validDateFrom = dateRx.test(entriesDateFrom) ? entriesDateFrom : todayStrInit;
+  const validDateTo = dateRx.test(entriesDateTo) ? entriesDateTo : todayStrInit;
+
   const shiftsQ = useQuery({
-    queryKey: ["shifts", millId, entriesDateFrom, entriesDateTo],
-    queryFn: () => productionApi.getEntries({ date_from: entriesDateFrom, date_to: entriesDateTo, mill_id: millId, page_size: 500 }),
+    queryKey: ["shifts", millId, validDateFrom, validDateTo],
+    queryFn: () => productionApi.getEntries({ date_from: validDateFrom, date_to: validDateTo, mill_id: millId, page_size: 500 }),
     staleTime: 30_000,
     retry: 1,
     enabled: !!millId,
@@ -1843,15 +1847,15 @@ function ProductionPage() {
   const [entryEditId, setEntryEditId] = useState<string | null>(null);
   const [entryEditForm, setEntryEditForm] = useState<Record<string, any>>({});
 
-  // Bulk select + cancel
+  // Bulk select + delete
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
   const [bulkCancelConfirm, setBulkCancelConfirm] = useState(false);
   const toggleEntrySelect = (id: string) =>
     setSelectedEntryIds((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   const bulkCancelMut = useMutation({
     mutationFn: () => productionApi.bulkCancelEntries(Array.from(selectedEntryIds)),
-    onSuccess: (res) => {
-      toast.success(`${res.cancelled} entries cancelled${res.skipped > 0 ? `, ${res.skipped} approved entries skipped` : ""}`);
+    onSuccess: (res: any) => {
+      toast.success(`${res.deleted ?? res.cancelled ?? 0} entries deleted`);
       setSelectedEntryIds(new Set());
       setBulkCancelConfirm(false);
       qc.invalidateQueries({ queryKey: ["shifts"] });
@@ -2293,7 +2297,7 @@ function ProductionPage() {
                         onClick={() => setBulkCancelConfirm(true)}
                       >
                         <Trash2 className="w-3 h-3 mr-1" />
-                        Cancel Selected
+                        Delete Selected
                       </Button>
                     </div>
                   )}
@@ -2372,16 +2376,16 @@ function ProductionPage() {
                 </CardContent>
               </Card>
 
-              {/* Bulk cancel confirm modal */}
+              {/* Bulk delete confirm modal */}
               {bulkCancelConfirm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
                   <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
                     <div className="flex items-start gap-3">
                       <Trash2 className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-semibold text-sm">Cancel {selectedEntryIds.size} entr{selectedEntryIds.size === 1 ? "y" : "ies"}?</p>
+                        <p className="font-semibold text-sm">Delete {selectedEntryIds.size} entr{selectedEntryIds.size === 1 ? "y" : "ies"}?</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Approved entries will be skipped. This cannot be undone.
+                          This will permanently remove the selected entries. Cannot be undone.
                         </p>
                       </div>
                     </div>
@@ -2395,7 +2399,7 @@ function ProductionPage() {
                         onClick={() => bulkCancelMut.mutate()}
                         disabled={bulkCancelMut.isPending}
                       >
-                        {bulkCancelMut.isPending ? "Cancelling…" : "Confirm Cancel"}
+                        {bulkCancelMut.isPending ? "Deleting…" : "Confirm Delete"}
                       </Button>
                     </div>
                   </div>

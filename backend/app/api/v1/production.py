@@ -389,12 +389,12 @@ async def bulk_cancel_entries(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production", write=True)),
 ):
-    """Soft-cancel up to 100 pending entries in one call. Approved entries are skipped."""
+    """Hard-delete up to 100 entries. No status restriction."""
     ids = body.get("ids", [])
     if not ids:
         raise HTTPException(400, detail="No entry IDs provided")
     if len(ids) > 100:
-        raise HTTPException(400, detail="Maximum 100 entries per bulk cancel")
+        raise HTTPException(400, detail="Maximum 100 entries per bulk delete")
     scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id")
 
@@ -403,16 +403,12 @@ async def bulk_cancel_entries(
         stmt = stmt.where(ProductionEntry.mill_id == mill_id)
     entries = (await db.execute(stmt)).scalars().all()
 
-    cancelled = 0
-    skipped = 0
+    deleted = 0
     for entry in entries:
-        if entry.status == "approved":
-            skipped += 1
-            continue
-        entry.status = "cancelled"
-        cancelled += 1
+        await db.delete(entry)
+        deleted += 1
     await db.commit()
-    return {"cancelled": cancelled, "skipped": skipped}
+    return {"deleted": deleted}
 
 
 @router.put("/production/entries/{entry_id}/approve", response_model=ProductionEntryResponse)
@@ -661,7 +657,7 @@ async def delete_production_entry(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production", write=True)),
 ):
-    """Soft-delete (cancel) a production entry. Only allowed if status is pending."""
+    """Hard-delete a production entry. No status restriction."""
     scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id")
     stmt = select(ProductionEntry).where(ProductionEntry.id == entry_id)
@@ -670,9 +666,7 @@ async def delete_production_entry(
     entry = (await db.execute(stmt)).scalar_one_or_none()
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    if entry.status == "approved":
-        raise HTTPException(status_code=409, detail="Cannot cancel an approved entry")
-    entry.status = "cancelled"
+    await db.delete(entry)
     await db.commit()
     return {"ok": True, "id": entry_id}
 
