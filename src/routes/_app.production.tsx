@@ -508,16 +508,18 @@ function ShiftGrid() {
               </div>
             </div>
 
-            {/* Entering As — always free text */}
-            <div className="flex items-center gap-2 min-w-[200px]">
-              <UserCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+            {/* Entering As — prominent required field */}
+            <div className="flex items-center gap-2 min-w-[220px]">
+              <UserCircle className="w-4 h-4 text-primary shrink-0" />
               <div className="flex-1 space-y-1">
-                <Label className="text-xs text-muted-foreground">Entering as</Label>
+                <Label className="text-xs font-semibold text-foreground">
+                  Entering as <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   value={operatorName}
                   onChange={(e) => setOperatorName(e.target.value)}
-                  placeholder="Operator name or ID…"
-                  className="h-7 text-xs"
+                  placeholder="Operator name or Emp ID"
+                  className="h-8 text-sm font-medium border-primary/40 focus:border-primary"
                 />
               </div>
             </div>
@@ -721,8 +723,6 @@ function ShiftGrid() {
                     <TableHead className="w-20">{config.getLabel('count')}</TableHead>
                     <TableHead className="w-28">{config.getLabel('produced_kg')}</TableHead>
                     <TableHead className="w-24">{config.getLabel('waste_kg')}</TableHead>
-                    <TableHead className="w-28">{config.getLabel('stoppage_mins')}</TableHead>
-                    <TableHead className="w-40">{config.getLabel('stoppage_reason')}</TableHead>
                     <TableHead className="w-32">{config.getLabel('machine_status')}</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -768,24 +768,6 @@ function ShiftGrid() {
                             value={row.wasteKg}
                             onChange={(e) => updateRow(idx, "wasteKg", e.target.value)}
                             placeholder="0"
-                            className="h-7 text-xs w-full"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min={0}
-                            value={row.stoppageMins}
-                            onChange={(e) => updateRow(idx, "stoppageMins", e.target.value)}
-                            placeholder="0"
-                            className="h-7 text-xs w-full"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            value={row.stoppageReason}
-                            onChange={(e) => updateRow(idx, "stoppageReason", e.target.value)}
-                            placeholder="Reason…"
                             className="h-7 text-xs w-full"
                           />
                         </TableCell>
