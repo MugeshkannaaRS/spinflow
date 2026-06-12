@@ -695,9 +695,10 @@ async def delete_production_entry(
     """Hard-delete a production entry. No status restriction."""
     scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id")
+    # ProductionEntry has no mill_id column — scope through Machine join
     stmt = select(ProductionEntry).where(ProductionEntry.id == entry_id)
     if mill_id:
-        stmt = stmt.where(ProductionEntry.mill_id == mill_id)
+        stmt = stmt.join(Machine, ProductionEntry.machine_code == Machine.code).where(Machine.mill_id == mill_id)
     entry = (await db.execute(stmt)).scalar_one_or_none()
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")

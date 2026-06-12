@@ -1107,6 +1107,23 @@ const STOP_CATEGORIES: Record<string, string> = {
   misc:                    "Misc",
 };
 
+/** Auto-formats 4-digit input → HH:MM. Avoids slow native scroll picker. */
+function TimeInput({ value, onChange, className = "" }: {
+  value: string; onChange: (v: string) => void; className?: string;
+}) {
+  const handle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 4);
+    onChange(raw.length >= 3 ? raw.slice(0, 2) + ":" + raw.slice(2) : raw);
+  };
+  return (
+    <input
+      type="text" inputMode="numeric" value={value} onChange={handle}
+      placeholder="HH:MM" maxLength={5}
+      className={className}
+    />
+  );
+}
+
 type StopRow = {
   id: string;
   stop_from: string;
@@ -1355,14 +1372,14 @@ function StoppageForm() {
                         <tr key={row.id} className={idx % 2 === 0 ? "bg-background" : "bg-muted/20"}>
                           {/* From */}
                           <td className="px-1.5 py-1 border-b">
-                            <input type="time" value={row.stop_from}
-                              onChange={(e) => setRowField(row.id, "stop_from", e.target.value)}
+                            <TimeInput value={row.stop_from}
+                              onChange={(v) => setRowField(row.id, "stop_from", v)}
                               className="w-full h-7 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
                           </td>
                           {/* To */}
                           <td className="px-1.5 py-1 border-b">
-                            <input type="time" value={row.stop_to}
-                              onChange={(e) => setRowField(row.id, "stop_to", e.target.value)}
+                            <TimeInput value={row.stop_to}
+                              onChange={(v) => setRowField(row.id, "stop_to", v)}
                               className="w-full h-7 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
                           </td>
                           {/* Min (auto) */}
@@ -2675,16 +2692,55 @@ function ProductionPage() {
                   <DataTable
                     tableId="production_downtime"
                     columns={[
-                      { key: "machine_code", label: "Machine", className: "font-mono text-xs" },
-                      { key: "reason", label: "Reason" },
-                      { key: "started_at", label: "Started" },
-                      { key: "duration_min", label: "Duration", render: (d: any) => `${d.duration_min ?? 0} min` },
-                      { key: "resolved", label: "Status", type: "status", render: (d: any) => <StatusBadge status={d.resolved ? "active" : "down"} label={d.resolved ? "Resolved" : "Open"} size="sm" /> },
+                      { key: "machine_code", label: "Machine", className: "font-mono text-xs font-semibold" },
+                      { key: "reason", label: "Stop Code / Reason", render: (d: any) => (
+                        <div className="max-w-[220px]">
+                          {d.datalog_code
+                            ? <span className="text-xs"><span className="font-mono font-bold text-primary mr-1">[{d.datalog_code}]</span>{(d.reason ?? "").replace(/^\[\d+\]\s*/, "")}</span>
+                            : <span className="text-xs text-muted-foreground">{d.reason ?? "—"}</span>
+                          }
+                        </div>
+                      )},
+                      { key: "started_at", label: "Date & Time", render: (d: any) => {
+                        if (!d.started_at) return <span className="text-muted-foreground text-xs">—</span>;
+                        const dt = new Date(d.started_at);
+                        const dateStr = dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" });
+                        const timeStr = d.stop_from && d.stop_to
+                          ? `${d.stop_from} → ${d.stop_to}`
+                          : dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                        return (
+                          <div>
+                            <div className="text-xs font-medium">{dateStr}</div>
+                            <div className="text-[10px] text-muted-foreground">{timeStr}</div>
+                          </div>
+                        );
+                      }},
+                      { key: "duration_min", label: "Duration", render: (d: any) => (
+                        <span className={`text-xs font-semibold ${(d.duration_min ?? 0) > 0 ? "text-amber-600" : "text-muted-foreground"}`}>
+                          {(d.duration_min ?? 0) > 0 ? `${d.duration_min} min` : "—"}
+                        </span>
+                      )},
+                      { key: "production_loss_kg", label: "Loss", render: (d: any) => (
+                        <span className="text-xs">{(d.production_loss_kg ?? 0) > 0 ? `${d.production_loss_kg} kg` : "—"}</span>
+                      )},
+                      { key: "resolved", label: "Status", render: (d: any) => <StatusBadge status={d.resolved ? "active" : "pending"} label={d.resolved ? "Resolved" : "Open"} size="sm" /> },
                     ] satisfies ColDef[]}
                     data={downtime}
                     loading={downQ.isLoading}
                     rowKey={(d: any) => d.id}
                     exportFilename="downtime_logs"
+                    actions={canEdit ? (d: any) => (
+                      <ConfirmDeleteButton
+                        onConfirm={async () => {
+                          await productionApi.deleteDowntime(d.id);
+                          qc.invalidateQueries({ queryKey: ["downtime"] });
+                        }}
+                        label={`Delete downtime record for ${d.machine_code}?`}
+                        title="Delete Downtime Log?"
+                        confirmText="Delete"
+                        successMessage="Record deleted"
+                      />
+                    ) : undefined}
                   />
                 </CardContent>
               </Card>
