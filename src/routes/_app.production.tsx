@@ -66,6 +66,13 @@ type GridRow = {
   machineStatus: "running" | "breakdown" | "idle";
 };
 
+type CardingRow = {
+  machineCode: string;
+  machineName: string;
+  lot: string;
+  status: "running" | "stopped";
+};
+
 function buildRows(machines: any[]): GridRow[] {
   return (machines ?? []).map((m: any) => ({
     machineCode: m.code ?? "",
@@ -76,6 +83,15 @@ function buildRows(machines: any[]): GridRow[] {
     stoppageMins: "",
     stoppageReason: "",
     machineStatus: (m.current_status ?? m.status ?? "running") as GridRow["machineStatus"],
+  }));
+}
+
+function buildCardingRows(machines: any[]): CardingRow[] {
+  return (machines ?? []).map((m: any) => ({
+    machineCode: m.code ?? "",
+    machineName: m.name ?? m.code ?? "",
+    lot: "",
+    status: "running" as const,
   }));
 }
 
@@ -131,6 +147,40 @@ function ShiftGrid() {
     setRows(buildRows(machines));
   }, [machines]);
 
+  // ── Carding section (visible only when Blowroom is selected) ──────────────
+  const isBlowroom = department.toLowerCase().includes("blowroom");
+
+  const cardingMachinesQ = useQuery({
+    queryKey: ["machines-carding", millId],
+    queryFn: () => productionApi.getMachines({ department: "Carding", mill_id: millId, page_size: 200, page: 1 }),
+    staleTime: 60_000,
+    enabled: !!millId && isBlowroom,
+  });
+
+  const cardingMachines = useMemo(
+    () => (Array.isArray(cardingMachinesQ.data) ? cardingMachinesQ.data : (cardingMachinesQ.data?.data ?? [])) as any[],
+    [cardingMachinesQ.data],
+  );
+
+  const [cardingRows, setCardingRows] = useState<CardingRow[]>([]);
+
+  useEffect(() => {
+    if (isBlowroom) setCardingRows(buildCardingRows(cardingMachines));
+  }, [cardingMachines, isBlowroom]);
+
+  // Reset carding rows when switching away from Blowroom
+  useEffect(() => {
+    if (!isBlowroom) setCardingRows([]);
+  }, [isBlowroom]);
+
+  const updateCardingRow = (idx: number, field: keyof CardingRow, value: string) => {
+    setCardingRows((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: value };
+      return next;
+    });
+  };
+
   const updateRow = (idx: number, field: keyof GridRow, value: string) => {
     setRows((prev) => {
       const next = [...prev];
@@ -151,10 +201,12 @@ function ShiftGrid() {
   }, [rows]);
 
   const bulkMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const activeRows = rows.filter((r) => Number(r.producedKg) > 0);
       if (activeRows.length === 0) throw new Error("No entries to submit");
-      return productionApi.createBulkEntries({
+
+      // Submit Blowroom entries
+      const res = await productionApi.createBulkEntries({
         date,
         shift,
         department,
@@ -169,6 +221,28 @@ function ShiftGrid() {
           machine_status: r.machineStatus,
         })),
       });
+
+      // Submit linked Carding entries when Blowroom is selected
+      if (isBlowroom && cardingRows.length > 0) {
+        const cardingEntries = cardingRows.map((r) => ({
+          machine_code: r.machineCode,
+          produced_kg: 0,
+          waste_kg: 0,
+          count,
+          stoppage_mins: r.status === "stopped" ? 480 : 0, // full shift if stopped
+          stoppage_reason: r.status === "stopped" ? "Blowroom linked stoppage" : undefined,
+          machine_status: r.status === "running" ? "running" : "breakdown",
+          lot_number: r.lot || undefined,
+        }));
+        await productionApi.createBulkEntries({
+          date,
+          shift,
+          department: "Carding",
+          entries: cardingEntries,
+        }).catch(() => { /* carding submit failure non-fatal */ });
+      }
+
+      return res;
     },
     onSuccess: (res: any) => {
       toast.success(
@@ -179,6 +253,7 @@ function ShiftGrid() {
       }
       qc.invalidateQueries({ queryKey: ["shifts"] });
       setRows(buildRows(machines));
+      if (isBlowroom) setCardingRows(buildCardingRows(cardingMachines));
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -314,6 +389,101 @@ function ShiftGrid() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Carding Machines section (Blowroom only) ───────────────────── */}
+      {isBlowroom && (
+        <Card className="border-blue-200 bg-blue-50/40">
+          <CardHeader className="py-3 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-sm text-blue-800">
+                🧵 Carding Machines — Shift {shift}
+              </CardTitle>
+              <p className="text-xs text-blue-600 mt-0.5">
+                Mark lot & status for each Carding machine linked to this Blowroom shift.
+              </p>
+            </div>
+            {cardingMachinesQ.isFetching && (
+              <span className="text-xs text-blue-500 animate-pulse">Loading…</span>
+            )}
+          </CardHeader>
+          <CardContent className="p-0 pb-3">
+            {cardingRows.length === 0 ? (
+              <p className="text-xs text-muted-foreground px-4 py-3">
+                No Carding machines found. Add them in Masters → Machines with department "Carding".
+              </p>
+            ) : (
+              <div className="w-full overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-blue-200 bg-blue-100/60 text-xs text-blue-700">
+                      <th className="text-left pl-4 py-2 font-medium w-20">MC Code</th>
+                      <th className="text-left py-2 font-medium w-32">Name</th>
+                      <th className="text-left py-2 font-medium w-36">Lot No.</th>
+                      <th className="text-left py-2 font-medium w-36">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cardingRows.map((row, idx) => (
+                      <tr key={row.machineCode} className="border-b border-blue-100 last:border-0">
+                        <td className="pl-4 py-2 font-mono text-xs font-medium text-blue-900">
+                          {row.machineCode}
+                        </td>
+                        <td className="py-2 text-xs text-muted-foreground pr-2">
+                          {row.machineName}
+                        </td>
+                        <td className="py-1.5 pr-3">
+                          <Input
+                            value={row.lot}
+                            onChange={(e) => updateCardingRow(idx, "lot", e.target.value)}
+                            placeholder="Lot / Batch no."
+                            className="h-7 text-xs w-full border-blue-200 focus:border-blue-400"
+                          />
+                        </td>
+                        <td className="py-1.5 pr-4">
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => updateCardingRow(idx, "status", "running")}
+                              className={[
+                                "flex-1 h-7 rounded-md text-xs font-medium transition-colors",
+                                row.status === "running"
+                                  ? "bg-green-500 text-white shadow-sm"
+                                  : "bg-white border border-green-300 text-green-700 hover:bg-green-50",
+                              ].join(" ")}
+                            >
+                              ✓ Running
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateCardingRow(idx, "status", "stopped")}
+                              className={[
+                                "flex-1 h-7 rounded-md text-xs font-medium transition-colors",
+                                row.status === "stopped"
+                                  ? "bg-red-500 text-white shadow-sm"
+                                  : "bg-white border border-red-300 text-red-700 hover:bg-red-50",
+                              ].join(" ")}
+                            >
+                              ✕ Stopped
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="px-4 pt-2 flex gap-4 text-xs text-blue-700">
+                  <span className="font-medium">
+                    ✓ Running: {cardingRows.filter(r => r.status === "running").length}
+                  </span>
+                  <span className="font-medium text-red-600">
+                    ✕ Stopped: {cardingRows.filter(r => r.status === "stopped").length}
+                  </span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
         <div className="rounded-lg border bg-card p-3">

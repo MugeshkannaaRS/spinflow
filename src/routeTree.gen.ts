@@ -64,6 +64,7 @@ import { Route as AppAdminAlertsRouteImport } from './routes/_app.admin.alerts'
 import { Route as AppAdminAlertOpsRouteImport } from './routes/_app.admin.alert-ops'
 import { Route as AppAdminCompaniesOnboardRouteImport } from './routes/_app.admin.companies.onboard'
 import { Route as AppAdminCompaniesCompanyIdRouteImport } from './routes/_app.admin.companies.$companyId'
+import { Route as AppAdminBillingUpgradeRequestsRouteImport } from './routes/_app.admin.billing.upgrade-requests'
 import { Route as AppAdminBillingSubscriptionsRouteImport } from './routes/_app.admin.billing.subscriptions'
 import { Route as AppAdminBillingPlansRouteImport } from './routes/_app.admin.billing.plans'
 import { Route as AppAdminBillingPaymentsRouteImport } from './routes/_app.admin.billing.payments'
@@ -347,6 +348,12 @@ const AppAdminCompaniesCompanyIdRoute =
     path: '/$companyId',
     getParentRoute: () => AppAdminCompaniesRoute,
   } as any)
+const AppAdminBillingUpgradeRequestsRoute =
+  AppAdminBillingUpgradeRequestsRouteImport.update({
+    id: '/upgrade-requests',
+    path: '/upgrade-requests',
+    getParentRoute: () => AppAdminBillingRoute,
+  } as any)
 const AppAdminBillingSubscriptionsRoute =
   AppAdminBillingSubscriptionsRouteImport.update({
     id: '/subscriptions',
@@ -440,6 +447,7 @@ export interface FileRoutesByFullPath {
   '/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
   '/admin/billing/plans': typeof AppAdminBillingPlansRoute
   '/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
+  '/admin/billing/upgrade-requests': typeof AppAdminBillingUpgradeRequestsRoute
   '/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
   '/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
 }
@@ -502,6 +510,7 @@ export interface FileRoutesByTo {
   '/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
   '/admin/billing/plans': typeof AppAdminBillingPlansRoute
   '/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
+  '/admin/billing/upgrade-requests': typeof AppAdminBillingUpgradeRequestsRoute
   '/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
   '/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
 }
@@ -566,6 +575,7 @@ export interface FileRoutesById {
   '/_app/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
   '/_app/admin/billing/plans': typeof AppAdminBillingPlansRoute
   '/_app/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
+  '/_app/admin/billing/upgrade-requests': typeof AppAdminBillingUpgradeRequestsRoute
   '/_app/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
   '/_app/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
 }
@@ -630,6 +640,7 @@ export interface FileRouteTypes {
     | '/admin/billing/payments'
     | '/admin/billing/plans'
     | '/admin/billing/subscriptions'
+    | '/admin/billing/upgrade-requests'
     | '/admin/companies/$companyId'
     | '/admin/companies/onboard'
   fileRoutesByTo: FileRoutesByTo
@@ -692,6 +703,7 @@ export interface FileRouteTypes {
     | '/admin/billing/payments'
     | '/admin/billing/plans'
     | '/admin/billing/subscriptions'
+    | '/admin/billing/upgrade-requests'
     | '/admin/companies/$companyId'
     | '/admin/companies/onboard'
   id:
@@ -755,6 +767,7 @@ export interface FileRouteTypes {
     | '/_app/admin/billing/payments'
     | '/_app/admin/billing/plans'
     | '/_app/admin/billing/subscriptions'
+    | '/_app/admin/billing/upgrade-requests'
     | '/_app/admin/companies/$companyId'
     | '/_app/admin/companies/onboard'
   fileRoutesById: FileRoutesById
@@ -1153,6 +1166,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminCompaniesCompanyIdRouteImport
       parentRoute: typeof AppAdminCompaniesRoute
     }
+    '/_app/admin/billing/upgrade-requests': {
+      id: '/_app/admin/billing/upgrade-requests'
+      path: '/upgrade-requests'
+      fullPath: '/admin/billing/upgrade-requests'
+      preLoaderRoute: typeof AppAdminBillingUpgradeRequestsRouteImport
+      parentRoute: typeof AppAdminBillingRoute
+    }
     '/_app/admin/billing/subscriptions': {
       id: '/_app/admin/billing/subscriptions'
       path: '/subscriptions'
@@ -1205,6 +1225,7 @@ interface AppAdminBillingRouteChildren {
   AppAdminBillingPaymentsRoute: typeof AppAdminBillingPaymentsRoute
   AppAdminBillingPlansRoute: typeof AppAdminBillingPlansRoute
   AppAdminBillingSubscriptionsRoute: typeof AppAdminBillingSubscriptionsRoute
+  AppAdminBillingUpgradeRequestsRoute: typeof AppAdminBillingUpgradeRequestsRoute
 }
 
 const AppAdminBillingRouteChildren: AppAdminBillingRouteChildren = {
@@ -1214,6 +1235,7 @@ const AppAdminBillingRouteChildren: AppAdminBillingRouteChildren = {
   AppAdminBillingPaymentsRoute: AppAdminBillingPaymentsRoute,
   AppAdminBillingPlansRoute: AppAdminBillingPlansRoute,
   AppAdminBillingSubscriptionsRoute: AppAdminBillingSubscriptionsRoute,
+  AppAdminBillingUpgradeRequestsRoute: AppAdminBillingUpgradeRequestsRoute,
 }
 
 const AppAdminBillingRouteWithChildren = AppAdminBillingRoute._addFileChildren(
