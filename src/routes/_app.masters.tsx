@@ -2386,15 +2386,17 @@ function OperatorGroupsTab({
   search: string;
 }) {
   const qc = useQueryClient();
+  const { millId } = useActiveMill();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<OperatorGroup | null>(null);
   const [form, setForm] = useState({ name: "", emp_id: "", machine_codes: [] as string[] });
   const [machineSearch, setMachineSearch] = useState("");
 
   const groupsQ = useQuery({
-    queryKey: ["operator-groups"],
-    queryFn: () => productionApi.getOperatorGroups({ active_only: false }),
+    queryKey: ["operator-groups", millId],
+    queryFn: () => productionApi.getOperatorGroups({ mill_id: millId, active_only: false }),
     staleTime: 30_000,
+    enabled: !!millId,
   });
   const groups: OperatorGroup[] = (groupsQ.data ?? []) as OperatorGroup[];
   const filtered = groups.filter(
@@ -2405,7 +2407,7 @@ function OperatorGroupsTab({
     mutationFn: () =>
       editing
         ? productionApi.updateOperatorGroup(editing.id, form)
-        : productionApi.createOperatorGroup({ ...form, is_active: true }),
+        : productionApi.createOperatorGroup({ ...form, is_active: true, mill_id: millId ?? undefined }),
     onSuccess: () => {
       toast.success(editing ? "Operator group updated" : "Operator group created");
       qc.invalidateQueries({ queryKey: ["operator-groups"] });

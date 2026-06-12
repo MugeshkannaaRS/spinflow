@@ -204,6 +204,7 @@ class OperatorGroupCreate(BaseModel):
     emp_id: Optional[str] = None
     machine_codes: Optional[List[str]] = []
     is_active: bool = True
+    mill_id: Optional[str] = None  # frontend passes active mill_id for MILL_OWNER
 
 
 class OperatorGroupUpdate(BaseModel):

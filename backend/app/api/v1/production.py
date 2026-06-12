@@ -762,11 +762,15 @@ async def list_operator_groups(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
+    from sqlalchemy import or_
     scope = await get_mill_scope(current_user, db)
     effective_mill_id = mill_id or scope.get("mill_id")
     stmt = select(OperatorGroup)
     if effective_mill_id:
-        stmt = stmt.where(OperatorGroup.mill_id == effective_mill_id)
+        # Include groups for this mill OR legacy groups with no mill_id (created by MILL_OWNER before fix)
+        stmt = stmt.where(
+            or_(OperatorGroup.mill_id == effective_mill_id, OperatorGroup.mill_id == None)
+        )
     if active_only:
         stmt = stmt.where(OperatorGroup.is_active == True)
     stmt = stmt.order_by(OperatorGroup.name)
@@ -781,7 +785,8 @@ async def create_operator_group(
     current_user: User = Depends(require_module("production", write=True)),
 ):
     scope = await get_mill_scope(current_user, db)
-    mill_id = scope.get("mill_id")
+    # Prefer scope mill_id; fall back to body.mill_id (MILL_OWNER passes active mill)
+    mill_id = scope.get("mill_id") or body.mill_id
     group = OperatorGroup(
         mill_id=mill_id,
         name=body.name,
