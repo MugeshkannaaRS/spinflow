@@ -113,7 +113,7 @@ def require_module(module: str, write: bool = False):
 
 async def get_mill_scope(
     current_user: User = Depends(get_current_user),
-    db: Optional[AsyncSession] = None,
+    db: AsyncSession = Depends(get_db),
 ):
     """Returns the data scope for the current user.
 
