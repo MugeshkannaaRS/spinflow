@@ -758,9 +758,6 @@ function ShiftGrid() {
                         <TableCell>
                           <span className="text-xs text-muted-foreground">{count || "—"}</span>
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {target > 0 ? `${target} kg` : "—"}
-                        </TableCell>
                         <TableCell>
                           <Input
                             type="number"
@@ -1163,11 +1160,12 @@ function StoppageForm() {
     }
   }, [deptOptions]);
 
-  // Stop codes
+  // Stop codes — filtered by selected department (codes with no dept = applies to all)
   const stopCodesQ = useQuery({
-    queryKey: ["stop-codes"],
-    queryFn: productionApi.getStopCodes,
+    queryKey: ["stop-codes", department],
+    queryFn: () => productionApi.getStopCodes(department || undefined),
     staleTime: 5 * 60_000,
+    enabled: true,
   });
   const stopCodes = (stopCodesQ.data ?? []) as any[];
 

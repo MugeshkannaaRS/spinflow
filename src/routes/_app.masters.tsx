@@ -2681,7 +2681,11 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
   const qc = useQueryClient();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
-  const [form, setForm] = useState({ code: "", name: "", category: "" });
+  const [form, setForm] = useState({ code: "", name: "", category: "", departments: [] as string[] });
+
+  // Mill departments for checkbox list
+  const { data: millMasters } = useMillMasters();
+  const deptOptions = (millMasters?.department ?? []) as any[];
 
   const codesQ = useQuery({
     queryKey: ["stop-codes", "all"],
@@ -2694,18 +2698,31 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
     return !q || String(c.code).includes(q) || (c.name ?? "").toLowerCase().includes(q) || (c.category ?? "").toLowerCase().includes(q);
   });
 
+  const toggleDept = (name: string) => {
+    setForm((p) => ({
+      ...p,
+      departments: p.departments.includes(name)
+        ? p.departments.filter((d) => d !== name)
+        : [...p.departments, name],
+    }));
+  };
+
   const saveMut = useMutation({
     mutationFn: async () => {
+      // departments: empty array = applies to all; non-empty = specific depts only
+      const depts = form.departments.length > 0 ? form.departments : null;
       if (editing) {
         return productionApi.updateStopCode(editing.code, {
           name: form.name,
           category: form.category || undefined,
+          departments: depts as any,
         });
       } else {
         return productionApi.createStopCode({
           code: parseInt(form.code),
           name: form.name,
           category: form.category || undefined,
+          departments: depts as any,
         });
       }
     },
@@ -2714,7 +2731,7 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
       qc.invalidateQueries({ queryKey: ["stop-codes"] });
       setSheetOpen(false);
       setEditing(null);
-      setForm({ code: "", name: "", category: "" });
+      setForm({ code: "", name: "", category: "", departments: [] });
     },
     onError: (err: any) => {
       const detail = err?.response?.data?.detail;
@@ -2722,8 +2739,12 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
     },
   });
 
-  const openAdd = () => { setEditing(null); setForm({ code: "", name: "", category: "" }); setSheetOpen(true); };
-  const openEdit = (c: any) => { setEditing(c); setForm({ code: String(c.code), name: c.name, category: c.category ?? "" }); setSheetOpen(true); };
+  const openAdd = () => { setEditing(null); setForm({ code: "", name: "", category: "", departments: [] }); setSheetOpen(true); };
+  const openEdit = (c: any) => {
+    setEditing(c);
+    setForm({ code: String(c.code), name: c.name, category: c.category ?? "", departments: Array.isArray(c.departments) ? c.departments : [] });
+    setSheetOpen(true);
+  };
 
   return (
     <div className="space-y-4 mt-4">
@@ -2743,24 +2764,30 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/40 border-b text-xs text-muted-foreground">
-                  <th className="text-left pl-4 py-2 w-16">Code</th>
-                  <th className="text-left py-2">Name / Reason</th>
-                  <th className="text-left py-2 w-40">Category</th>
-                  <th className="text-left py-2 w-16">Active</th>
+                  <th className="text-left pl-4 py-2 w-14">Code</th>
+                  <th className="text-left py-2 w-48">Name / Reason</th>
+                  <th className="text-left py-2 w-36">Category</th>
+                  <th className="text-left py-2">Departments <span className="font-normal opacity-70">(blank = all)</span></th>
+                  <th className="text-left py-2 w-14">Active</th>
                   <th className="py-2 w-20" />
                 </tr>
               </thead>
               <tbody>
                 {codesQ.isLoading ? (
-                  <tr><td colSpan={5} className="text-center py-6 text-muted-foreground text-xs">Loading…</td></tr>
+                  <tr><td colSpan={6} className="text-center py-6 text-muted-foreground text-xs">Loading…</td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={5} className="text-center py-6 text-muted-foreground text-xs">No stop codes found. Add one above.</td></tr>
+                  <tr><td colSpan={6} className="text-center py-6 text-muted-foreground text-xs">No stop codes found. Add one above.</td></tr>
                 ) : filtered.map((c: any, idx: number) => (
                   <tr key={c.code} className={["border-b last:border-0", idx % 2 === 0 ? "" : "bg-muted/20"].join(" ")}>
                     <td className="pl-4 py-2 font-mono font-bold text-primary">{c.code}</td>
                     <td className="py-2 font-medium">{c.name}</td>
                     <td className="py-2 text-xs text-muted-foreground">
                       {STOP_CODE_CATEGORIES.find(x => x.value === c.category)?.label ?? c.category ?? "—"}
+                    </td>
+                    <td className="py-2 text-xs text-muted-foreground">
+                      {Array.isArray(c.departments) && c.departments.length > 0
+                        ? c.departments.join(", ")
+                        : <span className="italic opacity-60">All departments</span>}
                     </td>
                     <td className="py-2">
                       <span className={`text-xs font-medium ${c.is_active !== false ? "text-emerald-600" : "text-red-500"}`}>
@@ -2833,6 +2860,40 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Departments — checkboxes */}
+            <div className="space-y-2">
+              <div>
+                <Label className="text-xs font-semibold">Applicable Departments</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">Leave all unchecked = applies to every department</p>
+              </div>
+              {deptOptions.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No departments set up in Masters yet</p>
+              ) : (
+                <div className="grid grid-cols-2 gap-y-1.5 gap-x-3 border rounded-md p-3 bg-muted/20">
+                  {deptOptions.map((d: any) => {
+                    const name = typeof d === "string" ? d : d.name;
+                    const checked = form.departments.includes(name);
+                    return (
+                      <label key={name} className="flex items-center gap-2 cursor-pointer text-xs">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleDept(name)}
+                          className="rounded border-gray-300"
+                        />
+                        <span className={checked ? "font-medium" : ""}>{name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              {form.departments.length > 0 && (
+                <p className="text-xs text-primary">
+                  ✓ Will only appear in: {form.departments.join(", ")}
+                </p>
+              )}
             </div>
           </div>
           <SheetFooter>

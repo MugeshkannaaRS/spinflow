@@ -100,7 +100,7 @@ export const productionApi = {
   deleteEntry: (id: string) => api.delete(`/production/entries/${id}`).then((r) => r.data),
   updateEntry: (id: string, data: any) => api.patch(`/production/entries/${id}`, data).then((r) => r.data),
   // v2 additions
-  getStopCodes: () => api.get("/production/datalog-stop-codes").then((r) => r.data?.data ?? []),
+  getStopCodes: (department?: string) => api.get("/production/datalog-stop-codes", { params: department ? { department } : undefined }).then((r) => r.data?.data ?? []),
   getAllStopCodes: () => api.get("/production/datalog-stop-codes").then((r) => r.data?.data ?? []),
   createStopCode: (data: { code: number; name: string; category?: string; departments?: string[] }) =>
     api.post("/production/datalog-stop-codes", data).then((r) => r.data),
