@@ -235,19 +235,14 @@ async def create_employee(
     if total_sal is None:
         total_sal = (req.basic or 0) + (req.house_rent or 0) + (req.medical or 0) + (req.conveyance or 0) + (req.food_allowance or 0) + (req.wages or 0) + (req.increment or 0) + (req.mobile_bill or 0) + (req.shift_benefit or 0)
 
-    # Enforce max_employees limit
+    # Enforce employee limit via subscription plan
     mill = await db.get(Mill, mill_id)
     if mill:
-        company = await db.get(Company, mill.company_id)
-        if company and company.max_employees:
-            emp_count = await db.scalar(
-                select(func.count()).select_from(Employee)
-                .where(Employee.mill_id.in_(
-                    select(Mill.id).where(Mill.company_id == company.id)
-                ), Employee.is_active == True)
-            )
-            if emp_count is not None and emp_count >= company.max_employees:
-                raise HTTPException(403, f"Employee limit reached ({emp_count}/{company.max_employees}). Upgrade plan.")
+        from app.services.pricing_service import PricingService
+        svc = PricingService(db)
+        ok, msg = await svc.can_create_employee(str(mill.company_id))
+        if not ok:
+            raise HTTPException(status_code=403, detail=msg)
 
     emp = Employee(
         code=req.employee_code,

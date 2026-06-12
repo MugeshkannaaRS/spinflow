@@ -510,7 +510,41 @@ async def list_change_requests(
         .offset(offset)
         .limit(page_size)
     )
-    return {"items": result.scalars().all(), "total": total or 0, "page": page, "page_size": page_size}
+    rows = result.scalars().all()
+
+    # Enrich with company name and plan names
+    company_ids = list({str(r.company_id) for r in rows})
+    plan_ids = list({str(i) for r in rows for i in [r.current_plan_id, r.requested_plan_id] if i})
+    companies: dict = {}
+    plans: dict = {}
+    if company_ids:
+        comp_res = await db.execute(select(Company).where(Company.id.in_(company_ids)))
+        companies = {str(c.id): c.name for c in comp_res.scalars().all()}
+    if plan_ids:
+        plan_res = await db.execute(select(SubscriptionPlan).where(SubscriptionPlan.id.in_(plan_ids)))
+        plans = {str(p.id): p.name for p in plan_res.scalars().all()}
+
+    items = []
+    for r in rows:
+        items.append({
+            "id": str(r.id),
+            "company_id": str(r.company_id),
+            "company_name": companies.get(str(r.company_id), "Unknown"),
+            "requested_by": str(r.requested_by),
+            "current_plan_id": str(r.current_plan_id),
+            "current_plan_name": plans.get(str(r.current_plan_id), "Unknown"),
+            "requested_plan_id": str(r.requested_plan_id),
+            "requested_plan_name": plans.get(str(r.requested_plan_id), "Unknown"),
+            "change_type": r.change_type,
+            "reason": r.reason,
+            "status": r.status,
+            "reviewed_by": str(r.reviewed_by) if r.reviewed_by else None,
+            "reviewed_at": r.reviewed_at.isoformat() if r.reviewed_at else None,
+            "review_notes": r.review_notes,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        })
+
+    return {"items": items, "total": total or 0, "page": page, "page_size": page_size}
 
 
 @router.put("/subscription/change-requests/{request_id}/review", response_model=ChangeRequestOut)

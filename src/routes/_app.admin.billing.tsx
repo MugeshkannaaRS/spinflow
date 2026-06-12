@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import {
   CreditCard, Receipt, DollarSign, TrendingUp, Building2,
-  AlertTriangle, Users as UsersIcon, CheckCircle2,
+  AlertTriangle, Users as UsersIcon, CheckCircle2, ArrowUpCircle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/admin/billing")({
@@ -17,6 +17,7 @@ export const Route = createFileRoute("/_app/admin/billing")({
 
 const SECTIONS = [
   { id: "subscriptions", label: "Subscriptions", icon: Building2, desc: "View and manage company subscriptions", color: "bg-blue-50 text-blue-600" },
+  { id: "upgrade-requests", label: "Upgrade Requests", icon: ArrowUpCircle, desc: "Review and approve plan upgrade requests", color: "bg-orange-50 text-orange-600" },
   { id: "invoices", label: "Invoices", icon: Receipt, desc: "All invoices across companies", color: "bg-indigo-50 text-indigo-600" },
   { id: "payments", label: "Payments", icon: DollarSign, desc: "Payment records and history", color: "bg-green-50 text-green-600" },
   { id: "plans", label: "Plans", icon: CreditCard, desc: "Manage subscription plans and pricing", color: "bg-purple-50 text-purple-600" },
