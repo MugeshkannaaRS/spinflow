@@ -26,6 +26,7 @@ _app_started = False
 _app_init_error: Optional[str] = None
 
 from app.api.v1 import auth, production, quality, inventory, dispatch, purchase, stores, hr, accounts, maintenance, dashboard, qr_system, reports, users, audit, masters, stock as stock_router, sales as sales_router, lotrac as lotrac_router, payroll as payroll_router, uploads as uploads_router, exports as exports_router, ui_config as ui_config_router, imports as imports_router
+from app.api.v1.quality_forms import router as quality_forms_router
 from app.api.v1.admin import router as admin_router
 from app.api.v1.billing import router as billing_router
 from app.api.v1.mill_config import router as mill_config_router
@@ -424,6 +425,7 @@ API_PREFIX = "/api/v1"
 app.include_router(auth.router, prefix=API_PREFIX, tags=["Authentication"])
 app.include_router(production.router, prefix=API_PREFIX, tags=["Production"])
 app.include_router(quality.router, prefix=API_PREFIX, tags=["Quality"])
+app.include_router(quality_forms_router, prefix=API_PREFIX, tags=["Quality Module v2"])
 app.include_router(inventory.router, prefix=API_PREFIX, tags=["Inventory"])
 app.include_router(dispatch.router, prefix=API_PREFIX, tags=["Dispatch"])
 app.include_router(purchase.router, prefix=API_PREFIX, tags=["Purchase"])

@@ -42,6 +42,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, CheckCircle2, XCircle, FlaskConical, AlertTriangle, ArrowDown, Trash2 } from "lucide-react";
+import { api } from "@/lib/api";
 import type { QualityTest } from "@/lib/types";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
@@ -168,10 +169,16 @@ function QualityPage() {
           </div>
 
           <Tabs defaultValue="tests">
-            <TabsList>
+            <TabsList className="flex-wrap h-auto gap-y-1">
               <TabsTrigger value="tests">Lab Tests</TabsTrigger>
               <TabsTrigger value="lots">Lot Approvals</TabsTrigger>
               <TabsTrigger value="rejections">Rejections</TabsTrigger>
+              <TabsTrigger value="carding">Carding / Blowroom</TabsTrigger>
+              <TabsTrigger value="drawing">Drawing</TabsTrigger>
+              <TabsTrigger value="simplex">Simplex</TabsTrigger>
+              <TabsTrigger value="ringframe">Ring Frame</TabsTrigger>
+              <TabsTrigger value="autoconer">Auto Coner</TabsTrigger>
+              <TabsTrigger value="packing">Packing</TabsTrigger>
             </TabsList>
 
             <TabsContent value="tests">
@@ -276,6 +283,310 @@ function QualityPage() {
                   </ErrorBoundary>
                 </CardContent>
               </Card>
+            </TabsContent>
+            {/* ── Department tabs ── */}
+            <TabsContent value="carding">
+              <div className="space-y-4">
+                <QmFormsTab
+                  title="CV% Records"
+                  endpoint="/quality/v2/carding/cv-record"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "machine_no", label: "Machine" },
+                    { key: "shift_code", label: "Shift" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "cv_1m", label: "CV 1m" },
+                    { key: "cv_2m", label: "CV 2m" },
+                    { key: "cv_5m", label: "CV 5m" },
+                    { key: "within_spec", label: "OK?", render: (r: any) => r.within_spec ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="destructive">No</Badge> },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+                <QmFormsTab
+                  title="Waste Study"
+                  endpoint="/quality/v2/carding/waste-study"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "machine_no", label: "Machine" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "total_production_kg", label: "Production (kg)" },
+                    { key: "total_wastage_pct", label: "Wastage %" },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+                <QmFormsTab
+                  title="Sliver Wrapping"
+                  endpoint="/quality/v2/carding/wrapping"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "machine_no", label: "Machine" },
+                    { key: "shift_code", label: "Shift" },
+                    { key: "std_hank", label: "Std Hank" },
+                    { key: "actual_hank", label: "Actual Hank" },
+                    { key: "cv_pct", label: "CV%" },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="drawing">
+              <div className="space-y-4">
+                <QmFormsTab
+                  title="Drawing CV Records"
+                  endpoint="/quality/v2/drawing/cv-record"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "machine_no", label: "Machine" },
+                    { key: "shift_code", label: "Shift" },
+                    { key: "process", label: "Process" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "a_pct", label: "A%" },
+                    { key: "cv_pct", label: "CV%" },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+                <QmFormsTab
+                  title="A% Check (Auto-Leveller)"
+                  endpoint="/quality/v2/drawing/a-pct"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "machine_no", label: "Machine" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "process", label: "Process" },
+                    { key: "a_pct_n_plus", label: "A% N+" },
+                    { key: "a_pct_n_minus", label: "A% N-" },
+                    { key: "within_spec", label: "OK?", render: (r: any) => r.within_spec ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="destructive">No</Badge> },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+                <QmFormsTab
+                  title="Sliver Wrapping (BD/FD)"
+                  endpoint="/quality/v2/drawing/sliver-wrapping"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "machine_no", label: "Machine" },
+                    { key: "shift_code", label: "Shift" },
+                    { key: "process", label: "Process" },
+                    { key: "actual_hank", label: "Actual Hank" },
+                    { key: "hank_cv_pct", label: "CV%" },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="simplex">
+              <div className="space-y-4">
+                <QmFormsTab
+                  title="Hank Test"
+                  endpoint="/quality/v2/simplex/hank-test"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "machine_no", label: "Machine" },
+                    { key: "shift_code", label: "Shift" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "nominal_hank", label: "Nominal Hank" },
+                    { key: "actual_hank", label: "Actual Hank" },
+                    { key: "cv_pct", label: "CV%" },
+                    { key: "within_spec", label: "OK?", render: (r: any) => r.within_spec ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="destructive">No</Badge> },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+                <QmFormsTab
+                  title="Breakage Study"
+                  endpoint="/quality/v2/simplex/breakage-study"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "machine_no", label: "Machine" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "total_breaks", label: "Total Breaks" },
+                    { key: "active_spindles", label: "Active Spindles" },
+                    { key: "breaks_per_100spl_hrs", label: "Breaks/100 Spl-Hr" },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+                <QmFormsTab
+                  title="Stretch %"
+                  endpoint="/quality/v2/simplex/stretch-pct"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "machine_no", label: "Machine" },
+                    { key: "shift_code", label: "Shift" },
+                    { key: "avg_stretch_pct", label: "Avg Stretch %" },
+                    { key: "within_spec", label: "OK?", render: (r: any) => r.within_spec ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="destructive">No</Badge> },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="ringframe">
+              <div className="space-y-4">
+                <QmFormsTab
+                  title="CSP Reports"
+                  endpoint="/quality/v2/ring-frame/csp-report"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "machine_no", label: "Machine" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "count_ne", label: "Count Ne" },
+                    { key: "tm", label: "TM" },
+                    { key: "tpi", label: "TPI" },
+                    { key: "avg_csp", label: "Avg CSP" },
+                    { key: "cv_pct", label: "CV%" },
+                    { key: "within_spec", label: "OK?", render: (r: any) => r.within_spec ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="destructive">No</Badge> },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+                <QmFormsTab
+                  title="Breakage Study"
+                  endpoint="/quality/v2/ring-frame/breakage-study"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "count_ne", label: "Count Ne" },
+                    { key: "total_breaks", label: "Total Breaks" },
+                    { key: "breaks_per_1000spl_hr", label: "Breaks/1000 Spl-Hr" },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+                <QmFormsTab
+                  title="Snap Study"
+                  endpoint="/quality/v2/ring-frame/snap-study"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "machine_no", label: "Machine" },
+                    { key: "shift_code", label: "Shift" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "snap_total", label: "Total Snaps" },
+                    { key: "idle_spindles_total", label: "Idle Spindles" },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="autoconer">
+              <div className="space-y-4">
+                <QmFormsTab
+                  title="Yarn Faults (Uster QQ4)"
+                  endpoint="/quality/v2/auto-coner/yarn-faults"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "machine_no", label: "Machine" },
+                    { key: "shift_code", label: "Shift" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "count_ne", label: "Count Ne" },
+                    { key: "kms", label: "km Tested" },
+                    { key: "yf", label: "YF" },
+                    { key: "n_neps", label: "N(Neps)" },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+                <QmFormsTab
+                  title="Splice Strength"
+                  endpoint="/quality/v2/auto-coner/splice-strength"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "machine_no", label: "Machine" },
+                    { key: "shift_code", label: "Shift" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "count_ne", label: "Count Ne" },
+                    { key: "splice_pct", label: "Splice %" },
+                    { key: "within_spec", label: "≥85%?", render: (r: any) => r.within_spec ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="destructive">No</Badge> },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+                <QmFormsTab
+                  title="Wax Pickup"
+                  endpoint="/quality/v2/auto-coner/wax-pickup"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "machine_no", label: "Machine" },
+                    { key: "shift_code", label: "Shift" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "count_ne", label: "Count Ne" },
+                    { key: "overall_wax_pickup_pct", label: "Wax Pickup %" },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+                <QmFormsTab
+                  title="Bag Fault Check"
+                  endpoint="/quality/v2/auto-coner/bag-faults"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "shift_code", label: "Shift" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "count_ne", label: "Count Ne" },
+                    { key: "avg_cone_wt", label: "Avg Cone Wt (g)" },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="packing">
+              <div className="space-y-4">
+                <QmFormsTab
+                  title="Blend Test"
+                  endpoint="/quality/v2/packing/blend-test"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "nominal_ratio", label: "Nominal Ratio" },
+                    { key: "cotton_pct", label: "Cotton %" },
+                    { key: "polyester_pct", label: "Polyester %" },
+                    { key: "within_spec", label: "OK?", render: (r: any) => r.within_spec ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="destructive">No</Badge> },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+                <QmFormsTab
+                  title="PWSE Check"
+                  endpoint="/quality/v2/packing/pwse-check"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "shift_code", label: "Shift" },
+                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+              </div>
             </TabsContent>
           </Tabs>
         </div>
@@ -540,6 +851,88 @@ function LotApproveAction({ lotId }: { lotId: string }) {
       <CheckCircle2 className="size-3 mr-1" />
       Approve
     </Button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Generic department tab — fetches from /quality/v2/<endpoint>
+// ---------------------------------------------------------------------------
+
+interface QmFormsTabProps {
+  title: string;
+  endpoint: string;
+  columns: any[];
+  millId: string | null | undefined;
+  canEdit: boolean;
+}
+
+function QmFormsTab({ title, endpoint, columns, millId, canEdit }: QmFormsTabProps) {
+  const [date, setDate] = useState("");
+  const [lotNo, setLotNo] = useState("");
+  const [machineNo, setMachineNo] = useState("");
+  const effectiveMillId = millId ?? undefined;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["qm-forms", endpoint, effectiveMillId, date, lotNo, machineNo],
+    queryFn: async () => {
+      const params = new URLSearchParams({ page_size: "100" });
+      if (date) params.set("date", date);
+      if (lotNo) params.set("lot_no", lotNo);
+      if (machineNo) params.set("machine_no", machineNo);
+      const res = await api.get(`/api/v1${endpoint}?${params.toString()}`);
+      return (res.data?.data ?? res.data) as any[];
+    },
+    enabled: !!effectiveMillId,
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <div className="flex flex-wrap gap-2 pt-2">
+          <Input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="h-8 w-36 text-xs"
+          />
+          <Input
+            placeholder="Lot No"
+            value={lotNo}
+            onChange={(e) => setLotNo(e.target.value)}
+            className="h-8 w-28 text-xs"
+          />
+          <Input
+            placeholder="Machine No"
+            value={machineNo}
+            onChange={(e) => setMachineNo(e.target.value)}
+            className="h-8 w-28 text-xs"
+          />
+          {(date || lotNo || machineNo) && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 text-xs"
+              onClick={() => { setDate(""); setLotNo(""); setMachineNo(""); }}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <DataTable
+          tableId={`qm_${endpoint.replace(/\//g, "_")}`}
+          columns={columns}
+          data={data ?? []}
+          loading={isLoading}
+          rowKey={(r: any) => r.id}
+          exportFilename={title.toLowerCase().replace(/\s+/g, "_")}
+        />
+      </CardContent>
+    </Card>
   );
 }
 
