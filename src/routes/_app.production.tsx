@@ -338,15 +338,19 @@ function ShiftGrid() {
     ? (machines[0]?.department || "Mixed")
     : department;
 
+  const requiredBaseFields = ["date", "shift", "count"] as const;
   const allHeaderFilled =
-    !!date.trim() && !!shift.trim() && !!count.trim() && !!operatorName.trim();
+    requiredBaseFields.every((f) => {
+      const vals: Record<string, string> = { date, shift, count };
+      return typeof vals[f] === "string" && vals[f].trim().length > 0;
+    }) && (usingGroups || !!department.trim());
 
   const handleSubmit = () => {
     const errors: Record<string, string> = {};
     if (!date.trim()) errors.date = "This field is required";
     if (!shift.trim()) errors.shift = "This field is required";
     if (!count.trim()) errors.count = "This field is required";
-    if (!operatorName.trim()) errors.operator = "Entering as is required";
+    if (!usingGroups && !department.trim()) errors.department = "This field is required";
     setRequiredErrors(errors);
     if (Object.keys(errors).length > 0) return;
     bulkMutation.mutate();
@@ -356,7 +360,7 @@ function ShiftGrid() {
     <div className="space-y-4">
       <Card>
         <CardContent className="p-4 space-y-3">
-          {/* Row 1: Date · Shift · Entering As · Count/Yarn */}
+          {/* Row 1: Date / Shift / Count (always visible) */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">
@@ -365,12 +369,15 @@ function ShiftGrid() {
               <Input
                 type="date"
                 value={date}
-                onChange={(e) => { setDate(e.target.value); setRequiredErrors((prev) => ({ ...prev, date: "" })); }}
-                className={["h-8 text-sm", requiredErrors.date ? "border-destructive" : ""].filter(Boolean).join(" ")}
+                onChange={(e) => {
+                  setDate(e.target.value);
+                  setRequiredErrors((prev) => ({ ...prev, date: "" }));
+                }}
+                className={["h-8 text-sm", requiredErrors.date ? "border-destructive" : ""]
+                  .filter(Boolean).join(" ")}
               />
               {requiredErrors.date && <p className="text-xs text-destructive">{requiredErrors.date}</p>}
             </div>
-
             <div className="space-y-1.5">
               <Label className="text-xs">
                 {config.getLabel('shift')}{config.isRequired('shift') && <span className="text-destructive"> *</span>}
@@ -387,21 +394,37 @@ function ShiftGrid() {
               </Select>
               {requiredErrors.shift && <p className="text-xs text-destructive">{requiredErrors.shift}</p>}
             </div>
-
-            {/* Entering As — prominent, first-class field */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold flex items-center gap-1">
-                <UserCircle className="w-3.5 h-3.5" />
-                Entering as <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                value={operatorName}
-                onChange={(e) => setOperatorName(e.target.value)}
-                placeholder="Operator name or Emp ID"
-                className={["h-8 text-sm", !operatorName.trim() && requiredErrors.operator ? "border-destructive" : ""].filter(Boolean).join(" ")}
-              />
-            </div>
-
+            {/* Department — only shown when no machine groups selected */}
+            {!usingGroups && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">
+                  {config.getLabel('department')}<span className="text-destructive"> *</span>
+                </Label>
+                <Select
+                  value={department}
+                  onValueChange={(v) => {
+                    setDepartment(v);
+                    const dOpt = deptOptions.find((d: any) => (typeof d === "string" ? d : d.name) === v);
+                    setDepartmentId(dOpt && typeof dOpt !== "string" ? (dOpt.id || null) : null);
+                    setRequiredErrors((prev) => ({ ...prev, department: "" }));
+                  }}
+                >
+                  <SelectTrigger className={["h-8 text-sm", requiredErrors.department ? "border-destructive" : ""].filter(Boolean).join(" ")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {deptOptions.length === 0
+                      ? <SelectItem value="_empty" disabled>Import machines to see departments</SelectItem>
+                      : deptOptions.map((d: any) => {
+                          const name = typeof d === "string" ? d : d.name;
+                          return <SelectItem key={name} value={name}>{name}</SelectItem>;
+                        })
+                    }
+                  </SelectContent>
+                </Select>
+                {requiredErrors.department && <p className="text-xs text-destructive">{requiredErrors.department}</p>}
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label className="text-xs">
                 {config.getLabel('count')}{config.isRequired('count') && <span className="text-destructive"> *</span>}
@@ -416,72 +439,113 @@ function ShiftGrid() {
             </div>
           </div>
 
-          {/* Row 2: Machine Group selector */}
-          <div className="flex flex-wrap gap-2 items-center pt-1 border-t border-dashed">
-            <div className="flex items-center gap-1.5 shrink-0">
-              <Layers className="w-4 h-4 text-muted-foreground" />
-              <Label className="text-xs font-semibold">Machine Group</Label>
-              {hasMachineGroups && selectedGroupIds.length === 0 && (
-                <span className="text-xs text-amber-600">(select to filter machines)</span>
-              )}
+          {/* Row 2: Machine Group selector + Entering As */}
+          <div className="flex flex-wrap gap-3 items-end pt-1 border-t border-dashed">
+            {/* Machine Group primary selector */}
+            <div className="flex items-start gap-2 min-w-[280px] flex-1">
+              <Layers className="w-4 h-4 text-muted-foreground shrink-0 mt-5" />
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-muted-foreground">
+                  Machine Group
+                  {hasMachineGroups && selectedGroupIds.length === 0 && (
+                    <span className="ml-1 text-amber-600">(select to filter machines)</span>
+                  )}
+                </Label>
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  {/* Selected group chips */}
+                  {selectedGroupIds.map((gid) => {
+                    const g = machineGroups.find((x) => x.id === gid);
+                    return g ? (
+                      <span key={gid} className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full border border-blue-200">
+                        {g.name}
+                        <button
+                          type="button"
+                          onClick={() => removeGroup(gid)}
+                          className="hover:text-red-600 ml-0.5"
+                          aria-label={`Remove ${g.name}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ) : null;
+                  })}
+                  {/* Dropdown to add a group */}
+                  {hasMachineGroups && (
+                    <select
+                      className="h-7 text-xs border border-input rounded-md bg-background px-2 focus:outline-none focus:ring-1 focus:ring-ring min-w-[180px]"
+                      value=""
+                      onChange={(e) => {
+                        const gid = e.target.value;
+                        if (gid) addGroup(gid);
+                        e.target.value = "";
+                      }}
+                    >
+                      <option value="">{selectedGroupIds.length === 0 ? "— Select machine group —" : "+ Mix another group"}</option>
+                      {machineGroups
+                        .filter((g) => !selectedGroupIds.includes(g.id))
+                        .map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.name} ({(g.machine_codes ?? []).length} machines)
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                  {!hasMachineGroups && (
+                    <span className="text-xs text-muted-foreground italic">
+                      No machine groups — <a href="/masters" className="underline text-primary">create them in Masters</a>
+                    </span>
+                  )}
+                  {selectedGroupIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearGroups}
+                      className="text-xs text-muted-foreground underline hover:text-destructive ml-1"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Selected group chips */}
-            {selectedGroupIds.map((gid) => {
-              const g = machineGroups.find((x) => x.id === gid);
-              return g ? (
-                <span key={gid} className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-1 rounded-full border border-blue-200">
-                  {g.name}
-                  <button type="button" onClick={() => removeGroup(gid)} className="hover:text-red-600 ml-0.5 leading-none" aria-label={`Remove ${g.name}`}>×</button>
-                </span>
-              ) : null;
-            })}
-
-            {/* Add group dropdown */}
-            {hasMachineGroups && (
-              <select
-                className="h-8 text-xs border border-input rounded-md bg-background px-2 focus:outline-none focus:ring-1 focus:ring-ring min-w-[190px]"
-                value=""
-                onChange={(e) => { const gid = e.target.value; if (gid) addGroup(gid); e.target.value = ""; }}
-              >
-                <option value="">{selectedGroupIds.length === 0 ? "— Select machine group —" : "+ Mix another group"}</option>
-                {machineGroups
-                  .filter((g) => !selectedGroupIds.includes(g.id))
-                  .map((g) => (
-                    <option key={g.id} value={g.id}>{g.name} ({(g.machine_codes ?? []).length} machines)</option>
-                  ))}
-              </select>
-            )}
-
-            {!hasMachineGroups && (
-              <span className="text-xs text-muted-foreground italic">
-                No groups yet — <a href="/masters" className="underline text-primary">create them in Masters</a>
-              </span>
-            )}
-
-            {selectedGroupIds.length > 0 && (
-              <button type="button" onClick={clearGroups} className="text-xs text-muted-foreground underline hover:text-destructive">
-                Clear all
-              </button>
-            )}
+            {/* Entering As — always free text */}
+            <div className="flex items-center gap-2 min-w-[200px]">
+              <UserCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-muted-foreground">Entering as</Label>
+                <Input
+                  value={operatorName}
+                  onChange={(e) => setOperatorName(e.target.value)}
+                  placeholder="Operator name or ID…"
+                  className="h-7 text-xs"
+                />
+              </div>
+            </div>
           </div>
 
-          {/* Row 3: Section line chips (dept-only fallback) */}
+          {/* Row 3: Section chips (only in dept mode) */}
           {!usingGroups && sections.length > 0 && (
             <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-dashed">
               <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-                <Layers className="w-3.5 h-3.5" /><span>Line:</span>
+                <Layers className="w-3.5 h-3.5" />
+                <span>Line:</span>
               </div>
               <button
                 onClick={() => setSelectedSection("all")}
                 className={["px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
                   selectedSection === "all" ? "bg-primary text-primary-foreground border-primary" : "bg-white border-gray-200 text-muted-foreground hover:border-gray-400"].join(" ")}
-              >All Lines</button>
+              >
+                All Lines
+              </button>
               {sections.map((s) => (
-                <button key={s} onClick={() => setSelectedSection(s === selectedSection ? "all" : s)}
+                <button
+                  key={s}
+                  onClick={() => setSelectedSection(s === selectedSection ? "all" : s)}
                   className={["px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
                     selectedSection === s ? "bg-blue-600 text-white border-blue-600" : "bg-white border-blue-200 text-blue-700 hover:border-blue-400"].join(" ")}
-                >{s}</button>
+                >
+                  {s}
+                </button>
               ))}
             </div>
           )}
