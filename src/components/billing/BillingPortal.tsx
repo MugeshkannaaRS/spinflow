@@ -466,12 +466,12 @@ function OveragePurchaseDialog({
 }
 
 function UpgradeDialog({
-  open, onClose, currentPlanId, companyName,
+  open, onClose, currentPlanId, currentPlanSortOrder, companyName,
 }: {
-  open: boolean; onClose: () => void; currentPlanId?: string; companyName?: string;
+  open: boolean; onClose: () => void; currentPlanId?: string;
+  currentPlanSortOrder?: number; companyName?: string;
 }) {
   const qc = useQueryClient();
-  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [reason, setReason] = useState("");
 
   const plansQ = useQuery({
@@ -480,21 +480,45 @@ function UpgradeDialog({
     staleTime: 5 * 60 * 1000,
   });
 
+  // All plans above current tier, sorted by sort_order
+  const upgradePlans = (Array.isArray(plansQ.data) ? plansQ.data : [])
+    .filter((p: any) => p.is_active && p.id !== currentPlanId && p.sort_order > (currentPlanSortOrder ?? 0))
+    .sort((a: any, b: any) => a.sort_order - b.sort_order);
+
+  // Auto-select next tier on open
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
+  useEffect(() => {
+    if (open && upgradePlans.length > 0 && !selectedPlanId) {
+      setSelectedPlanId(upgradePlans[0].id);
+    }
+    if (!open) {
+      setSelectedPlanId("");
+      setReason("");
+    }
+  }, [open, upgradePlans.length]);
+
+  const selectedPlan = upgradePlans.find((p: any) => p.id === selectedPlanId);
+  const currentPlanData = (Array.isArray(plansQ.data) ? plansQ.data : []).find((p: any) => p.id === currentPlanId);
+
   const changeReqMut = useMutation({
     mutationFn: (body: { company_id: string; requested_plan_id: string; reason?: string }) => {
       const params = new URLSearchParams({ company_id: body.company_id });
       return api.post(`/subscription/change-requests?${params.toString()}`, {
         requested_plan_id: body.requested_plan_id,
         change_type: "upgrade",
-        reason: body.reason,
+        reason: body.reason || null,
       }).then(r => r.data);
     },
     onSuccess: () => {
-      toast.success("Upgrade request submitted. Admin will review it.");
+      toast.success("Upgrade request submitted! We'll activate it within 24 hours.");
       qc.invalidateQueries({ queryKey: ["billing-my-plan"] });
       onClose();
     },
-    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Failed to submit request"),
+    onError: (e: any) => {
+      const detail = e?.response?.data?.detail;
+      const msg = typeof detail === "string" ? detail : "Failed to submit request. Please try again.";
+      toast.error(msg);
+    },
   });
 
   const { user } = useAuth();
@@ -502,7 +526,11 @@ function UpgradeDialog({
 
   if (!open) return null;
 
-  const plans = (Array.isArray(plansQ.data) ? plansQ.data : []).filter((p: any) => p.is_active && p.id !== currentPlanId);
+  // Plan diff for selected plan vs current
+  const userDiff = selectedPlan && currentPlanData
+    ? selectedPlan.included_users - currentPlanData.included_users : null;
+  const millDiff = selectedPlan && currentPlanData
+    ? selectedPlan.included_mills - currentPlanData.included_mills : null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -517,11 +545,13 @@ function UpgradeDialog({
             <div className="space-y-3">
               {[1,2,3].map(i => <div key={i} className="h-20 bg-[#e2e8f0] rounded-lg animate-pulse" />)}
             </div>
-          ) : plans.length === 0 ? (
-            <p className="text-[13px] text-[#94a3b8] text-center py-6">No other plans available</p>
+          ) : upgradePlans.length === 0 ? (
+            <p className="text-[13px] text-[#94a3b8] text-center py-6">
+              You are on the highest plan available. Contact support for custom pricing.
+            </p>
           ) : (
             <div className="space-y-2">
-              {plans.map((p: any) => (
+              {upgradePlans.map((p: any) => (
                 <button key={p.id} onClick={() => setSelectedPlanId(p.id)}
                   className={cn("w-full text-left p-4 rounded-lg border transition-all",
                     selectedPlanId === p.id
@@ -529,7 +559,9 @@ function UpgradeDialog({
                       : "border-[#e2e8f0] hover:border-blue-300")}>
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-[14px] text-[#0f172a]">{p.name}</span>
-                    <span className="font-mono font-bold text-[#0f172a]">₹{(p.monthly_price ?? 0).toLocaleString("en-IN")}/mo</span>
+                    <span className="font-mono font-bold text-[#0f172a]">
+                      ₹{(p.monthly_price ?? 0).toLocaleString("en-IN")}/mo
+                    </span>
                   </div>
                   <p className="text-[12px] text-[#64748b] mt-1">
                     {p.included_users} users · {p.included_mills} mills · {p.description || ""}
@@ -538,6 +570,19 @@ function UpgradeDialog({
               ))}
             </div>
           )}
+
+          {/* Plan diff summary */}
+          {selectedPlan && (userDiff !== null || millDiff !== null) && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-[12px] text-blue-800">
+              <p className="font-semibold mb-1">What you get with {selectedPlan.name}:</p>
+              <ul className="space-y-0.5 text-[11px]">
+                {userDiff !== null && userDiff > 0 && <li>+{userDiff} users ({selectedPlan.included_users} total)</li>}
+                {millDiff !== null && millDiff > 0 && <li>+{millDiff} mills ({selectedPlan.included_mills} total)</li>}
+                <li>Admin approval required · activates within 24 hours</li>
+              </ul>
+            </div>
+          )}
+
           <div>
             <label className="block text-[13px] font-semibold text-[#374151] mb-1">Reason (optional)</label>
             <textarea value={reason} onChange={e => setReason(e.target.value)}
@@ -548,8 +593,12 @@ function UpgradeDialog({
         <div className="px-6 py-4 border-t border-[#e2e8f0] flex justify-end gap-2 shrink-0">
           <button onClick={onClose}
             className="px-4 py-2 rounded-lg border border-[#d1d5db] text-[13px] font-medium text-[#374151] hover:bg-gray-50">Cancel</button>
-          <button onClick={() => companyId && changeReqMut.mutate({ company_id: companyId, requested_plan_id: selectedPlanId, reason: reason || undefined })}
-            disabled={!selectedPlanId || changeReqMut.isPending}
+          <button
+            onClick={() => {
+              if (!companyId || !selectedPlanId) return;
+              changeReqMut.mutate({ company_id: companyId, requested_plan_id: selectedPlanId, reason: reason || undefined });
+            }}
+            disabled={!selectedPlanId || changeReqMut.isPending || upgradePlans.length === 0}
             className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold disabled:opacity-50 flex items-center gap-2">
             {changeReqMut.isPending && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Submit Request
@@ -756,8 +805,25 @@ function MillOwnerBillingView() {
 
       <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto w-full">
 
-        {/* ── Upgrade alert banner ── */}
-        {(atLimit || nearLimit) && (
+        {/* ── Pending upgrade request banner ── */}
+        {d.pending_upgrade && (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 flex items-start gap-3">
+            <Loader2 className="w-4 h-4 text-blue-500 shrink-0 mt-0.5 animate-spin" />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm text-blue-800">
+                Upgrade to {d.pending_upgrade.to_plan_name} — pending review
+              </p>
+              <p className="text-xs text-blue-600 mt-0.5">
+                Requested {d.pending_upgrade.requested_at
+                  ? new Date(d.pending_upgrade.requested_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                  : "recently"} · Admin will activate within 24 hours.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Limit alert banner ── */}
+        {(atLimit || nearLimit) && !d.pending_upgrade && (
           <div className={cn(
             "rounded-xl border p-4 flex items-start gap-3",
             atLimit
@@ -809,12 +875,14 @@ function MillOwnerBillingView() {
                 <p className="text-2xl font-bold font-mono text-[#0f172a]">{fmtLakh(d.monthly_amount ?? 0)}</p>
                 <p className="text-xs text-[#64748b]">per month</p>
               </div>
-              <button
-                onClick={() => setUpgradeOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
-              >
-                <ArrowUp className="w-3.5 h-3.5" /> Upgrade Plan
-              </button>
+              {!d.pending_upgrade && (
+                <button
+                  onClick={() => setUpgradeOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors"
+                >
+                  <ArrowUp className="w-3.5 h-3.5" /> Upgrade Plan
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1027,6 +1095,7 @@ function MillOwnerBillingView() {
         open={upgradeOpen}
         onClose={() => setUpgradeOpen(false)}
         currentPlanId={d.plan_id}
+        currentPlanSortOrder={d.plan_sort_order}
         companyName={d.company_name}
       />
     </div>

@@ -384,51 +384,101 @@ async def create_change_request(
     db: AsyncSession = Depends(get_db),
 ):
     role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
-    if role_code != "MILL_OWNER":
+    if role_code not in ("MILL_OWNER", "SUPER_ADMIN"):
         raise HTTPException(status_code=403, detail="Only Mill Owner can request plan changes")
-    if str(current_user.company_id) != str(company_id):
+    if role_code == "MILL_OWNER" and str(current_user.company_id) != str(company_id):
         raise HTTPException(status_code=403, detail="You can only request changes for your own company")
+
     company = await db.get(Company, company_id)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
+
     target_plan = await db.get(SubscriptionPlan, req.requested_plan_id)
     if not target_plan or not target_plan.is_active:
         raise HTTPException(status_code=404, detail="Plan not found or inactive")
-    current_sub = await db.execute(
+
+    # Guard: no duplicate pending requests
+    existing_pending_res = await db.execute(
+        select(SubscriptionChangeRequest).where(
+            SubscriptionChangeRequest.company_id == company_id,
+            SubscriptionChangeRequest.status == "pending",
+        )
+    )
+    if existing_pending_res.scalar_one_or_none():
+        raise HTTPException(
+            status_code=400,
+            detail="You already have a pending upgrade request. Cancel it before submitting a new one.",
+        )
+
+    # Resolve current plan ID (FK required on the change request row)
+    current_sub_res = await db.execute(
         select(CompanySubscription).where(CompanySubscription.company_id == company_id)
     )
-    sub = current_sub.scalar_one_or_none()
+    sub = current_sub_res.scalar_one_or_none()
+
     if sub:
         current_plan_id = sub.plan_id
+        # Guard: cannot request same or lower tier
+        current_plan = await db.get(SubscriptionPlan, sub.plan_id)
+        if current_plan and current_plan.is_active and target_plan.sort_order <= current_plan.sort_order:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Already on {current_plan.name}. Select a higher-tier plan to upgrade.",
+            )
     else:
-        # Company has no subscription row yet (free/trial). Resolve current plan from
-        # company.plan code so the change request FK is satisfied.
+        # No subscription row — resolve from company.plan code
         fallback_res = await db.execute(
             select(SubscriptionPlan).where(SubscriptionPlan.code == (company.plan or "starter"))
         )
         fallback_plan = fallback_res.scalar_one_or_none()
         if not fallback_plan:
             any_plan_res = await db.execute(
-                select(SubscriptionPlan).where(SubscriptionPlan.is_active == True).limit(1)
+                select(SubscriptionPlan)
+                .where(SubscriptionPlan.is_active == True)
+                .order_by(SubscriptionPlan.sort_order)
+                .limit(1)
             )
             fallback_plan = any_plan_res.scalar_one_or_none()
         if not fallback_plan:
-            raise HTTPException(status_code=400, detail="No subscription plans configured. Contact SpinFlow support.")
+            raise HTTPException(
+                status_code=400,
+                detail="No subscription plans configured. Contact SpinFlow support.",
+            )
         current_plan_id = fallback_plan.id
 
-    change_request = SubscriptionChangeRequest(
-        company_id=company_id,
-        requested_by=current_user.id,
-        current_plan_id=current_plan_id,
-        requested_plan_id=req.requested_plan_id,
-        change_type=req.change_type,
-        reason=req.reason,
-    )
-    db.add(change_request)
-    await db.commit()
-    await db.refresh(change_request)
-    await log_audit(db, current_user.id, current_user.role or "UNKNOWN", "change_request_created", "subscription_change_request", change_request.id, f"{req.change_type} to {target_plan.name}")
-    return change_request
+    try:
+        change_request = SubscriptionChangeRequest(
+            company_id=company_id,
+            requested_by=current_user.id,
+            current_plan_id=current_plan_id,
+            requested_plan_id=req.requested_plan_id,
+            change_type=req.change_type or "upgrade",
+            reason=req.reason,
+        )
+        db.add(change_request)
+        await db.commit()
+        await db.refresh(change_request)
+    except Exception as exc:
+        await db.rollback()
+        logger.error(
+            f"create_change_request DB error company={company_id}: {exc}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to save upgrade request. Please try again or contact support.",
+        )
+
+    try:
+        await log_audit(
+            db, current_user.id, current_user.role or "UNKNOWN",
+            "change_request_created", "subscription_change_request",
+            change_request.id, f"{req.change_type} to {target_plan.name}",
+        )
+    except Exception:
+        pass  # audit log failure must never block the user
+
+    return ChangeRequestOut.model_validate(change_request)
 
 
 @router.get("/subscription/change-requests")
@@ -521,7 +571,7 @@ async def review_change_request(
     await db.commit()
     await db.refresh(change_request)
     await log_audit(db, current_user.id, current_user.role or "UNKNOWN", "change_request_reviewed", "subscription_change_request", request_id, f"{req.status} plan change {request_id}")
-    return change_request
+    return ChangeRequestOut.model_validate(change_request)
 
 
 # ── Billing History (by company) ───────────────────────
@@ -1191,6 +1241,28 @@ async def get_my_plan(
     additional_employee_cost = float(plan_obj.additional_employee_cost) if plan_obj and plan_obj.additional_employee_cost else 0
     plan_id = str(plan_obj.id) if plan_obj else None
 
+    # Pending upgrade request (if any)
+    pending_req_res = await db.execute(
+        select(SubscriptionChangeRequest)
+        .where(
+            SubscriptionChangeRequest.company_id == company_id,
+            SubscriptionChangeRequest.status == "pending",
+        )
+        .order_by(SubscriptionChangeRequest.created_at.desc())
+        .limit(1)
+    )
+    pending_req = pending_req_res.scalar_one_or_none()
+    pending_upgrade = None
+    if pending_req:
+        req_target_plan = await db.get(SubscriptionPlan, pending_req.requested_plan_id)
+        pending_upgrade = {
+            "id": str(pending_req.id),
+            "to_plan_id": str(pending_req.requested_plan_id),
+            "to_plan_name": req_target_plan.name if req_target_plan else "Unknown",
+            "requested_at": pending_req.created_at.isoformat() if pending_req.created_at else None,
+            "reason": pending_req.reason,
+        }
+
     return {
         "company_name": company.name,
         "plan": plan_name,
@@ -1217,6 +1289,8 @@ async def get_my_plan(
         "next_billing_at": next_billing,
         "last_payment_at": last_payment,
         "invoices": invoices_out,
+        "pending_upgrade": pending_upgrade,
+        "plan_sort_order": int(plan_obj.sort_order) if plan_obj else 1,
     }
 
 

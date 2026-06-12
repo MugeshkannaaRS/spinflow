@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict
+from pydantic import BaseModel, Field, field_serializer, model_validator
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
@@ -140,6 +140,15 @@ class InvoiceOut(BaseModel):
         from_attributes = True
 
 
+def _dt_to_str(v: Any) -> Optional[str]:
+    """Convert datetime → ISO string, pass through None/str unchanged."""
+    if v is None:
+        return None
+    if isinstance(v, datetime):
+        return v.isoformat()
+    return str(v)
+
+
 class ChangeRequestOut(BaseModel):
     id: str
     company_id: str
@@ -154,8 +163,33 @@ class ChangeRequestOut(BaseModel):
     review_notes: Optional[str] = None
     created_at: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
+
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_datetimes(cls, data: Any) -> Any:
+        """Accept ORM objects (from_attributes) and coerce datetime fields to str."""
+        if hasattr(data, "__dict__") or hasattr(data, "_sa_instance_state"):
+            # SQLAlchemy ORM object — extract attrs manually
+            return {
+                "id": str(getattr(data, "id", "") or ""),
+                "company_id": str(getattr(data, "company_id", "") or ""),
+                "requested_by": str(getattr(data, "requested_by", "") or ""),
+                "current_plan_id": str(getattr(data, "current_plan_id", "") or ""),
+                "requested_plan_id": str(getattr(data, "requested_plan_id", "") or ""),
+                "change_type": str(getattr(data, "change_type", "") or ""),
+                "reason": getattr(data, "reason", None),
+                "status": str(getattr(data, "status", "") or ""),
+                "reviewed_by": getattr(data, "reviewed_by", None),
+                "reviewed_at": _dt_to_str(getattr(data, "reviewed_at", None)),
+                "review_notes": getattr(data, "review_notes", None),
+                "created_at": _dt_to_str(getattr(data, "created_at", None)),
+            }
+        if isinstance(data, dict):
+            for field in ("reviewed_at", "created_at"):
+                if field in data:
+                    data[field] = _dt_to_str(data[field])
+        return data
 
 
 class ChangeRequestCreate(BaseModel):
