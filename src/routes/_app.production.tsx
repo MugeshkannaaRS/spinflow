@@ -45,6 +45,7 @@ import type { ColDef } from "@/components/ui/DataTable";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import { useState, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, ArrowDown, ArrowUp, Trash2, Clock, Users2, UserCircle, Layers } from "lucide-react";
 import { ExportMenu } from "@/components/ui/ExportMenu";
@@ -255,7 +256,7 @@ function ShiftGrid() {
     });
   };
 
-  const updateRow = (idx: number, field: keyof GridRow, value: string) => {
+  const updateRow = (idx: number, field: keyof GridRow, value: string | number) => {
     setRows((prev) => {
       const next = [...prev];
       next[idx] = { ...next[idx], [field]: value };
@@ -1115,6 +1116,7 @@ type StopRow = {
   showDropdown: boolean;
   section: string;
   production_loss_kg: string;
+  dropdownPos: { top: number; left: number; width: number } | null;
 };
 
 function makeStopRow(): StopRow {
@@ -1123,6 +1125,7 @@ function makeStopRow(): StopRow {
     stop_from: "", stop_to: "", datalog_code: "",
     codeSearch: "", showDropdown: false,
     section: "", production_loss_kg: "",
+    dropdownPos: null,
   };
 }
 
@@ -1386,8 +1389,12 @@ function StoppageForm() {
                                     value={row.codeSearch}
                                     placeholder="Type code or name…"
                                     onChange={(e) => { setRowField(row.id, "codeSearch", e.target.value); setRowField(row.id, "showDropdown", true); }}
-                                    onFocus={() => setRowField(row.id, "showDropdown", true)}
-                                    onBlur={() => setTimeout(() => setRowField(row.id, "showDropdown", false), 160)}
+                                    onFocus={(e) => {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      setRowField(row.id, "dropdownPos", { top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 260) });
+                                      setRowField(row.id, "showDropdown", true);
+                                    }}
+                                    onBlur={() => setTimeout(() => setRowField(row.id, "showDropdown", false), 200)}
                                     onKeyDown={(e) => {
                                       if (e.key === "Enter" && filteredCodes.length > 0) {
                                         const top = filteredCodes[0];
@@ -1399,25 +1406,33 @@ function StoppageForm() {
                                     }}
                                     className="w-full h-7 rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                                   />
-                                  {row.showDropdown && (
-                                    <div className="absolute z-50 left-0 top-8 w-64 bg-popover border rounded-md shadow-lg overflow-hidden">
+                                  {row.showDropdown && row.dropdownPos && createPortal(
+                                    <div style={{
+                                      position: "fixed",
+                                      top: row.dropdownPos.top,
+                                      left: row.dropdownPos.left,
+                                      width: row.dropdownPos.width,
+                                      zIndex: 9999,
+                                    }} className="bg-popover border rounded-md shadow-lg overflow-hidden">
                                       {stopCodesQ.isLoading ? (
                                         <div className="px-3 py-2 text-xs text-muted-foreground">Loading…</div>
                                       ) : filteredCodes.length === 0 ? (
-                                        <div className="px-3 py-2 text-xs text-muted-foreground">No codes match</div>
+                                        <div className="px-3 py-2 text-xs text-muted-foreground">No codes match — type a code number or name</div>
                                       ) : filteredCodes.map((c: any) => (
                                         <button key={c.code} type="button"
-                                          onMouseDown={() => {
+                                          onMouseDown={(e) => {
+                                            e.preventDefault();
                                             setRowField(row.id, "datalog_code", String(c.code));
                                             setRowField(row.id, "codeSearch", "");
                                             setRowField(row.id, "showDropdown", false);
                                           }}
-                                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent flex items-center gap-2">
+                                          className="w-full text-left px-3 py-2 text-xs hover:bg-accent flex items-center gap-2 cursor-pointer">
                                           <span className="font-mono font-bold text-primary w-8 shrink-0">{c.code}</span>
-                                          <span className="text-muted-foreground truncate">{c.name}</span>
+                                          <span className="text-foreground truncate">{c.name}</span>
                                         </button>
                                       ))}
-                                    </div>
+                                    </div>,
+                                    document.body
                                   )}
                                 </>
                               )}

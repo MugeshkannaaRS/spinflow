@@ -38,7 +38,7 @@ import { toast } from "sonner";
 import { Plus, Search, Settings, Blocks, ArrowDown, Pencil, Factory, Trash2, Users, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
-import { useMillMasterCategory } from "@/hooks/useMillConfig";
+import { useMillMasterCategory, useMillMasters } from "@/hooks/useMillConfig";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import type {
   Company,
