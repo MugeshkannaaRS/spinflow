@@ -1,6 +1,15 @@
 import { api } from "@/lib/api";
 import type { Role } from "@/lib/rbac";
 
+export interface OperatorGroup {
+  id: string;
+  mill_id?: string;
+  name: string;
+  emp_id?: string;
+  machine_codes: string[];
+  is_active: boolean;
+}
+
 // Extracts .data array from paginated responses; returns raw data otherwise
 function extractList(response: any) {
   if (Array.isArray(response)) return response;
@@ -49,7 +58,15 @@ export const productionApi = {
   getMachineSections: (params?: Record<string, any>) =>
     api.get("/production/machines/sections", { params }).then((r: any) => r.data as { sections: string[] }),
   bulkCancelEntries: (ids: string[]) =>
-    api.post("/production/entries/bulk-cancel", { ids }).then((r: any) => r.data as { cancelled: number; skipped: number }),
+    api.post("/production/entries/bulk-cancel", { ids }).then((r: any) => r.data),
+  getOperatorGroups: (params?: Record<string, any>) =>
+    api.get("/production/operator-groups", { params }).then((r: any) => r.data as OperatorGroup[]),
+  createOperatorGroup: (data: Partial<OperatorGroup>) =>
+    api.post("/production/operator-groups", data).then((r: any) => r.data as OperatorGroup),
+  updateOperatorGroup: (id: string, data: Partial<OperatorGroup>) =>
+    api.put(`/production/operator-groups/${id}`, data).then((r: any) => r.data as OperatorGroup),
+  deleteOperatorGroup: (id: string) =>
+    api.delete(`/production/operator-groups/${id}`).then((r: any) => r.data),
   createMachine: (data: any) => api.post("/production/machines", data).then((r) => r.data),
   updateMachine: (id: string, data: any) => api.put(`/production/machines/${id}`, data).then((r) => r.data),
   getEntries: (params?: Record<string, any>) => api.get("/production/entries", { params }).then((r: any) => r.data),
@@ -461,20 +478,22 @@ export async function exportDownload(endpoint: string, filename: string) {
 }
 
 export const exportApi = {
-  productionPdf: (dateFrom?: string, dateTo?: string) => {
+  productionPdf: (dateFrom?: string, dateTo?: string, operatorGroupId?: string) => {
     const params = new URLSearchParams();
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
+    if (operatorGroupId) params.set("operator_group_id", operatorGroupId);
     const qs = params.toString();
     return exportDownload(
       `/exports/production/pdf${qs ? `?${qs}` : ""}`,
       `production_${new Date().toISOString().slice(0, 10)}.pdf`,
     );
   },
-  productionXlsx: (dateFrom?: string, dateTo?: string) => {
+  productionXlsx: (dateFrom?: string, dateTo?: string, operatorGroupId?: string) => {
     const params = new URLSearchParams();
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
+    if (operatorGroupId) params.set("operator_group_id", operatorGroupId);
     const qs = params.toString();
     return exportDownload(
       `/exports/production/xlsx${qs ? `?${qs}` : ""}`,

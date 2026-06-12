@@ -195,3 +195,31 @@ class ProductionBulkResponse(BaseModel):
     created: int
     skipped: int
     errors: List[str]
+
+
+# ── Operator Groups ────────────────────────────────────────────────────────────
+
+class OperatorGroupCreate(BaseModel):
+    name: str
+    emp_id: Optional[str] = None
+    machine_codes: Optional[List[str]] = []
+    is_active: bool = True
+
+
+class OperatorGroupUpdate(BaseModel):
+    name: Optional[str] = None
+    emp_id: Optional[str] = None
+    machine_codes: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+
+class OperatorGroupResponse(BaseModel):
+    id: str
+    mill_id: Optional[str] = None
+    name: str
+    emp_id: Optional[str] = None
+    machine_codes: Optional[List[str]] = []
+    is_active: bool
+
+    class Config:
+        from_attributes = True

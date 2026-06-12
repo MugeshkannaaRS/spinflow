@@ -8,7 +8,7 @@ from app.db.session import get_db
 from app.core.deps import get_current_user, require_module, get_mill_scope, log_audit
 from app.core.limiter import limiter
 from app.models.user import User
-from app.models.production import ProductionEntry, Machine
+from app.models.production import ProductionEntry, Machine, OperatorGroup
 from app.models.dispatch import Dispatch
 from app.models.accounts import Invoice, GSTEntry
 from app.models.purchase import CottonPurchase
@@ -31,11 +31,11 @@ async def export_production_pdf(
     request: Request,
     date_from: str = Query(None),
     date_to: str = Query(None),
+    operator_group_id: str = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
     scope = await get_mill_scope(current_user, db)
-    svc = ProductionService(db, current_user)
     stmt = select(ProductionEntry).order_by(ProductionEntry.date.desc())
     if scope.get("mill_id"):
         stmt = stmt.where(ProductionEntry.mill_id == scope["mill_id"])
@@ -43,6 +43,15 @@ async def export_production_pdf(
         stmt = stmt.where(ProductionEntry.date >= date_from)
     if date_to:
         stmt = stmt.where(ProductionEntry.date <= date_to)
+
+    operator_label: Optional[str] = None
+    if operator_group_id:
+        grp = (await db.execute(select(OperatorGroup).where(OperatorGroup.id == operator_group_id))).scalar_one_or_none()
+        if grp:
+            operator_label = f"{grp.name}" + (f" ({grp.emp_id})" if grp.emp_id else "")
+            if grp.machine_codes:
+                stmt = stmt.where(ProductionEntry.machine_code.in_(grp.machine_codes))
+
     result = await db.execute(stmt)
     entries = result.scalars().all()
 
@@ -55,12 +64,14 @@ async def export_production_pdf(
             "operator": e.operator,
             "produced_kg": e.produced_kg,
             "waste_kg": e.waste_kg,
-            "status": e.status,
         }
         for e in entries
     ]
 
-    pdf_bytes = pdf_production(data)
+    title = "Production Report"
+    if operator_label:
+        title = f"Production Report — {operator_label}"
+    pdf_bytes = pdf_production(data, title=title)
     role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
     client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "0.0.0.0").split(",")[0].strip()
     await log_audit(db, current_user.id, role_code, "export", "production", current_user.mill_id or "all", f"Exported production PDF ({date_from}–{date_to})", ip_address=client_ip)
@@ -77,6 +88,7 @@ async def export_production_xlsx(
     request: Request,
     date_from: str = Query(None),
     date_to: str = Query(None),
+    operator_group_id: str = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
@@ -88,6 +100,12 @@ async def export_production_xlsx(
         stmt = stmt.where(ProductionEntry.date >= date_from)
     if date_to:
         stmt = stmt.where(ProductionEntry.date <= date_to)
+
+    if operator_group_id:
+        grp = (await db.execute(select(OperatorGroup).where(OperatorGroup.id == operator_group_id))).scalar_one_or_none()
+        if grp and grp.machine_codes:
+            stmt = stmt.where(ProductionEntry.machine_code.in_(grp.machine_codes))
+
     result = await db.execute(stmt)
     entries = result.scalars().all()
 
@@ -100,7 +118,6 @@ async def export_production_xlsx(
             "operator": e.operator,
             "produced_kg": e.produced_kg,
             "waste_kg": e.waste_kg,
-            "status": e.status,
         }
         for e in entries
     ]

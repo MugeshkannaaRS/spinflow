@@ -117,6 +117,20 @@ function ShiftGrid() {
   const [operatorName, setOperatorName] = useState<string>(() => {
     try { return sessionStorage.getItem("sf_operator") ?? ""; } catch { return ""; }
   });
+  // Selected operator group (null = no group / free-text mode)
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(() => {
+    try { return sessionStorage.getItem("sf_operator_group") || null; } catch { return null; }
+  });
+
+  // Load all operator groups for this mill
+  const operatorGroupsQ = useQuery({
+    queryKey: ["operator-groups", millId],
+    queryFn: () => productionApi.getOperatorGroups({ mill_id: millId, active_only: true }),
+    staleTime: 60_000,
+    enabled: !!millId,
+  });
+  const operatorGroups = (operatorGroupsQ.data ?? []) as import("@/lib/api-service").OperatorGroup[];
+  const hasGroups = operatorGroups.length > 0;
 
   // Machine section / line filter
   const [selectedSection, setSelectedSection] = useState<string>("all");
@@ -128,7 +142,7 @@ function ShiftGrid() {
       mill_id: millId,
     }),
     staleTime: 60_000,
-    enabled: !!millId && !!(departmentId || department),
+    enabled: !!millId && !!(departmentId || department) && !selectedGroupId,
   });
   const sections: string[] = sectionsQ.data?.sections ?? [];
 
@@ -149,16 +163,21 @@ function ShiftGrid() {
   const config = useColumnConfig("production_entries");
 
   const machinesQ = useQuery({
-    queryKey: ["machines", departmentId || department, millId, selectedSection],
+    queryKey: ["machines", departmentId || department, millId, selectedSection, selectedGroupId],
     queryFn: () => productionApi.getMachines({
-      ...(departmentId ? { department_id: departmentId } : { department }),
-      ...(selectedSection && selectedSection !== "all" ? { section: selectedSection } : {}),
+      // If a group is selected, filter by group — ignore dept/section
+      ...(selectedGroupId
+        ? { operator_group_id: selectedGroupId }
+        : {
+            ...(departmentId ? { department_id: departmentId } : { department }),
+            ...(selectedSection && selectedSection !== "all" ? { section: selectedSection } : {}),
+          }),
       mill_id: millId,
       page_size: 1000,
       page: 1,
     }),
     staleTime: 60_000,
-    enabled: !!millId && !!(departmentId || department),
+    enabled: !!millId && (!!(departmentId || department) || !!selectedGroupId),
   });
 
   const machines = useMemo(
@@ -421,17 +440,44 @@ function ShiftGrid() {
 
           {/* Row 2: Entering As + Machine Line/Section filter */}
           <div className="flex flex-wrap gap-3 items-end pt-1 border-t border-dashed">
-            {/* Entering As — operator identity for shared login */}
-            <div className="flex items-center gap-2 min-w-[200px] flex-1">
+            {/* Entering As — operator identity: dropdown if groups exist, else free text */}
+            <div className="flex items-center gap-2 min-w-[220px] flex-1">
               <UserCircle className="w-4 h-4 text-muted-foreground shrink-0" />
               <div className="flex-1 space-y-1">
                 <Label className="text-xs text-muted-foreground">Entering as</Label>
-                <Input
-                  value={operatorName}
-                  onChange={(e) => setOperatorName(e.target.value)}
-                  placeholder="Operator name or Emp ID…"
-                  className="h-7 text-xs"
-                />
+                {hasGroups ? (
+                  <select
+                    className="h-7 text-xs w-full border border-input rounded-md bg-background px-2 focus:outline-none focus:ring-1 focus:ring-ring"
+                    value={selectedGroupId ?? ""}
+                    onChange={(e) => {
+                      const gid = e.target.value;
+                      if (!gid) {
+                        setSelectedGroupId(null);
+                        setOperatorName("");
+                        try { sessionStorage.removeItem("sf_operator_group"); } catch {}
+                      } else {
+                        const grp = operatorGroups.find((g) => g.id === gid);
+                        setSelectedGroupId(gid);
+                        if (grp) setOperatorName(grp.emp_id ? `${grp.name} (${grp.emp_id})` : grp.name);
+                        try { sessionStorage.setItem("sf_operator_group", gid); } catch {}
+                      }
+                    }}
+                  >
+                    <option value="">— Select operator —</option>
+                    {operatorGroups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}{g.emp_id ? ` (${g.emp_id})` : ""} — {(g.machine_codes ?? []).length} machines
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    value={operatorName}
+                    onChange={(e) => setOperatorName(e.target.value)}
+                    placeholder="Operator name or Emp ID…"
+                    className="h-7 text-xs"
+                  />
+                )}
               </div>
             </div>
 
@@ -1692,12 +1738,22 @@ function ProductionPage() {
     retry: 1,
     enabled: !!millId,
   });
-  // Entries Log date + shift filter state
+  // Entries Log date + shift + operator group filter state
   const todayStrInit = new Date().toISOString().split("T")[0];
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
   const [entriesDateFrom, setEntriesDateFrom] = useState(todayStrInit);
   const [entriesDateTo, setEntriesDateTo] = useState(todayStrInit);
   const [entriesShift, setEntriesShift] = useState<"all" | "A" | "B" | "C">("all");
+  const [entriesGroupId, setEntriesGroupId] = useState<string>("");
+
+  // Load operator groups for export filter
+  const entryGroupsQ = useQuery({
+    queryKey: ["operator-groups-log", millId],
+    queryFn: () => productionApi.getOperatorGroups({ mill_id: millId, active_only: true }),
+    staleTime: 60_000,
+    enabled: !!millId,
+  });
+  const entryGroups = (entryGroupsQ.data ?? []) as import("@/lib/api-service").OperatorGroup[];
 
   const dateRx = /^\d{4}-\d{2}-\d{2}$/;
   const validDateFrom = dateRx.test(entriesDateFrom) ? entriesDateFrom : todayStrInit;
@@ -2273,6 +2329,24 @@ function ProductionPage() {
                         </Button>
                       ))}
                     </div>
+                    {/* Operator group filter (for export) */}
+                    {entryGroups.length > 0 && (
+                      <div className="flex items-center gap-1.5 border-l pl-3 ml-1">
+                        <Label className="text-xs text-muted-foreground whitespace-nowrap">Operator</Label>
+                        <select
+                          className="h-7 text-xs border border-input rounded-md bg-background px-2 focus:outline-none focus:ring-1 focus:ring-ring"
+                          value={entriesGroupId}
+                          onChange={(e) => setEntriesGroupId(e.target.value)}
+                        >
+                          <option value="">All operators</option>
+                          {entryGroups.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name}{g.emp_id ? ` (${g.emp_id})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                     {shiftsQ.isFetching && <span className="text-xs text-muted-foreground animate-pulse">Loading…</span>}
                     <span className="text-xs text-muted-foreground ml-auto">{shifts.length} entries</span>
                   </div>
@@ -2334,8 +2408,8 @@ function ProductionPage() {
                     disableExport={true}
                     toolbar={
                       <ExportDateRangeButton
-                        onExportXlsx={(f, t) => exportApi.productionXlsx(f, t)}
-                        onExportPdf={(f, t) => exportApi.productionPdf(f, t)}
+                        onExportXlsx={(f, t) => exportApi.productionXlsx(f, t, entriesGroupId || undefined)}
+                        onExportPdf={(f, t) => exportApi.productionPdf(f, t, entriesGroupId || undefined)}
                       />
                     }
                     actions={canEdit ? (s: any) => (

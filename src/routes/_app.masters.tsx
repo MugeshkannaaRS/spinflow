@@ -1,6 +1,7 @@
 import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, productionApi, inventoryApi, adminApi } from "@/lib/api-service";
+import type { OperatorGroup } from "@/lib/api-service";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
@@ -33,7 +34,7 @@ import {
 } from "@/components/ui/sheet";
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
-import { Plus, Search, Settings, Blocks, ArrowDown, Pencil, Factory, Trash2 } from "lucide-react";
+import { Plus, Search, Settings, Blocks, ArrowDown, Pencil, Factory, Trash2, Users, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useMillMasterCategory } from "@/hooks/useMillConfig";
@@ -236,16 +237,17 @@ function MastersPage() {
             <TabsList className="flex-wrap h-auto">
               {(() => {
                 const allTabs = [
-                  { key: "companies",   label: "Companies" },
-                  { key: "mills",       label: "Mills" },
-                  { key: "machines",    label: "Machines" },
-                  { key: "departments", label: "Departments" },
-                  { key: "yarn-counts", label: "Yarn Counts" },
-                  { key: "customers",   label: "Customers" },
-                  { key: "vehicles",    label: "Vehicles" },
-                  { key: "routes",      label: "Routes" },
-                  { key: "shifts",      label: "Shifts" },
-                  { key: "warehouses",  label: "Warehouses" },
+                  { key: "companies",       label: "Companies" },
+                  { key: "mills",           label: "Mills" },
+                  { key: "machines",        label: "Machines" },
+                  { key: "operator-groups", label: "Operator Groups" },
+                  { key: "departments",     label: "Departments" },
+                  { key: "yarn-counts",     label: "Yarn Counts" },
+                  { key: "customers",       label: "Customers" },
+                  { key: "vehicles",        label: "Vehicles" },
+                  { key: "routes",          label: "Routes" },
+                  { key: "shifts",          label: "Shifts" },
+                  { key: "warehouses",      label: "Warehouses" },
                 ];
                 const isSuperAdmin = false;
                 return allTabs.filter(t =>
@@ -320,6 +322,14 @@ function MastersPage() {
                 colConfig={machineColConfig}
                 canEdit={canEdit}
                 onImportSuccess={() => qcMasters.invalidateQueries({ queryKey: ["masters", "machines"] })}
+              />
+            </TabsContent>
+
+            <TabsContent value="operator-groups">
+              <OperatorGroupsTab
+                allMachines={machinesData}
+                canEdit={canEdit}
+                search={search}
               />
             </TabsContent>
 
@@ -2361,5 +2371,271 @@ function MachineForm({
         </form>
       </SheetContent>
     </Sheet>
+  );
+}
+
+// ── Operator Groups Tab ────────────────────────────────────────────────────────
+
+function OperatorGroupsTab({
+  allMachines,
+  canEdit,
+  search,
+}: {
+  allMachines: any[];
+  canEdit: boolean;
+  search: string;
+}) {
+  const qc = useQueryClient();
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<OperatorGroup | null>(null);
+  const [form, setForm] = useState({ name: "", emp_id: "", machine_codes: [] as string[] });
+  const [machineSearch, setMachineSearch] = useState("");
+
+  const groupsQ = useQuery({
+    queryKey: ["operator-groups"],
+    queryFn: () => productionApi.getOperatorGroups({ active_only: false }),
+    staleTime: 30_000,
+  });
+  const groups: OperatorGroup[] = (groupsQ.data ?? []) as OperatorGroup[];
+  const filtered = groups.filter(
+    (g) => !search || g.name.toLowerCase().includes(search.toLowerCase()) || (g.emp_id ?? "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const saveMut = useMutation({
+    mutationFn: () =>
+      editing
+        ? productionApi.updateOperatorGroup(editing.id, form)
+        : productionApi.createOperatorGroup({ ...form, is_active: true }),
+    onSuccess: () => {
+      toast.success(editing ? "Operator group updated" : "Operator group created");
+      qc.invalidateQueries({ queryKey: ["operator-groups"] });
+      setSheetOpen(false);
+    },
+    onError: () => toast.error("Failed to save"),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => productionApi.deleteOperatorGroup(id),
+    onSuccess: () => {
+      toast.success("Operator group deleted");
+      qc.invalidateQueries({ queryKey: ["operator-groups"] });
+    },
+    onError: () => toast.error("Failed to delete"),
+  });
+
+  function openNew() {
+    setEditing(null);
+    setForm({ name: "", emp_id: "", machine_codes: [] });
+    setMachineSearch("");
+    setSheetOpen(true);
+  }
+
+  function openEdit(g: OperatorGroup) {
+    setEditing(g);
+    setForm({ name: g.name, emp_id: g.emp_id ?? "", machine_codes: g.machine_codes ?? [] });
+    setMachineSearch("");
+    setSheetOpen(true);
+  }
+
+  function toggleMachine(code: string) {
+    setForm((prev) => ({
+      ...prev,
+      machine_codes: prev.machine_codes.includes(code)
+        ? prev.machine_codes.filter((c) => c !== code)
+        : [...prev.machine_codes, code],
+    }));
+  }
+
+  const filteredMachines = allMachines.filter(
+    (m: any) =>
+      !machineSearch ||
+      m.code?.toLowerCase().includes(machineSearch.toLowerCase()) ||
+      m.name?.toLowerCase().includes(machineSearch.toLowerCase()) ||
+      m.department?.toLowerCase().includes(machineSearch.toLowerCase())
+  );
+
+  // Group machines by department for the picker
+  const machinesByDept = filteredMachines.reduce((acc: Record<string, any[]>, m: any) => {
+    const dept = m.department || "Uncategorised";
+    if (!acc[dept]) acc[dept] = [];
+    acc[dept].push(m);
+    return acc;
+  }, {});
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <div>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Users className="size-4" /> Operator Groups
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Assign machines to each operator. In Shift Entry, selecting an operator filters to only their machines.
+          </p>
+        </div>
+        {canEdit && (
+          <Button size="sm" onClick={openNew}>
+            <Plus className="size-3.5 mr-1" /> New Group
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent>
+        {groupsQ.isLoading ? (
+          <p className="text-sm text-muted-foreground py-4 text-center">Loading…</p>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-10 text-muted-foreground space-y-2">
+            <Users className="size-8 mx-auto opacity-30" />
+            <p className="text-sm">No operator groups yet.</p>
+            {canEdit && (
+              <Button size="sm" variant="outline" onClick={openNew}>
+                <Plus className="size-3.5 mr-1" /> Create first group
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y">
+            {filtered.map((g) => (
+              <div key={g.id} className="flex items-start gap-3 py-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-sm">{g.name}</span>
+                    {g.emp_id && (
+                      <Badge variant="outline" className="text-xs font-mono">{g.emp_id}</Badge>
+                    )}
+                    {!g.is_active && (
+                      <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {(g.machine_codes ?? []).length === 0 ? (
+                      <span className="text-xs text-muted-foreground italic">No machines assigned</span>
+                    ) : (
+                      (g.machine_codes ?? []).slice(0, 12).map((code) => (
+                        <Badge key={code} variant="secondary" className="text-xs font-mono">{code}</Badge>
+                      ))
+                    )}
+                    {(g.machine_codes ?? []).length > 12 && (
+                      <Badge variant="secondary" className="text-xs">+{(g.machine_codes ?? []).length - 12} more</Badge>
+                    )}
+                  </div>
+                </div>
+                {canEdit && (
+                  <div className="flex gap-1 shrink-0">
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(g)}>
+                      <Pencil className="size-3.5" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      disabled={deleteMut.isPending}
+                      onClick={() => {
+                        if (window.confirm(`Delete operator group "${g.name}"?`)) {
+                          deleteMut.mutate(g.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+
+      {/* Create / Edit Sheet */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{editing ? "Edit Operator Group" : "New Operator Group"}</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1.5">
+              <Label>Operator Name <span className="text-destructive">*</span></Label>
+              <Input
+                value={form.name}
+                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                placeholder="e.g. Ravi Kumar"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Employee ID</Label>
+              <Input
+                value={form.emp_id}
+                onChange={(e) => setForm((p) => ({ ...p, emp_id: e.target.value }))}
+                placeholder="e.g. E123"
+              />
+            </div>
+
+            {/* Machine picker */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Assigned Machines ({form.machine_codes.length} selected)</Label>
+                {form.machine_codes.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-xs h-6 text-muted-foreground"
+                    onClick={() => setForm((p) => ({ ...p, machine_codes: [] }))}
+                  >
+                    Clear all
+                  </Button>
+                )}
+              </div>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                <Input
+                  className="pl-8 h-8 text-xs"
+                  placeholder="Search machines…"
+                  value={machineSearch}
+                  onChange={(e) => setMachineSearch(e.target.value)}
+                />
+              </div>
+              <div className="border rounded-lg max-h-72 overflow-y-auto divide-y">
+                {Object.keys(machinesByDept).length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">No machines found</p>
+                ) : (
+                  Object.entries(machinesByDept).map(([dept, machines]) => (
+                    <div key={dept}>
+                      <div className="px-3 py-1.5 bg-muted/50 sticky top-0">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{dept}</span>
+                      </div>
+                      {machines.map((m: any) => {
+                        const selected = form.machine_codes.includes(m.code);
+                        return (
+                          <button
+                            key={m.code}
+                            type="button"
+                            onClick={() => toggleMachine(m.code)}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-muted/40 transition-colors ${selected ? "bg-primary/5" : ""}`}
+                          >
+                            <div className={`size-4 rounded flex items-center justify-center border ${selected ? "bg-primary border-primary" : "border-input"}`}>
+                              {selected && <Check className="size-2.5 text-white" />}
+                            </div>
+                            <span className="font-mono text-xs font-medium">{m.code}</span>
+                            {m.name && <span className="text-xs text-muted-foreground truncate">{m.name}</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+          <SheetFooter>
+            <Button
+              onClick={() => saveMut.mutate()}
+              disabled={saveMut.isPending || !form.name.trim()}
+              className="w-full"
+            >
+              {saveMut.isPending ? "Saving…" : editing ? "Update Group" : "Create Group"}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </Card>
   );
 }

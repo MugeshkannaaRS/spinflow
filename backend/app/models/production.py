@@ -108,6 +108,20 @@ class ProductionEntry(TimestampMixin, Base):
     entered_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
 
+class OperatorGroup(Base):
+    """Named operator assigned to a fixed set of machines per mill."""
+    __tablename__ = "operator_groups"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    emp_id: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    machine_codes: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class Shift(Base):
     __tablename__ = "shifts"
 
