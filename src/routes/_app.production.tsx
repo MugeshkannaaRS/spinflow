@@ -1082,27 +1082,48 @@ const STOP_CATEGORIES: Record<string, string> = {
   misc:                    "Misc",
 };
 
+type StopRow = {
+  id: string;
+  stop_from: string;
+  stop_to: string;
+  datalog_code: string;
+  codeSearch: string;
+  showDropdown: boolean;
+  section: string;
+  production_loss_kg: string;
+};
+
+function makeStopRow(): StopRow {
+  return {
+    id: Math.random().toString(36).slice(2),
+    stop_from: "", stop_to: "", datalog_code: "",
+    codeSearch: "", showDropdown: false,
+    section: "", production_loss_kg: "",
+  };
+}
+
 function StoppageForm() {
   const qc = useQueryClient();
   const { millId } = useActiveMill();
   const today = new Date();
   const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+
+  // Header state
   const [date, setDate] = useState(localDate);
   const [shift, setShift] = useState<"A" | "B" | "C">("A");
   const [department, setDepartment] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [selectedMachine, setSelectedMachine] = useState<string>("");
 
-  const [form, setForm] = useState({
-    machine_code: "", section: "", datalog_code: "",
-    stop_from: "", stop_to: "", production_loss_kg: "", remarks: "",
-  });
-  const setField = (k: string, v: string) => {
-    setForm((p) => ({ ...p, [k]: v }));
-    setErrors((p) => ({ ...p, [k]: "" }));
-  };
+  // Multi-row state
+  const [rows, setRows] = useState<StopRow[]>([makeStopRow()]);
 
+  const setRowField = (id: string, field: keyof StopRow, value: any) =>
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+  const addRow = () => setRows((prev) => [...prev, makeStopRow()]);
+  const removeRow = (id: string) => setRows((prev) => prev.length > 1 ? prev.filter((r) => r.id !== id) : prev);
+
+  // Mill masters
   const { data: millMasters } = useMillMasters();
   const deptOptions = millMasters?.department ?? [];
   useEffect(() => {
@@ -1115,6 +1136,7 @@ function StoppageForm() {
     }
   }, [deptOptions]);
 
+  // Stop codes
   const stopCodesQ = useQuery({
     queryKey: ["stop-codes"],
     queryFn: productionApi.getStopCodes,
@@ -1122,13 +1144,7 @@ function StoppageForm() {
   });
   const stopCodes = (stopCodesQ.data ?? []) as any[];
 
-  const filteredCodes = useMemo(() => {
-    let codes = stopCodes;
-    if (selectedCategory !== "all") codes = codes.filter((c) => c.category === selectedCategory);
-    return codes;
-  }, [stopCodes, selectedCategory]);
-
-  // Machines filtered by selected department
+  // Machines for selected department
   const machinesQ = useQuery({
     queryKey: ["machines", departmentId || department, millId, "stoppage"],
     queryFn: () => productionApi.getMachines({
@@ -1140,14 +1156,12 @@ function StoppageForm() {
   });
   const machines = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[];
 
-  // Reset machine when department changes
-  useEffect(() => { setField("machine_code", ""); }, [department]);
+  useEffect(() => { setSelectedMachine(""); }, [department]);
 
-  // Stoppage log date range filter (defaults to today)
+  // Stoppage log date range
   const [logDateFrom, setLogDateFrom] = useState(localDate);
   const [logDateTo, setLogDateTo] = useState(localDate);
 
-  // Live stoppage log
   const stoppageLogQ = useQuery({
     queryKey: ["downtime", millId, logDateFrom, logDateTo],
     queryFn: () => productionApi.getDowntimeLogs({ mill_id: millId, page_size: 500, date_from: logDateFrom, date_to: logDateTo }),
@@ -1155,52 +1169,54 @@ function StoppageForm() {
     enabled: !!millId,
   });
   const stoppageLogs = (Array.isArray(stoppageLogQ.data) ? stoppageLogQ.data : (stoppageLogQ.data?.data ?? [])) as any[];
+  const todayTotal = useMemo(() => stoppageLogs.reduce((s: number, r: any) => s + (r.duration_min || 0), 0), [stoppageLogs]);
 
-  const logMutation = useMutation({
-    mutationFn: () => {
-      if (!form.machine_code) throw new Error("Machine is required");
-      if (!form.datalog_code) throw new Error("Stop code is required");
-      return productionApi.logDatalogDowntime({
-        machine_code: form.machine_code,
-        datalog_code: Number(form.datalog_code),
-        stop_from: form.stop_from || undefined,
-        stop_to: form.stop_to || undefined,
-        date, shift,
-        production_loss_kg: form.production_loss_kg ? Number(form.production_loss_kg) : 0,
-        remarks: form.remarks || undefined,
-      }, millId ?? "");
+  // Helper: auto-calc minutes for a row
+  const calcMin = (from: string, to: string) => {
+    if (!from || !to) return null;
+    const [fh, fm] = from.split(":").map(Number);
+    const [th, tm] = to.split(":").map(Number);
+    const diff = (th * 60 + tm) - (fh * 60 + fm);
+    return diff > 0 ? diff : null;
+  };
+
+  // Save all mutation
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedMachine) throw new Error("Select a machine first");
+      const validRows = rows.filter((r) => r.datalog_code);
+      if (validRows.length === 0) throw new Error("Add at least one row with a stop code");
+      const results = await Promise.allSettled(
+        validRows.map((r) =>
+          productionApi.logDatalogDowntime({
+            machine_code: selectedMachine,
+            datalog_code: Number(r.datalog_code),
+            stop_from: r.stop_from || undefined,
+            stop_to: r.stop_to || undefined,
+            date, shift,
+            production_loss_kg: r.production_loss_kg ? Number(r.production_loss_kg) : 0,
+            remarks: r.section || undefined,
+          }, millId ?? "")
+        )
+      );
+      const failed = results.filter((r) => r.status === "rejected");
+      if (failed.length > 0) {
+        const firstErr = (failed[0] as PromiseRejectedResult).reason;
+        throw new Error(firstErr?.response?.data?.detail || `${failed.length} row(s) failed`);
+      }
+      return results.length;
     },
-    onSuccess: (res: any) => {
-      toast.success(`Logged — [${res.datalog_code}] ${res.code_name} · ${res.duration_min} min`);
-      setForm({ machine_code: "", section: "", datalog_code: "", stop_from: "", stop_to: "", production_loss_kg: "", remarks: "" });
+    onSuccess: (count) => {
+      toast.success(`Saved ${count} stoppage${count !== 1 ? "s" : ""} for ${selectedMachine}`);
+      setRows([makeStopRow()]);
       qc.invalidateQueries({ queryKey: ["downtime"] });
     },
     onError: (err: any) => {
-      const detail = err?.response?.data?.detail;
-      toast.error(typeof detail === "string" ? detail : err.message || "Failed to log stoppage");
+      toast.error(err.message || "Failed to save stoppages");
     },
   });
 
-  const handleSubmit = () => {
-    const errs: Record<string, string> = {};
-    if (!form.machine_code) errs.machine_code = "Required";
-    if (!form.datalog_code) errs.datalog_code = "Select a stop code below";
-    setErrors(errs);
-    if (Object.keys(errs).length > 0) return;
-    logMutation.mutate();
-  };
-
-  const selectedCode = stopCodes.find((c) => String(c.code) === form.datalog_code);
-  const totalMin = useMemo(() => {
-    if (!form.stop_from || !form.stop_to) return null;
-    const [fh, fm] = form.stop_from.split(":").map(Number);
-    const [th, tm] = form.stop_to.split(":").map(Number);
-    const diff = (th * 60 + tm) - (fh * 60 + fm);
-    return diff > 0 ? diff : null;
-  }, [form.stop_from, form.stop_to]);
-
-  // Today's summary
-  const todayTotal = useMemo(() => stoppageLogs.reduce((s: number, r: any) => s + (r.duration_min || 0), 0), [stoppageLogs]);
+  const codedRows = rows.filter((r) => r.datalog_code).length;
 
   return (
     <div className="space-y-4">
@@ -1216,16 +1232,17 @@ function StoppageForm() {
             </span>
           )}
         </CardHeader>
-        <CardContent className="space-y-5">
-          {/* Row 1: Date / Shift / Department */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <CardContent className="space-y-4">
+
+          {/* ── Header: Date / Shift / Department ── */}
+          <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Date</Label>
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-8 text-sm" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Shift</Label>
-              <Select value={shift} onValueChange={(v) => setShift(v as "A"|"B"|"C")}>
+              <Select value={shift} onValueChange={(v) => setShift(v as "A" | "B" | "C")}>
                 <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="A">A — Morning</SelectItem>
@@ -1235,7 +1252,7 @@ function StoppageForm() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Department *</Label>
+              <Label className="text-xs">Department</Label>
               <Select value={department} onValueChange={(v) => {
                 setDepartment(v);
                 const d = deptOptions.find((x: any) => (typeof x === "string" ? x : x.name) === v);
@@ -1252,125 +1269,175 @@ function StoppageForm() {
             </div>
           </div>
 
-          {/* Row 2: Machine / Section */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Machine * {department && <span className="text-muted-foreground">({department})</span>}</Label>
-              <Select value={form.machine_code} onValueChange={(v) => setField("machine_code", v)}
-                disabled={!department}>
-                <SelectTrigger className={["h-8 text-sm", errors.machine_code ? "border-destructive" : ""].filter(Boolean).join(" ")}>
-                  <SelectValue placeholder={department ? "Select machine" : "Select dept first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {machines.length === 0 ? (
-                    <SelectItem value="_none" disabled>No machines in {department}</SelectItem>
-                  ) : machines.map((m: any) => (
-                    <SelectItem key={m.code} value={m.code}>{m.code}{m.name ? ` — ${m.name}` : ""}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.machine_code && <p className="text-xs text-destructive">{errors.machine_code}</p>}
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Section / Frame No</Label>
-              <Input value={form.section} onChange={(e) => setField("section", e.target.value)}
-                placeholder="e.g. A1 or Frame 3" className="h-8 text-sm" />
-            </div>
-          </div>
-
-          {/* Row 3: From / To / Total Min / Loss */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">From (HH:MM)</Label>
-              <Input type="time" value={form.stop_from} onChange={(e) => setField("stop_from", e.target.value)} className="h-8 text-sm" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">To (HH:MM)</Label>
-              <Input type="time" value={form.stop_to} onChange={(e) => setField("stop_to", e.target.value)} className="h-8 text-sm" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Total Min</Label>
-              <div className="h-8 flex items-center px-3 rounded-md border bg-muted/40 text-sm font-semibold">
-                {totalMin !== null ? <span className="text-amber-600">{totalMin} min</span> : "—"}
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Production Loss (kg)</Label>
-              <Input type="number" min={0} step="0.01" value={form.production_loss_kg}
-                onChange={(e) => setField("production_loss_kg", e.target.value)}
-                placeholder="0" className="h-8 text-sm" />
-            </div>
-          </div>
-
-          {/* DATALOG code picker */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
+          {/* ── Machine selector (once for all rows) ── */}
+          <div className="flex items-end gap-3">
+            <div className="flex-1 space-y-1.5">
               <Label className="text-xs font-semibold">
-                DATALOG Stop Code *
-                {errors.datalog_code && <span className="ml-2 text-destructive font-normal">{errors.datalog_code}</span>}
+                Machine <span className="text-destructive">*</span>
+                {department && <span className="text-muted-foreground font-normal ml-1">({department})</span>}
               </Label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="h-7 text-xs w-52">
-                  <SelectValue placeholder="All categories" />
+              <Select value={selectedMachine} onValueChange={setSelectedMachine} disabled={!department}>
+                <SelectTrigger className="h-9 text-sm border-primary/40 font-medium">
+                  <SelectValue placeholder={department ? "Select machine to log stoppages…" : "Select a department first"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  {Object.entries(STOP_CATEGORIES).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v}</SelectItem>
-                  ))}
+                  {machines.length === 0
+                    ? <SelectItem value="_none" disabled>No machines in {department}</SelectItem>
+                    : machines.map((m: any) => (
+                        <SelectItem key={m.code} value={m.code}>{m.code}{m.name ? ` — ${m.name}` : ""}</SelectItem>
+                      ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className={["grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-3 rounded-lg border max-h-64 overflow-y-auto",
-              errors.datalog_code ? "border-destructive bg-destructive/5" : "bg-muted/30"].filter(Boolean).join(" ")}>
-              {stopCodesQ.isLoading ? (
-                <div className="col-span-5 text-xs text-muted-foreground py-3 text-center">Loading DATALOG codes…</div>
-              ) : stopCodes.length === 0 ? (
-                <div className="col-span-5 text-xs text-amber-600 py-3 text-center space-y-1">
-                  <p className="font-medium">No stop codes found.</p>
-                  <p className="text-muted-foreground">Run the seed script: <code className="bg-muted px-1 rounded">python3 -m app.db.seed_datalog</code></p>
-                </div>
-              ) : filteredCodes.length === 0 ? (
-                <div className="col-span-5 text-xs text-muted-foreground py-3 text-center">No codes in this category</div>
-              ) : filteredCodes.map((c: any) => (
-                <button
-                  key={c.code}
-                  type="button"
-                  onClick={() => { setField("datalog_code", String(c.code)); setErrors((p) => ({ ...p, datalog_code: "" })); }}
-                  className={[
-                    "text-left px-3 py-2 rounded-md border text-xs transition-all",
-                    form.datalog_code === String(c.code)
-                      ? "bg-primary text-primary-foreground border-primary font-semibold shadow-sm"
-                      : "bg-card hover:bg-accent border-border",
-                  ].join(" ")}
-                >
-                  <span className="font-mono font-bold">{c.code}</span>
-                  <span className="block text-[11px] mt-0.5 leading-tight opacity-80">{c.name}</span>
-                </button>
-              ))}
-            </div>
-            {selectedCode && (
-              <div className="text-xs bg-primary/10 border border-primary/20 rounded px-3 py-2 flex items-center gap-2">
-                <CheckCircle2 className="size-3.5 text-primary shrink-0" />
-                <span><strong>[{selectedCode.code}] {selectedCode.name}</strong>
-                {selectedCode.category && <> · <span className="text-primary">{STOP_CATEGORIES[selectedCode.category] ?? selectedCode.category}</span></>}
-                </span>
-              </div>
+            {selectedMachine && (
+              <span className="text-xs text-muted-foreground pb-2 shrink-0">
+                {rows.length} row{rows.length !== 1 ? "s" : ""} · {codedRows} coded
+              </span>
             )}
           </div>
 
-          <div className="space-y-1.5">
-            <Label className="text-xs">Remarks</Label>
-            <Textarea value={form.remarks} onChange={(e) => setField("remarks", e.target.value)}
-              placeholder="Additional details…" className="text-sm min-h-[60px]" />
-          </div>
+          {/* ── Rows table ── */}
+          {selectedMachine ? (
+            <>
+              <div className="overflow-x-auto rounded-md border">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-muted/60 text-muted-foreground">
+                      <th className="text-left px-2 py-1.5 font-medium border-b w-[88px]">From</th>
+                      <th className="text-left px-2 py-1.5 font-medium border-b w-[88px]">To</th>
+                      <th className="text-center px-2 py-1.5 font-medium border-b w-[52px]">Min</th>
+                      <th className="text-left px-2 py-1.5 font-medium border-b min-w-[180px]">Stop Code <span className="text-destructive">*</span></th>
+                      <th className="text-left px-2 py-1.5 font-medium border-b w-[88px]">Section</th>
+                      <th className="text-left px-2 py-1.5 font-medium border-b w-[80px]">Loss (kg)</th>
+                      <th className="border-b w-[28px]" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, idx) => {
+                      const min = calcMin(row.stop_from, row.stop_to);
+                      const selectedCode = stopCodes.find((c: any) => String(c.code) === row.datalog_code);
+                      const filteredCodes = stopCodes
+                        .filter((c: any) => {
+                          const q = row.codeSearch.toLowerCase();
+                          return !q || String(c.code).includes(q) || (c.name ?? "").toLowerCase().includes(q);
+                        })
+                        .slice(0, 8);
 
-          <div className="flex justify-end">
-            <Button onClick={handleSubmit} disabled={logMutation.isPending} className="gap-2">
-              <CheckCircle2 className="size-4" />
-              {logMutation.isPending ? "Logging…" : "Log Stoppage"}
-            </Button>
-          </div>
+                      return (
+                        <tr key={row.id} className={idx % 2 === 0 ? "bg-background" : "bg-muted/20"}>
+                          {/* From */}
+                          <td className="px-1.5 py-1 border-b">
+                            <input type="time" value={row.stop_from}
+                              onChange={(e) => setRowField(row.id, "stop_from", e.target.value)}
+                              className="w-full h-7 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                          </td>
+                          {/* To */}
+                          <td className="px-1.5 py-1 border-b">
+                            <input type="time" value={row.stop_to}
+                              onChange={(e) => setRowField(row.id, "stop_to", e.target.value)}
+                              className="w-full h-7 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                          </td>
+                          {/* Min (auto) */}
+                          <td className="px-1.5 py-1 border-b text-center">
+                            <span className={min ? "font-semibold text-amber-600" : "text-muted-foreground"}>
+                              {min ?? "—"}
+                            </span>
+                          </td>
+                          {/* Stop code — searchable combobox */}
+                          <td className="px-1.5 py-1 border-b">
+                            <div className="relative">
+                              {selectedCode ? (
+                                <div className="flex items-center gap-1 h-7 px-2 rounded border border-primary/40 bg-primary/5 text-xs">
+                                  <span className="font-mono font-bold text-primary shrink-0">[{selectedCode.code}]</span>
+                                  <span className="truncate text-muted-foreground">{selectedCode.name}</span>
+                                  <button type="button"
+                                    onClick={() => { setRowField(row.id, "datalog_code", ""); setRowField(row.id, "codeSearch", ""); }}
+                                    className="ml-auto text-muted-foreground hover:text-destructive shrink-0 text-base leading-none">×</button>
+                                </div>
+                              ) : (
+                                <>
+                                  <input
+                                    type="text"
+                                    value={row.codeSearch}
+                                    placeholder="Type code or name…"
+                                    onChange={(e) => { setRowField(row.id, "codeSearch", e.target.value); setRowField(row.id, "showDropdown", true); }}
+                                    onFocus={() => setRowField(row.id, "showDropdown", true)}
+                                    onBlur={() => setTimeout(() => setRowField(row.id, "showDropdown", false), 160)}
+                                    className="w-full h-7 rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                                  />
+                                  {row.showDropdown && (
+                                    <div className="absolute z-50 left-0 top-8 w-64 bg-popover border rounded-md shadow-lg overflow-hidden">
+                                      {stopCodesQ.isLoading ? (
+                                        <div className="px-3 py-2 text-xs text-muted-foreground">Loading…</div>
+                                      ) : filteredCodes.length === 0 ? (
+                                        <div className="px-3 py-2 text-xs text-muted-foreground">No codes match</div>
+                                      ) : filteredCodes.map((c: any) => (
+                                        <button key={c.code} type="button"
+                                          onMouseDown={() => {
+                                            setRowField(row.id, "datalog_code", String(c.code));
+                                            setRowField(row.id, "codeSearch", "");
+                                            setRowField(row.id, "showDropdown", false);
+                                          }}
+                                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent flex items-center gap-2">
+                                          <span className="font-mono font-bold text-primary w-8 shrink-0">{c.code}</span>
+                                          <span className="text-muted-foreground truncate">{c.name}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </td>
+                          {/* Section */}
+                          <td className="px-1.5 py-1 border-b">
+                            <input type="text" value={row.section}
+                              onChange={(e) => setRowField(row.id, "section", e.target.value)}
+                              placeholder="e.g. A1"
+                              className="w-full h-7 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                          </td>
+                          {/* Loss */}
+                          <td className="px-1.5 py-1 border-b">
+                            <input type="number" min={0} step="0.01" value={row.production_loss_kg}
+                              onChange={(e) => setRowField(row.id, "production_loss_kg", e.target.value)}
+                              placeholder="0"
+                              className="w-full h-7 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                          </td>
+                          {/* Delete row */}
+                          <td className="px-1 py-1 border-b text-center">
+                            <button type="button" onClick={() => removeRow(row.id)}
+                              disabled={rows.length === 1}
+                              className="text-muted-foreground hover:text-destructive disabled:opacity-20 px-1 text-base leading-none">×</button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Actions row */}
+              <div className="flex items-center justify-between gap-3">
+                <Button type="button" variant="outline" size="sm" onClick={addRow} className="gap-1.5 text-xs h-8">
+                  <Plus className="size-3.5" />
+                  Add Row
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => saveMutation.mutate()}
+                  disabled={saveMutation.isPending || codedRows === 0}
+                  className="gap-2"
+                >
+                  <Save className="size-4" />
+                  {saveMutation.isPending ? "Saving…" : `Save All (${codedRows})`}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-8 text-sm text-muted-foreground">
+              {!department ? "Select a department above to get started" : "Select a machine above to log stoppages"}
+            </div>
+          )}
         </CardContent>
       </Card>
 
