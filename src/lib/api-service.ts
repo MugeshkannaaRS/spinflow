@@ -46,6 +46,10 @@ export const authApi = {
 export const productionApi = {
   getMachines: (params?: Record<string, any>) =>
     api.get("/production/machines", { params }).then((r: any) => extractList(r.data)),
+  getMachineSections: (params?: Record<string, any>) =>
+    api.get("/production/machines/sections", { params }).then((r: any) => r.data as { sections: string[] }),
+  bulkCancelEntries: (ids: string[]) =>
+    api.post("/production/entries/bulk-cancel", { ids }).then((r: any) => r.data as { cancelled: number; skipped: number }),
   createMachine: (data: any) => api.post("/production/machines", data).then((r) => r.data),
   updateMachine: (id: string, data: any) => api.put(`/production/machines/${id}`, data).then((r) => r.data),
   getEntries: () => api.get("/production/entries").then((r: any) => extractList(r.data)),

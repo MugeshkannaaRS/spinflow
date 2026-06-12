@@ -41,10 +41,11 @@ import {
 } from "@/components/ui/sheet";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
+import { Checkbox } from "@/components/ui/checkbox";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, ArrowDown, ArrowUp, Trash2, Clock, Users2 } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, ArrowDown, ArrowUp, Trash2, Clock, Users2, UserCircle, Layers } from "lucide-react";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useActiveMill } from "@/hooks/useActiveMill";
@@ -112,6 +113,25 @@ function ShiftGrid() {
   const [department, setDepartment] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
 
+  // Operator identification — shared login support
+  const [operatorName, setOperatorName] = useState<string>(() => {
+    try { return sessionStorage.getItem("sf_operator") ?? ""; } catch { return ""; }
+  });
+
+  // Machine section / line filter
+  const [selectedSection, setSelectedSection] = useState<string>("all");
+
+  const sectionsQ = useQuery({
+    queryKey: ["machine-sections", departmentId || department, millId],
+    queryFn: () => productionApi.getMachineSections({
+      ...(departmentId ? { department_id: departmentId } : { department }),
+      mill_id: millId,
+    }),
+    staleTime: 60_000,
+    enabled: !!millId && !!(departmentId || department),
+  });
+  const sections: string[] = sectionsQ.data?.sections ?? [];
+
   useEffect(() => {
     if (!department && deptOptions.length > 0) {
       const first = deptOptions[0];
@@ -122,13 +142,17 @@ function ShiftGrid() {
     }
   }, [deptOptions]);
 
+  // Reset section filter when dept changes
+  useEffect(() => { setSelectedSection("all"); }, [department]);
+
   const [count, setCount] = useState("30s");
   const config = useColumnConfig("production_entries");
 
   const machinesQ = useQuery({
-    queryKey: ["machines", departmentId || department, millId],
+    queryKey: ["machines", departmentId || department, millId, selectedSection],
     queryFn: () => productionApi.getMachines({
       ...(departmentId ? { department_id: departmentId } : { department }),
+      ...(selectedSection && selectedSection !== "all" ? { section: selectedSection } : {}),
       mill_id: millId,
       page_size: 1000,
       page: 1,
@@ -144,8 +168,14 @@ function ShiftGrid() {
   const [rows, setRows] = useState<GridRow[]>(() => buildRows(machines));
 
   useEffect(() => {
-    setRows(buildRows(machines));
+    setRows(buildRows(machines).map((r) => ({ ...r, operator: operatorName })));
   }, [machines]);
+
+  // When operator name changes, pre-fill all existing rows
+  useEffect(() => {
+    setRows((prev) => prev.map((r) => ({ ...r, operator: operatorName })));
+    try { sessionStorage.setItem("sf_operator", operatorName); } catch {}
+  }, [operatorName]);
 
   // ── Carding section (visible only when Blowroom is selected) ──────────────
   const isBlowroom = department.toLowerCase().includes("blowroom");
@@ -283,7 +313,8 @@ function ShiftGrid() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-3">
+          {/* Row 1: Date / Shift / Dept / Count */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">
@@ -386,6 +417,58 @@ function ShiftGrid() {
                 <p className="text-xs text-destructive">{requiredErrors.count}</p>
               )}
             </div>
+          </div>
+
+          {/* Row 2: Entering As + Machine Line/Section filter */}
+          <div className="flex flex-wrap gap-3 items-end pt-1 border-t border-dashed">
+            {/* Entering As — operator identity for shared login */}
+            <div className="flex items-center gap-2 min-w-[200px] flex-1">
+              <UserCircle className="w-4 h-4 text-muted-foreground shrink-0" />
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-muted-foreground">Entering as</Label>
+                <Input
+                  value={operatorName}
+                  onChange={(e) => setOperatorName(e.target.value)}
+                  placeholder="Operator name or Emp ID…"
+                  className="h-7 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Machine Line / Section chips */}
+            {sections.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Line:</span>
+                </div>
+                <button
+                  onClick={() => setSelectedSection("all")}
+                  className={[
+                    "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                    selectedSection === "all"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-white border-gray-200 text-muted-foreground hover:border-gray-400",
+                  ].join(" ")}
+                >
+                  All Lines
+                </button>
+                {sections.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setSelectedSection(s === selectedSection ? "all" : s)}
+                    className={[
+                      "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                      selectedSection === s
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white border-blue-200 text-blue-700 hover:border-blue-400",
+                    ].join(" ")}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1689,18 +1772,22 @@ function ProductionPage() {
   // Machine edit
   const [machineEditOpen, setMachineEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
-    code: "", name: "", type: "", make: "", model: "", capacity: "", status: "",
+    code: "", name: "", type: "", make: "", model: "", capacity: "", status: "", section: "",
   });
   const [editMachineId, setEditMachineId] = useState<string | null>(null);
   const updateMachineMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
-      productionApi.updateMachineStatus(id, data),
+      productionApi.updateMachine(id, data),
     onSuccess: () => {
       toast.success("Machine updated");
       setMachineEditOpen(false);
       qc.invalidateQueries({ queryKey: ["machines"] });
+      qc.invalidateQueries({ queryKey: ["machine-sections"] });
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail;
+      toast.error(typeof detail === "string" ? detail : err.message || "Update failed");
+    },
   });
 
   // Machine deactivate
@@ -1740,6 +1827,25 @@ function ProductionPage() {
   const [entryEditOpen, setEntryEditOpen] = useState(false);
   const [entryEditId, setEntryEditId] = useState<string | null>(null);
   const [entryEditForm, setEntryEditForm] = useState<Record<string, any>>({});
+
+  // Bulk select + cancel
+  const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
+  const [bulkCancelConfirm, setBulkCancelConfirm] = useState(false);
+  const toggleEntrySelect = (id: string) =>
+    setSelectedEntryIds((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  const bulkCancelMut = useMutation({
+    mutationFn: () => productionApi.bulkCancelEntries(Array.from(selectedEntryIds)),
+    onSuccess: (res) => {
+      toast.success(`${res.cancelled} entries cancelled${res.skipped > 0 ? `, ${res.skipped} approved entries skipped` : ""}`);
+      setSelectedEntryIds(new Set());
+      setBulkCancelConfirm(false);
+      qc.invalidateQueries({ queryKey: ["shifts"] });
+    },
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail;
+      toast.error(typeof detail === "string" ? detail : err.message || "Bulk cancel failed");
+    },
+  });
   const updateEntryMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => productionApi.updateEntry(id, data),
     onSuccess: () => {
@@ -1957,6 +2063,7 @@ function ProductionPage() {
                               model: m.model ?? "",
                               capacity: m.capacity ?? "",
                               status: m.current_status ?? m.status ?? "",
+                              section: m.section ?? "",
                             });
                             setEditMachineId(m.id);
                             setMachineEditOpen(true);
@@ -2041,6 +2148,20 @@ function ProductionPage() {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label className="flex items-center gap-1">
+                        <Layers className="w-3.5 h-3.5 text-muted-foreground" />
+                        Machine Line / Section
+                      </Label>
+                      <Input
+                        value={editForm.section}
+                        onChange={(e) => setEditForm((p) => ({ ...p, section: e.target.value }))}
+                        placeholder="e.g. Carding Line 1, Ring Frame A"
+                      />
+                      <p className="text-[10px] text-muted-foreground">
+                        Group this machine into a line/section. Used to filter machines in Shift Entry.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
                       <Label>Status</Label>
                       <Select
                         value={editForm.status}
@@ -2074,17 +2195,59 @@ function ProductionPage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Shift Production Entries</CardTitle>
-                  {canEdit && <ImportShiftEntriesDialog />}
+                  <div className="flex items-center gap-2">
+                    {canEdit && <ImportShiftEntriesDialog />}
+                  </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-3">
+                  {/* Bulk action toolbar */}
+                  {selectedEntryIds.size > 0 && (
+                    <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
+                      <span className="text-sm text-red-700 font-medium flex-1">
+                        {selectedEntryIds.size} entr{selectedEntryIds.size === 1 ? "y" : "ies"} selected
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setSelectedEntryIds(new Set())}
+                        className="h-7 text-xs"
+                      >
+                        Clear
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white"
+                        onClick={() => setBulkCancelConfirm(true)}
+                      >
+                        <Trash2 className="w-3 h-3 mr-1" />
+                        Cancel Selected
+                      </Button>
+                    </div>
+                  )}
+
                   <DataTable
                     tableId="production_shifts"
                     columns={[
+                      {
+                        key: "_select",
+                        label: "",
+                        className: "w-8",
+                        render: (s: any) => s.status !== "approved" ? (
+                          <Checkbox
+                            checked={selectedEntryIds.has(s.id)}
+                            onCheckedChange={() => toggleEntrySelect(s.id)}
+                            aria-label="Select entry"
+                          />
+                        ) : (
+                          <span title="Approved — cannot cancel" className="text-muted-foreground/40 text-xs">🔒</span>
+                        ),
+                      },
                       { key: "date", label: machineColConfig.getLabel('date'), type: "date" },
                       { key: "shift", label: machineColConfig.getLabel('shift'), render: (s: any) => <Badge variant="outline">{s.shift}</Badge> },
                       { key: "machine_code", label: machineColConfig.getLabel('machine_code'), className: "font-mono text-xs" },
                       { key: "department", label: machineColConfig.getLabel('department'), type: "status" },
                       { key: "operator", label: machineColConfig.getLabel('operator') },
+                      { key: "entered_by", label: "Entered by", render: (s: any) => <span className="text-xs text-muted-foreground">{s.entered_by ?? "—"}</span> },
                       { key: "count", label: machineColConfig.getLabel('count') },
                       { key: "produced_kg", label: machineColConfig.getLabel('produced_kg'), render: (s: any) => `${s.produced_kg ?? 0} kg` },
                       { key: "waste_kg", label: machineColConfig.getLabel('waste_kg'), render: (s: any) => <span className="text-muted-foreground">{s.waste_kg ?? 0} kg</span> },
@@ -2127,7 +2290,7 @@ function ProductionPage() {
                           <ConfirmDeleteButton
                             onConfirm={async () => {
                               await productionApi.deleteEntry(s.id);
-                              qc.invalidateQueries({ queryKey: ["production-entries"] });
+                              qc.invalidateQueries({ queryKey: ["shifts"] });
                             }}
                             label={`Cancel this entry for machine ${s.machine_code}?`}
                             title="Cancel Entry?"
@@ -2140,6 +2303,36 @@ function ProductionPage() {
                   />
                 </CardContent>
               </Card>
+
+              {/* Bulk cancel confirm modal */}
+              {bulkCancelConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                  <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4">
+                    <div className="flex items-start gap-3">
+                      <Trash2 className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold text-sm">Cancel {selectedEntryIds.size} entr{selectedEntryIds.size === 1 ? "y" : "ies"}?</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Approved entries will be skipped. This cannot be undone.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="outline" size="sm" onClick={() => setBulkCancelConfirm(false)} disabled={bulkCancelMut.isPending}>
+                        Back
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                        onClick={() => bulkCancelMut.mutate()}
+                        disabled={bulkCancelMut.isPending}
+                      >
+                        {bulkCancelMut.isPending ? "Cancelling…" : "Confirm Cancel"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Entry Edit Sheet */}
               <Sheet open={entryEditOpen} onOpenChange={setEntryEditOpen}>
                 <SheetContent side="right" className="w-96">

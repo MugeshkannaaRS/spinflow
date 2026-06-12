@@ -90,9 +90,12 @@ class ProductionEntryResponse(BaseModel):
     production_kg_actual: Optional[float] = None
     variance_kg: Optional[float] = None
     fiber_composition: Optional[Dict[str, Any]] = None
+    stoppage_mins: Optional[int] = None
+    stoppage_reason: Optional[str] = None
     status: str
     approved_by: Optional[str] = None
     approved_at: Optional[datetime] = None
+    entered_by: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:

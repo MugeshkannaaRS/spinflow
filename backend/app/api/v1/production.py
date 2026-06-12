@@ -27,6 +27,7 @@ MAX_BATCH = 500
 async def get_machines(
     department: Optional[str] = Query(None),
     department_id: Optional[str] = Query(None),
+    section: Optional[str] = Query(None),
     mill_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=1000),
@@ -73,6 +74,8 @@ async def get_machines(
         else:
             # Partial fallback: filter by department string column
             query = query.where(Machine.department.ilike(f"%{department.strip()}%"))
+    if section and section not in ("all", ""):
+        query = query.where(Machine.section == section)
     # Order by global serial_no (cast String→Int so 1,2,3 not 1,10,11,2)
     query = query.order_by(nullslast(cast(Machine.serial_no, Integer).asc()), Machine.created_at.asc())
     try:
@@ -137,6 +140,53 @@ async def get_machines(
     except Exception as e:
         logger.error(f"production.machines list error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve machines")
+
+
+@router.get("/production/machines/sections")
+async def get_machine_sections(
+    department_id: Optional[str] = Query(None),
+    department: Optional[str] = Query(None),
+    mill_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production")),
+):
+    """Return distinct Machine.section values for a mill+dept — used to populate Line/Group chips."""
+    scope = await get_mill_scope(current_user, db)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(Mill.id == mill_id, Mill.company_id == current_user.company_id)
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
+    stmt = select(Machine.section).where(
+        Machine.status == True,
+        Machine.section.isnot(None),
+        Machine.section != "",
+    )
+    if effective_mill_id:
+        stmt = stmt.where(Machine.mill_id == effective_mill_id)
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if department_id:
+        stmt = stmt.where(Machine.department_id == department_id)
+    elif department and department not in ("all", ""):
+        stmt = stmt.where(Machine.department.ilike(f"%{department.strip()}%"))
+
+    stmt = stmt.distinct().order_by(Machine.section)
+    try:
+        result = await db.execute(stmt)
+        sections = [row[0] for row in result.all() if row[0]]
+        return {"sections": sections}
+    except Exception as e:
+        logger.error(f"production.machines.sections error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve machine sections")
 
 
 @router.post("/production/machines", response_model=MachineResponse)
@@ -324,6 +374,38 @@ async def create_entries_bulk(
         raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     svc = ProductionService(db, current_user)
     return await svc.create_entries_bulk(req)
+
+
+@router.post("/production/entries/bulk-cancel")
+async def bulk_cancel_entries(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    """Soft-cancel up to 100 pending entries in one call. Approved entries are skipped."""
+    ids = body.get("ids", [])
+    if not ids:
+        raise HTTPException(400, detail="No entry IDs provided")
+    if len(ids) > 100:
+        raise HTTPException(400, detail="Maximum 100 entries per bulk cancel")
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id")
+
+    stmt = select(ProductionEntry).where(ProductionEntry.id.in_(ids))
+    if mill_id:
+        stmt = stmt.where(ProductionEntry.mill_id == mill_id)
+    entries = (await db.execute(stmt)).scalars().all()
+
+    cancelled = 0
+    skipped = 0
+    for entry in entries:
+        if entry.status == "approved":
+            skipped += 1
+            continue
+        entry.status = "cancelled"
+        cancelled += 1
+    await db.commit()
+    return {"cancelled": cancelled, "skipped": skipped}
 
 
 @router.put("/production/entries/{entry_id}/approve", response_model=ProductionEntryResponse)
