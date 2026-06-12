@@ -197,7 +197,7 @@ class ProductionBulkResponse(BaseModel):
     errors: List[str]
 
 
-# ── Operator Groups ────────────────────────────────────────────────────────────
+# ── Operator Groups (legacy) ───────────────────────────────────────────────────
 
 class OperatorGroupCreate(BaseModel):
     name: str
@@ -219,6 +219,35 @@ class OperatorGroupResponse(BaseModel):
     mill_id: Optional[str] = None
     name: str
     emp_id: Optional[str] = None
+    machine_codes: Optional[List[str]] = []
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+# ── Machine Groups ─────────────────────────────────────────────────────────────
+
+class MachineGroupCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    machine_codes: Optional[List[str]] = []
+    is_active: bool = True
+    mill_id: Optional[str] = None  # frontend passes active mill_id for MILL_OWNER
+
+
+class MachineGroupUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    machine_codes: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+
+class MachineGroupResponse(BaseModel):
+    id: str
+    mill_id: Optional[str] = None
+    name: str
+    description: Optional[str] = None
     machine_codes: Optional[List[str]] = []
     is_active: bool
 

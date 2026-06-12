@@ -9,7 +9,7 @@ from app.db.session import get_db
 logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
-from app.models.production import Machine, Shift, ProductionEntry, DowntimeLog, OperatorGroup
+from app.models.production import Machine, Shift, ProductionEntry, DowntimeLog, OperatorGroup, MachineGroup
 from app.models.masters import Mill, Department, YarnCount
 from app.models.mill_config import MillCustomField, MillRecordValue
 from app.schemas.production import (
@@ -17,6 +17,7 @@ from app.schemas.production import (
     DowntimeResponse, DowntimeCreate, ShiftCreate, ShiftOut,
     ProductionBulkCreate, ProductionBulkResponse,
     OperatorGroupCreate, OperatorGroupUpdate, OperatorGroupResponse,
+    MachineGroupCreate, MachineGroupUpdate, MachineGroupResponse,
 )
 from app.services.production_service import ProductionService
 
@@ -30,6 +31,8 @@ async def get_machines(
     department_id: Optional[str] = Query(None),
     section: Optional[str] = Query(None),
     operator_group_id: Optional[str] = Query(None),
+    machine_group_id: Optional[str] = Query(None),
+    machine_group_ids: Optional[str] = Query(None),  # comma-sep IDs for multi-group
     mill_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=1000),
@@ -84,7 +87,29 @@ async def get_machines(
         if grp and grp.machine_codes:
             query = query.where(Machine.code.in_(grp.machine_codes))
         else:
-            # Group not found or empty — return nothing
+            query = query.where(Machine.id == "no-match")
+    elif machine_group_ids or machine_group_id:
+        # Machine Groups: support single ID (machine_group_id) or multi (machine_group_ids csv)
+        from sqlalchemy import or_
+        raw_ids = []
+        if machine_group_ids:
+            raw_ids = [x.strip() for x in machine_group_ids.split(",") if x.strip()]
+        if machine_group_id and machine_group_id not in raw_ids:
+            raw_ids.append(machine_group_id)
+        if raw_ids:
+            grps_res = await db.execute(
+                select(MachineGroup).where(MachineGroup.id.in_(raw_ids))
+            )
+            grps = grps_res.scalars().all()
+            all_codes: list = []
+            for g in grps:
+                if g.machine_codes:
+                    all_codes.extend(g.machine_codes)
+            if all_codes:
+                query = query.where(Machine.code.in_(all_codes))
+            else:
+                query = query.where(Machine.id == "no-match")
+        else:
             query = query.where(Machine.id == "no-match")
     # Order by global serial_no (cast String→Int so 1,2,3 not 1,10,11,2)
     query = query.order_by(nullslast(cast(Machine.serial_no, Integer).asc()), Machine.created_at.asc())
@@ -842,5 +867,96 @@ async def delete_operator_group(
     group = (await db.execute(stmt)).scalar_one_or_none()
     if not group:
         raise HTTPException(status_code=404, detail="Operator group not found")
+    await db.delete(group)
+    await db.commit()
+
+
+# ── Machine Groups ─────────────────────────────────────────────────────────────
+
+@router.get("/production/machine-groups", response_model=List[MachineGroupResponse])
+async def list_machine_groups(
+    mill_id: Optional[str] = Query(None),
+    active_only: bool = Query(True),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production")),
+):
+    from sqlalchemy import or_
+    scope = await get_mill_scope(current_user, db)
+    effective_mill_id = mill_id or scope.get("mill_id")
+    stmt = select(MachineGroup)
+    if effective_mill_id:
+        stmt = stmt.where(
+            or_(MachineGroup.mill_id == effective_mill_id, MachineGroup.mill_id == None)
+        )
+    if active_only:
+        stmt = stmt.where(MachineGroup.is_active == True)
+    stmt = stmt.order_by(MachineGroup.name)
+    rows = (await db.execute(stmt)).scalars().all()
+    return [MachineGroupResponse.model_validate(r) for r in rows]
+
+
+@router.post("/production/machine-groups", response_model=MachineGroupResponse)
+async def create_machine_group(
+    body: MachineGroupCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id") or body.mill_id
+    group = MachineGroup(
+        mill_id=mill_id,
+        name=body.name,
+        description=body.description,
+        machine_codes=body.machine_codes or [],
+        is_active=body.is_active,
+    )
+    db.add(group)
+    await db.commit()
+    await db.refresh(group)
+    return MachineGroupResponse.model_validate(group)
+
+
+@router.put("/production/machine-groups/{group_id}", response_model=MachineGroupResponse)
+async def update_machine_group(
+    group_id: str,
+    body: MachineGroupUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id")
+    stmt = select(MachineGroup).where(MachineGroup.id == group_id)
+    if mill_id:
+        stmt = stmt.where(MachineGroup.mill_id == mill_id)
+    group = (await db.execute(stmt)).scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Machine group not found")
+    if body.name is not None:
+        group.name = body.name
+    if body.description is not None:
+        group.description = body.description
+    if body.machine_codes is not None:
+        group.machine_codes = body.machine_codes
+    if body.is_active is not None:
+        group.is_active = body.is_active
+    await db.commit()
+    await db.refresh(group)
+    return MachineGroupResponse.model_validate(group)
+
+
+@router.delete("/production/machine-groups/{group_id}", status_code=204)
+async def delete_machine_group(
+    group_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id")
+    stmt = select(MachineGroup).where(MachineGroup.id == group_id)
+    if mill_id:
+        stmt = stmt.where(MachineGroup.mill_id == mill_id)
+    group = (await db.execute(stmt)).scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Machine group not found")
     await db.delete(group)
     await db.commit()

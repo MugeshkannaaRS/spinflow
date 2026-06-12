@@ -122,6 +122,22 @@ class OperatorGroup(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class MachineGroup(Base):
+    """Named machine set (e.g. 'Carding Line 1', 'Ring Frame Section A').
+    Groups are defined by the machine set, not by operator.
+    A machine can appear in multiple groups."""
+    __tablename__ = "machine_groups"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    machine_codes: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True, default=list)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class Shift(Base):
     __tablename__ = "shifts"
 

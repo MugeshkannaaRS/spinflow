@@ -1,7 +1,7 @@
 import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, productionApi, inventoryApi, adminApi } from "@/lib/api-service";
-import type { OperatorGroup } from "@/lib/api-service";
+import type { MachineGroup } from "@/lib/api-service";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
@@ -240,7 +240,7 @@ function MastersPage() {
                   { key: "companies",       label: "Companies" },
                   { key: "mills",           label: "Mills" },
                   { key: "machines",        label: "Machines" },
-                  { key: "operator-groups", label: "Operator Groups" },
+                  { key: "machine-groups", label: "Machine Groups" },
                   { key: "departments",     label: "Departments" },
                   { key: "yarn-counts",     label: "Yarn Counts" },
                   { key: "customers",       label: "Customers" },
@@ -325,8 +325,8 @@ function MastersPage() {
               />
             </TabsContent>
 
-            <TabsContent value="operator-groups">
-              <OperatorGroupsTab
+            <TabsContent value="machine-groups">
+              <MachineGroupsTab
                 allMachines={machinesData}
                 canEdit={canEdit}
                 search={search}
@@ -2374,9 +2374,9 @@ function MachineForm({
   );
 }
 
-// ── Operator Groups Tab ────────────────────────────────────────────────────────
+// ── Machine Groups Tab ─────────────────────────────────────────────────────────
 
-function OperatorGroupsTab({
+function MachineGroupsTab({
   allMachines,
   canEdit,
   search,
@@ -2388,53 +2388,53 @@ function OperatorGroupsTab({
   const qc = useQueryClient();
   const { millId } = useActiveMill();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [editing, setEditing] = useState<OperatorGroup | null>(null);
-  const [form, setForm] = useState({ name: "", emp_id: "", machine_codes: [] as string[] });
+  const [editing, setEditing] = useState<MachineGroup | null>(null);
+  const [form, setForm] = useState({ name: "", description: "", machine_codes: [] as string[] });
   const [machineSearch, setMachineSearch] = useState("");
 
   const groupsQ = useQuery({
-    queryKey: ["operator-groups", millId],
-    queryFn: () => productionApi.getOperatorGroups({ mill_id: millId, active_only: false }),
+    queryKey: ["machine-groups", millId],
+    queryFn: () => productionApi.getMachineGroups({ mill_id: millId, active_only: false }),
     staleTime: 30_000,
     enabled: !!millId,
   });
-  const groups: OperatorGroup[] = (groupsQ.data ?? []) as OperatorGroup[];
+  const groups: MachineGroup[] = (groupsQ.data ?? []) as MachineGroup[];
   const filtered = groups.filter(
-    (g) => !search || g.name.toLowerCase().includes(search.toLowerCase()) || (g.emp_id ?? "").toLowerCase().includes(search.toLowerCase())
+    (g) => !search || g.name.toLowerCase().includes(search.toLowerCase()) || (g.description ?? "").toLowerCase().includes(search.toLowerCase())
   );
 
   const saveMut = useMutation({
     mutationFn: () =>
       editing
-        ? productionApi.updateOperatorGroup(editing.id, form)
-        : productionApi.createOperatorGroup({ ...form, is_active: true, mill_id: millId ?? undefined }),
+        ? productionApi.updateMachineGroup(editing.id, form)
+        : productionApi.createMachineGroup({ ...form, is_active: true, mill_id: millId ?? undefined }),
     onSuccess: () => {
-      toast.success(editing ? "Operator group updated" : "Operator group created");
-      qc.invalidateQueries({ queryKey: ["operator-groups"] });
+      toast.success(editing ? "Machine group updated" : "Machine group created");
+      qc.invalidateQueries({ queryKey: ["machine-groups"] });
       setSheetOpen(false);
     },
     onError: () => toast.error("Failed to save"),
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: string) => productionApi.deleteOperatorGroup(id),
+    mutationFn: (id: string) => productionApi.deleteMachineGroup(id),
     onSuccess: () => {
-      toast.success("Operator group deleted");
-      qc.invalidateQueries({ queryKey: ["operator-groups"] });
+      toast.success("Machine group deleted");
+      qc.invalidateQueries({ queryKey: ["machine-groups"] });
     },
     onError: () => toast.error("Failed to delete"),
   });
 
   function openNew() {
     setEditing(null);
-    setForm({ name: "", emp_id: "", machine_codes: [] });
+    setForm({ name: "", description: "", machine_codes: [] });
     setMachineSearch("");
     setSheetOpen(true);
   }
 
-  function openEdit(g: OperatorGroup) {
+  function openEdit(g: MachineGroup) {
     setEditing(g);
-    setForm({ name: g.name, emp_id: g.emp_id ?? "", machine_codes: g.machine_codes ?? [] });
+    setForm({ name: g.name, description: g.description ?? "", machine_codes: g.machine_codes ?? [] });
     setMachineSearch("");
     setSheetOpen(true);
   }
@@ -2469,10 +2469,10 @@ function OperatorGroupsTab({
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <div>
           <CardTitle className="text-base flex items-center gap-2">
-            <Users className="size-4" /> Operator Groups
+            <Blocks className="size-4" /> Machine Groups
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Assign machines to each operator. In Shift Entry, selecting an operator filters to only their machines.
+            Name and group your machines (e.g. "Carding Line 1", "Ring Frame Section A"). In Shift Entry, the worker selects a group to log entries.
           </p>
         </div>
         {canEdit && (
@@ -2486,8 +2486,9 @@ function OperatorGroupsTab({
           <p className="text-sm text-muted-foreground py-4 text-center">Loading…</p>
         ) : filtered.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground space-y-2">
-            <Users className="size-8 mx-auto opacity-30" />
-            <p className="text-sm">No operator groups yet.</p>
+            <Blocks className="size-8 mx-auto opacity-30" />
+            <p className="text-sm">No machine groups yet.</p>
+            <p className="text-xs">Create groups like "Carding Line 1" or "Ring Frame Section A".</p>
             {canEdit && (
               <Button size="sm" variant="outline" onClick={openNew}>
                 <Plus className="size-3.5 mr-1" /> Create first group
@@ -2501,13 +2502,14 @@ function OperatorGroupsTab({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-sm">{g.name}</span>
-                    {g.emp_id && (
-                      <Badge variant="outline" className="text-xs font-mono">{g.emp_id}</Badge>
-                    )}
+                    <Badge variant="outline" className="text-xs">{(g.machine_codes ?? []).length} machines</Badge>
                     {!g.is_active && (
                       <Badge variant="secondary" className="text-xs">Inactive</Badge>
                     )}
                   </div>
+                  {g.description && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{g.description}</p>
+                  )}
                   <div className="flex flex-wrap gap-1 mt-1.5">
                     {(g.machine_codes ?? []).length === 0 ? (
                       <span className="text-xs text-muted-foreground italic">No machines assigned</span>
@@ -2532,7 +2534,7 @@ function OperatorGroupsTab({
                       className="text-destructive hover:text-destructive"
                       disabled={deleteMut.isPending}
                       onClick={() => {
-                        if (window.confirm(`Delete operator group "${g.name}"?`)) {
+                        if (window.confirm(`Delete machine group "${g.name}"?`)) {
                           deleteMut.mutate(g.id);
                         }
                       }}
@@ -2551,30 +2553,30 @@ function OperatorGroupsTab({
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
           <SheetHeader>
-            <SheetTitle>{editing ? "Edit Operator Group" : "New Operator Group"}</SheetTitle>
+            <SheetTitle>{editing ? "Edit Machine Group" : "New Machine Group"}</SheetTitle>
           </SheetHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1.5">
-              <Label>Operator Name <span className="text-destructive">*</span></Label>
+              <Label>Group Name <span className="text-destructive">*</span></Label>
               <Input
                 value={form.name}
                 onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                placeholder="e.g. Ravi Kumar"
+                placeholder="e.g. Carding Line 1, Ring Frame Section A"
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Employee ID</Label>
+              <Label>Description <span className="text-xs text-muted-foreground">(optional)</span></Label>
               <Input
-                value={form.emp_id}
-                onChange={(e) => setForm((p) => ({ ...p, emp_id: e.target.value }))}
-                placeholder="e.g. E123"
+                value={form.description}
+                onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+                placeholder="e.g. North wing, 3rd floor"
               />
             </div>
 
             {/* Machine picker */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Assigned Machines ({form.machine_codes.length} selected)</Label>
+                <Label>Machines in this group ({form.machine_codes.length} selected)</Label>
                 {form.machine_codes.length > 0 && (
                   <Button
                     size="sm"
@@ -2604,7 +2606,7 @@ function OperatorGroupsTab({
                       <div className="px-3 py-1.5 bg-muted/50 sticky top-0">
                         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{dept}</span>
                       </div>
-                      {machines.map((m: any) => {
+                      {(machines as any[]).map((m: any) => {
                         const selected = form.machine_codes.includes(m.code);
                         return (
                           <button
@@ -2618,6 +2620,7 @@ function OperatorGroupsTab({
                             </div>
                             <span className="font-mono text-xs font-medium">{m.code}</span>
                             {m.name && <span className="text-xs text-muted-foreground truncate">{m.name}</span>}
+                            {m.department && <span className="ml-auto text-xs text-muted-foreground/60">{m.department}</span>}
                           </button>
                         );
                       })}

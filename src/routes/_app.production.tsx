@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productionApi, exportApi } from "@/lib/api-service";
+import type { MachineGroup } from "@/lib/api-service";
 import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { useAuth } from "@/stores/auth";
@@ -113,28 +114,50 @@ function ShiftGrid() {
   const [department, setDepartment] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
 
-  // Operator identification — shared login support
+  // Operator identification — free text, persisted per session
   const [operatorName, setOperatorName] = useState<string>(() => {
     try { return sessionStorage.getItem("sf_operator") ?? ""; } catch { return ""; }
   });
-  // Selected operator group (null = no group / free-text mode)
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(() => {
-    try { return sessionStorage.getItem("sf_operator_group") || null; } catch { return null; }
+
+  // Machine Groups — selected group IDs (supports multi-group mixing)
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(() => {
+    try {
+      const raw = sessionStorage.getItem("sf_machine_groups");
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
   });
 
-  // Load all operator groups for this mill
-  const operatorGroupsQ = useQuery({
-    queryKey: ["operator-groups", millId],
-    queryFn: () => productionApi.getOperatorGroups({ mill_id: millId, active_only: true }),
+  // Load all machine groups for this mill
+  const machineGroupsQ = useQuery({
+    queryKey: ["machine-groups", millId],
+    queryFn: () => productionApi.getMachineGroups({ mill_id: millId, active_only: true }),
     staleTime: 60_000,
     enabled: !!millId,
   });
-  const operatorGroups = (operatorGroupsQ.data ?? []) as import("@/lib/api-service").OperatorGroup[];
-  const hasGroups = operatorGroups.length > 0;
+  const machineGroups = (machineGroupsQ.data ?? []) as MachineGroup[];
+  const hasMachineGroups = machineGroups.length > 0;
+
+  // Helpers for multi-group selection
+  function addGroup(id: string) {
+    if (!id || selectedGroupIds.includes(id)) return;
+    const next = [...selectedGroupIds, id];
+    setSelectedGroupIds(next);
+    try { sessionStorage.setItem("sf_machine_groups", JSON.stringify(next)); } catch {}
+  }
+  function removeGroup(id: string) {
+    const next = selectedGroupIds.filter((x) => x !== id);
+    setSelectedGroupIds(next);
+    try { sessionStorage.setItem("sf_machine_groups", JSON.stringify(next)); } catch {}
+  }
+  function clearGroups() {
+    setSelectedGroupIds([]);
+    try { sessionStorage.removeItem("sf_machine_groups"); } catch {}
+  }
 
   // Machine section / line filter
   const [selectedSection, setSelectedSection] = useState<string>("all");
 
+  // Section filter only applies when no machine group selected (dept-based flow)
   const sectionsQ = useQuery({
     queryKey: ["machine-sections", departmentId || department, millId],
     queryFn: () => productionApi.getMachineSections({
@@ -142,7 +165,7 @@ function ShiftGrid() {
       mill_id: millId,
     }),
     staleTime: 60_000,
-    enabled: !!millId && !!(departmentId || department) && !selectedGroupId,
+    enabled: !!millId && !!(departmentId || department) && selectedGroupIds.length === 0,
   });
   const sections: string[] = sectionsQ.data?.sections ?? [];
 
@@ -163,11 +186,11 @@ function ShiftGrid() {
   const config = useColumnConfig("production_entries");
 
   const machinesQ = useQuery({
-    queryKey: ["machines", departmentId || department, millId, selectedSection, selectedGroupId],
+    queryKey: ["machines", departmentId || department, millId, selectedSection, selectedGroupIds],
     queryFn: () => productionApi.getMachines({
-      // If a group is selected, filter by group — ignore dept/section
-      ...(selectedGroupId
-        ? { operator_group_id: selectedGroupId }
+      // Machine groups take priority over department filter
+      ...(selectedGroupIds.length > 0
+        ? { machine_group_ids: selectedGroupIds.join(",") }
         : {
             ...(departmentId ? { department_id: departmentId } : { department }),
             ...(selectedSection && selectedSection !== "all" ? { section: selectedSection } : {}),
@@ -177,7 +200,7 @@ function ShiftGrid() {
       page: 1,
     }),
     staleTime: 60_000,
-    enabled: !!millId && (!!(departmentId || department) || !!selectedGroupId),
+    enabled: !!millId && (!!(departmentId || department) || selectedGroupIds.length > 0),
   });
 
   const machines = useMemo(
@@ -254,11 +277,11 @@ function ShiftGrid() {
       const activeRows = rows.filter((r) => Number(r.producedKg) > 0);
       if (activeRows.length === 0) throw new Error("No entries to submit");
 
-      // Submit Blowroom entries
+      // Submit entries (department derived from machines when using machine groups)
       const res = await productionApi.createBulkEntries({
         date,
         shift,
-        department,
+        department: effectiveDepartment,
         entries: activeRows.map((r) => ({
           machine_code: r.machineCode,
           operator: r.operator,
@@ -309,21 +332,25 @@ function ShiftGrid() {
 
   const activeCount = rows.filter((r) => Number(r.producedKg) > 0).length;
 
-  const headerFields = ["date", "shift", "department", "count"] as const;
-  const allHeaderFilled = headerFields.every((f) => {
-    const vals = { date, shift, department, count };
-    const v = vals[f];
-    return typeof v === "string" && v.trim().length > 0;
-  });
+  // When machine groups are selected, department is optional (derived from machines)
+  const usingGroups = selectedGroupIds.length > 0;
+  const effectiveDepartment = usingGroups
+    ? (machines[0]?.department || "Mixed")
+    : department;
+
+  const requiredBaseFields = ["date", "shift", "count"] as const;
+  const allHeaderFilled =
+    requiredBaseFields.every((f) => {
+      const vals: Record<string, string> = { date, shift, count };
+      return typeof vals[f] === "string" && vals[f].trim().length > 0;
+    }) && (usingGroups || !!department.trim());
+
   const handleSubmit = () => {
     const errors: Record<string, string> = {};
-    const vals = { date, shift, department, count };
-    headerFields.forEach((f) => {
-      const v = vals[f];
-      if (!v || (typeof v === "string" && !v.trim())) {
-        errors[f] = "This field is required";
-      }
-    });
+    if (!date.trim()) errors.date = "This field is required";
+    if (!shift.trim()) errors.shift = "This field is required";
+    if (!count.trim()) errors.count = "This field is required";
+    if (!usingGroups && !department.trim()) errors.department = "This field is required";
     setRequiredErrors(errors);
     if (Object.keys(errors).length > 0) return;
     bulkMutation.mutate();
@@ -333,7 +360,7 @@ function ShiftGrid() {
     <div className="space-y-4">
       <Card>
         <CardContent className="p-4 space-y-3">
-          {/* Row 1: Date / Shift / Dept / Count */}
+          {/* Row 1: Date / Shift / Count (always visible) */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">
@@ -347,29 +374,16 @@ function ShiftGrid() {
                   setRequiredErrors((prev) => ({ ...prev, date: "" }));
                 }}
                 className={["h-8 text-sm", requiredErrors.date ? "border-destructive" : ""]
-                  .filter(Boolean)
-                  .join(" ")}
+                  .filter(Boolean).join(" ")}
               />
-              {requiredErrors.date && (
-                <p className="text-xs text-destructive">{requiredErrors.date}</p>
-              )}
+              {requiredErrors.date && <p className="text-xs text-destructive">{requiredErrors.date}</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">
                 {config.getLabel('shift')}{config.isRequired('shift') && <span className="text-destructive"> *</span>}
               </Label>
-              <Select
-                value={shift}
-                onValueChange={(v) => {
-                  setShift(v as "A" | "B" | "C");
-                  setRequiredErrors((prev) => ({ ...prev, shift: "" }));
-                }}
-              >
-                <SelectTrigger
-                  className={["h-8 text-sm", requiredErrors.shift ? "border-destructive" : ""]
-                    .filter(Boolean)
-                    .join(" ")}
-                >
+              <Select value={shift} onValueChange={(v) => { setShift(v as "A" | "B" | "C"); setRequiredErrors((prev) => ({ ...prev, shift: "" })); }}>
+                <SelectTrigger className={["h-8 text-sm", requiredErrors.shift ? "border-destructive" : ""].filter(Boolean).join(" ")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -378,144 +392,163 @@ function ShiftGrid() {
                   <SelectItem value="C">C — Night</SelectItem>
                 </SelectContent>
               </Select>
-              {requiredErrors.shift && (
-                <p className="text-xs text-destructive">{requiredErrors.shift}</p>
-              )}
+              {requiredErrors.shift && <p className="text-xs text-destructive">{requiredErrors.shift}</p>}
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">
-                {config.getLabel('department')}{config.isRequired('department') && <span className="text-destructive"> *</span>}
-              </Label>
-              <Select
-                value={department}
-                onValueChange={(v) => {
-                  setDepartment(v);
-                  const dOpt = deptOptions.find((d: any) =>
-                    (typeof d === "string" ? d : d.name) === v
-                  );
-                  setDepartmentId(dOpt && typeof dOpt !== "string" ? (dOpt.id || null) : null);
-                  setRequiredErrors((prev) => ({ ...prev, department: "" }));
-                }}
-              >
-                <SelectTrigger
-                  className={["h-8 text-sm", requiredErrors.department ? "border-destructive" : ""]
-                    .filter(Boolean)
-                    .join(" ")}
+            {/* Department — only shown when no machine groups selected */}
+            {!usingGroups && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">
+                  {config.getLabel('department')}<span className="text-destructive"> *</span>
+                </Label>
+                <Select
+                  value={department}
+                  onValueChange={(v) => {
+                    setDepartment(v);
+                    const dOpt = deptOptions.find((d: any) => (typeof d === "string" ? d : d.name) === v);
+                    setDepartmentId(dOpt && typeof dOpt !== "string" ? (dOpt.id || null) : null);
+                    setRequiredErrors((prev) => ({ ...prev, department: "" }));
+                  }}
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {deptOptions.length === 0 ? (
-                    <SelectItem value="_empty" disabled>Import machines to see departments</SelectItem>
-                  ) : deptOptions.map((d: any) => {
-                    const name = typeof d === "string" ? d : d.name;
-                    return <SelectItem key={name} value={name}>{name}</SelectItem>;
-                  })}
-                </SelectContent>
-              </Select>
-              {requiredErrors.department && (
-                <p className="text-xs text-destructive">{requiredErrors.department}</p>
-              )}
-            </div>
+                  <SelectTrigger className={["h-8 text-sm", requiredErrors.department ? "border-destructive" : ""].filter(Boolean).join(" ")}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {deptOptions.length === 0
+                      ? <SelectItem value="_empty" disabled>Import machines to see departments</SelectItem>
+                      : deptOptions.map((d: any) => {
+                          const name = typeof d === "string" ? d : d.name;
+                          return <SelectItem key={name} value={name}>{name}</SelectItem>;
+                        })
+                    }
+                  </SelectContent>
+                </Select>
+                {requiredErrors.department && <p className="text-xs text-destructive">{requiredErrors.department}</p>}
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label className="text-xs">
                 {config.getLabel('count')}{config.isRequired('count') && <span className="text-destructive"> *</span>}
               </Label>
               <Input
                 value={count}
-                onChange={(e) => {
-                  setCount(e.target.value);
-                  setRequiredErrors((prev) => ({ ...prev, count: "" }));
-                }}
+                onChange={(e) => { setCount(e.target.value); setRequiredErrors((prev) => ({ ...prev, count: "" })); }}
                 placeholder="e.g. 30s"
-                className={["h-8 text-sm", requiredErrors.count ? "border-destructive" : ""]
-                  .filter(Boolean)
-                  .join(" ")}
+                className={["h-8 text-sm", requiredErrors.count ? "border-destructive" : ""].filter(Boolean).join(" ")}
               />
-              {requiredErrors.count && (
-                <p className="text-xs text-destructive">{requiredErrors.count}</p>
-              )}
+              {requiredErrors.count && <p className="text-xs text-destructive">{requiredErrors.count}</p>}
             </div>
           </div>
 
-          {/* Row 2: Entering As + Machine Line/Section filter */}
+          {/* Row 2: Machine Group selector + Entering As */}
           <div className="flex flex-wrap gap-3 items-end pt-1 border-t border-dashed">
-            {/* Entering As — operator identity: dropdown if groups exist, else free text */}
-            <div className="flex items-center gap-2 min-w-[220px] flex-1">
+            {/* Machine Group primary selector */}
+            <div className="flex items-start gap-2 min-w-[280px] flex-1">
+              <Layers className="w-4 h-4 text-muted-foreground shrink-0 mt-5" />
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-muted-foreground">
+                  Machine Group
+                  {hasMachineGroups && selectedGroupIds.length === 0 && (
+                    <span className="ml-1 text-amber-600">(select to filter machines)</span>
+                  )}
+                </Label>
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  {/* Selected group chips */}
+                  {selectedGroupIds.map((gid) => {
+                    const g = machineGroups.find((x) => x.id === gid);
+                    return g ? (
+                      <span key={gid} className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full border border-blue-200">
+                        {g.name}
+                        <button
+                          type="button"
+                          onClick={() => removeGroup(gid)}
+                          className="hover:text-red-600 ml-0.5"
+                          aria-label={`Remove ${g.name}`}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ) : null;
+                  })}
+                  {/* Dropdown to add a group */}
+                  {hasMachineGroups && (
+                    <select
+                      className="h-7 text-xs border border-input rounded-md bg-background px-2 focus:outline-none focus:ring-1 focus:ring-ring min-w-[180px]"
+                      value=""
+                      onChange={(e) => {
+                        const gid = e.target.value;
+                        if (gid) addGroup(gid);
+                        e.target.value = "";
+                      }}
+                    >
+                      <option value="">{selectedGroupIds.length === 0 ? "— Select machine group —" : "+ Mix another group"}</option>
+                      {machineGroups
+                        .filter((g) => !selectedGroupIds.includes(g.id))
+                        .map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.name} ({(g.machine_codes ?? []).length} machines)
+                          </option>
+                        ))}
+                    </select>
+                  )}
+                  {!hasMachineGroups && (
+                    <span className="text-xs text-muted-foreground italic">
+                      No machine groups — <a href="/masters" className="underline text-primary">create them in Masters</a>
+                    </span>
+                  )}
+                  {selectedGroupIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearGroups}
+                      className="text-xs text-muted-foreground underline hover:text-destructive ml-1"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Entering As — always free text */}
+            <div className="flex items-center gap-2 min-w-[200px]">
               <UserCircle className="w-4 h-4 text-muted-foreground shrink-0" />
               <div className="flex-1 space-y-1">
                 <Label className="text-xs text-muted-foreground">Entering as</Label>
-                {hasGroups ? (
-                  <select
-                    className="h-7 text-xs w-full border border-input rounded-md bg-background px-2 focus:outline-none focus:ring-1 focus:ring-ring"
-                    value={selectedGroupId ?? ""}
-                    onChange={(e) => {
-                      const gid = e.target.value;
-                      if (!gid) {
-                        setSelectedGroupId(null);
-                        setOperatorName("");
-                        try { sessionStorage.removeItem("sf_operator_group"); } catch {}
-                      } else {
-                        const grp = operatorGroups.find((g) => g.id === gid);
-                        setSelectedGroupId(gid);
-                        if (grp) setOperatorName(grp.emp_id ? `${grp.name} (${grp.emp_id})` : grp.name);
-                        try { sessionStorage.setItem("sf_operator_group", gid); } catch {}
-                      }
-                    }}
-                  >
-                    <option value="">— Select operator —</option>
-                    {operatorGroups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name}{g.emp_id ? ` (${g.emp_id})` : ""} — {(g.machine_codes ?? []).length} machines
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <Input
-                    value={operatorName}
-                    onChange={(e) => setOperatorName(e.target.value)}
-                    placeholder="Operator name or Emp ID…"
-                    className="h-7 text-xs"
-                  />
-                )}
+                <Input
+                  value={operatorName}
+                  onChange={(e) => setOperatorName(e.target.value)}
+                  placeholder="Operator name or ID…"
+                  className="h-7 text-xs"
+                />
               </div>
             </div>
-
-            {/* Machine Line / Section chips */}
-            {sections.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>Line:</span>
-                </div>
-                <button
-                  onClick={() => setSelectedSection("all")}
-                  className={[
-                    "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
-                    selectedSection === "all"
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-white border-gray-200 text-muted-foreground hover:border-gray-400",
-                  ].join(" ")}
-                >
-                  All Lines
-                </button>
-                {sections.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setSelectedSection(s === selectedSection ? "all" : s)}
-                    className={[
-                      "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
-                      selectedSection === s
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white border-blue-200 text-blue-700 hover:border-blue-400",
-                    ].join(" ")}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
+
+          {/* Row 3: Section chips (only in dept mode) */}
+          {!usingGroups && sections.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-dashed">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                <Layers className="w-3.5 h-3.5" />
+                <span>Line:</span>
+              </div>
+              <button
+                onClick={() => setSelectedSection("all")}
+                className={["px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                  selectedSection === "all" ? "bg-primary text-primary-foreground border-primary" : "bg-white border-gray-200 text-muted-foreground hover:border-gray-400"].join(" ")}
+              >
+                All Lines
+              </button>
+              {sections.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSelectedSection(s === selectedSection ? "all" : s)}
+                  className={["px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                    selectedSection === s ? "bg-blue-600 text-white border-blue-600" : "bg-white border-blue-200 text-blue-700 hover:border-blue-400"].join(" ")}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -642,7 +675,12 @@ function ShiftGrid() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between py-3">
           <CardTitle className="text-sm">
-            Machine Grid — {department} · Shift {shift} · {date}
+            Machine Grid —{" "}
+            {usingGroups
+              ? selectedGroupIds.map((gid) => machineGroups.find((x) => x.id === gid)?.name ?? gid).join(" + ")
+              : department
+            }
+            {" "}· Shift {shift} · {date}
           </CardTitle>
           <Button
             size="sm"
@@ -656,12 +694,21 @@ function ShiftGrid() {
         <CardContent className="p-0">
           {rows.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground text-center space-y-2">
-              <p>
-                No machines in <strong>{department}</strong>. Add them in Masters → Machines.
-              </p>
-              <Link to="/masters" className="text-primary underline text-xs inline-block">
-                Go to Masters
-              </Link>
+              {usingGroups ? (
+                <>
+                  <p>No machines found in the selected group(s). Check Masters → Machine Groups.</p>
+                  <Link to="/masters" className="text-primary underline text-xs inline-block">Go to Masters</Link>
+                </>
+              ) : !department ? (
+                hasMachineGroups
+                  ? <p>Select a <strong>Machine Group</strong> above to load machines.</p>
+                  : <p>Select a <strong>Department</strong> or create Machine Groups in Masters.</p>
+              ) : (
+                <>
+                  <p>No machines in <strong>{department}</strong>. Add them in Masters → Machines.</p>
+                  <Link to="/masters" className="text-primary underline text-xs inline-block">Go to Masters</Link>
+                </>
+              )}
             </div>
           ) : (
             <div className="w-full overflow-x-auto">
@@ -1746,14 +1793,14 @@ function ProductionPage() {
   const [entriesShift, setEntriesShift] = useState<"all" | "A" | "B" | "C">("all");
   const [entriesGroupId, setEntriesGroupId] = useState<string>("");
 
-  // Load operator groups for export filter
+  // Load machine groups for export filter
   const entryGroupsQ = useQuery({
-    queryKey: ["operator-groups-log", millId],
-    queryFn: () => productionApi.getOperatorGroups({ mill_id: millId, active_only: true }),
+    queryKey: ["machine-groups-log", millId],
+    queryFn: () => productionApi.getMachineGroups({ mill_id: millId, active_only: true }),
     staleTime: 60_000,
     enabled: !!millId,
   });
-  const entryGroups = (entryGroupsQ.data ?? []) as import("@/lib/api-service").OperatorGroup[];
+  const entryGroups = (entryGroupsQ.data ?? []) as MachineGroup[];
 
   const dateRx = /^\d{4}-\d{2}-\d{2}$/;
   const validDateFrom = dateRx.test(entriesDateFrom) ? entriesDateFrom : todayStrInit;
@@ -2329,19 +2376,19 @@ function ProductionPage() {
                         </Button>
                       ))}
                     </div>
-                    {/* Operator group filter (for export) */}
+                    {/* Machine group filter (for export) */}
                     {entryGroups.length > 0 && (
                       <div className="flex items-center gap-1.5 border-l pl-3 ml-1">
-                        <Label className="text-xs text-muted-foreground whitespace-nowrap">Operator</Label>
+                        <Label className="text-xs text-muted-foreground whitespace-nowrap">Group</Label>
                         <select
                           className="h-7 text-xs border border-input rounded-md bg-background px-2 focus:outline-none focus:ring-1 focus:ring-ring"
                           value={entriesGroupId}
                           onChange={(e) => setEntriesGroupId(e.target.value)}
                         >
-                          <option value="">All operators</option>
+                          <option value="">All groups</option>
                           {entryGroups.map((g) => (
                             <option key={g.id} value={g.id}>
-                              {g.name}{g.emp_id ? ` (${g.emp_id})` : ""}
+                              {g.name}
                             </option>
                           ))}
                         </select>
@@ -2408,8 +2455,8 @@ function ProductionPage() {
                     disableExport={true}
                     toolbar={
                       <ExportDateRangeButton
-                        onExportXlsx={(f, t) => exportApi.productionXlsx(f, t, entriesGroupId || undefined)}
-                        onExportPdf={(f, t) => exportApi.productionPdf(f, t, entriesGroupId || undefined)}
+                        onExportXlsx={(f, t) => exportApi.productionXlsx(f, t, undefined, entriesGroupId || undefined)}
+                        onExportPdf={(f, t) => exportApi.productionPdf(f, t, undefined, entriesGroupId || undefined)}
                       />
                     }
                     actions={canEdit ? (s: any) => (
