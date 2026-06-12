@@ -262,6 +262,8 @@ async def create_shift(
 @router.get("/production/entries")
 async def get_entries(
     date: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     shift: Optional[str] = Query(None),
     department: Optional[str] = Query(None),
     machine: Optional[str] = Query(None),
@@ -299,6 +301,11 @@ async def get_entries(
         query = query.where(ProductionEntry.operator == current_user.name)
     if date:
         query = query.where(ProductionEntry.date == date)
+    elif date_from or date_to:
+        if date_from:
+            query = query.where(ProductionEntry.date >= date_from)
+        if date_to:
+            query = query.where(ProductionEntry.date <= date_to)
     if shift:
         query = query.where(ProductionEntry.shift == shift)
     if department:

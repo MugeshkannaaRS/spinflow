@@ -1692,10 +1692,16 @@ function ProductionPage() {
     retry: 1,
     enabled: !!millId,
   });
+  // Entries Log date filter state
+  const todayStrInit = new Date().toISOString().split("T")[0];
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const [entriesDateFrom, setEntriesDateFrom] = useState(sevenDaysAgo);
+  const [entriesDateTo, setEntriesDateTo] = useState(todayStrInit);
+
   const shiftsQ = useQuery({
-    queryKey: ["shifts", millId],
-    queryFn: productionApi.getEntries,
-    staleTime: 60_000,
+    queryKey: ["shifts", millId, entriesDateFrom, entriesDateTo],
+    queryFn: () => productionApi.getEntries({ date_from: entriesDateFrom, date_to: entriesDateTo, mill_id: millId, page_size: 500 }),
+    staleTime: 30_000,
     retry: 1,
     enabled: !!millId,
   });
@@ -1813,12 +1819,20 @@ function ProductionPage() {
       qc.invalidateQueries({ queryKey: ["machines"] });
     },
     onError: (err: any) => {
+      const status = err?.response?.status;
       const detail = err?.response?.data?.detail;
-      toast.error(typeof detail === "string" ? detail : err.message || "Delete failed");
+      if (status === 409) {
+        toast.error(
+          `Machine has existing entries — cannot delete. Set it to Inactive in Masters instead.`,
+          { duration: 6000 }
+        );
+      } else {
+        toast.error(typeof detail === "string" ? detail : err.message || "Delete failed");
+      }
     },
   });
   const handleDeleteMachine = (m: any) => {
-    if (window.confirm(`Permanently DELETE machine ${m.code}? This cannot be undone.`)) {
+    if (window.confirm(`Permanently DELETE machine ${m.code}? This cannot be undone.\n\nMachines with existing entries cannot be deleted — deactivate them instead.`)) {
       deleteMachineMutation.mutate(m.id);
     }
   };
@@ -1860,7 +1874,7 @@ function ProductionPage() {
   });
 
   const machines = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[];
-  const shifts = (Array.isArray(shiftsQ.data) ? shiftsQ.data : (shiftsQ.data?.data ?? [])) as any[];
+  const shifts = (Array.isArray(shiftsQ.data) ? shiftsQ.data : ((shiftsQ.data as any)?.data ?? [])) as any[];
   const downtime = (Array.isArray(downQ.data) ? downQ.data : (downQ.data?.data ?? [])) as any[];
   const machineColConfig = useColumnConfig("production_entries");
   const downColConfig = useColumnConfig("production_downtime");
@@ -2193,13 +2207,53 @@ function ProductionPage() {
 
             <TabsContent value="shifts">
               <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
+                <CardHeader className="flex flex-row items-center justify-between pb-3">
                   <CardTitle className="text-base">Shift Production Entries</CardTitle>
                   <div className="flex items-center gap-2">
                     {canEdit && <ImportShiftEntriesDialog />}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {/* Date filter bar */}
+                  <div className="flex items-center gap-3 flex-wrap pb-3 border-b">
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label>
+                      <Input
+                        type="date"
+                        value={entriesDateFrom}
+                        onChange={(e) => setEntriesDateFrom(e.target.value)}
+                        className="h-7 text-xs w-36"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs text-muted-foreground whitespace-nowrap">To</Label>
+                      <Input
+                        type="date"
+                        value={entriesDateTo}
+                        onChange={(e) => setEntriesDateTo(e.target.value)}
+                        className="h-7 text-xs w-36"
+                      />
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => { setEntriesDateFrom(sevenDaysAgo); setEntriesDateTo(todayStrInit); }}
+                    >
+                      Last 7 days
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs"
+                      onClick={() => { const t = new Date().toISOString().split("T")[0]; setEntriesDateFrom(t); setEntriesDateTo(t); }}
+                    >
+                      Today
+                    </Button>
+                    {shiftsQ.isFetching && <span className="text-xs text-muted-foreground animate-pulse">Loading…</span>}
+                    <span className="text-xs text-muted-foreground ml-auto">{shifts.length} entries</span>
+                  </div>
+
                   {/* Bulk action toolbar */}
                   {selectedEntryIds.size > 0 && (
                     <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
@@ -2232,14 +2286,12 @@ function ProductionPage() {
                         key: "_select",
                         label: "",
                         className: "w-8",
-                        render: (s: any) => s.status !== "approved" ? (
+                        render: (s: any) => (
                           <Checkbox
                             checked={selectedEntryIds.has(s.id)}
                             onCheckedChange={() => toggleEntrySelect(s.id)}
                             aria-label="Select entry"
                           />
-                        ) : (
-                          <span title="Approved — cannot cancel" className="text-muted-foreground/40 text-xs">🔒</span>
                         ),
                       },
                       { key: "date", label: machineColConfig.getLabel('date'), type: "date" },
@@ -2251,7 +2303,6 @@ function ProductionPage() {
                       { key: "count", label: machineColConfig.getLabel('count') },
                       { key: "produced_kg", label: machineColConfig.getLabel('produced_kg'), render: (s: any) => `${s.produced_kg ?? 0} kg` },
                       { key: "waste_kg", label: machineColConfig.getLabel('waste_kg'), render: (s: any) => <span className="text-muted-foreground">{s.waste_kg ?? 0} kg</span> },
-                      { key: "status", label: machineColConfig.getLabel('status'), type: "status", render: (s: any) => <StatusBadge status={s.status} size="sm" /> },
                     ] satisfies ColDef[]}
                     data={shifts}
                     loading={shiftsQ.isLoading}
@@ -2286,18 +2337,16 @@ function ProductionPage() {
                         >
                           <Pencil className="size-3.5" />
                         </Button>
-                        {s.status !== "approved" && (
-                          <ConfirmDeleteButton
-                            onConfirm={async () => {
-                              await productionApi.deleteEntry(s.id);
-                              qc.invalidateQueries({ queryKey: ["shifts"] });
-                            }}
-                            label={`Cancel this entry for machine ${s.machine_code}?`}
-                            title="Cancel Entry?"
-                            confirmText="Cancel Entry"
-                            successMessage="Entry cancelled"
-                          />
-                        )}
+                        <ConfirmDeleteButton
+                          onConfirm={async () => {
+                            await productionApi.deleteEntry(s.id);
+                            qc.invalidateQueries({ queryKey: ["shifts"] });
+                          }}
+                          label={`Delete entry for machine ${s.machine_code} on ${s.date}?`}
+                          title="Delete Entry?"
+                          confirmText="Delete"
+                          successMessage="Entry deleted"
+                        />
                       </div>
                     ) : undefined}
                   />

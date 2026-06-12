@@ -52,7 +52,7 @@ export const productionApi = {
     api.post("/production/entries/bulk-cancel", { ids }).then((r: any) => r.data as { cancelled: number; skipped: number }),
   createMachine: (data: any) => api.post("/production/machines", data).then((r) => r.data),
   updateMachine: (id: string, data: any) => api.put(`/production/machines/${id}`, data).then((r) => r.data),
-  getEntries: () => api.get("/production/entries").then((r: any) => extractList(r.data)),
+  getEntries: (params?: Record<string, any>) => api.get("/production/entries", { params }).then((r: any) => r.data),
   createEntry: (data: any) => api.post("/production/entries", data).then((r) => r.data),
   createBulkEntries: (data: any) => api.post("/production/entries/bulk", data).then((r) => r.data),
   getDowntime: () => api.get("/production/downtime").then((r: any) => extractList(r.data)),
