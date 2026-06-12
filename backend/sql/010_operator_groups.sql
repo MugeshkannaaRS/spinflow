@@ -1,10 +1,11 @@
 -- Migration 010: Operator Groups
 -- Assigns a named operator (emp_id + name) to a set of machine codes per mill.
 -- machine_codes is a JSONB array of strings e.g. ["CD_001","CD_002","RF_001"]
+-- Note: mills.id is VARCHAR(36), not UUID — FK must match
 
 CREATE TABLE IF NOT EXISTS operator_groups (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    mill_id     UUID REFERENCES mills(id) ON DELETE CASCADE,
+    id          VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    mill_id     VARCHAR(36) REFERENCES mills(id) ON DELETE CASCADE,
     name        VARCHAR(200) NOT NULL,
     emp_id      VARCHAR(50),
     machine_codes JSONB NOT NULL DEFAULT '[]'::jsonb,
