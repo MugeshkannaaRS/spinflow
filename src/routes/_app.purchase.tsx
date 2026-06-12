@@ -68,6 +68,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/purchase")({
   head: () => ({ meta: [{ title: "Cotton Purchase — SpinFlow ERP" }] }),
@@ -147,7 +148,13 @@ function PurchasePage() {
     { key: "status" as const, label: "Status" },
   ];
 
-  if (!user) return null;
+  if (!user) return (
+    <div className="p-6 space-y-4">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
 
   if (purchasesQ.isLoading)
     return (

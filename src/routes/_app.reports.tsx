@@ -29,6 +29,7 @@ import { exportApi } from "@/lib/api-service";
 import { useState } from "react";
 import { Topbar } from "@/components/layout/Topbar";
 import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/reports")({
   head: () => ({ meta: [{ title: "Reports — SpinFlow ERP" }] }),
@@ -58,7 +59,13 @@ function ReportsPage() {
     }
   };
 
-  if (!user) return null;
+  if (!user) return (
+    <div className="p-6 space-y-4">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
 
   if (query.isLoading)
     return (

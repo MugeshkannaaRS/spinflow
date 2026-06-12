@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import {
   Wrench,
   AlertTriangle,
@@ -61,6 +62,7 @@ import { useMillMasterCategory } from "@/hooks/useMillConfig";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/maintenance")({
   head: () => ({ meta: [{ title: "Maintenance — SpinFlow ERP" }] }),
@@ -371,7 +373,13 @@ function MaintenancePage() {
   ).length;
   const totalDownTime = tasks.reduce((s, t) => s + (t.downtimeMin ?? 0), 0);
 
-  if (!user) return null;
+  if (!user) return (
+    <div className="p-6 space-y-4">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
 
   if (maintQ.isLoading)
     return (
@@ -478,6 +486,7 @@ function MaintenancePage() {
                   <CardTitle className="text-base">Maintenance Tasks</CardTitle>
                 </CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="Maintenance Tasks">
                   <DataTable
                     tableId="maintenance_tasks"
                     columns={[
@@ -513,6 +522,7 @@ function MaintenancePage() {
                       </div>
                     ) : undefined}
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -525,6 +535,7 @@ function MaintenancePage() {
                   {canEdit && <ImportScheduleDialog />}
                 </CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="PM Schedules">
                   <DataTable
                     tableId="maintenance_schedules"
                     columns={[
@@ -552,11 +563,11 @@ function MaintenancePage() {
                       />
                     ) : null : undefined}
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
             </TabsContent>
 
-            {/* ── Machine Parameters tab ── */}
             <TabsContent value="parameters">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -569,6 +580,7 @@ function MaintenancePage() {
                   )}
                 </CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="Machine Parameters">
                   <DataTable
                     tableId="maintenance_parameters"
                     columns={[
@@ -585,6 +597,7 @@ function MaintenancePage() {
                     exportFilename="machine_parameters"
                     emptyMessage='No parameters yet. Use "Import Parameters" to upload from Excel.'
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -600,6 +613,7 @@ function MaintenancePage() {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="Maintenance Machines">
                   <DataTable
                     tableId="maintenance_machines"
                     columns={[
@@ -623,6 +637,7 @@ function MaintenancePage() {
                     ) : undefined}
                     emptyMessage="No machines registered yet."
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
             </TabsContent>

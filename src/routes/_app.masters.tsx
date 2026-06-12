@@ -34,12 +34,14 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet";
 import { useState, useEffect, useMemo } from "react";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { toast } from "sonner";
 import { Plus, Search, Settings, Blocks, ArrowDown, Pencil, Factory, Trash2, Users, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useMillMasterCategory, useMillMasters } from "@/hooks/useMillConfig";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
+import { Skeleton } from "@/components/ui/skeleton";
 import type {
   Company,
   Mill,
@@ -208,7 +210,13 @@ function MastersPage() {
   const warehousesData = (warehousesQ.data ?? []) as any[];
   const machinesData = (Array.isArray(machinesQ.data) ? machinesQ.data : []) as any[];
 
-  if (!user) return null;
+  if (!user) return (
+    <div className="p-6 space-y-4">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
 
   // SUPER_ADMIN should not land on Masters — redirect to Admin
   if (user.role === "SUPER_ADMIN") {
@@ -261,6 +269,7 @@ function MastersPage() {
             </TabsList>
 
             <TabsContent value="companies">
+              <ErrorBoundary inline label="Companies">
               <MasterTable
                 title="Companies"
                 data={companiesData.filter((x) => matchesSearch(x, search))}
@@ -285,9 +294,11 @@ function MastersPage() {
                   </Button>
                 )}
               />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="mills">
+              <ErrorBoundary inline label="Mills">
               <MasterTable
                 title="Mills"
                 data={millsData.filter((x) => matchesSearch(x, search))}
@@ -314,10 +325,12 @@ function MastersPage() {
                   </Button>
                 )}
               />
+              </ErrorBoundary>
             </TabsContent>
 
             {/* ── Machines ─────────────────────────────────────────────────── */}
             <TabsContent value="machines">
+              <ErrorBoundary inline label="Machines">
               <MachinesTab
                 machines={machinesData.filter((x: any) => matchesSearch(x, search))}
                 isLoading={machinesQ.isLoading}
@@ -325,17 +338,21 @@ function MastersPage() {
                 canEdit={canEdit}
                 onImportSuccess={() => qcMasters.invalidateQueries({ queryKey: ["masters", "machines"] })}
               />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="machine-groups">
+              <ErrorBoundary inline label="Machine Groups">
               <MachineGroupsTab
                 allMachines={machinesData}
                 canEdit={canEdit}
                 search={search}
               />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="departments">
+              <ErrorBoundary inline label="Departments">
               <MasterTable
                 title="Departments"
                 data={deptsData.filter((x) => matchesSearch(x, search))}
@@ -350,9 +367,11 @@ function MastersPage() {
                 onEdit={(item) => <DepartmentForm item={item} mills={millsData} />}
                 onDeactivate={canEdit ? deactivateDepartment : undefined}
               />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="yarn-counts">
+              <ErrorBoundary inline label="Yarn Counts">
               <MasterTable
                 title="Yarn Counts"
                 data={yarnData.filter((x) => matchesSearch(x, search))}
@@ -368,9 +387,11 @@ function MastersPage() {
                 onEdit={(item) => <YarnCountForm item={item} mills={millsData} />}
                 onDeactivate={canEdit ? deactivateYarnCount : undefined}
               />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="customers">
+              <ErrorBoundary inline label="Customers">
               <MasterTable
                 title="Customers"
                 data={custData.filter((x) => matchesSearch(x, search))}
@@ -388,9 +409,11 @@ function MastersPage() {
                 onDeactivate={canEdit ? deactivateCustomer : undefined}
                 headerExtra={canEdit ? <ImportCustomersDialog /> : undefined}
               />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="vehicles">
+              <ErrorBoundary inline label="Vehicles">
               <MasterTable
                 title="Vehicles"
                 data={vehData.filter((x) => matchesSearch(x, search))}
@@ -407,9 +430,11 @@ function MastersPage() {
                 onEdit={(item) => <VehicleForm item={item} mills={millsData} />}
                 onDeactivate={canEdit ? deactivateVehicle : undefined}
               />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="routes">
+              <ErrorBoundary inline label="Routes">
               <MasterTable
                 title="Routes"
                 data={routeData.filter((x) => matchesSearch(x, search))}
@@ -426,9 +451,11 @@ function MastersPage() {
                 onEdit={(item) => <RouteForm item={item} mills={millsData} />}
                 onDeactivate={canEdit ? deactivateRoute : undefined}
               />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="shifts">
+              <ErrorBoundary inline label="Shifts">
               <MasterTable
                 title="Shifts"
                 data={shiftsData.filter((x) => matchesSearch(x, search))}
@@ -443,9 +470,11 @@ function MastersPage() {
                 onAdd={<ShiftForm />}
                 onEdit={(item) => <ShiftForm item={item} />}
               />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="warehouses">
+              <ErrorBoundary inline label="Warehouses">
               <MasterTable
                 title="Warehouses"
                 data={warehousesData.filter((x) => matchesSearch(x, search))}
@@ -461,10 +490,13 @@ function MastersPage() {
                 onEdit={(item) => <WarehouseForm item={item} />}
                 onDeactivate={canEdit ? deactivateWarehouse : undefined}
               />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="stop-codes">
+              <ErrorBoundary inline label="Stop Codes">
               <StopCodesTab canEdit={canEdit} search={search} />
+              </ErrorBoundary>
             </TabsContent>
           </Tabs>
         </div>

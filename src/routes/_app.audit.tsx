@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export const Route = createFileRoute("/_app/audit")({
   head: () => ({ meta: [{ title: "Audit Logs — SpinFlow ERP" }] }),
@@ -315,6 +316,7 @@ function AuditPage() {
           </CardHeader>
 
           <CardContent className="pt-0">
+            <ErrorBoundary inline label="Audit Logs">
             <DataTable
               tableId="audit_logs"
               columns={AUDIT_COLS}
@@ -324,6 +326,7 @@ function AuditPage() {
               exportFilename="audit_logs"
               emptyMessage="No audit events match your filters."
             />
+            </ErrorBoundary>
 
             {/* Pagination */}
             {pages > 1 && (

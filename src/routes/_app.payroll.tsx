@@ -29,6 +29,8 @@ import { CheckCircle2, Loader2, ArrowUpFromLine } from "lucide-react";
 import { exportApi } from "@/lib/api-service";
 import type { PayrollMonth, PayslipEntry } from "@/lib/types";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/payroll")({
   head: () => ({ meta: [{ title: "Payroll — SpinFlow ERP" }] }),
@@ -73,7 +75,13 @@ function PayrollPage() {
     retry: 1,
   });
 
-  if (!user) return null;
+  if (!user) return (
+    <div className="p-6 space-y-4">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
 
   const summaryData = summaryQ.data ?? [];
 
@@ -429,6 +437,7 @@ function PayslipsTab({ millId, year }: { millId: string; year: number }) {
         {!payrollMonthId ? (
           <p className="text-sm text-muted-foreground">Payroll not yet processed for this month</p>
         ) : (
+          <ErrorBoundary inline label="Payroll">
           <DataTable
             tableId="payroll_payslips"
             columns={[
@@ -448,6 +457,7 @@ function PayslipsTab({ millId, year }: { millId: string; year: number }) {
             rowKey={(p: any) => p.id}
             exportFilename={`payslips_${month}_${MONTHS[Number(month) - 1]}`}
           />
+          </ErrorBoundary>
         )}
       </CardContent>
     </Card>

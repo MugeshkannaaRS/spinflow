@@ -56,6 +56,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export const Route = createFileRoute("/_app/users")({
   head: () => ({ meta: [{ title: "Users & Roles — SpinFlow ERP" }] }),
@@ -474,6 +475,7 @@ function UsersPage() {
           </div>
           <Card>
             <CardContent className="pt-6">
+              <ErrorBoundary inline label="Users">
               <DataTable
                 tableId="users_list"
                 columns={[
@@ -540,6 +542,7 @@ function UsersPage() {
                   </div>
                 )}
               />
+              </ErrorBoundary>
             </CardContent>
           </Card>
         </div>

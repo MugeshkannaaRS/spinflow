@@ -30,6 +30,8 @@ import { toast } from "sonner";
 import { Truck, ClipboardList, Loader2, MapPin, Plus } from "lucide-react";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/dispatch")({
   head: () => ({ meta: [{ title: "Dispatch — SpinFlow ERP" }] }),
@@ -144,7 +146,13 @@ function DispatchPage() {
     });
   }
 
-  if (!user) return null;
+  if (!user) return (
+    <div className="p-6 space-y-4">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
 
   const orderCols: ColDef[] = [
     { key: "order_no", label: orderColConfig.getLabel('order_no'), className: "font-mono text-xs" },
@@ -199,6 +207,7 @@ function DispatchPage() {
             </TabsList>
 
             <TabsContent value="trips">
+              <ErrorBoundary inline label="Dispatch Trips">
               <DataTable
                 tableId="dispatch_trips_table"
                 columns={tripCols}
@@ -239,9 +248,11 @@ function DispatchPage() {
                   </Button>
                 }
               />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="orders">
+              <ErrorBoundary inline label="Dispatch Orders">
               <DataTable
                 tableId="dispatch_orders_table"
                 columns={orderCols}
@@ -266,6 +277,7 @@ function DispatchPage() {
                   ) : <></>
                 ) : undefined}
               />
+              </ErrorBoundary>
             </TabsContent>
           </Tabs>
         </div>

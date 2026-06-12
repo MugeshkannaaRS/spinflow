@@ -45,6 +45,7 @@ import type { ColDef } from "@/components/ui/DataTable";
 import { Checkbox } from "@/components/ui/checkbox";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import { useState, useMemo, useEffect } from "react";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, ArrowDown, ArrowUp, Trash2, Clock, Users2, UserCircle, Layers } from "lucide-react";
@@ -52,6 +53,7 @@ import { ExportMenu } from "@/components/ui/ExportMenu";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { useMillMasters, useMillMasterCategory } from "@/hooks/useMillConfig";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/production")({
   head: () => ({ meta: [{ title: "Production — SpinFlow ERP" }] }),
@@ -2023,42 +2025,16 @@ function ProductionPage() {
   const deactivateMachineMutation = useMutation({
     mutationFn: (id: string) => productionApi.updateMachineStatus(id, { status: "idle" }),
     onSuccess: () => {
-      toast.success("Machine deactivated");
       qc.invalidateQueries({ queryKey: ["machines"] });
     },
-    onError: (err: Error) => toast.error(err.message),
   });
-  const handleDeactivateMachine = (m: any) => {
-    if (window.confirm(`Deactivate machine ${m.code}?`)) {
-      deactivateMachineMutation.mutate(m.id);
-    }
-  };
 
-  // Machine hard delete
   const deleteMachineMutation = useMutation({
     mutationFn: (id: string) => productionApi.deleteMachine(id),
-    onSuccess: (_res: any, id: string) => {
-      toast.success(`Machine deleted`);
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["machines"] });
     },
-    onError: (err: any) => {
-      const status = err?.response?.status;
-      const detail = err?.response?.data?.detail;
-      if (status === 409) {
-        toast.error(
-          `Machine has existing entries — cannot delete. Set it to Inactive in Masters instead.`,
-          { duration: 6000 }
-        );
-      } else {
-        toast.error(typeof detail === "string" ? detail : err.message || "Delete failed");
-      }
-    },
   });
-  const handleDeleteMachine = (m: any) => {
-    if (window.confirm(`Permanently DELETE machine ${m.code}? This cannot be undone.\n\nMachines with existing entries cannot be deleted — deactivate them instead.`)) {
-      deleteMachineMutation.mutate(m.id);
-    }
-  };
 
   // Entry inline edit
   const [entryEditOpen, setEntryEditOpen] = useState(false);
@@ -2124,7 +2100,13 @@ function ProductionPage() {
 
   const anyError = machinesQ.isError || shiftsQ.isError || downQ.isError;
 
-  if (!user) return null;
+  if (!user) return (
+    <div className="p-6 space-y-4">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
 
   if (machinesQ.isLoading || shiftsQ.isLoading)
     return (
@@ -2230,6 +2212,7 @@ function ProductionPage() {
             </TabsList>
 
             <TabsContent value="entry">
+              <ErrorBoundary inline label="Shift Grid">
               {canEdit ? (
                 <ShiftGrid />
               ) : (
@@ -2237,9 +2220,11 @@ function ProductionPage() {
                   You do not have permission to create shift entries.
                 </div>
               )}
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="waste">
+              <ErrorBoundary inline label="Waste">
               {canEdit ? (
                 <WasteGrid />
               ) : (
@@ -2247,9 +2232,11 @@ function ProductionPage() {
                   You do not have permission to create waste entries.
                 </div>
               )}
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="stoppage">
+              <ErrorBoundary inline label="Stoppage">
               {canEdit ? (
                 <StoppageForm />
               ) : (
@@ -2257,9 +2244,11 @@ function ProductionPage() {
                   You do not have permission to log stoppages.
                 </div>
               )}
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="manpower">
+              <ErrorBoundary inline label="Shift Planning">
               {canEdit ? (
                 <ManpowerGrid />
               ) : (
@@ -2267,12 +2256,14 @@ function ProductionPage() {
                   You do not have permission to manage manpower plans.
                 </div>
               )}
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="machines">
               <Card>
                 <CardHeader><CardTitle className="text-base">Machine Status</CardTitle></CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="Machine Status">
                   <DataTable
                     tableId="production_machines"
                     columns={[
@@ -2309,25 +2300,29 @@ function ProductionPage() {
                         >
                           <Pencil className="size-3 mr-1" /> Edit
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeactivateMachine(m)}
-                        >
-                          Deactivate
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDeleteMachine(m)}
-                          disabled={deleteMachineMutation.isPending}
-                          title="Hard delete from database"
-                        >
-                          <Trash2 className="size-3 mr-1" /> Delete
-                        </Button>
+                        <ConfirmDeleteButton
+                          onConfirm={async () => {
+                            await deactivateMachineMutation.mutateAsync(m.id);
+                          }}
+                          title="Deactivate this machine?"
+                          label={`Deactivate machine ${m.code}?`}
+                          confirmText="Deactivate"
+                          successMessage="Machine deactivated"
+                        />
+                        <ConfirmDeleteButton
+                          onConfirm={async () => {
+                            await deleteMachineMutation.mutateAsync(m.id);
+                          }}
+                          title="Permanently delete this machine?"
+                          label={`Permanently DELETE machine ${m.code}? This cannot be undone.`}
+                          confirmText="Delete"
+                          successMessage="Machine deleted"
+                          errorMessage="Machine has existing entries — cannot delete. Set it to Inactive in Masters instead."
+                        />
                       </div>
                     )}
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
               <Sheet open={machineEditOpen} onOpenChange={setMachineEditOpen}>
@@ -2538,6 +2533,7 @@ function ProductionPage() {
                     </div>
                   )}
 
+                  <ErrorBoundary inline label="Shift Entries">
                   <DataTable
                     tableId="production_shifts"
                     columns={[
@@ -2609,6 +2605,7 @@ function ProductionPage() {
                       </div>
                     ) : undefined}
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
 
@@ -2689,6 +2686,7 @@ function ProductionPage() {
                   </Button>
                 </CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="Downtime Logs">
                   <DataTable
                     tableId="production_downtime"
                     columns={[
@@ -2742,6 +2740,7 @@ function ProductionPage() {
                       />
                     ) : undefined}
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
               <Sheet open={downtimeOpen} onOpenChange={setDowntimeOpen}>

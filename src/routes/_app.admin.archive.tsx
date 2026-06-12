@@ -28,6 +28,7 @@ import { Archive, CheckCircle, Trash2, Undo } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export const Route = createFileRoute("/_app/admin/archive")({
   head: () => ({ meta: [{ title: "Archive — Admin — SpinFlow ERP" }] }),
@@ -146,6 +147,7 @@ function ArchivePage() {
             <CardTitle className="text-base">Suspended Companies ({suspendedCompanies.length})</CardTitle>
           </CardHeader>
           <CardContent>
+            <ErrorBoundary inline label="Suspended Companies">
             <DataTable
               columns={columns}
               data={suspendedCompanies}
@@ -172,6 +174,7 @@ function ArchivePage() {
                 </div>
               )}
             />
+            </ErrorBoundary>
           </CardContent>
         </Card>
       )}
@@ -182,6 +185,7 @@ function ArchivePage() {
             <CardTitle className="text-base">Archived Companies ({archivedCompanies.length})</CardTitle>
           </CardHeader>
           <CardContent>
+            <ErrorBoundary inline label="Archived Companies">
             <DataTable
               columns={columns}
               data={archivedCompanies}
@@ -217,6 +221,7 @@ function ArchivePage() {
                 </div>
               )}
             />
+            </ErrorBoundary>
           </CardContent>
         </Card>
       )}

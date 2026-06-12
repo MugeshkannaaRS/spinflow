@@ -29,6 +29,8 @@ import { toast } from "sonner";
 import { Plus, Boxes, ArrowRightLeft, AlertTriangle, Package } from "lucide-react";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/inventory")({
   head: () => ({ meta: [{ title: "Inventory — SpinFlow ERP" }] }),
@@ -53,7 +55,13 @@ function InventoryPage() {
   const ageingLots = lots.filter((l) => l.age > 14).length;
   const lowStock = lots.filter((l) => l.quantity < 3000).length;
 
-  if (!user) return null;
+  if (!user) return (
+    <div className="p-6 space-y-4">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
   if (lotsQ.isLoading) return (<><PageHeader title="Inventory" subtitle="Loading..." /><div className="p-6 text-sm text-muted-foreground">Loading data…</div></>);
   if (lotsQ.isError) return (<><PageHeader title="Inventory" subtitle="Error" /><div className="p-6 text-sm text-destructive">Error loading data.</div></>);
 
@@ -116,6 +124,7 @@ function InventoryPage() {
                   <CardTitle className="text-base">Inventory Lots</CardTitle>
                 </CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="Inventory Lots">
                   <DataTable
                     tableId="inventory_lots"
                     columns={lotCols}
@@ -140,6 +149,7 @@ function InventoryPage() {
                       ) : <></>
                     ) : undefined}
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -151,7 +161,9 @@ function InventoryPage() {
                   {canEdit && <NewTransferDialog />}
                 </CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="Stock Transfers">
                   <DataTable tableId="stock_transfers" columns={transferCols} data={transfers} loading={transfersQ.isLoading} rowKey={(t) => t.id} exportFilename="stock_transfers" />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
             </TabsContent>

@@ -19,6 +19,7 @@ import {
 import { FileText, ShieldCheck, Activity, Monitor, Search, X, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export const Route = createFileRoute("/_app/admin/audit")({
   head: () => ({ meta: [{ title: "Audit Logs — Admin — SpinFlow ERP" }] }),
@@ -274,6 +275,7 @@ function AuditPage() {
               <Button variant="outline" size="sm" onClick={() => logsQ.refetch()}>Retry</Button>
             </div>
           ) : (
+            <ErrorBoundary inline label="Admin Audit Logs">
             <DataTable
               tableId="admin_audit_logs"
               columns={columns}
@@ -283,6 +285,7 @@ function AuditPage() {
               exportFilename="admin_audit_logs"
               emptyMessage={hasAnyFilter ? "No audit events match your filters." : "No audit events yet."}
             />
+            </ErrorBoundary>
           )}
         </CardContent>
       </Card>

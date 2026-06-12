@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Company } from "@/lib/types";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export const Route = createFileRoute("/_app/admin/limits")({
   head: () => ({ meta: [{ title: "User Limits — Admin — SpinFlow ERP" }] }),
@@ -165,6 +166,7 @@ function LimitsPage() {
           <CardTitle>Company User Limits</CardTitle>
         </CardHeader>
         <CardContent>
+          <ErrorBoundary inline label="Limits">
           <DataTable
             tableId="admin_limits"
             columns={[
@@ -198,6 +200,7 @@ function LimitsPage() {
               }} />
             )}
           />
+          </ErrorBoundary>
         </CardContent>
       </Card>
     </div>

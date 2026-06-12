@@ -27,6 +27,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Plus, Factory } from "lucide-react";
 import type { Mill } from "@/lib/types";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export const Route = createFileRoute("/_app/admin/mills")({
   head: () => ({ meta: [{ title: "Mills — Admin — SpinFlow ERP" }] }),
@@ -114,6 +115,7 @@ function MillsPage() {
           <CardTitle className="text-base">All Mills ({mills.length})</CardTitle>
         </CardHeader>
         <CardContent>
+          <ErrorBoundary inline label="Mills">
           <DataTable
             tableId="admin_mills"
             columns={columns}
@@ -123,6 +125,7 @@ function MillsPage() {
             exportFilename="admin_mills"
             rowKey={(m) => m.id}
           />
+          </ErrorBoundary>
         </CardContent>
       </Card>
 

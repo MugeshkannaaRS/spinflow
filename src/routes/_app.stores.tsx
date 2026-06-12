@@ -41,6 +41,8 @@ import { toast } from "sonner";
 import { Plus, Warehouse, AlertTriangle, Package, Pencil, ArrowDown, Trash2 } from "lucide-react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/stores")({
   head: () => ({ meta: [{ title: "Stores — SpinFlow ERP" }] }),
@@ -66,7 +68,13 @@ function StoresPage() {
   const spareColConfig = useColumnConfig("stores_spares");
   const issueColConfig = useColumnConfig("stores_issues");
 
-  if (!user) return null;
+  if (!user) return (
+    <div className="p-6 space-y-4">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
   if (itemsQ.isLoading) return (<><PageHeader title="Stores & Spares" subtitle="Loading..." /><div className="p-6 text-sm text-muted-foreground">Loading data…</div></>);
   if (itemsQ.isError) return (<><PageHeader title="Stores & Spares" subtitle="Error" /><div className="p-6 text-sm text-destructive">Error loading data.</div></>);
 
@@ -128,6 +136,7 @@ function StoresPage() {
               <Card>
                 <CardHeader><CardTitle className="text-base">Spare Parts & Consumables</CardTitle></CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="Spare Inventory">
                   <DataTable
                     tableId="stores_spares"
                     columns={itemCols}
@@ -160,6 +169,7 @@ function StoresPage() {
                       </div>
                     ) : undefined}
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -171,6 +181,7 @@ function StoresPage() {
                   {canEdit && <NewIssueNoteDialog items={items} />}
                 </CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="Issue Notes">
                   <DataTable
                     tableId="stores_issues"
                     columns={issueCols}
@@ -191,6 +202,7 @@ function StoresPage() {
                       />
                     ) : undefined}
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
             </TabsContent>

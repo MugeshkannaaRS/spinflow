@@ -45,6 +45,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/accounts")({
   head: () => ({ meta: [{ title: "Accounts — SpinFlow ERP" }] }),
@@ -90,20 +93,19 @@ function AccountsPage() {
     mutationFn: (id: string) => accountsApi.deleteInvoice(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["invoices"] });
-      toast.success("Invoice deleted");
-    },
-    onError: (err: any) => {
-      toast.error(err?.message ?? "Failed to delete invoice");
     },
   });
 
   const handleEdit = (inv: any) => { setEditingInv(inv); setInvSlideOpen(true); };
   const handleNew = () => { setEditingInv(null); setInvSlideOpen(true); };
-  const handleDelete = (inv: any) => {
-    if (window.confirm(`Delete invoice ${inv.invoiceNo ?? ""}?`)) deleteM.mutate(inv.id);
-  };
 
-  if (!user) return null;
+  if (!user) return (
+    <div className="p-6 space-y-4">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
 
   if (invQ.isLoading)
     return (
@@ -187,6 +189,7 @@ function AccountsPage() {
                   <CardTitle className="text-base">GST Invoices</CardTitle>
                 </CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="Invoices">
                   <DataTable
                     tableId="accounts_invoices"
                     columns={[
@@ -213,12 +216,19 @@ function AccountsPage() {
                         <Button variant="ghost" size="icon" className="size-7" onClick={() => handleEdit(inv)}>
                           <Pencil className="size-3" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="size-7 text-destructive" onClick={() => handleDelete(inv)}>
-                          <Trash2 className="size-3" />
-                        </Button>
+                        <ConfirmDeleteButton
+                          onConfirm={async () => {
+                            await deleteM.mutateAsync(inv.id);
+                          }}
+                          title="Delete invoice?"
+                          label={`Delete invoice ${inv.invoiceNo ?? ""}?`}
+                          confirmText="Delete"
+                          successMessage="Invoice deleted"
+                        />
                       </div>
                     )}
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -227,6 +237,7 @@ function AccountsPage() {
               <Card>
                 <CardHeader><CardTitle className="text-base">Outstanding Receivables</CardTitle></CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="Receivables">
                   <DataTable
                     tableId="accounts_receivables"
                     columns={[
@@ -244,6 +255,7 @@ function AccountsPage() {
                     rowKey={(r) => r.id}
                     exportFilename="receivables"
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
             </TabsContent>

@@ -46,6 +46,7 @@ import * as XLSX from "xlsx";
 import { cn } from "@/lib/utils";
 import { generateCodeFromName } from "@/lib/company-utils";
 import type { Company } from "@/lib/types";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export const Route = createFileRoute("/_app/admin/companies")({
   head: () => ({ meta: [{ title: "Companies — Admin — SpinFlow ERP" }] }),
@@ -248,6 +249,7 @@ function CompaniesPage() {
           </div>
         </CardHeader>
         <CardContent>
+          <ErrorBoundary inline label="Companies">
           <DataTable
             tableId="admin_companies"
             columns={[
@@ -314,6 +316,7 @@ function CompaniesPage() {
               </div>
             )}
           />
+          </ErrorBoundary>
         </CardContent>
 
         <EditCompanyDialog company={editCompany} onClose={() => setEditCompany(null)} onDone={() => { qc.invalidateQueries({ queryKey: ["masters"] }); qc.invalidateQueries({ queryKey: ["admin-summary"] }); setEditCompany(null); }} />

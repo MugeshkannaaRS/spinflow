@@ -62,6 +62,7 @@ import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import { cn } from "@/lib/utils";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import {
   Plus,
   Users,
@@ -86,6 +87,7 @@ import {
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { useMillMasters } from "@/hooks/useMillConfig";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/hr")({
   head: () => ({ meta: [{ title: "HR — SpinFlow ERP" }] }),
@@ -290,7 +292,13 @@ function HRPage() {
   const pendingLeaves = leaves.filter((l) => l.status === "pending").length;
   const todayAbsent = attendance.filter((a) => a.date === todayStr && a.status === "absent").length;
 
-  if (!user) return null;
+  if (!user) return (
+    <div className="p-6 space-y-4">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
 
   if (empQ.isLoading)
     return (
@@ -365,19 +373,27 @@ function HRPage() {
             </TabsList>
 
             <TabsContent value="employees">
+              <ErrorBoundary inline label="Employees">
               <EmployeesTab employees={employees} canEdit={canEdit} customFieldDefs={empCustomFieldDefs} />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="attendance">
+              <ErrorBoundary inline label="Attendance">
               <AttendanceTab employees={employees} canEdit={canEdit} />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="payroll">
+              <ErrorBoundary inline label="Payroll">
               <PayrollTab employees={employees} canEdit={canEdit} millId={millId!} userRole={user.role} />
+              </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="leaves">
+              <ErrorBoundary inline label="Leaves">
               <LeavesTab employees={employees} leaves={leaves} canEdit={canEdit} user={user} />
+              </ErrorBoundary>
             </TabsContent>
           </Tabs>
         </div>

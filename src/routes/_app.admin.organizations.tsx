@@ -8,6 +8,7 @@ import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import { Building2, Factory, Users, Shield, ExternalLink } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
 export const Route = createFileRoute("/_app/admin/organizations")({
   head: () => ({ meta: [{ title: "Organizations — Admin — SpinFlow ERP" }] }),
@@ -80,6 +81,7 @@ function OrganizationsPage() {
           <CardTitle>Organizations</CardTitle>
         </CardHeader>
         <CardContent>
+          <ErrorBoundary inline label="Organizations">
           <DataTable
             tableId="admin_organizations"
             columns={[
@@ -127,6 +129,7 @@ function OrganizationsPage() {
             rowKey={(c: any) => c.id}
             exportFilename="organizations"
           />
+          </ErrorBoundary>
         </CardContent>
       </Card>
     </div>

@@ -45,6 +45,8 @@ import { Plus, CheckCircle2, XCircle, FlaskConical, AlertTriangle, ArrowDown, Tr
 import type { QualityTest } from "@/lib/types";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/quality")({
   head: () => ({ meta: [{ title: "Quality — SpinFlow ERP" }] }),
@@ -93,7 +95,13 @@ function QualityPage() {
   const pendingLots = lots.filter((l) => l.status === "pending").length;
   const totalRejectedKg = rejections.reduce((s, r) => s + (r.quantity_kg ?? 0), 0);
 
-  if (!user) return null;
+  if (!user) return (
+    <div className="p-6 space-y-4">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
 
   if (testsQ.isLoading)
     return (
@@ -173,6 +181,7 @@ function QualityPage() {
                   {canEdit && <NewTestSlideOver />}
                 </CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="Quality Tests">
                   <DataTable
                     tableId="quality_tests"
                     columns={[
@@ -208,6 +217,7 @@ function QualityPage() {
                       />
                     ) : null : undefined}
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -216,6 +226,7 @@ function QualityPage() {
               <Card>
                 <CardHeader><CardTitle className="text-base">Lot Approval Workflow</CardTitle></CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="Lot Approvals">
                   <DataTable
                     tableId="quality_lots"
                     columns={[
@@ -236,6 +247,7 @@ function QualityPage() {
                       <div className="flex gap-1"><LotApproveAction lotId={l.id} /><LotRejectAction lotId={l.id} /></div>
                     ) : null}
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -244,6 +256,7 @@ function QualityPage() {
               <Card>
                 <CardHeader><CardTitle className="text-base">Rejection Analysis</CardTitle></CardHeader>
                 <CardContent>
+                  <ErrorBoundary inline label="Rejection Analysis">
                   <DataTable
                     tableId="quality_rejections"
                     columns={[
@@ -260,6 +273,7 @@ function QualityPage() {
                     rowKey={(r) => r.id}
                     exportFilename="rejections"
                   />
+                  </ErrorBoundary>
                 </CardContent>
               </Card>
             </TabsContent>

@@ -30,6 +30,7 @@ import { Truck, Scan, MapPin, CheckCircle2, Loader2, AlertTriangle, X } from "lu
 import type { Trip, TripStatus, ScanResult as ScanResultType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useOfflineScanner } from "@/hooks/useOfflineScanner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/lotrac")({
   head: () => ({ meta: [{ title: "LoTrac — Trip Logistics" }] }),
@@ -132,7 +133,13 @@ function LotracPage() {
     window.history.replaceState({}, "", url.toString());
   };
 
-  if (!user) return null;
+  if (!user) return (
+    <div className="p-6 space-y-4">
+      <Skeleton className="h-8 w-64" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-96 w-full" />
+    </div>
+  );
 
   return (
     <>
