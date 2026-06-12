@@ -1,6 +1,7 @@
 import { createFileRoute, Navigate, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, productionApi, inventoryApi, adminApi } from "@/lib/api-service";
+import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import type { MachineGroup } from "@/lib/api-service";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
@@ -248,6 +249,7 @@ function MastersPage() {
                   { key: "routes",          label: "Routes" },
                   { key: "shifts",          label: "Shifts" },
                   { key: "warehouses",      label: "Warehouses" },
+                  { key: "stop-codes",      label: "Stop Codes" },
                 ];
                 const isSuperAdmin = false;
                 return allTabs.filter(t =>
@@ -459,6 +461,10 @@ function MastersPage() {
                 onEdit={(item) => <WarehouseForm item={item} />}
                 onDeactivate={canEdit ? deactivateWarehouse : undefined}
               />
+            </TabsContent>
+
+            <TabsContent value="stop-codes">
+              <StopCodesTab canEdit={canEdit} search={search} />
             </TabsContent>
           </Tabs>
         </div>
@@ -2139,6 +2145,19 @@ function MachinesTab({
         exportFilename="machines"
         rowKey={(m) => m.id ?? m.code}
         onRowClick={canEdit ? (m) => setEditItem(m) : undefined}
+        actions={canEdit ? (m: any) => (
+          <ConfirmDeleteButton
+            onConfirm={async () => {
+              await productionApi.deleteMachine(m.id);
+              qc.invalidateQueries({ queryKey: ["masters", "machines"] });
+              qc.invalidateQueries({ queryKey: ["machines"] });
+            }}
+            label={`Delete machine ${m.code}?`}
+            title="Delete Machine?"
+            confirmText="Delete"
+            successMessage={`Machine ${m.code} deleted`}
+          />
+        ) : undefined}
       />
 
       {/* Import Modal */}
@@ -2642,5 +2661,191 @@ function MachineGroupsTab({
         </SheetContent>
       </Sheet>
     </Card>
+  );
+}
+
+// ── Stop Codes Tab ────────────────────────────────────────────────────────────
+
+const STOP_CODE_CATEGORIES = [
+  { value: "normal",                label: "Normal" },
+  { value: "planned",               label: "Planned" },
+  { value: "breakdown_mechanical",  label: "Breakdown — Mechanical" },
+  { value: "breakdown_electrical",  label: "Breakdown — Electrical" },
+  { value: "production_change",     label: "Production Change" },
+  { value: "quality",               label: "Quality" },
+  { value: "utility",               label: "Utility" },
+  { value: "misc",                  label: "Misc" },
+];
+
+function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string }) {
+  const qc = useQueryClient();
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [form, setForm] = useState({ code: "", name: "", category: "" });
+
+  const codesQ = useQuery({
+    queryKey: ["stop-codes", "all"],
+    queryFn: productionApi.getAllStopCodes,
+    staleTime: 30_000,
+  });
+  const allCodes = (codesQ.data ?? []) as any[];
+  const filtered = allCodes.filter((c) => {
+    const q = search.toLowerCase();
+    return !q || String(c.code).includes(q) || (c.name ?? "").toLowerCase().includes(q) || (c.category ?? "").toLowerCase().includes(q);
+  });
+
+  const saveMut = useMutation({
+    mutationFn: async () => {
+      if (editing) {
+        return productionApi.updateStopCode(editing.code, {
+          name: form.name,
+          category: form.category || undefined,
+        });
+      } else {
+        return productionApi.createStopCode({
+          code: parseInt(form.code),
+          name: form.name,
+          category: form.category || undefined,
+        });
+      }
+    },
+    onSuccess: () => {
+      toast.success(editing ? "Stop code updated" : "Stop code created");
+      qc.invalidateQueries({ queryKey: ["stop-codes"] });
+      setSheetOpen(false);
+      setEditing(null);
+      setForm({ code: "", name: "", category: "" });
+    },
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail;
+      toast.error(typeof detail === "string" ? detail : "Failed to save stop code");
+    },
+  });
+
+  const openAdd = () => { setEditing(null); setForm({ code: "", name: "", category: "" }); setSheetOpen(true); };
+  const openEdit = (c: any) => { setEditing(c); setForm({ code: String(c.code), name: c.name, category: c.category ?? "" }); setSheetOpen(true); };
+
+  return (
+    <div className="space-y-4 mt-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold flex items-center gap-2">
+          DATALOG Stop Codes
+          {!codesQ.isLoading && <span className="text-xs text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded-full">{allCodes.length}</span>}
+        </h2>
+        {canEdit && (
+          <Button size="sm" onClick={openAdd}><Plus className="size-4 mr-1" /> Add Stop Code</Button>
+        )}
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/40 border-b text-xs text-muted-foreground">
+                  <th className="text-left pl-4 py-2 w-16">Code</th>
+                  <th className="text-left py-2">Name / Reason</th>
+                  <th className="text-left py-2 w-40">Category</th>
+                  <th className="text-left py-2 w-16">Active</th>
+                  <th className="py-2 w-20" />
+                </tr>
+              </thead>
+              <tbody>
+                {codesQ.isLoading ? (
+                  <tr><td colSpan={5} className="text-center py-6 text-muted-foreground text-xs">Loading…</td></tr>
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan={5} className="text-center py-6 text-muted-foreground text-xs">No stop codes found. Add one above.</td></tr>
+                ) : filtered.map((c: any, idx: number) => (
+                  <tr key={c.code} className={["border-b last:border-0", idx % 2 === 0 ? "" : "bg-muted/20"].join(" ")}>
+                    <td className="pl-4 py-2 font-mono font-bold text-primary">{c.code}</td>
+                    <td className="py-2 font-medium">{c.name}</td>
+                    <td className="py-2 text-xs text-muted-foreground">
+                      {STOP_CODE_CATEGORIES.find(x => x.value === c.category)?.label ?? c.category ?? "—"}
+                    </td>
+                    <td className="py-2">
+                      <span className={`text-xs font-medium ${c.is_active !== false ? "text-emerald-600" : "text-red-500"}`}>
+                        {c.is_active !== false ? "Yes" : "No"}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-3">
+                      {canEdit && (
+                        <div className="flex items-center gap-1 justify-end">
+                          <button onClick={() => openEdit(c)} className="p-1.5 rounded hover:bg-blue-50 text-blue-600" title="Edit">
+                            <Pencil className="size-3.5" />
+                          </button>
+                          <ConfirmDeleteButton
+                            onConfirm={async () => {
+                              await productionApi.deleteStopCode(c.code);
+                              qc.invalidateQueries({ queryKey: ["stop-codes"] });
+                            }}
+                            label={`Deactivate code ${c.code} — ${c.name}?`}
+                            title="Deactivate Stop Code?"
+                            confirmText="Deactivate"
+                            successMessage="Stop code deactivated"
+                          />
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Add / Edit Sheet */}
+      <Sheet open={sheetOpen} onOpenChange={(o) => { if (!o) { setSheetOpen(false); setEditing(null); } }}>
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{editing ? `Edit Code ${editing.code}` : "Add Stop Code"}</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-4 py-4">
+            {!editing && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">Code Number *</Label>
+                <Input
+                  type="number" min={1} max={9999}
+                  value={form.code}
+                  onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
+                  placeholder="e.g. 1"
+                  className="h-8 text-sm"
+                />
+                <p className="text-xs text-muted-foreground">Numeric code used in DATALOG system (1–9999)</p>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Reason / Name *</Label>
+              <Input
+                value={form.name}
+                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+                placeholder="e.g. Cleaning, Creel Change…"
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Category</Label>
+              <Select value={form.category} onValueChange={(v) => setForm((p) => ({ ...p, category: v }))}>
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectContent>
+                  {STOP_CODE_CATEGORIES.map((c) => (
+                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <SheetFooter>
+            <Button
+              onClick={() => saveMut.mutate()}
+              disabled={saveMut.isPending || !form.name.trim() || (!editing && !form.code)}
+              className="w-full"
+            >
+              {saveMut.isPending ? "Saving…" : editing ? "Update" : "Add Stop Code"}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }

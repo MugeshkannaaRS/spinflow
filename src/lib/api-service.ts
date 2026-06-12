@@ -101,6 +101,12 @@ export const productionApi = {
   updateEntry: (id: string, data: any) => api.patch(`/production/entries/${id}`, data).then((r) => r.data),
   // v2 additions
   getStopCodes: () => api.get("/production/datalog-stop-codes").then((r) => r.data?.data ?? []),
+  getAllStopCodes: () => api.get("/production/datalog-stop-codes").then((r) => r.data?.data ?? []),
+  createStopCode: (data: { code: number; name: string; category?: string; departments?: string[] }) =>
+    api.post("/production/datalog-stop-codes", data).then((r) => r.data),
+  updateStopCode: (code: number, data: { name?: string; category?: string; departments?: string[]; is_active?: boolean }) =>
+    api.put(`/production/datalog-stop-codes/${code}`, data).then((r) => r.data),
+  deleteStopCode: (code: number) => api.delete(`/production/datalog-stop-codes/${code}`),
   getPageInit: (millId: string) => api.get("/production/v2/page-init", { params: { mill_id: millId } }).then((r) => r.data),
   getWasteEntries: (params?: Record<string, any>) => api.get("/production/waste-entries", { params }).then((r) => r.data),
   createWasteBulk: (data: any) => api.post("/production/waste-entries/bulk", data).then((r) => r.data),

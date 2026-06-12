@@ -23,7 +23,7 @@ from app.models.production_v2 import (
 )
 from app.models.mixing import MixingChangeLog
 from app.schemas.production_v2 import (
-    DatalogStopCodeOut,
+    DatalogStopCodeOut, DatalogStopCodeCreate, DatalogStopCodeUpdate,
     WasteEntryCreate, WasteEntryBulkCreate, WasteEntryOut,
     RFManpowerCreate, RFManpowerBulkCreate, RFManpowerOut,
     MixingFibreRowCreate, MixingFibreRowOut,
@@ -96,6 +96,67 @@ async def list_stop_codes(
     except Exception as e:
         logger.error(f"datalog-stop-codes list error: {e}")
         return {"data": [], "total": 0}
+
+
+@router.post("/production/datalog-stop-codes", status_code=201)
+async def create_stop_code(
+    body: DatalogStopCodeCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    """Create a new DATALOG stop code."""
+    existing = (await db.execute(select(DatalogStopCode).where(DatalogStopCode.code == body.code))).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Stop code {body.code} already exists")
+    row = DatalogStopCode(
+        code=body.code,
+        name=body.name,
+        category=body.category,
+        departments=body.departments,
+        is_active=body.is_active,
+    )
+    db.add(row)
+    await db.commit()
+    await db.refresh(row)
+    return DatalogStopCodeOut.model_validate(row).model_dump()
+
+
+@router.put("/production/datalog-stop-codes/{code}")
+async def update_stop_code(
+    code: int,
+    body: DatalogStopCodeUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    """Update a DATALOG stop code by its numeric code."""
+    row = (await db.execute(select(DatalogStopCode).where(DatalogStopCode.code == code))).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Stop code not found")
+    if body.name is not None:
+        row.name = body.name
+    if body.category is not None:
+        row.category = body.category
+    if body.departments is not None:
+        row.departments = body.departments
+    if body.is_active is not None:
+        row.is_active = body.is_active
+    await db.commit()
+    await db.refresh(row)
+    return DatalogStopCodeOut.model_validate(row).model_dump()
+
+
+@router.delete("/production/datalog-stop-codes/{code}", status_code=204)
+async def delete_stop_code(
+    code: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    """Soft-delete a DATALOG stop code (sets is_active=False)."""
+    row = (await db.execute(select(DatalogStopCode).where(DatalogStopCode.code == code))).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Stop code not found")
+    row.is_active = False
+    await db.commit()
 
 
 @router.get("/production/datalog-stop-codes/by-department")

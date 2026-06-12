@@ -18,6 +18,21 @@ class DatalogStopCodeOut(BaseModel):
         from_attributes = True
 
 
+class DatalogStopCodeCreate(BaseModel):
+    code: int = Field(..., ge=1, le=9999)
+    name: str = Field(..., min_length=1, max_length=100)
+    category: Optional[str] = None
+    departments: Optional[List[str]] = None  # None = all depts
+    is_active: bool = True
+
+
+class DatalogStopCodeUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    departments: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+
 # ------------------------------------------------------------------ #
 # Waste Entry                                                          #
 # ------------------------------------------------------------------ #

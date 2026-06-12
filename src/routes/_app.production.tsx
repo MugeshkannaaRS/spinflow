@@ -66,6 +66,7 @@ type GridRow = {
   stoppageMins: string;
   stoppageReason: string;
   machineStatus: "running" | "breakdown" | "idle";
+  targetKg: number;
 };
 
 type CardingRow = {
@@ -85,6 +86,7 @@ function buildRows(machines: any[]): GridRow[] {
     stoppageMins: "",
     stoppageReason: "",
     machineStatus: (m.current_status ?? m.status ?? "running") as GridRow["machineStatus"],
+    targetKg: m.target_kg ?? 0,
   }));
 }
 
@@ -714,14 +716,16 @@ function ShiftGrid() {
             </div>
           ) : (
             <div className="w-full overflow-x-auto">
-              <Table className="min-w-[900px] w-full text-sm">
+              <Table className="min-w-[1050px] w-full text-sm">
                 <TableHeader>
                   <TableRow className="bg-muted/40">
                     <TableHead className="w-24 pl-4">{config.getLabel('machine_code')}</TableHead>
                     <TableHead className="w-36">{(() => { const l = config.getLabel('machine_name'); return l === 'machine_name' ? 'name' : l; })()}</TableHead>
                     <TableHead className="w-32">{config.getLabel('operator')}</TableHead>
                     <TableHead className="w-20">{config.getLabel('count')}</TableHead>
+                    <TableHead className="w-24">Target (kg)</TableHead>
                     <TableHead className="w-28">{config.getLabel('produced_kg')}</TableHead>
+                    <TableHead className="w-20">Efficiency</TableHead>
                     <TableHead className="w-24">{config.getLabel('waste_kg')}</TableHead>
                     <TableHead className="w-32">{config.getLabel('machine_status')}</TableHead>
                   </TableRow>
@@ -729,6 +733,9 @@ function ShiftGrid() {
                 <TableBody>
                   {(rows ?? []).map((row, idx) => {
                     const hasData = Number(row.producedKg) > 0;
+                    const produced = Number(row.producedKg) || 0;
+                    const target = row.targetKg || 0;
+                    const effPct = target > 0 ? Math.round((produced / target) * 100) : null;
                     return (
                       <TableRow
                         key={row.machineCode}
@@ -751,6 +758,9 @@ function ShiftGrid() {
                         <TableCell>
                           <span className="text-xs text-muted-foreground">{count || "—"}</span>
                         </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {target > 0 ? `${target} kg` : "—"}
+                        </TableCell>
                         <TableCell>
                           <Input
                             type="number"
@@ -760,6 +770,13 @@ function ShiftGrid() {
                             placeholder="0"
                             className="h-7 text-xs w-full"
                           />
+                        </TableCell>
+                        <TableCell className="text-xs font-semibold">
+                          {effPct !== null ? (
+                            <span className={effPct >= 90 ? "text-green-600" : effPct >= 75 ? "text-amber-600" : "text-destructive"}>
+                              {effPct}%
+                            </span>
+                          ) : <span className="text-muted-foreground font-normal">—</span>}
                         </TableCell>
                         <TableCell>
                           <Input
@@ -1363,6 +1380,15 @@ function StoppageForm() {
                                     onChange={(e) => { setRowField(row.id, "codeSearch", e.target.value); setRowField(row.id, "showDropdown", true); }}
                                     onFocus={() => setRowField(row.id, "showDropdown", true)}
                                     onBlur={() => setTimeout(() => setRowField(row.id, "showDropdown", false), 160)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" && filteredCodes.length > 0) {
+                                        const top = filteredCodes[0];
+                                        setRowField(row.id, "datalog_code", String(top.code));
+                                        setRowField(row.id, "codeSearch", "");
+                                        setRowField(row.id, "showDropdown", false);
+                                        e.preventDefault();
+                                      }
+                                    }}
                                     className="w-full h-7 rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                                   />
                                   {row.showDropdown && (
