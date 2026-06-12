@@ -67,15 +67,8 @@ export function ColumnConfigurator({ module, tableKey }: ColumnConfiguratorProps
     try {
       const updated = localCols.map((c, i) => ({
         key: c.key,
-        label: c.label,
         is_visible: c.visible,
         display_order: i + 1,
-        type: "text",
-        is_required: false,
-        is_searchable: true,
-        is_sortable: true,
-        is_exportable: true,
-        is_importable: true,
       }));
       await api.put("/ui-config/columns", { columns: updated }, {
         params: { table: tableKey, mill_id: "default" },

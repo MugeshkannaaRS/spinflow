@@ -159,6 +159,10 @@ async def get_suppliers(
 
     try:
         stmt = select(Supplier)
+        if effective_mill_id:
+            stmt = stmt.where(Supplier.mill_id == effective_mill_id)
+        elif scope.get("company_id"):
+            stmt = stmt.join(Mill, Supplier.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = (await db.execute(count_stmt)).scalar() or 0
         stmt = stmt.offset((page - 1) * page_size).limit(page_size)

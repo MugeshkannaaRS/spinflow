@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from typing import AsyncGenerator
 
+import httpx
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -55,6 +56,23 @@ async def session(engine) -> AsyncGenerator[AsyncSession, None]:
     await session.close()
     await transaction.rollback()
     await connection.close()
+
+
+@pytest_asyncio.fixture
+async def db_session(session: AsyncSession) -> AsyncSession:
+    return session
+
+
+@pytest_asyncio.fixture
+async def client(session: AsyncSession) -> AsyncGenerator[httpx.AsyncClient, None]:
+    from app.db.session import get_db
+    from app.main import app as fastapi_app
+
+    fastapi_app.dependency_overrides[get_db] = lambda: session
+    transport = httpx.ASGITransport(app=fastapi_app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+    fastapi_app.dependency_overrides.clear()
 
 
 @pytest_asyncio.fixture

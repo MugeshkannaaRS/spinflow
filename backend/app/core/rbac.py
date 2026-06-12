@@ -19,7 +19,7 @@ ROLES = [
     "SECURITY_GATE", "AUDITOR", "OPERATOR",
 ]
 
-MODULES = ALL_MODULE_CODES + ["whatsapp", "lc_tracking", "analytics"]
+MODULES = ALL_MODULE_CODES
 
 SYSTEM_MODULES = frozenset(SYSTEM_MODULE_CODES)
 
@@ -166,4 +166,5 @@ ROLE_LABELS: dict[str, str] = {
     "MACHINE_OPERATOR": "Machine Operator",
     "SECURITY_GATE": "Security Gate",
     "AUDITOR": "Auditor (Read-only)",
+    "OPERATOR": "Operator",
 }

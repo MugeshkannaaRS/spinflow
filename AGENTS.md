@@ -72,10 +72,37 @@
   - **Verdict: GO** — 26/26 workflows passed, 0 errors, 1 slow query (1115ms invoice generation).
   - Report saved to `backend/lr1_report.json`.
 
+### Done
+- **Service Audit — 6 Critical Fixes**: Fixed all Critical issues from comprehensive backend audit.
+  - **A1**: COGS always $0 — now computed from average CottonPurchase rate + `total_cogs` accumulated (`accounts_service.py:35-51`)
+  - **E1**: Rollback on audit failure destroyed invoice — removed `rollback()` + `raise` from 3 audit handlers in `billing_invoice_service.py`; audit failure no longer destroys invoice
+  - **I1**: SQL injection in `deletion_service.py` — replaced all `f"IN ({mp})"` string interpolation with parameterized `= ANY(:mill_ids)` across `count_all`, `generate_backup`, and `hard_delete`; modified `_delete_from()` to accept `**extra_params`
+  - **S1**: Invoice PDF showed "No line items" — line item dict flattened correctly from `base_plan`/`addon_modules`/etc. keys instead of looking for `items[]` (`pdf_export.py:198-203`)
+  - **Z1**: Negative stock checked AFTER modification — computed new values first, validated, then assigned (`stock_service.py:143-210`)
+  - **Z2**: Race condition on StockBalance creation — `IntegrityError` retry pattern for concurrent SELECT→INSERT (`stock_service.py:114-141`)
+
+- **IDOR Audit & Fix Sprint**: Audited all 25 API route files for auth, IDOR, SQLi, pagination, validation, error handling, and rate limiting. Fixed 9 critical IDOR vulnerabilities:
+  - **auth.py: `GET /auth/users`** — Added company scope filter; non-SUPER_ADMIN only sees own company users
+  - **hr.py: `POST /hr/payroll/calculate`** — Added mill scope check before processing
+  - **hr.py: `PUT /hr/payroll/{id}`** — Added mill/company scope check on payroll record
+  - **hr.py: `POST /hr/payroll/finalize`** — Added mill scope check before finalizing
+  - **payroll.py: `POST /payroll/months/process`** — Added mill scope check
+  - **payroll.py: `POST /payroll/months/{id}/approve`** — Added PayrollMonth scope check
+  - **payroll.py: `POST /payroll/months/{id}/mark-paid`** — Added PayrollMonth scope check
+  - **dashboard.py: `GET /dashboard/admin-summary`** — Changed to `require_module("admin")` (was unprotected `get_current_user`)
+  - **uploads.py: All 3 endpoints** — Added `_check_entity_scope()` helper that verifies employee/purchase entities belong to user's company
+  - **purchase.py: `GET /purchase/suppliers`** — Applied computed `effective_mill_id` filter to query (was computed but never used)
+  - **stock.py: `GET /stock/snapshot`** — Added scope check on `mill_id` query param
+  - **stock.py: `GET /stock/lot/{id}/history`** — Added Lot scope check via mill_id/company_id
+  - **stock.py: `GET /stock/lot/{id}/balance`** — Added Lot scope check via mill_id/company_id
+  - Note: `GET /purchase/bales/stats` and `POST /purchase/bales/group` cannot be fully scoped — `CottonBale` model lacks `mill_id` field (schema change needed)
+
 ### Deferred
 - 8 pre-existing dashboard test failures (unrelated to admin/onboarding)
 - `log_audit()` in deps.py still calls its own `db.commit()` — 50+ callers need eventual refactor for transactional safety
 - `generate_subscription_invoice` is slow (1115ms) — exceeds 1s SLOW_QUERY_THRESHOLD
+- ~15 High-severity audit issues remain (missing mill_id filters, double-counting, growth skew, wrong role field, SO number collision, etc.)
+- `CottonBale` model lacks `mill_id` — `GET /purchase/bales/stats` and `POST /purchase/bales/group` rely solely on module-level gating
 
 ## Key Decisions
 - Company is the root entity — everything managed inside Company workspace, not sibling pages
@@ -138,3 +165,10 @@
 - `backend/lr1_report.json`: LR-1 results (GO, 26/26 passed, 1 slow query)
 - `backend/tests/test_rc1_1_security.py`: 11 integration tests for RC-1.1 fixes
 - `backend/app/models/audit.py`: `user_id` changed to `nullable=True`
+- `backend/app/api/v1/auth.py`: `GET /auth/users` company scope filter added
+- `backend/app/api/v1/hr.py`: Payroll calculate/update/finalize scope checks
+- `backend/app/api/v1/payroll.py`: Payroll process/approve/mark-paid scope checks
+- `backend/app/api/v1/dashboard.py`: `GET /dashboard/admin-summary` gated with `require_module("admin")`
+- `backend/app/api/v1/uploads.py`: `_check_entity_scope()` helper for entity ownership
+- `backend/app/api/v1/purchase.py`: `GET /purchase/suppliers` mill_id filter applied
+- `backend/app/api/v1/stock.py`: Lot scope checks on history/balance endpoints

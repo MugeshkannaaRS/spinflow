@@ -196,7 +196,11 @@ def invoice_pdf(invoice, company_name: str) -> bytes:
 
     # Line items table
     line_items = invoice.line_items or {}
-    items_list = line_items.get("items", []) if isinstance(line_items, dict) else []
+    items_list = []
+    if isinstance(line_items, dict):
+        for key, item in line_items.items():
+            if isinstance(item, dict):
+                items_list.append(item)
     if items_list:
         table_data = [["#", "Description", "Qty", "Amount"]]
         for i, item in enumerate(items_list, 1):

@@ -54,7 +54,7 @@ async def resolve_access(
     Returns:
         AccessResult with granted, reason, level.
     """
-    role_code = user.role
+    role_code = user.role_rel.code if user.role_rel else (user.role or "")
 
     # ── SUPER_ADMIN: bypass everything ──────────────────────────────────────
     if role_code == "SUPER_ADMIN":
@@ -112,7 +112,13 @@ async def resolve_access(
                     level="none",
                 )
             # is_allowed=True overrides a role that normally can't access the module
-            access_level = "read"
+            # Preserve write access if the role originally had it
+            if not write:
+                access_level = "read"
+            elif role_can_write(role_code, module):
+                access_level = "write"
+            else:
+                access_level = "read"
 
     # ── LAYER 4: User module restrictions ────────────────────────────────────
     # User-level module restrictions can only REDUCE access.

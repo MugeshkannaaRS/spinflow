@@ -66,7 +66,7 @@ services:
     volumes:
       - backend_uploads:/app/uploads
     command: >
-      sh -c "cd /app && python -m app.db.seed --force && alembic stamp head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --loop asyncio"
+      sh -c "cd /app && alembic upgrade head && python -m app.db.seed && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --loop asyncio"
     logging:
       driver: "json-file"
       options:

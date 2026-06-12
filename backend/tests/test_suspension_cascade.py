@@ -168,7 +168,7 @@ class TestSuspensionCascade:
             entity_id=test_company.id,
             details="Test suspension cascade",
         ))
-        await session.commit()
+        await session.flush()
 
         await session.refresh(test_company)
         assert test_company.is_active == False
@@ -185,7 +185,7 @@ class TestSuspensionCascade:
         await session.execute(
             sa_update(Mill).where(Mill.company_id == test_company.id).values(is_active=False)
         )
-        await session.commit()
+        await session.flush()
 
         result = await session.execute(
             select(Mill).where(Mill.company_id == test_company.id)
@@ -207,7 +207,7 @@ class TestSuspensionCascade:
         await session.execute(
             sa_update(User).where(User.company_id == test_company.id).values(is_active=False)
         )
-        await session.commit()
+        await session.flush()
 
         for u in users:
             await session.refresh(u)
@@ -230,7 +230,7 @@ class TestSuspensionCascade:
             ))
             .values(is_active=False)
         )
-        await session.commit()
+        await session.flush()
 
         for s in sessions:
             await session.refresh(s)
@@ -251,7 +251,7 @@ class TestSuspensionCascade:
         assert sub is not None
         sub.status = "suspended"
 
-        await session.commit()
+        await session.flush()
 
         await session.refresh(sub)
         assert sub.status == "suspended"
@@ -278,7 +278,7 @@ class TestSuspensionCascade:
         await session.execute(
             sa_update(User).where(User.company_id == test_company.id).values(is_active=True)
         )
-        await session.commit()
+        await session.flush()
 
         await session.refresh(test_company)
         assert test_company.is_active == True
@@ -300,7 +300,7 @@ class TestSuspensionCascade:
         await session.execute(
             sa_update(User).where(User.company_id == test_company.id).values(is_active=True)
         )
-        await session.commit()
+        await session.flush()
 
         mill_result = await session.execute(
             select(Mill).where(Mill.company_id == test_company.id)
@@ -321,7 +321,7 @@ class TestSuspensionCascade:
         await session.flush()
 
         test_subscription.status = "active"
-        await session.commit()
+        await session.flush()
 
         await session.refresh(test_subscription)
         assert test_subscription.status == "active"

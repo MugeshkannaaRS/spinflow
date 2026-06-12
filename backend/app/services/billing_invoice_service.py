@@ -111,8 +111,6 @@ class InvoiceService:
             )
         except Exception as e:
             logger.warning("Failed to log audit for invoice %s: %s", invoice.id, e)
-            await self.db.rollback()
-            raise
 
         return invoice
 
@@ -242,8 +240,6 @@ class InvoiceService:
             )
         except Exception as e:
             logger.warning("Failed to log audit for prorated invoice %s: %s", invoice.id, e)
-            await self.db.rollback()
-            raise
 
         return invoice
 
@@ -320,8 +316,6 @@ class InvoiceService:
             )
         except Exception as e:
             logger.warning("Failed to log audit for overage invoice %s: %s", invoice.id, e)
-            await self.db.rollback()
-            raise
 
         return invoice
 

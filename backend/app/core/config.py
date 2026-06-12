@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     # Production Render domains must be listed explicitly in CORS_ORIGINS (set via env var).
     # Defaults include local development and the known Render production deployment.
     CORS_ORIGINS: str = DEFAULT_CORS_ORIGINS
-    CORS_ORIGIN_REGEX: str = r"^https://.*\.ngrok(?:-free)?\.dev$"
+    CORS_ORIGIN_REGEX: str = ""
 
     @property
     def parsed_cors_origins(self) -> List[str]:

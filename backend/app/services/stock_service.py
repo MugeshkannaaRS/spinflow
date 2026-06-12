@@ -1,6 +1,7 @@
 from typing import Optional, List
 from datetime import datetime, timezone
 from sqlalchemy import select, func, and_, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from app.services.base import BaseService
 from app.models.stock import StockLedger, StockBalance
@@ -111,76 +112,102 @@ class StockLedgerService(BaseService[StockLedger]):
         now = datetime.now(timezone.utc)
 
         if balance is None:
-            balance = StockBalance(
-                mill_id=mill_id,
-                lot_id=lot_id,
-                warehouse_id=warehouse_id,
-                fg_state="WIP",
-                qty_on_hand=0.0,
-                qty_reserved=0.0,
-                qty_quarantine=0.0,
-                weight_on_hand_kg=0.0,
-                weight_reserved_kg=0.0,
-                last_move_at=now,
-            )
-            self.db.add(balance)
-            await self.db.flush()
+            try:
+                balance = StockBalance(
+                    mill_id=mill_id,
+                    lot_id=lot_id,
+                    warehouse_id=warehouse_id,
+                    fg_state="WIP",
+                    qty_on_hand=0.0,
+                    qty_reserved=0.0,
+                    qty_quarantine=0.0,
+                    weight_on_hand_kg=0.0,
+                    weight_reserved_kg=0.0,
+                    last_move_at=now,
+                )
+                self.db.add(balance)
+                await self.db.flush()
+            except IntegrityError:
+                await self.db.rollback()
+                result = await self.db.execute(
+                    select(StockBalance).where(
+                        and_(
+                            StockBalance.mill_id == mill_id,
+                            StockBalance.lot_id == lot_id,
+                            StockBalance.warehouse_id == warehouse_id,
+                        )
+                    )
+                )
+                balance = result.scalar_one()
+
+        new_qty_on_hand = balance.qty_on_hand
+        new_qty_reserved = balance.qty_reserved
+        new_qty_quarantine = balance.qty_quarantine
+        new_weight_on_hand_kg = balance.weight_on_hand_kg
+        new_weight_reserved_kg = balance.weight_reserved_kg
+        new_fg_state = balance.fg_state
 
         if move_type == "PRODUCTION_IN":
-            balance.qty_on_hand += qty_in
-            balance.weight_on_hand_kg += weight_in_kg
-            balance.fg_state = "QC_PENDING"
+            new_qty_on_hand += qty_in
+            new_weight_on_hand_kg += weight_in_kg
+            new_fg_state = "QC_PENDING"
         elif move_type == "QC_APPROVED":
-            balance.fg_state = "SELLABLE"
+            new_fg_state = "SELLABLE"
         elif move_type == "QC_REJECTED_TO_QUARANTINE":
-            balance.qty_on_hand -= qty_out
-            balance.qty_quarantine += qty_out
-            balance.weight_on_hand_kg -= weight_out_kg
-            balance.fg_state = "QUARANTINE"
+            new_qty_on_hand -= qty_out
+            new_qty_quarantine += qty_out
+            new_weight_on_hand_kg -= weight_out_kg
+            new_fg_state = "QUARANTINE"
         elif move_type == "SALES_RESERVED":
-            balance.qty_reserved += qty_in
-            balance.weight_reserved_kg += weight_in_kg
-            balance.fg_state = "RESERVED"
+            new_qty_reserved += qty_in
+            new_weight_reserved_kg += weight_in_kg
+            new_fg_state = "RESERVED"
         elif move_type == "SALES_RESERVATION_RELEASED":
-            balance.qty_reserved -= qty_out
-            balance.weight_reserved_kg -= weight_out_kg
-            balance.fg_state = "SELLABLE"
+            new_qty_reserved -= qty_out
+            new_weight_reserved_kg -= weight_out_kg
+            new_fg_state = "SELLABLE"
         elif move_type == "DISPATCH_OUT":
-            balance.qty_on_hand -= qty_out
-            balance.weight_on_hand_kg -= weight_out_kg
-            balance.fg_state = "DISPATCHED"
+            new_qty_on_hand -= qty_out
+            new_weight_on_hand_kg -= weight_out_kg
+            new_fg_state = "DISPATCHED"
         elif move_type == "DELIVERY_CONFIRMED":
-            balance.fg_state = "DELIVERED"
+            new_fg_state = "DELIVERED"
         elif move_type == "RETURN_IN":
-            balance.qty_on_hand += qty_in
-            balance.weight_on_hand_kg += weight_in_kg
-            balance.fg_state = "SELLABLE"
+            new_qty_on_hand += qty_in
+            new_weight_on_hand_kg += weight_in_kg
+            new_fg_state = "SELLABLE"
         elif move_type == "TRANSFER_OUT":
-            balance.qty_on_hand -= qty_out
-            balance.weight_on_hand_kg -= weight_out_kg
+            new_qty_on_hand -= qty_out
+            new_weight_on_hand_kg -= weight_out_kg
         elif move_type == "TRANSFER_IN":
-            balance.qty_on_hand += qty_in
-            balance.weight_on_hand_kg += weight_in_kg
+            new_qty_on_hand += qty_in
+            new_weight_on_hand_kg += weight_in_kg
         elif move_type == "ADJUSTMENT_IN":
-            balance.qty_on_hand += qty_in
-            balance.weight_on_hand_kg += weight_in_kg
+            new_qty_on_hand += qty_in
+            new_weight_on_hand_kg += weight_in_kg
         elif move_type == "ADJUSTMENT_OUT":
-            balance.qty_on_hand -= qty_out
-            balance.weight_on_hand_kg -= weight_out_kg
+            new_qty_on_hand -= qty_out
+            new_weight_on_hand_kg -= weight_out_kg
 
-        if balance.qty_on_hand < 0:
+        if new_qty_on_hand < 0:
             raise SpinFlowException(
                 status_code=400,
                 code=ErrorCode.INSUFFICIENT_STOCK,
-                message=f"Insufficient stock: qty_on_hand would be {balance.qty_on_hand:.1f}",
+                message=f"Insufficient stock: qty_on_hand would be {new_qty_on_hand:.1f}",
             )
-        if balance.qty_reserved < 0:
+        if new_qty_reserved < 0:
             raise SpinFlowException(
                 status_code=400,
                 code=ErrorCode.INSUFFICIENT_STOCK,
-                message=f"Insufficient reserved stock: qty_reserved would be {balance.qty_reserved:.1f}",
+                message=f"Insufficient reserved stock: qty_reserved would be {new_qty_reserved:.1f}",
             )
 
+        balance.qty_on_hand = new_qty_on_hand
+        balance.qty_reserved = new_qty_reserved
+        balance.qty_quarantine = new_qty_quarantine
+        balance.weight_on_hand_kg = new_weight_on_hand_kg
+        balance.weight_reserved_kg = new_weight_reserved_kg
+        balance.fg_state = new_fg_state
         balance.last_move_at = now
         await self.db.flush()
 

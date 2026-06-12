@@ -43,9 +43,8 @@ services:
         sync: false
 
   # ── Frontend Static Site ──────────────────────────────────────────────
-  - type: web
+  - type: static_site
     name: spinflow-staging-frontend
-    env: static
     buildCommand: npm ci && npm run build
     staticPublishPath: ./dist
     envVars:

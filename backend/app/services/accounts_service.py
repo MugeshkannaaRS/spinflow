@@ -1,7 +1,5 @@
 from typing import Optional, List, Dict
 from datetime import datetime, timezone, date
-from sqlalchemy import select, func, and_, cast
-from sqlalchemy.dialects.postgresql import TIMESTAMP
 from app.services.base import BaseService
 from app.models.accounts import Invoice, Payment, GSTEntry
 from app.models.payroll import PayrollMonth
@@ -34,11 +32,18 @@ class AccountsService(BaseService[Invoice]):
             )
             .group_by(StockLedger.yarn_count)
         )
+        rate_result = await self.db.execute(
+            select(func.avg(CottonPurchase.rate_per_kg))
+            .where(CottonPurchase.mill_id == mill_id)
+        )
+        avg_unit_cost = float(rate_result.scalar() or 0)
+
         by_yarn = []
         total_cogs = 0.0
         for yarn_count, weight_kg in result.all():
             weight_kg = float(weight_kg)
-            estimated_value = 0.0
+            estimated_value = round(weight_kg * avg_unit_cost, 2)
+            total_cogs += estimated_value
             by_yarn.append({
                 "yarn_count": yarn_count or "Unknown",
                 "weight_kg": weight_kg,

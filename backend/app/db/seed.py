@@ -68,7 +68,9 @@ async def seed():
 
         superadmin = await db.scalar(select(User).where(User.name == "superadmin"))
         if not superadmin:
-            password = os.environ.get("SUPERADMIN_PASSWORD", "Admin@1234")
+            password = os.environ.get("SUPERADMIN_PASSWORD")
+            if not password:
+                raise RuntimeError("SUPERADMIN_PASSWORD environment variable is required for seeding")
             superadmin = User(
                 name="superadmin",
                 email="admin@mill.spinflow",
@@ -81,17 +83,11 @@ async def seed():
             )
             db.add(superadmin)
             await db.flush()
-            print()
-            print("!" * 72)
-            print("  WARNING: Superadmin account created")
-            print("  " + "-" * 68)
-            print(f"  Username     : superadmin")
-            print(f"  Email        : admin@mill.spinflow")
-            print(f"  Password     : {password}")
-            print("  " + "-" * 68)
-            print("  Change this password immediately after first login.")
-            print("!" * 72)
-            print()
+            import sys
+            print("WARNING: Superadmin account created", file=sys.stderr)
+            print(f"  Email: admin@mill.spinflow", file=sys.stderr)
+            print(f"  Password: [set via SUPERADMIN_PASSWORD env var]", file=sys.stderr)
+            print("  Change this password immediately after first login.", file=sys.stderr)
 
         await db.commit()
         print("System ready. Login as superadmin to begin setup.")

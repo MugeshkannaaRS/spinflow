@@ -456,7 +456,12 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("users")),
 ):
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
     stmt = select(User).options(selectinload(User.role_rel)).where(User.deleted_at.is_(None))
+    if role_code != "SUPER_ADMIN":
+        if not current_user.company_id:
+            return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
+        stmt = stmt.where(User.company_id == current_user.company_id)
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = (await db.execute(count_stmt)).scalar() or 0
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)

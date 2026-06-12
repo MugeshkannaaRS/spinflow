@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
-from jose import jwt, JWTError
+import jwt
 import bcrypt
+import uuid
 from app.core.config import settings
 
 
@@ -22,6 +23,7 @@ def create_access_token(user_id: str, role: str) -> str:
         "iat": datetime.now(timezone.utc),
         "type": "access",
         "iss": settings.APP_NAME,
+        "jti": uuid.uuid4().hex,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
@@ -35,6 +37,7 @@ def create_refresh_token(user_id: str, role: str) -> str:
         "iat": datetime.now(timezone.utc),
         "type": "refresh",
         "iss": settings.APP_NAME,
+        "jti": uuid.uuid4().hex,
     }
     return jwt.encode(payload, settings.REFRESH_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
@@ -50,7 +53,7 @@ def decode_token(token: str, use_refresh_secret: bool = False) -> Optional[dict]
             issuer=settings.APP_NAME,
         )
         return payload
-    except JWTError:
+    except jwt.InvalidTokenError:
         return None
 
 

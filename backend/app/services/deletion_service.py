@@ -37,7 +37,7 @@ class CompanyDeletionService:
         result = await self.db.execute(text(f"SELECT COUNT(*) FROM {table} WHERE {where}"), {"p": param})
         return result.scalar() or 0
 
-    async def _delete_from(self, table: str, where: str, param: Any) -> int:
+    async def _delete_from(self, table: str, where: str, param: Any = None, **extra_params) -> int:
         """Delete rows with SAVEPOINT isolation.
 
         CRITICAL: Without SAVEPOINT, any exception (e.g. table not found) puts the
@@ -45,7 +45,11 @@ class CompanyDeletionService:
         transaction fail with 'current transaction is aborted'. SAVEPOINT lets us
         roll back only the failed statement and continue.
         """
-        params = {"p": param} if ":p" in where else {}
+        params = {}
+        if param is not None and ":p" in where:
+            params["p"] = param
+        if extra_params:
+            params.update(extra_params)
         sp = f"sp_{table[:20].replace('-', '_')}"
         try:
             await self.db.execute(text(f"SAVEPOINT {sp}"))
@@ -97,8 +101,7 @@ class CompanyDeletionService:
             counts["mills"] = 0
         else:
             counts["mills"] = len(mill_ids)
-            placeholders = ",".join(f"'{m}'" for m in mill_ids)
-            mp = placeholders
+            params = {"mill_ids": mill_ids}
 
             for table, col in [
                 ("master_departments", "mill_id"),
@@ -133,7 +136,7 @@ class CompanyDeletionService:
                 ("column_dropdown_options", "mill_id"),
                 ("import_mappings", "mill_id"),
             ]:
-                q = await self.db.execute(text(f"SELECT COUNT(*) FROM {table} WHERE {col} IN ({mp})"))
+                q = await self.db.execute(text(f"SELECT COUNT(*) FROM {table} WHERE {col} = ANY(:mill_ids)"), params)
                 cnt = q.scalar() or 0
                 if cnt:
                     counts[table] = cnt
@@ -145,8 +148,8 @@ class CompanyDeletionService:
                 ("employee_custom_values", "employee_id", "employees"),
             ]:
                 q = await self.db.execute(text(
-                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM {parent_table} e WHERE e.id = t.{parent_col} AND e.mill_id IN ({mp}))"
-                ))
+                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM {parent_table} e WHERE e.id = t.{parent_col} AND e.mill_id = ANY(:mill_ids))"
+                ), params)
                 cnt = q.scalar() or 0
                 if cnt:
                     counts[table] = cnt
@@ -158,24 +161,24 @@ class CompanyDeletionService:
                 ("stock_movements", "lot_id", "lots", "mill_id"),
             ]:
                 q = await self.db.execute(text(
-                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM {parent_table} p WHERE p.id = t.{parent_col} AND p.{parent_fk} IN ({mp}))"
-                ))
+                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM {parent_table} p WHERE p.id = t.{parent_col} AND p.{parent_fk} = ANY(:mill_ids))"
+                ), params)
                 cnt = q.scalar() or 0
                 if cnt:
                     counts[table] = cnt
 
             for table in ["bale_stock", "grn_entries"]:
                 q = await self.db.execute(text(
-                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM cotton_purchases c WHERE c.id = t.purchase_id AND c.mill_id IN ({mp}))"
-                ))
+                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM cotton_purchases c WHERE c.id = t.purchase_id AND c.mill_id = ANY(:mill_ids))"
+                ), params)
                 cnt = q.scalar() or 0
                 if cnt:
                     counts[table] = cnt
 
             for table in ["payments", "gst_entries"]:
                 q = await self.db.execute(text(
-                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM invoices i WHERE i.id = t.invoice_id AND i.mill_id IN ({mp}))"
-                ))
+                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM invoices i WHERE i.id = t.invoice_id AND i.mill_id = ANY(:mill_ids))"
+                ), params)
                 cnt = q.scalar() or 0
                 if cnt:
                     counts[table] = cnt
@@ -183,8 +186,8 @@ class CompanyDeletionService:
             for table in ["production_entries", "downtime_logs"]:
                 for col in ["machine_code"]:
                     q = await self.db.execute(text(
-                        f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM machines m WHERE m.code = t.{col} AND m.mill_id IN ({mp}))"
-                    ))
+                        f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM machines m WHERE m.code = t.{col} AND m.mill_id = ANY(:mill_ids))"
+                    ), params)
                     cnt = q.scalar() or 0
                     if cnt:
                         key = f"{table}_via_{col}"
@@ -192,8 +195,8 @@ class CompanyDeletionService:
 
             for table in ["quality_tests", "lab_reports", "quality_approvals"]:
                 q = await self.db.execute(text(
-                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM lots l WHERE l.id = t.lot_id AND l.mill_id IN ({mp}))"
-                ))
+                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM lots l WHERE l.id = t.lot_id AND l.mill_id = ANY(:mill_ids))"
+                ), params)
                 cnt = q.scalar() or 0
                 if cnt:
                     counts[table] = cnt
@@ -201,29 +204,29 @@ class CompanyDeletionService:
             for table in ["maintenance_logs", "maintenance_schedule", "machine_parameters"]:
                 for col in ["machine_code"]:
                     q = await self.db.execute(text(
-                        f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM machines m WHERE m.code = t.{col} AND m.mill_id IN ({mp}))"
-                    ))
+                        f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM machines m WHERE m.code = t.{col} AND m.mill_id = ANY(:mill_ids))"
+                    ), params)
                     cnt = q.scalar() or 0
                     if cnt:
                         key = f"{table}_via_{col}"
                         counts[key] = counts.get(key, 0) + cnt
 
             dispatches_q = await self.db.execute(text(
-                f"SELECT COUNT(*) FROM dispatches d WHERE EXISTS (SELECT 1 FROM lots l WHERE l.id = d.lot_id AND l.mill_id IN ({mp}))"
-            ))
+                f"SELECT COUNT(*) FROM dispatches d WHERE EXISTS (SELECT 1 FROM lots l WHERE l.id = d.lot_id AND l.mill_id = ANY(:mill_ids))"
+            ), params)
             dc = dispatches_q.scalar() or 0
             if dc:
                 counts["dispatches"] = dc
                 di_q = await self.db.execute(text(
-                    f"SELECT COUNT(*) FROM dispatch_items di WHERE EXISTS (SELECT 1 FROM dispatches d WHERE d.id = di.dispatch_id AND EXISTS (SELECT 1 FROM lots l WHERE l.id = d.lot_id AND l.mill_id IN ({mp})))"
-                ))
+                    f"SELECT COUNT(*) FROM dispatch_items di WHERE EXISTS (SELECT 1 FROM dispatches d WHERE d.id = di.dispatch_id AND EXISTS (SELECT 1 FROM lots l WHERE l.id = d.lot_id AND l.mill_id = ANY(:mill_ids)))"
+                ), params)
                 dic = di_q.scalar() or 0
                 if dic:
                     counts["dispatch_items"] = dic
 
             bale_stock_q = await self.db.execute(text(
-                f"SELECT COUNT(*) FROM cotton_bales b WHERE EXISTS (SELECT 1 FROM bale_stock bs WHERE bs.bale_no = b.bale_number AND EXISTS (SELECT 1 FROM cotton_purchases c WHERE c.id = bs.purchase_id AND c.mill_id IN ({mp})))"
-            ))
+                f"SELECT COUNT(*) FROM cotton_bales b WHERE EXISTS (SELECT 1 FROM bale_stock bs WHERE bs.bale_no = b.bale_number AND EXISTS (SELECT 1 FROM cotton_purchases c WHERE c.id = bs.purchase_id AND c.mill_id = ANY(:mill_ids)))"
+            ), params)
             bc = bale_stock_q.scalar() or 0
             if bc:
                 counts["cotton_bales"] = bc
@@ -280,7 +283,6 @@ class CompanyDeletionService:
         mills_q = await self.db.execute(text("SELECT id, code, name FROM mills WHERE company_id = :p"), {"p": c})
         mills = mills_q.fetchall()
         mill_ids = [m[0] for m in mills]
-        mp = ",".join(f"'{m}'" for m in mill_ids) if mill_ids else "''"
 
         backup_id = str(uuid.uuid4())
         os.makedirs(BACKUP_DIR, exist_ok=True)
@@ -296,19 +298,21 @@ class CompanyDeletionService:
                 except Exception as e:
                     logger.warning(f"Backup table {t}: {e}")
 
-            for table, col in [
-                ("master_departments", "mill_id"), ("employees", "mill_id"),
-                ("machines", "mill_id"), ("lots", "mill_id"),
-                ("warehouses", "mill_id"), ("customers", "mill_id"),
-                ("suppliers", "mill_id"), ("sales_orders", "mill_id"),
-                ("invoices", "mill_id"),
-            ]:
-                try:
-                    rows = (await self.db.execute(text(f"SELECT * FROM {table} WHERE {col} IN ({mp})"))).fetchall()
-                    if rows:
-                        zf.writestr(f"{table}.json", json.dumps([dict(r._mapping) for r in rows], default=str))
-                except Exception as e:
-                    logger.warning(f"Backup table {table}: {e}")
+            if mill_ids:
+                bparams = {"mill_ids": mill_ids}
+                for table, col in [
+                    ("master_departments", "mill_id"), ("employees", "mill_id"),
+                    ("machines", "mill_id"), ("lots", "mill_id"),
+                    ("warehouses", "mill_id"), ("customers", "mill_id"),
+                    ("suppliers", "mill_id"), ("sales_orders", "mill_id"),
+                    ("invoices", "mill_id"),
+                ]:
+                    try:
+                        rows = (await self.db.execute(text(f"SELECT * FROM {table} WHERE {col} = ANY(:mill_ids)"), bparams)).fetchall()
+                        if rows:
+                            zf.writestr(f"{table}.json", json.dumps([dict(r._mapping) for r in rows], default=str))
+                    except Exception as e:
+                        logger.warning(f"Backup table {table}: {e}")
 
         backup_path = os.path.join(BACKUP_DIR, f"company_{company_id}_{backup_id}.zip")
         with open(backup_path, "wb") as f:
@@ -330,7 +334,6 @@ class CompanyDeletionService:
 
         mills_q = await self.db.execute(text("SELECT id FROM mills WHERE company_id = :p"), {"p": company_id})
         mill_ids = [row[0] for row in mills_q.fetchall()]
-        mp = ",".join(f"'{m}'" for m in mill_ids) if mill_ids else "''"
 
         # DeletionLog is optional — if the table doesn't exist (e.g. migration 018 not yet run),
         # we skip it and proceed with deletion rather than blocking the entire operation.
@@ -354,38 +357,14 @@ class CompanyDeletionService:
 
         try:
             counts = {}
-            tables_to_log = [
-                ("trip_scan_logs", f"trip_id IN (SELECT id FROM trips WHERE mill_id IN ({mp}))"),
-                ("trip_items", f"trip_id IN (SELECT id FROM trips WHERE mill_id IN ({mp}))"),
-                ("sales_order_lines", f"so_id IN (SELECT id FROM sales_orders WHERE mill_id IN ({mp}))"),
-                ("stock_movements", f"lot_id IN (SELECT id FROM lots WHERE mill_id IN ({mp}))"),
-                ("bale_stock", f"purchase_id IN (SELECT id FROM cotton_purchases WHERE mill_id IN ({mp}))"),
-                ("grn_entries", f"purchase_id IN (SELECT id FROM cotton_purchases WHERE mill_id IN ({mp}))"),
-                ("dispatch_items", f"dispatch_id IN (SELECT id FROM dispatches WHERE lot_id IN (SELECT id FROM lots WHERE mill_id IN ({mp})))"),
-                ("payments", f"invoice_id IN (SELECT id FROM invoices WHERE mill_id IN ({mp}))"),
-                ("gst_entries", f"invoice_id IN (SELECT id FROM invoices WHERE mill_id IN ({mp}))"),
-                ("employee_custom_values", f"employee_id IN (SELECT id FROM employees WHERE mill_id IN ({mp}))"),
-                ("attendance", f"employee_id IN (SELECT id FROM employees WHERE mill_id IN ({mp}))"),
-                ("leaves", f"employee_id IN (SELECT id FROM employees WHERE mill_id IN ({mp}))"),
-                ("employee_shifts", f"employee_id IN (SELECT id FROM employees WHERE mill_id IN ({mp}))"),
-                ("payslip_entries", f"payroll_month_id IN (SELECT id FROM payroll_months WHERE mill_id IN ({mp}))"),
-                ("quality_tests", f"lot_id IN (SELECT id FROM lots WHERE mill_id IN ({mp}))"),
-                ("lab_reports", f"lot_id IN (SELECT id FROM lots WHERE mill_id IN ({mp}))"),
-                ("quality_approvals", f"lot_id IN (SELECT id FROM lots WHERE mill_id IN ({mp}))"),
-                ("production_entries", f"machine_code IN (SELECT code FROM machines WHERE mill_id IN ({mp}))"),
-                ("downtime_logs", f"machine_code IN (SELECT code FROM machines WHERE mill_id IN ({mp}))"),
-                ("maintenance_logs", f"machine_code IN (SELECT code FROM machines WHERE mill_id IN ({mp}))"),
-                ("maintenance_schedule", f"machine_code IN (SELECT code FROM machines WHERE mill_id IN ({mp}))"),
-                ("machine_parameters", f"machine_code IN (SELECT code FROM machines WHERE mill_id IN ({mp}))"),
-                ("dispatches", f"lot_id IN (SELECT id FROM lots WHERE mill_id IN ({mp}))"),
-            ]
+            mill_params = {"mill_ids": mill_ids} if mill_ids else {}
 
             if mill_ids:
                 try:
                     await self.db.execute(text("SAVEPOINT sp_cotton_bales"))
                     cnt_cb = await self.db.execute(text(
-                        f"DELETE FROM cotton_bales WHERE bale_number IN (SELECT bs.bale_no FROM bale_stock bs WHERE bs.purchase_id IN (SELECT id FROM cotton_purchases WHERE mill_id IN ({mp})))"
-                    ))
+                        "DELETE FROM cotton_bales WHERE bale_number IN (SELECT bs.bale_no FROM bale_stock bs WHERE bs.purchase_id IN (SELECT id FROM cotton_purchases WHERE mill_id = ANY(:mill_ids)))"
+                    ), mill_params)
                     await self.db.execute(text("RELEASE SAVEPOINT sp_cotton_bales"))
                     cb_cnt = cnt_cb.rowcount
                     if cb_cnt:
@@ -400,8 +379,34 @@ class CompanyDeletionService:
                 # ── Step 1: Delete all child-of-child records FIRST ──────────
                 # These reference parent tables deleted in Step 2 via subquery;
                 # they must be deleted before the parents so the subquery still works.
+                tables_to_log = [
+                    ("trip_scan_logs", "trip_id IN (SELECT id FROM trips WHERE mill_id = ANY(:mill_ids))"),
+                    ("trip_items", "trip_id IN (SELECT id FROM trips WHERE mill_id = ANY(:mill_ids))"),
+                    ("sales_order_lines", "so_id IN (SELECT id FROM sales_orders WHERE mill_id = ANY(:mill_ids))"),
+                    ("stock_movements", "lot_id IN (SELECT id FROM lots WHERE mill_id = ANY(:mill_ids))"),
+                    ("bale_stock", "purchase_id IN (SELECT id FROM cotton_purchases WHERE mill_id = ANY(:mill_ids))"),
+                    ("grn_entries", "purchase_id IN (SELECT id FROM cotton_purchases WHERE mill_id = ANY(:mill_ids))"),
+                    ("dispatch_items", "dispatch_id IN (SELECT id FROM dispatches WHERE lot_id IN (SELECT id FROM lots WHERE mill_id = ANY(:mill_ids)))"),
+                    ("payments", "invoice_id IN (SELECT id FROM invoices WHERE mill_id = ANY(:mill_ids))"),
+                    ("gst_entries", "invoice_id IN (SELECT id FROM invoices WHERE mill_id = ANY(:mill_ids))"),
+                    ("employee_custom_values", "employee_id IN (SELECT id FROM employees WHERE mill_id = ANY(:mill_ids))"),
+                    ("attendance", "employee_id IN (SELECT id FROM employees WHERE mill_id = ANY(:mill_ids))"),
+                    ("leaves", "employee_id IN (SELECT id FROM employees WHERE mill_id = ANY(:mill_ids))"),
+                    ("employee_shifts", "employee_id IN (SELECT id FROM employees WHERE mill_id = ANY(:mill_ids))"),
+                    ("payslip_entries", "payroll_month_id IN (SELECT id FROM payroll_months WHERE mill_id = ANY(:mill_ids))"),
+                    ("quality_tests", "lot_id IN (SELECT id FROM lots WHERE mill_id = ANY(:mill_ids))"),
+                    ("lab_reports", "lot_id IN (SELECT id FROM lots WHERE mill_id = ANY(:mill_ids))"),
+                    ("quality_approvals", "lot_id IN (SELECT id FROM lots WHERE mill_id = ANY(:mill_ids))"),
+                    ("production_entries", "machine_code IN (SELECT code FROM machines WHERE mill_id = ANY(:mill_ids))"),
+                    ("downtime_logs", "machine_code IN (SELECT code FROM machines WHERE mill_id = ANY(:mill_ids))"),
+                    ("maintenance_logs", "machine_code IN (SELECT code FROM machines WHERE mill_id = ANY(:mill_ids))"),
+                    ("maintenance_schedule", "machine_code IN (SELECT code FROM machines WHERE mill_id = ANY(:mill_ids))"),
+                    ("machine_parameters", "machine_code IN (SELECT code FROM machines WHERE mill_id = ANY(:mill_ids))"),
+                    ("dispatches", "lot_id IN (SELECT id FROM lots WHERE mill_id = ANY(:mill_ids))"),
+                ]
+
                 for table, cond in tables_to_log:
-                    cnt = await self._delete_from(table, cond, None)
+                    cnt = await self._delete_from(table, cond, **mill_params)
                     if cnt:
                         counts[table] = cnt
 
@@ -440,7 +445,7 @@ class CompanyDeletionService:
                 ]
 
                 for table in direct_mill_tables:
-                    cnt = await self._delete_from(table, f"mill_id IN ({mp})", None)
+                    cnt = await self._delete_from(table, "mill_id = ANY(:mill_ids)", **mill_params)
                     if cnt:
                         counts[table] = cnt
 

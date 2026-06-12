@@ -29,14 +29,14 @@ class Dispatch(TimestampMixin, Base):
     approved_by: Mapped[str] = mapped_column(String(200), nullable=True)
     approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    items = relationship("DispatchItem", back_populates="dispatch")
+    items = relationship("DispatchItem", back_populates="dispatch", cascade="all, delete-orphan")
 
 
 class DispatchItem(Base):
     __tablename__ = "dispatch_items"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
-    dispatch_id: Mapped[str] = mapped_column(String(36), ForeignKey("dispatches.id"), nullable=False, index=True)
+    dispatch_id: Mapped[str] = mapped_column(String(36), ForeignKey("dispatches.id", ondelete="CASCADE"), nullable=False, index=True)
     lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
     quantity_kg: Mapped[float] = mapped_column(Float, nullable=False)
     package_type: Mapped[str] = mapped_column(String(50), nullable=True)

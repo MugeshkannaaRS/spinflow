@@ -28,13 +28,13 @@ async def _simulate_login(db: AsyncSession, user: User, password: str) -> User:
             if found.failed_login_attempts >= MAX_FAILED_ATTEMPTS:
                 found.locked_until = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
                 found.failed_login_attempts = 0
-                await db.commit()
+                await db.flush()
                 raise SpinFlowException(
                     status_code=423,
                     code=ErrorCode.ACCOUNT_LOCKED,
                     message=f"Account locked after {MAX_FAILED_ATTEMPTS} failed attempts. Try again in {LOCKOUT_MINUTES} minutes.",
                 )
-            await db.commit()
+            await db.flush()
         raise SpinFlowException(
             status_code=401,
             code=ErrorCode.INVALID_CREDENTIALS,

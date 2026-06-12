@@ -14,15 +14,13 @@ import subprocess
 from pathlib import Path
 
 
-def check(label: str, condition: bool) -> None:
+def check(label: str, condition: bool, failures: list[str] | None = None) -> None:
     if condition:
         print(f"  ✓ {label}")
     else:
         print(f"  ✗ {label}")
-        nonlocal_ok = [v for v in globals().values() if isinstance(v, list)]
-        for lst in nonlocal_ok:
-            if lst is globals().get("_failures", None):
-                lst.append(label)
+        if failures is not None:
+            failures.append(label)
 
 
 _failures: list[str] = []

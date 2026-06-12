@@ -70,10 +70,12 @@ def verify_qr_payload(qr_string: str) -> dict:  # type: ignore[type-arg]
     if issued_at_str:
         try:
             issued_at = datetime.fromisoformat(issued_at_str)
-            if (datetime.now(timezone.utc) - issued_at).days > 365:
+            if (datetime.now(timezone.utc) - issued_at).days > 3:
                 raise SpinFlowException.bad_request(
                     "QR code expired", ErrorCode.QR_EXPIRED
                 )
         except ValueError:
-            pass
+            raise SpinFlowException.bad_request(
+                "QR code timestamp invalid", ErrorCode.QR_SIGNATURE_INVALID
+            )
     return payload

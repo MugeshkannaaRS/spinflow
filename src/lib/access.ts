@@ -32,6 +32,7 @@ const ACCESS_MATRIX: Record<string, Record<string, AccessLevel>> = {
     sales: "write", lotrac: "write", payroll: "write",
     column_config: "write", whatsapp: "write", lc_tracking: "write",
     analytics: "write", uploads: "write", admin: "write",
+    alerts: "write",
   },
 
   MILL_OWNER: {
@@ -43,6 +44,7 @@ const ACCESS_MATRIX: Record<string, Record<string, AccessLevel>> = {
     sales: "write", lotrac: "write", payroll: "write",
     column_config: "write", whatsapp: "write", lc_tracking: "write",
     analytics: "write", uploads: "write",
+    alerts: "write",
   },
 
   GENERAL_MANAGER: {
@@ -53,6 +55,7 @@ const ACCESS_MATRIX: Record<string, Record<string, AccessLevel>> = {
     uploads: "write", analytics: "write", lc_tracking: "write",
     hr: "read", payroll: "read", accounts: "read",
     audit: "read", masters: "read",
+    alerts: "write",
   },
 
   PRODUCTION_MANAGER: {
@@ -60,12 +63,14 @@ const ACCESS_MATRIX: Record<string, Record<string, AccessLevel>> = {
     maintenance: "read", quality: "read", inventory: "read",
     stock: "read", reports: "write", uploads: "write",
     analytics: "write",
+    alerts: "read",
   },
 
   QUALITY_MANAGER: {
     dashboard: "write", quality: "write",
     production: "read", inventory: "read", stock: "read",
     reports: "write", uploads: "write",
+    alerts: "read",
   },
 
   DISPATCH_MANAGER: {
@@ -73,44 +78,52 @@ const ACCESS_MATRIX: Record<string, Record<string, AccessLevel>> = {
     stores: "write", inventory: "write",
     sales: "read", stock: "read",
     reports: "write", uploads: "write",
+    alerts: "read",
   },
 
   STORE_MANAGER: {
     dashboard: "write", stores: "write", inventory: "write",
     purchase: "read", maintenance: "read",
     reports: "write", stock: "write", uploads: "write",
+    alerts: "read",
   },
 
   HR_MANAGER: {
     dashboard: "write", hr: "write", payroll: "write",
     reports: "write", uploads: "write",
+    alerts: "read",
   },
 
   ACCOUNTANT: {
     dashboard: "write", accounts: "write", payroll: "write",
     purchase: "read", dispatch: "read", sales: "read",
     reports: "write", lc_tracking: "write", uploads: "write",
+    alerts: "read",
   },
 
   MAINTENANCE_MANAGER: {
     dashboard: "write", maintenance: "write",
     stores: "read", production: "read",
     reports: "write", uploads: "write",
+    alerts: "read",
   },
 
   SUPERVISOR: {
     dashboard: "write", production: "write", reports: "write",
+    alerts: "read",
   },
 
   MACHINE_OPERATOR: {
     dashboard: "write",
-    production: "write", // can enter shift entries for their machine
+    production: "write",
+    alerts: "read",
   },
 
   SECURITY_GATE: {
     dashboard: "write",
-    dispatch: "read",    // can view outgoing trips / scan gate
-    lotrac: "write",     // QR scan at gate
+    dispatch: "read",
+    lotrac: "write",
+    alerts: "read",
   },
 
   AUDITOR: {
@@ -118,6 +131,7 @@ const ACCESS_MATRIX: Record<string, Record<string, AccessLevel>> = {
     hr: "read", accounts: "read", reports: "write",
     audit: "write", inventory: "read", stores: "read",
     dispatch: "read", maintenance: "read",
+    alerts: "read",
   },
 
   // OPERATOR is a general factory floor role — lighter than SUPERVISOR
@@ -127,12 +141,14 @@ const ACCESS_MATRIX: Record<string, Record<string, AccessLevel>> = {
     quality: "read",
     stores: "read",
     reports: "read",
+    alerts: "read",
   },
 };
 
 // Modules that bypass company subscription check
 const SYSTEM_MODULES = new Set([
   "dashboard", "masters", "users", "column_config", "admin", "audit",
+  "alerts",
 ]);
 
 // Roles restricted to dashboard + profile + auth only

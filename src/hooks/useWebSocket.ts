@@ -69,12 +69,13 @@ export function useWebSocket() {
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let intentionalClose = false;
     let retryCount = 0;
-    const MAX_RETRIES = 3;
 
     const API_BASE =
       import.meta.env.VITE_API_BASE_URL || "https://spinflow.onrender.com";
     const WS_BASE = API_BASE.replace("https://", "wss://").replace("http://", "ws://");
     const wsUrl = `${WS_BASE}/ws/notifications?token=${token}`;
+    // SECURITY: token in URL is logged by proxies/servers and exposed via document.referrer.
+    // TODO: Replace with dedicated short-lived WS token or cookie-based auth.
 
     function connect() {
       try {
@@ -95,10 +96,8 @@ export function useWebSocket() {
           if (!isMountedRef.current || intentionalClose || e.code === 4001) return;
           setIsConnected(false);
 
-          if (retryCount >= MAX_RETRIES) return;
-
           retryCount += 1;
-          const backoff = Math.min(1000 * Math.pow(2, retryCount - 1), 8000);
+          const backoff = Math.min(1000 * Math.pow(2, Math.min(retryCount - 1, 6)), 60000);
           reconnectTimer = setTimeout(() => {
             if (isMountedRef.current) connect();
           }, backoff);

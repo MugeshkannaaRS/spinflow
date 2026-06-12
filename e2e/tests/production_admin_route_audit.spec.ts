@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 import { loginAs } from './helpers';
@@ -89,5 +89,9 @@ test('authenticated production route audit', async ({ page }) => {
     if (networkRequests.length) fs.writeFileSync(path.join(evidenceDir, 'network-requests.json'), JSON.stringify(networkRequests, null, 2));
 
     console.log(`${route}: title=${pageTitle} console=${consoleMessages.length} pageErrors=${pageErrors.length} failedRequests=${failedRequests.length} responseErrors=${responseErrors.length}`);
+
+    expect(consoleMessages).toHaveLength(0);
+    expect(pageErrors).toHaveLength(0);
+    expect(failedRequests).toHaveLength(0);
   }
 });

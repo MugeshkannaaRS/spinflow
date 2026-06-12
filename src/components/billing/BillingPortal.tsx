@@ -708,10 +708,7 @@ function MillOwnerBillingView() {
   const d = planQ.data ?? {};
 
   function handleDownloadInvoice(invoiceId: string) {
-    const token = localStorage.getItem("spinflow-auth");
-    if (!token) return;
-    const parsed = JSON.parse(token);
-    const accessToken = parsed?.state?.accessToken || parsed?.accessToken;
+    const accessToken = useAuth.getState().token;
     if (!accessToken) { toast.error("Not authenticated"); return; }
     const xhr = new XMLHttpRequest();
     xhr.open("GET", `/api/v1/billing/invoices/${invoiceId}/download`);

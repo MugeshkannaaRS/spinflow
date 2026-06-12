@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 import { loginAs } from './helpers';
@@ -80,4 +80,8 @@ test('logged-in /admin/users captures production Users evidence', async ({ page 
   console.log('failed requests:', failedRequests.length);
   console.log('response errors:', responseErrors.length);
   console.log('screenshot:', screenshotPath);
+
+  expect(consoleMessages).toHaveLength(0);
+  expect(pageErrors).toHaveLength(0);
+  expect(failedRequests).toHaveLength(0);
 });

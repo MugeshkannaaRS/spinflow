@@ -148,6 +148,9 @@ def parse_excel_all_sheets(file_bytes: bytes) -> dict:
     import io
     import openpyxl
 
+    if len(file_bytes) > 10 * 1024 * 1024:
+        raise ValueError(f"File too large: {len(file_bytes)} bytes (max 10MB)")
+
     wb = openpyxl.load_workbook(
         filename=io.BytesIO(file_bytes),
         read_only=True,

@@ -88,4 +88,8 @@ test('logged-in /admin/companies renders and captures console/network evidence',
   console.log('failed requests:', failedRequests.length);
   console.log('response errors:', responseErrors.length);
   console.log('screenshot:', screenshotPath);
+
+  expect(consoleMessages).toHaveLength(0);
+  expect(pageErrors).toHaveLength(0);
+  expect(failedRequests).toHaveLength(0);
 });

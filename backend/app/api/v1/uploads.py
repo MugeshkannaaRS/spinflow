@@ -8,11 +8,14 @@ from sqlalchemy import select
 from typing import Optional, List
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module, log_audit
+from app.core.deps import get_current_user, require_module, log_audit, get_mill_scope
 from app.core.config import settings
 from app.core.limiter import limiter
 from app.models.attachment import DocumentAttachment
 from app.models.user import User
+from app.models.masters import Mill
+from app.models.hr import Employee
+from app.models.purchase import CottonPurchase
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -31,6 +34,37 @@ ALLOWED_ENTITY_TYPES = {
     "employee", "dispatch", "purchase", "quality", "maintenance",
     "production", "invoice", "payment", "contract", "report",
 }
+
+
+async def _check_entity_scope(db: AsyncSession, entity_type: str, entity_id: str, current_user: User) -> None:
+    """Verify the entity belongs to the current user's company scope."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code == "SUPER_ADMIN":
+        return
+    scope = await get_mill_scope(current_user, db)
+    company_id = scope.get("company_id")
+    if not company_id:
+        raise HTTPException(403, "No company scope")
+
+    mill_id = None
+    if entity_type == "employee":
+        row = await db.get(Employee, entity_id)
+        if row:
+            mill_id = row.mill_id
+    elif entity_type == "purchase":
+        row = await db.get(CottonPurchase, entity_id)
+        if row:
+            mill_id = row.mill_id
+    elif entity_type in ("dispatch", "quality", "maintenance", "production"):
+        # These models require model-specific lookups; for now, rely on require_module
+        return
+    else:
+        return
+
+    if mill_id:
+        mill = await db.get(Mill, mill_id)
+        if not mill or str(mill.company_id) != company_id:
+            raise HTTPException(404, "Entity not found")
 
 
 class AttachmentResponse(BaseModel):
@@ -55,6 +89,7 @@ async def upload_file(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("uploads", write=True)),
 ):
+    await _check_entity_scope(db, entity_type, entity_id, current_user)
     MAX_SIZE = 10 * 1024 * 1024  # 10 MB
     content = await file.read()
     if len(content) > MAX_SIZE:
@@ -114,6 +149,7 @@ async def list_attachments(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("uploads")),
 ):
+    await _check_entity_scope(db, entity_type, entity_id, current_user)
     result = await db.execute(
         select(DocumentAttachment)
         .where(
@@ -139,6 +175,7 @@ async def delete_attachment(
     if not attachment:
         raise HTTPException(status_code=404, detail="Attachment not found")
 
+    await _check_entity_scope(db, attachment.entity_type, attachment.entity_id, current_user)
     file_path = Path(attachment.file_path)
     if file_path.exists():
         file_path.unlink()

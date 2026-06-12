@@ -1,3 +1,4 @@
+import React from "react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { cn } from "@/lib/utils";
 import { HelpCircle } from "lucide-react";
@@ -21,12 +22,13 @@ export function FormField({ columnKey, tableName, error, children, className }: 
   const config = getConfig(columnKey);
   const helpText = config?.helpText;
 
-  const child = children;
   const childProps: Record<string, any> = {};
 
   if (config?.placeholder) childProps.placeholder = config.placeholder;
   if (config?.minValue != null) childProps.min = config.minValue;
   if (config?.maxValue != null) childProps.max = config.maxValue;
+
+  const child = React.cloneElement(children, childProps);
 
   return (
     <div className={cn("space-y-1.5", className)}>

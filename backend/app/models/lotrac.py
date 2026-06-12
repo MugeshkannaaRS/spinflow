@@ -77,7 +77,7 @@ class TripScanLog(Base):
     __tablename__ = "trip_scan_logs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
-    trip_id: Mapped[str] = mapped_column(String(36), ForeignKey("trips.id"), nullable=False, index=True)
+    trip_id: Mapped[str] = mapped_column(String(36), ForeignKey("trips.id", ondelete="CASCADE"), nullable=False, index=True)
     trip_item_id: Mapped[str] = mapped_column(String(36), ForeignKey("trip_items.id"), nullable=True)
     scan_type: Mapped[str] = mapped_column(String(30), nullable=False)
     qr_code: Mapped[str] = mapped_column(String(1000), nullable=False)

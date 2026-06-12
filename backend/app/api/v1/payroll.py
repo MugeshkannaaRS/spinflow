@@ -49,6 +49,18 @@ async def process_payroll(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("payroll", write=True)),
 ):
+    scope = await get_mill_scope(current_user, db)
+    role_code = scope.get("role", "")
+    if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
+        mill_check = await db.execute(
+            select(Mill).where(
+                Mill.id == req.mill_id,
+                Mill.company_id == current_user.company_id,
+            )
+        )
+        if not mill_check.scalar_one_or_none():
+            raise HTTPException(403, "Cannot process payroll for this mill")
+
     svc = PayrollService(db, current_user)
     return await svc.process_payroll(
         req.mill_id,
@@ -65,6 +77,16 @@ async def approve_payroll(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("payroll", write=True)),
 ):
+    scope = await get_mill_scope(current_user, db)
+    pm = await db.get(PayrollMonth, payroll_month_id)
+    if pm:
+        if scope.get("mill_id") and pm.mill_id != scope["mill_id"]:
+            raise HTTPException(404, "Payroll month not found")
+        elif scope.get("company_id"):
+            mill_row = await db.get(Mill, pm.mill_id)
+            if not mill_row or str(mill_row.company_id) != scope["company_id"]:
+                raise HTTPException(404, "Payroll month not found")
+
     svc = PayrollService(db, current_user)
     return await svc.approve_payroll(
         payroll_month_id,
@@ -79,6 +101,16 @@ async def mark_paid(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("payroll", write=True)),
 ):
+    scope = await get_mill_scope(current_user, db)
+    pm = await db.get(PayrollMonth, payroll_month_id)
+    if pm:
+        if scope.get("mill_id") and pm.mill_id != scope["mill_id"]:
+            raise HTTPException(404, "Payroll month not found")
+        elif scope.get("company_id"):
+            mill_row = await db.get(Mill, pm.mill_id)
+            if not mill_row or str(mill_row.company_id) != scope["company_id"]:
+                raise HTTPException(404, "Payroll month not found")
+
     svc = PayrollService(db, current_user)
     return await svc.mark_paid(payroll_month_id, user_id=current_user.id)
 

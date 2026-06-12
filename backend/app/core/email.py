@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
@@ -26,11 +27,16 @@ async def send_email(to: str, subject: str, html_body: str, text_body: str = "")
     message.attach(MIMEText(html_body, "html"))
 
     try:
-        context = ssl.create_default_context()
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-            server.starttls(context=context)
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.send_message(message)
+        def _send() -> None:
+            context = ssl.create_default_context()
+            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as server:
+                server.starttls(context=context)
+                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+                server.send_message(message)
+        await asyncio.wait_for(asyncio.to_thread(_send), timeout=15)
+    except asyncio.TimeoutError:
+        logger.error("SMTP timeout sending email to %s", to)
+        raise SpinFlowException.bad_request("Email send timed out", ErrorCode.EMAIL_ERROR)
     except Exception:
         logger.exception("Failed to send email to %s", to)
         raise SpinFlowException.bad_request("Failed to send email", ErrorCode.EMAIL_ERROR)

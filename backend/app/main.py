@@ -395,12 +395,8 @@ app.add_middleware(
         "localhost",
         "127.0.0.1",
         "::1",
-        "spinflow.local",
         "spinflow.onrender.com",
-        "*.spinflow.in",
         "*.onrender.com",
-        "*.ngrok.io",
-        "*.ngrok-free.dev",
     ],
 )
 
