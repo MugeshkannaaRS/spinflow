@@ -765,6 +765,16 @@ function ShiftGrid() {
                           <Input
                             type="number"
                             min={0}
+                            value={row.targetKg || ""}
+                            onChange={(e) => updateRow(idx, "targetKg", Number(e.target.value) || 0)}
+                            placeholder="0"
+                            className="h-7 text-xs w-full"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={0}
                             value={row.producedKg}
                             onChange={(e) => updateRow(idx, "producedKg", e.target.value)}
                             placeholder="0"
