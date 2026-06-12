@@ -1692,11 +1692,12 @@ function ProductionPage() {
     retry: 1,
     enabled: !!millId,
   });
-  // Entries Log date filter state
+  // Entries Log date + shift filter state
   const todayStrInit = new Date().toISOString().split("T")[0];
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-  const [entriesDateFrom, setEntriesDateFrom] = useState(sevenDaysAgo);
+  const [entriesDateFrom, setEntriesDateFrom] = useState(todayStrInit);
   const [entriesDateTo, setEntriesDateTo] = useState(todayStrInit);
+  const [entriesShift, setEntriesShift] = useState<"all" | "A" | "B" | "C">("all");
 
   const shiftsQ = useQuery({
     queryKey: ["shifts", millId, entriesDateFrom, entriesDateTo],
@@ -1874,7 +1875,8 @@ function ProductionPage() {
   });
 
   const machines = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[];
-  const shifts = (Array.isArray(shiftsQ.data) ? shiftsQ.data : ((shiftsQ.data as any)?.data ?? [])) as any[];
+  const shiftsRaw = (Array.isArray(shiftsQ.data) ? shiftsQ.data : ((shiftsQ.data as any)?.data ?? [])) as any[];
+  const shifts = entriesShift === "all" ? shiftsRaw : shiftsRaw.filter((s: any) => s.shift === entriesShift);
   const downtime = (Array.isArray(downQ.data) ? downQ.data : (downQ.data?.data ?? [])) as any[];
   const machineColConfig = useColumnConfig("production_entries");
   const downColConfig = useColumnConfig("production_downtime");
@@ -2214,8 +2216,26 @@ function ProductionPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {/* Date filter bar */}
+                  {/* Date + Shift filter bar */}
                   <div className="flex items-center gap-3 flex-wrap pb-3 border-b">
+                    {/* Quick date buttons */}
+                    <Button
+                      size="sm"
+                      variant={entriesDateFrom === todayStrInit && entriesDateTo === todayStrInit ? "default" : "outline"}
+                      className="h-7 text-xs"
+                      onClick={() => { setEntriesDateFrom(todayStrInit); setEntriesDateTo(todayStrInit); }}
+                    >
+                      Today
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={entriesDateFrom === sevenDaysAgo && entriesDateTo === todayStrInit ? "default" : "outline"}
+                      className="h-7 text-xs"
+                      onClick={() => { setEntriesDateFrom(sevenDaysAgo); setEntriesDateTo(todayStrInit); }}
+                    >
+                      Last 7 days
+                    </Button>
+                    {/* Custom date range */}
                     <div className="flex items-center gap-1.5">
                       <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label>
                       <Input
@@ -2234,22 +2254,21 @@ function ProductionPage() {
                         className="h-7 text-xs w-36"
                       />
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs"
-                      onClick={() => { setEntriesDateFrom(sevenDaysAgo); setEntriesDateTo(todayStrInit); }}
-                    >
-                      Last 7 days
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-7 text-xs"
-                      onClick={() => { const t = new Date().toISOString().split("T")[0]; setEntriesDateFrom(t); setEntriesDateTo(t); }}
-                    >
-                      Today
-                    </Button>
+                    {/* Shift filter chips */}
+                    <div className="flex items-center gap-1 border-l pl-3 ml-1">
+                      <Label className="text-xs text-muted-foreground whitespace-nowrap mr-1">Shift</Label>
+                      {(["all", "A", "B", "C"] as const).map((s) => (
+                        <Button
+                          key={s}
+                          size="sm"
+                          variant={entriesShift === s ? "default" : "outline"}
+                          className="h-7 text-xs px-2.5"
+                          onClick={() => setEntriesShift(s)}
+                        >
+                          {s === "all" ? "All" : s}
+                        </Button>
+                      ))}
+                    </div>
                     {shiftsQ.isFetching && <span className="text-xs text-muted-foreground animate-pulse">Loading…</span>}
                     <span className="text-xs text-muted-foreground ml-auto">{shifts.length} entries</span>
                   </div>
