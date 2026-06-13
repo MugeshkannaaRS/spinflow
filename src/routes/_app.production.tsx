@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productionApi, exportApi } from "@/lib/api-service";
+import { api } from "@/lib/api";
 import type { MachineGroup } from "@/lib/api-service";
 import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
@@ -1190,6 +1191,9 @@ function StoppageForm() {
   const today = new Date();
   const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split("T")[0];
 
+  // Mode: individual machine OR machine group
+  const [stoppageMode, setStoppageMode] = useState<"individual" | "group">("individual");
+
   // Header state
   const [date, setDate] = useState(localDate);
   const [shift, setShift] = useState<"A" | "B" | "C">("A");
@@ -1274,16 +1278,27 @@ function StoppageForm() {
     return diff > 0 ? diff : null;
   };
 
-  // Save all mutation
+  // Save all mutation — handles both individual and group mode
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedMachine) throw new Error("Select a machine first");
       const validRows = rows.filter((r) => r.datalog_code);
       if (validRows.length === 0) throw new Error("Add at least one row with a stop code");
-      const results = await Promise.allSettled(
+
+      let machineCodes: string[] = [];
+      if (stoppageMode === "individual") {
+        if (!selectedMachine) throw new Error("Select a machine first");
+        machineCodes = [selectedMachine];
+      } else {
+        // Group mode: apply stoppage to all machines in the selected group
+        const groupMachines = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[];
+        if (groupMachines.length === 0) throw new Error("No machines found in selected group");
+        machineCodes = groupMachines.map((m: any) => m.code).filter(Boolean);
+      }
+
+      const calls = machineCodes.flatMap((machine_code) =>
         validRows.map((r) =>
           productionApi.logDatalogDowntime({
-            machine_code: selectedMachine,
+            machine_code,
             datalog_code: Number(r.datalog_code),
             stop_from: r.stop_from || undefined,
             stop_to: r.stop_to || undefined,
@@ -1293,15 +1308,19 @@ function StoppageForm() {
           }, millId ?? "")
         )
       );
+      const results = await Promise.allSettled(calls);
       const failed = results.filter((r) => r.status === "rejected");
       if (failed.length > 0) {
         const firstErr = (failed[0] as PromiseRejectedResult).reason;
         throw new Error(firstErr?.response?.data?.detail || `${failed.length} row(s) failed`);
       }
-      return results.length;
+      return { total: results.length, machines: machineCodes.length };
     },
-    onSuccess: (count) => {
-      toast.success(`Saved ${count} stoppage${count !== 1 ? "s" : ""} for ${selectedMachine}`);
+    onSuccess: ({ total, machines }) => {
+      const label = stoppageMode === "group"
+        ? `${total} stoppages logged across ${machines} machines`
+        : `${total} stoppage${total !== 1 ? "s" : ""} saved for ${selectedMachine}`;
+      toast.success(label);
       setRows([makeStopRow()]);
       qc.invalidateQueries({ queryKey: ["downtime"] });
     },
@@ -1320,11 +1339,28 @@ function StoppageForm() {
             <Clock className="size-4 text-muted-foreground" />
             Log Stoppage — DATALOG Entry
           </CardTitle>
-          {todayTotal > 0 && (
-            <span className="text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1">
-              Today: <strong>{stoppageLogs.length} stops · {todayTotal} min total</strong>
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {todayTotal > 0 && (
+              <span className="text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1">
+                Today: <strong>{stoppageLogs.length} stops · {todayTotal} min total</strong>
+              </span>
+            )}
+            {/* Mode toggle */}
+            <div className="flex rounded-md border overflow-hidden text-xs">
+              <button
+                className={`px-3 py-1.5 font-medium transition-colors ${stoppageMode === "individual" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                onClick={() => { setStoppageMode("individual"); setSelectedGroupId(""); }}
+              >
+                Individual
+              </button>
+              <button
+                className={`px-3 py-1.5 font-medium transition-colors border-l ${stoppageMode === "group" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                onClick={() => { setStoppageMode("group"); setSelectedMachine(""); }}
+              >
+                Machine Group
+              </button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
 
@@ -1364,61 +1400,100 @@ function StoppageForm() {
             </div>
           </div>
 
-          {/* ── Machine Group filter ── */}
-          {machineGroups.length > 0 && (
-            <div className="flex items-center gap-3">
-              <Layers className="size-4 text-muted-foreground shrink-0" />
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">
-                  Machine Group <span className="text-[10px]">(select to filter machines)</span>
+          {/* ── Machine selector — mode-aware ── */}
+          {stoppageMode === "individual" ? (
+            <div className="space-y-3">
+              {/* Group filter (optional, to narrow machine list) */}
+              {machineGroups.length > 0 && (
+                <div className="flex items-center gap-3">
+                  <Layers className="size-4 text-muted-foreground shrink-0" />
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">
+                      Machine Group <span className="text-[10px]">(select to filter machines)</span>
+                    </Label>
+                    <Select
+                      value={selectedGroupId || "_all"}
+                      onValueChange={(v) => { setSelectedGroupId(v === "_all" ? "" : v); setSelectedMachine(""); }}
+                    >
+                      <SelectTrigger className="h-8 text-sm w-64">
+                        <SelectValue placeholder="— All machines in department —" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_all">— All machines in department —</SelectItem>
+                        {machineGroups.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+              <div className="flex items-end gap-3">
+                <div className="flex-1 space-y-1.5">
+                  <Label className="text-xs font-semibold">
+                    Machine <span className="text-destructive">*</span>
+                    {department && <span className="text-muted-foreground font-normal ml-1">({department})</span>}
+                  </Label>
+                  <Select value={selectedMachine} onValueChange={setSelectedMachine} disabled={!department && !selectedGroupId}>
+                    <SelectTrigger className="h-9 text-sm border-primary/40 font-medium">
+                      <SelectValue placeholder={department || selectedGroupId ? "Select machine to log stoppages…" : "Select a department first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {machines.length === 0
+                        ? <SelectItem value="_none" disabled>No machines found</SelectItem>
+                        : machines.map((m: any) => (
+                            <SelectItem key={m.code} value={m.code}>{m.code}{m.name ? ` — ${m.name}` : ""}</SelectItem>
+                          ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedMachine && (
+                  <span className="text-xs text-muted-foreground pb-2 shrink-0">
+                    {rows.length} row{rows.length !== 1 ? "s" : ""} · {codedRows} coded
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            /* Group mode — select group, all machines get the stoppage */
+            <div className="space-y-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">
+                  Machine Group <span className="text-destructive">*</span>
+                  <span className="text-muted-foreground font-normal ml-1 text-[10px]">(stoppage will be logged for all machines in this group)</span>
                 </Label>
                 <Select
-                  value={selectedGroupId || "_all"}
-                  onValueChange={(v) => setSelectedGroupId(v === "_all" ? "" : v)}
+                  value={selectedGroupId || ""}
+                  onValueChange={(v) => setSelectedGroupId(v)}
                 >
-                  <SelectTrigger className="h-8 text-sm w-64">
-                    <SelectValue placeholder="— All machines in department —" />
+                  <SelectTrigger className="h-9 text-sm border-primary/40 font-medium">
+                    <SelectValue placeholder="Select machine group…" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="_all">— All machines in department —</SelectItem>
-                    {machineGroups.map((g) => (
-                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                    ))}
+                    {machineGroups.length === 0
+                      ? <SelectItem value="_none" disabled>No machine groups configured</SelectItem>
+                      : machineGroups.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                        ))}
                   </SelectContent>
                 </Select>
               </div>
+              {selectedGroupId && machines.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="text-xs text-muted-foreground">Will log for:</span>
+                  {machines.slice(0, 12).map((m: any) => (
+                    <span key={m.code} className="text-xs bg-muted rounded px-1.5 py-0.5 font-mono">{m.code}</span>
+                  ))}
+                  {machines.length > 12 && (
+                    <span className="text-xs text-muted-foreground">+{machines.length - 12} more</span>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
-          {/* ── Machine selector (once for all rows) ── */}
-          <div className="flex items-end gap-3">
-            <div className="flex-1 space-y-1.5">
-              <Label className="text-xs font-semibold">
-                Machine <span className="text-destructive">*</span>
-                {department && <span className="text-muted-foreground font-normal ml-1">({department})</span>}
-              </Label>
-              <Select value={selectedMachine} onValueChange={setSelectedMachine} disabled={!department}>
-                <SelectTrigger className="h-9 text-sm border-primary/40 font-medium">
-                  <SelectValue placeholder={department ? "Select machine to log stoppages…" : "Select a department first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {machines.length === 0
-                    ? <SelectItem value="_none" disabled>No machines in {department}</SelectItem>
-                    : machines.map((m: any) => (
-                        <SelectItem key={m.code} value={m.code}>{m.code}{m.name ? ` — ${m.name}` : ""}</SelectItem>
-                      ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {selectedMachine && (
-              <span className="text-xs text-muted-foreground pb-2 shrink-0">
-                {rows.length} row{rows.length !== 1 ? "s" : ""} · {codedRows} coded
-              </span>
-            )}
-          </div>
-
           {/* ── Rows table ── */}
-          {selectedMachine ? (
+          {(stoppageMode === "individual" ? !!selectedMachine : !!selectedGroupId) ? (
             <>
               <div className="overflow-x-auto rounded-md border">
                 <table className="w-full text-xs border-collapse">
@@ -1577,7 +1652,9 @@ function StoppageForm() {
             </>
           ) : (
             <div className="text-center py-8 text-sm text-muted-foreground">
-              {!department ? "Select a department above to get started" : "Select a machine above to log stoppages"}
+              {stoppageMode === "group"
+                ? (!selectedGroupId ? "Select a machine group above to log stoppages" : "Add rows above and click Save All")
+                : (!department ? "Select a department above to get started" : "Select a machine above to log stoppages")}
             </div>
           )}
         </CardContent>
@@ -1965,6 +2042,436 @@ function ImportShiftEntriesDialog() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PACKING GRID
+// ─────────────────────────────────────────────────────────────────────────────
+
+type PackingRow = {
+  _localId: string;          // ephemeral key for React
+  id?: string;               // set after save
+  lot_no: string;
+  count_ne: string;
+  count_desc: string;
+  bag_from: string;
+  bag_to: string;
+  total_bags: string;
+  machine_code: string;
+  operator: string;
+  supervisor?: string;
+  remarks: string;
+  status?: string;
+};
+
+const EMPTY_PACKING_ROW = (): PackingRow => ({
+  _localId: crypto.randomUUID(),
+  lot_no: "",
+  count_ne: "",
+  count_desc: "",
+  bag_from: "",
+  bag_to: "",
+  total_bags: "",
+  machine_code: "",
+  operator: "",
+  remarks: "",
+});
+
+function computeTotal(row: PackingRow): string {
+  const f = parseInt(row.bag_from, 10);
+  const t = parseInt(row.bag_to, 10);
+  if (!isNaN(f) && !isNaN(t) && t >= f) return String(t - f + 1);
+  return "";
+}
+
+function PackingGrid() {
+  const qc = useQueryClient();
+  const { millId } = useActiveMill();
+  const today = new Date();
+  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
+  const [date, setDate] = useState(localDate);
+  const [shift, setShift] = useState<"A" | "B" | "C">("A");
+  const [supervisor, setSupervisor] = useState("");
+  const [rows, setRows] = useState<PackingRow[]>([EMPTY_PACKING_ROW()]);
+  const [saving, setSaving] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+
+  // Fetch existing entries for the selected date+shift
+  const entriesQ = useQuery({
+    queryKey: ["packing-entries", millId, date, shift],
+    queryFn: async () => {
+      const r = await api.get(
+        `/production/packing/entries?date=${date}&shift=${shift}&page_size=200`
+      );
+      return (r.data?.data ?? []) as PackingRow[];
+    },
+    enabled: !!millId && !!date,
+    staleTime: 30_000,
+  });
+
+  // Load fetched entries into grid
+  useEffect(() => {
+    const fetched = entriesQ.data;
+    if (fetched && fetched.length > 0) {
+      setRows(
+        fetched.map((e: any) => ({
+          _localId: e.id,
+          id: e.id,
+          lot_no: e.lot_no ?? "",
+          count_ne: e.count_ne != null ? String(e.count_ne) : "",
+          count_desc: e.count_desc ?? "",
+          bag_from: e.bag_from != null ? String(e.bag_from) : "",
+          bag_to: e.bag_to != null ? String(e.bag_to) : "",
+          total_bags: e.total_bags != null ? String(e.total_bags) : "",
+          machine_code: e.machine_code ?? "",
+          operator: e.operator ?? "",
+          remarks: e.remarks ?? "",
+          status: e.status,
+        }))
+      );
+      const sv = fetched.find((e: any) => e.supervisor)?.supervisor;
+      if (sv) setSupervisor(sv);
+    } else if (fetched) {
+      setRows([EMPTY_PACKING_ROW()]);
+    }
+  }, [entriesQ.data]);
+
+  // Auto-suggest next bag_from when lot_no loses focus
+  async function onLotBlur(idx: number) {
+    const lot = rows[idx].lot_no.trim();
+    if (!lot) return;
+    try {
+      const r = await api.get(
+        `/production/packing/last-bag/${encodeURIComponent(lot)}`
+      );
+      const last = r.data?.last_bag_to;
+      if (last != null && !rows[idx].bag_from) {
+        updateRow(idx, "bag_from", String(last + 1));
+      }
+    } catch {
+      // ignore — non-critical
+    }
+  }
+
+  function updateRow(idx: number, field: keyof PackingRow, value: string) {
+    setRows((prev) => {
+      const next = [...prev];
+      const r = { ...next[idx], [field]: value };
+      // Auto-calc total_bags
+      if (field === "bag_from" || field === "bag_to") {
+        r.total_bags = computeTotal({ ...r, [field]: value });
+      }
+      next[idx] = r;
+      return next;
+    });
+  }
+
+  function addRow(copyFrom?: PackingRow) {
+    setRows((prev) => [
+      ...prev,
+      copyFrom
+        ? { ...EMPTY_PACKING_ROW(), lot_no: copyFrom.lot_no, count_ne: copyFrom.count_ne, count_desc: copyFrom.count_desc, machine_code: copyFrom.machine_code }
+        : EMPTY_PACKING_ROW(),
+    ]);
+  }
+
+  function deleteRow(idx: number) {
+    setRows((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  // Validate rows
+  function validate(): string[] {
+    const errs: string[] = [];
+    rows.forEach((r, i) => {
+      if (!r.lot_no.trim()) errs.push(`Row ${i + 1}: Lot No is required`);
+      const f = parseInt(r.bag_from, 10);
+      const t = parseInt(r.bag_to, 10);
+      if (!isNaN(f) && !isNaN(t) && f > t) {
+        errs.push(`Row ${i + 1} (${r.lot_no}): Bag From > Bag To`);
+      }
+    });
+    return errs;
+  }
+
+  async function saveAll() {
+    const errs = validate();
+    if (errs.length) {
+      toast.error(errs.join("\n"));
+      return;
+    }
+    setSaving(true);
+    try {
+      // Split into new (no id) and existing (has id)
+      const newRows = rows.filter((r) => !r.id);
+      const existingRows = rows.filter((r) => !!r.id);
+
+      if (newRows.length) {
+        await api.post("/production/packing/entries/bulk", {
+          date,
+          shift,
+          supervisor,
+          entries: newRows.map((r) => ({
+            lot_no: r.lot_no,
+            count_ne: r.count_ne ? parseFloat(r.count_ne) : null,
+            count_desc: r.count_desc || null,
+            bag_from: r.bag_from ? parseInt(r.bag_from, 10) : null,
+            bag_to: r.bag_to ? parseInt(r.bag_to, 10) : null,
+            machine_code: r.machine_code || null,
+            operator: r.operator || null,
+            supervisor: supervisor || null,
+            remarks: r.remarks || null,
+          })),
+        });
+      }
+
+      for (const r of existingRows) {
+        await api.patch(`/production/packing/entries/${r.id}`, {
+          lot_no: r.lot_no,
+          count_ne: r.count_ne ? parseFloat(r.count_ne) : null,
+          count_desc: r.count_desc || null,
+          bag_from: r.bag_from ? parseInt(r.bag_from, 10) : null,
+          bag_to: r.bag_to ? parseInt(r.bag_to, 10) : null,
+          machine_code: r.machine_code || null,
+          operator: r.operator || null,
+          supervisor: supervisor || null,
+          remarks: r.remarks || null,
+        });
+      }
+
+      toast.success("Packing entries saved");
+      qc.invalidateQueries({ queryKey: ["packing-entries", millId, date, shift] });
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteEntry(id: string) {
+    try {
+      await api.delete(`/production/packing/entries/${id}`);
+      toast.success("Entry deleted");
+      qc.invalidateQueries({ queryKey: ["packing-entries", millId, date, shift] });
+    } catch {
+      toast.error("Delete failed");
+    }
+  }
+
+  const totalBags = rows.reduce((s, r) => s + (parseInt(r.total_bags, 10) || 0), 0);
+
+  return (
+    <Card className="mt-4">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <CardTitle className="text-base">Packing Shift Entry</CardTitle>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Input
+              type="date"
+              className="w-36 h-8 text-xs"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+            <Select value={shift} onValueChange={(v) => setShift(v as "A" | "B" | "C")}>
+              <SelectTrigger className="w-28 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="A">A — Morning</SelectItem>
+                <SelectItem value="B">B — Afternoon</SelectItem>
+                <SelectItem value="C">C — Night</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              className="w-36 h-8 text-xs"
+              placeholder="Supervisor"
+              value={supervisor}
+              onChange={(e) => setSupervisor(e.target.value)}
+            />
+            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setImportOpen(true)}>
+              Import
+            </Button>
+            <ExportMenu
+              filename={`packing_${date}_${shift}`}
+              title="Packing Entries"
+              subtitle={`Date: ${date}  Shift: ${shift}`}
+              columns={[
+                { key: "lot_no", label: "Lot No" },
+                { key: "count_ne", label: "Count Ne" },
+                { key: "count_desc", label: "Count Desc" },
+                { key: "bag_from", label: "Bag From" },
+                { key: "bag_to", label: "Bag To" },
+                { key: "total_bags", label: "Total Bags" },
+                { key: "machine_code", label: "Machine" },
+                { key: "operator", label: "Operator" },
+                { key: "supervisor", label: "Supervisor" },
+                { key: "remarks", label: "Remarks" },
+              ]}
+              rows={rows}
+              className="h-8 text-xs"
+            />
+          </div>
+        </div>
+        {totalBags > 0 && (
+          <p className="text-xs text-muted-foreground mt-1">
+            {rows.length} rows · <strong>{totalBags}</strong> total bags this shift
+          </p>
+        )}
+      </CardHeader>
+
+      <CardContent className="p-0 overflow-x-auto">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="border-b bg-muted/40">
+              <th className="px-2 py-1.5 text-left font-medium w-6">#</th>
+              <th className="px-2 py-1.5 text-left font-medium min-w-[110px]">Lot No *</th>
+              <th className="px-2 py-1.5 text-left font-medium w-20">Count Ne</th>
+              <th className="px-2 py-1.5 text-left font-medium min-w-[130px]">Count Desc</th>
+              <th className="px-2 py-1.5 text-left font-medium w-24">Bag From</th>
+              <th className="px-2 py-1.5 text-left font-medium w-24">Bag To</th>
+              <th className="px-2 py-1.5 text-left font-medium w-20">Total</th>
+              <th className="px-2 py-1.5 text-left font-medium w-24">Machine</th>
+              <th className="px-2 py-1.5 text-left font-medium min-w-[110px]">Operator</th>
+              <th className="px-2 py-1.5 text-left font-medium min-w-[130px]">Remarks</th>
+              <th className="px-2 py-1.5 text-center font-medium w-20">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, idx) => (
+              <tr key={row._localId} className="border-b hover:bg-muted/20">
+                <td className="px-2 py-1 text-muted-foreground">{idx + 1}</td>
+                <td className="px-1 py-1">
+                  <Input
+                    className="h-7 text-xs"
+                    value={row.lot_no}
+                    onChange={(e) => updateRow(idx, "lot_no", e.target.value)}
+                    onBlur={() => onLotBlur(idx)}
+                    placeholder="LOT-001"
+                  />
+                </td>
+                <td className="px-1 py-1">
+                  <Input
+                    className="h-7 text-xs"
+                    type="number"
+                    step="0.5"
+                    value={row.count_ne}
+                    onChange={(e) => updateRow(idx, "count_ne", e.target.value)}
+                    placeholder="30"
+                  />
+                </td>
+                <td className="px-1 py-1">
+                  <Input
+                    className="h-7 text-xs"
+                    value={row.count_desc}
+                    onChange={(e) => updateRow(idx, "count_desc", e.target.value)}
+                    placeholder="100% Combed"
+                  />
+                </td>
+                <td className="px-1 py-1">
+                  <Input
+                    className="h-7 text-xs"
+                    type="number"
+                    value={row.bag_from}
+                    onChange={(e) => updateRow(idx, "bag_from", e.target.value)}
+                    placeholder="1001"
+                  />
+                </td>
+                <td className="px-1 py-1">
+                  <Input
+                    className="h-7 text-xs"
+                    type="number"
+                    value={row.bag_to}
+                    onChange={(e) => updateRow(idx, "bag_to", e.target.value)}
+                    placeholder="1040"
+                  />
+                </td>
+                <td className="px-2 py-1 font-medium tabular-nums">
+                  {row.total_bags || <span className="text-muted-foreground">—</span>}
+                </td>
+                <td className="px-1 py-1">
+                  <Input
+                    className="h-7 text-xs"
+                    value={row.machine_code}
+                    onChange={(e) => updateRow(idx, "machine_code", e.target.value)}
+                    placeholder="P-01"
+                  />
+                </td>
+                <td className="px-1 py-1">
+                  <Input
+                    className="h-7 text-xs"
+                    value={row.operator}
+                    onChange={(e) => updateRow(idx, "operator", e.target.value)}
+                    placeholder="Name"
+                  />
+                </td>
+                <td className="px-1 py-1">
+                  <Input
+                    className="h-7 text-xs"
+                    value={row.remarks}
+                    onChange={(e) => updateRow(idx, "remarks", e.target.value)}
+                    placeholder="—"
+                  />
+                </td>
+                <td className="px-1 py-1">
+                  <div className="flex items-center justify-center gap-1">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6"
+                      title="Duplicate row"
+                      onClick={() => addRow(row)}
+                    >
+                      <Plus className="size-3" />
+                    </Button>
+                    {row.id ? (
+                      <ConfirmDeleteButton
+                        onConfirm={() => deleteEntry(row.id!)}
+                      />
+                    ) : (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6 text-destructive hover:text-destructive"
+                        onClick={() => deleteRow(idx)}
+                        disabled={rows.length === 1}
+                      >
+                        <Trash2 className="size-3" />
+                      </Button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardContent>
+
+      <div className="flex items-center justify-between gap-2 px-4 py-3 border-t">
+        <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => addRow()}>
+          <Plus className="size-3" /> Add Row
+        </Button>
+        <Button
+          size="sm"
+          className="h-8 text-xs gap-1"
+          onClick={saveAll}
+          disabled={saving}
+        >
+          <Save className="size-3" />
+          {saving ? "Saving…" : "Save All"}
+        </Button>
+      </div>
+
+      <UniversalImportModal
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
+        tableName="packing_shift_entries"
+        endpoint="/production/packing/entries/bulk"
+        importMillId={millId ?? ""}
+        title="Import Packing Entries"
+      />
+    </Card>
+  );
+}
+
 function ProductionPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "production");
@@ -2280,6 +2787,10 @@ function ProductionPage() {
                 <Users2 className="size-3.5" />
                 Manpower
               </TabsTrigger>
+              <TabsTrigger value="packing" className="gap-1.5">
+                <Save className="size-3.5" />
+                Packing
+              </TabsTrigger>
               <TabsTrigger value="machines">Machines</TabsTrigger>
               <TabsTrigger value="shifts">Entries Log</TabsTrigger>
               <TabsTrigger value="downtime">Downtime Log</TabsTrigger>
@@ -2328,6 +2839,18 @@ function ProductionPage() {
               ) : (
                 <div className="p-6 text-sm text-muted-foreground">
                   You do not have permission to manage manpower plans.
+                </div>
+              )}
+              </ErrorBoundary>
+            </TabsContent>
+
+            <TabsContent value="packing">
+              <ErrorBoundary inline label="Packing">
+              {canEdit ? (
+                <PackingGrid />
+              ) : (
+                <div className="p-6 text-sm text-muted-foreground">
+                  You do not have permission to create packing entries.
                 </div>
               )}
               </ErrorBoundary>

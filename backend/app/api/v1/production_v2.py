@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response as FastAPIResponse
 from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +20,7 @@ from app.models.production_v2 import (
     WasteEntry,
     RFManpowerPlan,
     MixingChangeFibreRow,
+    PackingShiftEntry,
 )
 from app.models.mixing import MixingChangeLog
 from app.schemas.production_v2 import (
@@ -667,3 +668,179 @@ async def production_v2_page_init(
 
     result["rf_category_labels"] = RF_CATEGORY_LABELS
     return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PACKING SHIFT ENTRIES  (migration 039)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/production/packing/entries")
+async def list_packing_entries(
+    date: Optional[str] = Query(None),
+    shift: Optional[str] = Query(None),
+    lot_no: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(100, ge=1, le=500),
+    scope: tuple = Depends(get_mill_scope),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_module("production")),
+):
+    mill_id, company_id = scope
+    stmt = select(PackingShiftEntry)
+    if mill_id:
+        stmt = stmt.where(PackingShiftEntry.mill_id == mill_id)
+    if date:
+        stmt = stmt.where(PackingShiftEntry.date == date)
+    if shift:
+        stmt = stmt.where(PackingShiftEntry.shift == shift)
+    if lot_no:
+        stmt = stmt.where(PackingShiftEntry.lot_no.ilike(f"%{lot_no}%"))
+    stmt = stmt.order_by(PackingShiftEntry.date.desc(), PackingShiftEntry.lot_no)
+    total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar()
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    rows = (await db.execute(stmt)).scalars().all()
+    return {
+        "data": [_pse_dict(r) for r in rows],
+        "total": total,
+        "page": page,
+        "per_page": page_size,
+    }
+
+
+@router.get("/production/packing/last-bag/{lot_no}")
+async def get_last_bag_for_lot(
+    lot_no: str,
+    scope: tuple = Depends(get_mill_scope),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_module("production")),
+):
+    """Return the highest bag_to for this lot so frontend can auto-suggest next bag_from."""
+    mill_id, _ = scope
+    stmt = (
+        select(func.max(PackingShiftEntry.bag_to))
+        .where(PackingShiftEntry.lot_no == lot_no)
+    )
+    if mill_id:
+        stmt = stmt.where(PackingShiftEntry.mill_id == mill_id)
+    last = (await db.execute(stmt)).scalar()
+    return {"lot_no": lot_no, "last_bag_to": last}
+
+
+@router.post("/production/packing/entries/bulk", status_code=201)
+async def bulk_create_packing_entries(
+    body: dict,
+    scope: tuple = Depends(get_mill_scope),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    """Bulk-create packing entries for one shift.
+    body = { date, shift, supervisor?, entries: [{lot_no, count_ne, ...}] }
+    """
+    mill_id, _ = scope
+    resolved_mill_id = await _resolve_mill(current_user, db, None) if not mill_id else mill_id
+    entries = body.get("entries", [])
+    if not entries:
+        raise HTTPException(status_code=400, detail="entries list is empty")
+
+    date = body.get("date", "")
+    shift = body.get("shift", "A")
+    supervisor = body.get("supervisor")
+
+    created, errors = 0, []
+    for i, e in enumerate(entries):
+        lot_no = e.get("lot_no", "").strip()
+        if not lot_no:
+            errors.append(f"Row {i+1}: lot_no is required")
+            continue
+        bag_from = e.get("bag_from")
+        bag_to = e.get("bag_to")
+        total = e.get("total_bags")
+        if bag_from is not None and bag_to is not None:
+            if int(bag_from) > int(bag_to):
+                errors.append(f"Row {i+1} ({lot_no}): bag_from > bag_to")
+                continue
+            total = int(bag_to) - int(bag_from) + 1
+        obj = PackingShiftEntry(
+            id=generate_uuid(),
+            mill_id=resolved_mill_id,
+            date=date,
+            shift=shift,
+            lot_no=lot_no,
+            count_ne=e.get("count_ne"),
+            count_desc=e.get("count_desc"),
+            bag_from=int(bag_from) if bag_from is not None else None,
+            bag_to=int(bag_to) if bag_to is not None else None,
+            total_bags=total,
+            machine_code=e.get("machine_code"),
+            operator=e.get("operator"),
+            supervisor=e.get("supervisor") or supervisor,
+            remarks=e.get("remarks"),
+            status="draft",
+        )
+        db.add(obj)
+        created += 1
+
+    await db.commit()
+    return {"created": created, "errors": errors}
+
+
+@router.patch("/production/packing/entries/{entry_id}")
+async def update_packing_entry(
+    entry_id: str,
+    body: dict,
+    scope: tuple = Depends(get_mill_scope),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_module("production", write=True)),
+):
+    obj = await db.get(PackingShiftEntry, entry_id)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    mill_id, _ = scope
+    if mill_id and obj.mill_id != mill_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    for k, v in body.items():
+        if k not in ("id", "mill_id", "created_at") and hasattr(obj, k):
+            setattr(obj, k, v)
+    # Recompute total_bags if bag range changed
+    if obj.bag_from is not None and obj.bag_to is not None:
+        obj.total_bags = int(obj.bag_to) - int(obj.bag_from) + 1
+    await db.commit()
+    await db.refresh(obj)
+    return _pse_dict(obj)
+
+
+@router.delete("/production/packing/entries/{entry_id}", status_code=204)
+async def delete_packing_entry(
+    entry_id: str,
+    scope: tuple = Depends(get_mill_scope),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_module("production", write=True)),
+):
+    obj = await db.get(PackingShiftEntry, entry_id)
+    if not obj:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    mill_id, _ = scope
+    if mill_id and obj.mill_id != mill_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    await db.delete(obj)
+    await db.commit()
+    return FastAPIResponse(status_code=204)
+
+
+def _pse_dict(r: PackingShiftEntry) -> dict:
+    return {
+        "id": r.id,
+        "date": r.date,
+        "shift": r.shift,
+        "lot_no": r.lot_no,
+        "count_ne": r.count_ne,
+        "count_desc": r.count_desc,
+        "bag_from": r.bag_from,
+        "bag_to": r.bag_to,
+        "total_bags": r.total_bags,
+        "machine_code": r.machine_code,
+        "operator": r.operator,
+        "supervisor": r.supervisor,
+        "remarks": r.remarks,
+        "status": r.status,
+    }

@@ -1,6 +1,6 @@
 """
-Production v2 models: DatalogStopCode, WasteEntry, RFManpowerPlan, MixingChangeFibreRow
-Added in migration 020.
+Production v2 models: DatalogStopCode, WasteEntry, RFManpowerPlan, MixingChangeFibreRow,
+PackingShiftEntry (migration 039)
 """
 from sqlalchemy import (
     String, Float, Integer, Boolean, DateTime, ForeignKey,
@@ -75,6 +75,29 @@ class RFManpowerPlan(Base):
         UniqueConstraint("mill_id", "date", "shift", "category", "mc_id_from",
                          name="uq_rf_manpower_mill_date_shift_cat_from"),
     )
+
+
+class PackingShiftEntry(Base):
+    """Packing department production log — lot+count bag-range entry per shift."""
+    __tablename__ = "packing_shift_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
+    date: Mapped[str] = mapped_column(String(10), nullable=False)
+    shift: Mapped[str] = mapped_column(String(5), nullable=False)           # A / B / C
+    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    count_desc: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    bag_from: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    bag_to: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    total_bags: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    machine_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    operator: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    supervisor: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class MixingChangeFibreRow(Base):

@@ -72,4 +72,5 @@ from app.models.production_v2 import (
     WasteEntry,
     RFManpowerPlan,
     MixingChangeFibreRow,
+    PackingShiftEntry,
 )
