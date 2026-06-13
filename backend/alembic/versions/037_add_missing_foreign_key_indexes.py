@@ -9,6 +9,7 @@ Create Date: 2026-06-12
 """
 from typing import Sequence, Union
 from alembic import op
+import sqlalchemy as sa
 
 revision: str = "037"
 down_revision: Union[str, None] = "036"
@@ -38,9 +39,7 @@ def upgrade() -> None:
     conn = op.get_bind()
     for table, column, index_name in INDEXES:
         result = conn.execute(
-            op.text(
-                "SELECT 1 FROM pg_indexes WHERE indexname = :idx"
-            ),
+            sa.text("SELECT 1 FROM pg_indexes WHERE indexname = :idx"),
             {"idx": index_name},
         ).fetchone()
         if not result:
