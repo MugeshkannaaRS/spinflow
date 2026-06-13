@@ -1,7 +1,7 @@
-"""036 — Quality Module v2 (all qm_* tables from 86 AA Yarn Mills forms)
+"""038 — Quality Module v2 (all qm_* tables from 86 AA Yarn Mills forms)
 
-Revision ID: 036
-Revises: 035
+Revision ID: 038
+Revises: 037
 Create Date: 2026-06-13
 """
 
@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = "036"
-down_revision = "035"
+revision = "038"
+down_revision = "037"
 branch_labels = None
 depends_on = None
 

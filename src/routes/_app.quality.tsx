@@ -879,7 +879,7 @@ function QmFormsTab({ title, endpoint, columns, millId, canEdit }: QmFormsTabPro
       if (date) params.set("date", date);
       if (lotNo) params.set("lot_no", lotNo);
       if (machineNo) params.set("machine_no", machineNo);
-      const res = await api.get(`/api/v1${endpoint}?${params.toString()}`);
+      const res = await api.get(`${endpoint}?${params.toString()}`);
       return (res.data?.data ?? res.data) as any[];
     },
     enabled: !!effectiveMillId,
