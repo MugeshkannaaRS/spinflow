@@ -39,9 +39,9 @@ import {
   SheetTrigger,
   SheetFooter,
 } from "@/components/ui/sheet";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { Plus, CheckCircle2, XCircle, FlaskConical, AlertTriangle, ArrowDown, Trash2 } from "lucide-react";
+import { Plus, CheckCircle2, XCircle, FlaskConical, AlertTriangle, ArrowDown, Trash2, Pencil } from "lucide-react";
 import { api } from "@/lib/api";
 import type { QualityTest } from "@/lib/types";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
@@ -856,7 +856,33 @@ function LotApproveAction({ lotId }: { lotId: string }) {
 
 // ---------------------------------------------------------------------------
 // Generic department tab — fetches from /quality/v2/<endpoint>
+// Full CRUD: + New record, Edit (Sheet), Delete (ConfirmDeleteButton)
 // ---------------------------------------------------------------------------
+
+type QmFieldType = "text" | "number" | "date" | "shift" | "status" | "yn";
+
+interface QmFieldDef {
+  key: string;
+  label: string;
+  type: QmFieldType;
+  required?: boolean;
+  step?: string;
+}
+
+const SHIFT_OPTIONS = ["A", "B", "C", "R/A", "R/B", "R/C"];
+const STATUS_OPTIONS = ["draft", "approved", "rejected"];
+
+function colToQmField(key: string, label: string): QmFieldDef {
+  if (key === "date") return { key, label, type: "date", required: true };
+  if (key === "shift_code") return { key, label, type: "shift" };
+  if (key === "status") return { key, label, type: "status" };
+  if (key === "within_spec") return { key, label, type: "yn" };
+  if (key === "lot_no") return { key, label, type: "text", required: true };
+  if (key === "machine_no" || key === "machine") return { key, label, type: "text", required: true };
+  const numericRe = /(_pct|_kg|_ne|_csp|kms|_min|_max|_total|_count|_breaks|_weight|_hank|_speed|_tm|_tpi|_wt|_grams|_hrs|_psi|_bar|_rpm|_1m|_2m|_5m|_10m|_20m|_50m|_100m|_pct$|_yf$)$|^(cv_|avg_|total_|max_|min_|n_)/;
+  if (numericRe.test(key)) return { key, label, type: "number", step: "0.01" };
+  return { key, label, type: "text" };
+}
 
 interface QmFormsTabProps {
   title: string;
@@ -867,10 +893,47 @@ interface QmFormsTabProps {
 }
 
 function QmFormsTab({ title, endpoint, columns, millId, canEdit }: QmFormsTabProps) {
+  const qc = useQueryClient();
   const [date, setDate] = useState("");
   const [lotNo, setLotNo] = useState("");
   const [machineNo, setMachineNo] = useState("");
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editRecord, setEditRecord] = useState<any | null>(null);
   const effectiveMillId = millId ?? undefined;
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Derive form fields from columns (skip id/mill_id, auto-infer types)
+  const formFields = useMemo<QmFieldDef[]>(() => {
+    const fields = columns
+      .filter((c: any) => !["id", "mill_id"].includes(c.key as string))
+      .map((c: any) => colToQmField(c.key as string, c.label as string));
+    if (!fields.find((f) => f.key === "remarks")) {
+      fields.push({ key: "remarks", label: "Remarks", type: "text" });
+    }
+    return fields;
+  }, [columns]);
+
+  const defaultForm = useMemo(() => {
+    const d: Record<string, any> = {};
+    formFields.forEach((f) => {
+      if (f.key === "date") d[f.key] = today;
+      else if (f.key === "status") d[f.key] = "draft";
+      else if (f.key === "shift_code") d[f.key] = "A";
+      else d[f.key] = "";
+    });
+    return d;
+  }, [formFields, today]);
+
+  const [form, setForm] = useState<Record<string, any>>(defaultForm);
+
+  const openNew = () => { setForm(defaultForm); setEditRecord(null); setSheetOpen(true); };
+  const openEdit = (record: any) => {
+    const f: Record<string, any> = {};
+    formFields.forEach((field) => { f[field.key] = record[field.key] ?? ""; });
+    setForm(f);
+    setEditRecord(record);
+    setSheetOpen(true);
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ["qm-forms", endpoint, effectiveMillId, date, lotNo, machineNo],
@@ -887,52 +950,215 @@ function QmFormsTab({ title, endpoint, columns, millId, canEdit }: QmFormsTabPro
     retry: 1,
   });
 
+  const createMut = useMutation({
+    mutationFn: (payload: any) => api.post(endpoint, payload),
+    onSuccess: () => {
+      toast.success("Record saved");
+      qc.invalidateQueries({ queryKey: ["qm-forms", endpoint] });
+      setSheetOpen(false);
+    },
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail;
+      toast.error(typeof detail === "string" ? detail : "Failed to save");
+    },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: any }) =>
+      api.patch(`${endpoint}/${id}`, payload),
+    onSuccess: () => {
+      toast.success("Record updated");
+      qc.invalidateQueries({ queryKey: ["qm-forms", endpoint] });
+      setSheetOpen(false);
+    },
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail;
+      toast.error(typeof detail === "string" ? detail : "Failed to update");
+    },
+  });
+
+  const handleSubmit = () => {
+    const payload: Record<string, any> = {};
+    formFields.forEach((f) => {
+      const val = form[f.key];
+      if (f.type === "number") {
+        payload[f.key] = val === "" || val === undefined ? null : parseFloat(String(val));
+      } else if (f.type === "yn") {
+        payload[f.key] = val === "true" ? true : val === "false" ? false : null;
+      } else {
+        payload[f.key] = val === "" ? null : val;
+      }
+    });
+    if (editRecord) {
+      updateMut.mutate({ id: editRecord.id, payload });
+    } else {
+      createMut.mutate(payload);
+    }
+  };
+
+  const isPending = createMut.isPending || updateMut.isPending;
+
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <div className="flex flex-wrap gap-2 pt-2">
-          <Input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="h-8 w-36 text-xs"
-          />
-          <Input
-            placeholder="Lot No"
-            value={lotNo}
-            onChange={(e) => setLotNo(e.target.value)}
-            className="h-8 w-28 text-xs"
-          />
-          <Input
-            placeholder="Machine No"
-            value={machineNo}
-            onChange={(e) => setMachineNo(e.target.value)}
-            className="h-8 w-28 text-xs"
-          />
-          {(date || lotNo || machineNo) && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-8 text-xs"
-              onClick={() => { setDate(""); setLotNo(""); setMachineNo(""); }}
-            >
-              Clear
+    <>
+      <Card>
+        <CardHeader className="pb-3 flex flex-row items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-sm font-medium">{title}</CardTitle>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="h-8 w-36 text-xs"
+              />
+              <Input
+                placeholder="Lot No"
+                value={lotNo}
+                onChange={(e) => setLotNo(e.target.value)}
+                className="h-8 w-28 text-xs"
+              />
+              <Input
+                placeholder="Machine No"
+                value={machineNo}
+                onChange={(e) => setMachineNo(e.target.value)}
+                className="h-8 w-28 text-xs"
+              />
+              {(date || lotNo || machineNo) && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 text-xs"
+                  onClick={() => { setDate(""); setLotNo(""); setMachineNo(""); }}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+          {canEdit && (
+            <Button size="sm" onClick={openNew} className="mt-1 shrink-0">
+              <Plus className="size-3 mr-1" /> New record
             </Button>
           )}
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <DataTable
-          tableId={`qm_${endpoint.replace(/\//g, "_")}`}
-          columns={columns}
-          data={data ?? []}
-          loading={isLoading}
-          rowKey={(r: any) => r.id}
-          exportFilename={title.toLowerCase().replace(/\s+/g, "_")}
-        />
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <DataTable
+            tableId={`qm_${endpoint.replace(/\//g, "_")}`}
+            columns={columns}
+            data={data ?? []}
+            loading={isLoading}
+            rowKey={(r: any) => r.id}
+            exportFilename={title.toLowerCase().replace(/\s+/g, "_")}
+            actions={canEdit ? (r: any) => (
+              <div className="flex gap-1">
+                <Button size="sm" variant="outline" onClick={() => openEdit(r)}>
+                  <Pencil className="size-3 mr-1" /> Edit
+                </Button>
+                <ConfirmDeleteButton
+                  onConfirm={async () => {
+                    await api.delete(`${endpoint}/${r.id}`);
+                    qc.invalidateQueries({ queryKey: ["qm-forms", endpoint] });
+                  }}
+                  label={`Delete this ${title} record? This cannot be undone.`}
+                  successMessage="Record deleted"
+                />
+              </div>
+            ) : undefined}
+          />
+        </CardContent>
+      </Card>
+
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{editRecord ? `Edit ${title}` : `New ${title}`}</SheetTitle>
+          </SheetHeader>
+          <div className="space-y-3 py-4">
+            {formFields.map((f) => (
+              <div key={f.key} className="space-y-1.5">
+                <Label>
+                  {f.label}
+                  {f.required && <span className="text-destructive ml-0.5">*</span>}
+                </Label>
+                {f.type === "date" && (
+                  <Input
+                    type="date"
+                    value={form[f.key] ?? ""}
+                    onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
+                  />
+                )}
+                {f.type === "shift" && (
+                  <Select
+                    value={form[f.key] ?? "A"}
+                    onValueChange={(v) => setForm((p) => ({ ...p, [f.key]: v }))}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {SHIFT_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
+                {f.type === "status" && (
+                  <Select
+                    value={form[f.key] ?? "draft"}
+                    onValueChange={(v) => setForm((p) => ({ ...p, [f.key]: v }))}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((o) => (
+                        <SelectItem key={o} value={o}>
+                          {o.charAt(0).toUpperCase() + o.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {f.type === "yn" && (
+                  <Select
+                    value={
+                      form[f.key] === true || form[f.key] === "true"
+                        ? "true"
+                        : form[f.key] === false || form[f.key] === "false"
+                        ? "false"
+                        : ""
+                    }
+                    onValueChange={(v) => setForm((p) => ({ ...p, [f.key]: v }))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Yes</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+                {f.type === "number" && (
+                  <Input
+                    type="number"
+                    step={f.step ?? "0.01"}
+                    value={form[f.key] ?? ""}
+                    onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
+                  />
+                )}
+                {f.type === "text" && (
+                  <Input
+                    value={form[f.key] ?? ""}
+                    onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+          <SheetFooter className="gap-2">
+            <Button variant="outline" onClick={() => setSheetOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={isPending}>
+              {isPending ? "Saving…" : editRecord ? "Update" : "Save"}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
 

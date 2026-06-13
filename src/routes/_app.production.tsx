@@ -856,6 +856,16 @@ function WasteGrid() {
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Machine Group filter
+  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+  const machineGroupsQ = useQuery({
+    queryKey: ["machine-groups", millId],
+    queryFn: () => productionApi.getMachineGroups({ mill_id: millId, active_only: true }),
+    staleTime: 60_000,
+    enabled: !!millId,
+  });
+  const machineGroups = (machineGroupsQ.data ?? []) as MachineGroup[];
+
   useEffect(() => {
     if (!department && deptOptions.length > 0) {
       const first = deptOptions[0];
@@ -867,13 +877,14 @@ function WasteGrid() {
   }, [deptOptions]);
 
   const machinesQ = useQuery({
-    queryKey: ["machines", departmentId || department, millId],
-    queryFn: () => productionApi.getMachines({
-      ...(departmentId ? { department_id: departmentId } : { department }),
-      mill_id: millId, page_size: 1000, page: 1,
-    }),
+    queryKey: ["machines", departmentId || department, millId, selectedGroupId],
+    queryFn: () => productionApi.getMachines(
+      selectedGroupId
+        ? { machine_group_ids: selectedGroupId, mill_id: millId, page_size: 1000, page: 1 }
+        : { ...(departmentId ? { department_id: departmentId } : { department }), mill_id: millId, page_size: 1000, page: 1 }
+    ),
     staleTime: 60_000,
-    enabled: !!millId && !!(departmentId || department),
+    enabled: !!millId && !!(selectedGroupId || departmentId || department),
   });
   const machines = useMemo(
     () => (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[],
@@ -938,7 +949,7 @@ function WasteGrid() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-3">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Date *</Label>
@@ -960,6 +971,7 @@ function WasteGrid() {
               <Label className="text-xs">Department *</Label>
               <Select value={department} onValueChange={(v) => {
                 setDepartment(v);
+                setSelectedGroupId("");
                 const d = deptOptions.find((x: any) => (typeof x === "string" ? x : x.name) === v);
                 setDepartmentId(d && typeof d !== "string" ? (d.id || null) : null);
               }}>
@@ -973,6 +985,30 @@ function WasteGrid() {
               </Select>
             </div>
           </div>
+          {machineGroups.length > 0 && (
+            <div className="flex items-center gap-3">
+              <Layers className="size-4 text-muted-foreground shrink-0" />
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-muted-foreground">
+                  Machine Group <span className="text-[10px]">(select to filter machines)</span>
+                </Label>
+                <Select
+                  value={selectedGroupId || "_all"}
+                  onValueChange={(v) => setSelectedGroupId(v === "_all" ? "" : v)}
+                >
+                  <SelectTrigger className="h-8 text-sm w-64">
+                    <SelectValue placeholder="— All machines in department —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all">— All machines in department —</SelectItem>
+                    {machineGroups.map((g) => (
+                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1191,19 +1227,30 @@ function StoppageForm() {
   });
   const stopCodes = (stopCodesQ.data ?? []) as any[];
 
-  // Machines for selected department
-  const machinesQ = useQuery({
-    queryKey: ["machines", departmentId || department, millId, "stoppage"],
-    queryFn: () => productionApi.getMachines({
-      ...(departmentId ? { department_id: departmentId } : { department }),
-      mill_id: millId, page_size: 1000, page: 1,
-    }),
+  // Machine Group filter
+  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+  const machineGroupsQ = useQuery({
+    queryKey: ["machine-groups", millId],
+    queryFn: () => productionApi.getMachineGroups({ mill_id: millId, active_only: true }),
     staleTime: 60_000,
-    enabled: !!millId && !!(departmentId || department),
+    enabled: !!millId,
+  });
+  const machineGroups = (machineGroupsQ.data ?? []) as MachineGroup[];
+
+  // Machines — filtered by group OR department
+  const machinesQ = useQuery({
+    queryKey: ["machines", departmentId || department, millId, "stoppage", selectedGroupId],
+    queryFn: () => productionApi.getMachines(
+      selectedGroupId
+        ? { machine_group_ids: selectedGroupId, mill_id: millId, page_size: 1000, page: 1 }
+        : { ...(departmentId ? { department_id: departmentId } : { department }), mill_id: millId, page_size: 1000, page: 1 }
+    ),
+    staleTime: 60_000,
+    enabled: !!millId && !!(selectedGroupId || departmentId || department),
   });
   const machines = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[];
 
-  useEffect(() => { setSelectedMachine(""); }, [department]);
+  useEffect(() => { setSelectedMachine(""); }, [department, selectedGroupId]);
 
   // Stoppage log date range
   const [logDateFrom, setLogDateFrom] = useState(localDate);
@@ -1302,6 +1349,7 @@ function StoppageForm() {
               <Label className="text-xs">Department</Label>
               <Select value={department} onValueChange={(v) => {
                 setDepartment(v);
+                setSelectedGroupId("");
                 const d = deptOptions.find((x: any) => (typeof x === "string" ? x : x.name) === v);
                 setDepartmentId(d && typeof d !== "string" ? (d.id || null) : null);
               }}>
@@ -1315,6 +1363,32 @@ function StoppageForm() {
               </Select>
             </div>
           </div>
+
+          {/* ── Machine Group filter ── */}
+          {machineGroups.length > 0 && (
+            <div className="flex items-center gap-3">
+              <Layers className="size-4 text-muted-foreground shrink-0" />
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">
+                  Machine Group <span className="text-[10px]">(select to filter machines)</span>
+                </Label>
+                <Select
+                  value={selectedGroupId || "_all"}
+                  onValueChange={(v) => setSelectedGroupId(v === "_all" ? "" : v)}
+                >
+                  <SelectTrigger className="h-8 text-sm w-64">
+                    <SelectValue placeholder="— All machines in department —" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all">— All machines in department —</SelectItem>
+                    {machineGroups.map((g) => (
+                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
 
           {/* ── Machine selector (once for all rows) ── */}
           <div className="flex items-end gap-3">

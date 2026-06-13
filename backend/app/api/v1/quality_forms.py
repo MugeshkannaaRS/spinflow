@@ -6,7 +6,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select, func, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
@@ -182,7 +182,23 @@ def _make_crud_routes(
         await db.refresh(obj)
         return _model_to_dict(obj)
 
-    return list_records, get_record, create_record, update_record
+    @router.delete(f"{path}/{{record_id}}", status_code=204, summary=f"Delete {tag}")
+    async def delete_record(
+        record_id: str,
+        scope: tuple = Depends(get_mill_scope),
+        db: AsyncSession = Depends(get_db),
+    ):
+        obj = await db.get(model, record_id)
+        if not obj:
+            raise HTTPException(status_code=404, detail=f"{tag} not found")
+        mill_id, _ = scope
+        if mill_id and getattr(obj, "mill_id", None) != mill_id:
+            raise HTTPException(status_code=403, detail="Forbidden")
+        await db.delete(obj)
+        await db.commit()
+        return Response(status_code=204)
+
+    return list_records, get_record, create_record, update_record, delete_record
 
 
 # Register all form CRUD routes
