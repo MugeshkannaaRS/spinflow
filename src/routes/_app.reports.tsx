@@ -33,6 +33,8 @@ import {
   Trash2,
   Boxes,
   Users2,
+  Clock,
+  Layers,
 } from "lucide-react";
 import { exportApi } from "@/lib/api-service";
 import { useState, useMemo } from "react";
@@ -40,6 +42,7 @@ import { Topbar } from "@/components/layout/Topbar";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExportMenu } from "@/components/ui/ExportMenu";
+import { useMillMasters } from "@/hooks/useMillConfig";
 
 export const Route = createFileRoute("/_app/reports")({
   head: () => ({ meta: [{ title: "Reports — SpinFlow ERP" }] }),
@@ -423,13 +426,14 @@ function ReportsPage() {
 // PRODUCTION RECORDS TAB
 // ─────────────────────────────────────────────────────────────────────────────
 
-type RecordType = "entries" | "wastage" | "packing" | "manpower";
+type RecordType = "entries" | "wastage" | "packing" | "stoppage" | "manpower";
 
 const RECORD_TYPES: { value: RecordType; label: string; icon: React.ElementType }[] = [
   { value: "entries",  label: "Shift Entries",  icon: TrendingUp },
-  { value: "wastage",  label: "Wastage",         icon: Trash2 },
-  { value: "packing",  label: "Packing",         icon: Boxes },
-  { value: "manpower", label: "Manpower",        icon: Users2 },
+  { value: "wastage",   label: "Wastage",   icon: Trash2 },
+  { value: "packing",   label: "Packing",   icon: Boxes },
+  { value: "stoppage",  label: "Stoppage",  icon: Clock },
+  { value: "manpower",  label: "Manpower",  icon: Users2 },
 ];
 
 function ProductionRecordsTab() {
@@ -444,32 +448,44 @@ function ProductionRecordsTab() {
   const [dateTo, setDateTo]     = useState(localDate);
   const [shift, setShift]       = useState<string>("_all");
   const [department, setDepartment] = useState<string>("");
+  const [machineGroupId, setMachineGroupId] = useState<string>("");
+  const [machineCode, setMachineCode] = useState<string>("");
+
+  // Dept options from mill masters
+  const { data: millMasters } = useMillMasters();
+  const deptOptions = (millMasters?.department ?? []) as any[];
+
+  // Machine groups
+  const machineGroupsQ = useQuery({
+    queryKey: ["machine-groups", millId],
+    queryFn: () => productionApi.getMachineGroups({ mill_id: millId, active_only: true }),
+    staleTime: 60_000,
+    enabled: !!millId,
+  });
+  const machineGroups = (machineGroupsQ.data ?? []) as any[];
 
   // Load data based on record type
+  const commonParams = {
+    mill_id: millId,
+    ...(dateFrom ? { date_from: dateFrom } : {}),
+    ...(dateTo   ? { date_to: dateTo }     : {}),
+    ...(shift !== "_all" ? { shift } : {}),
+    ...(department ? { department } : {}),
+    ...(machineGroupId ? { machine_group_id: machineGroupId } : {}),
+    ...(machineCode ? { machine_code: machineCode } : {}),
+    page_size: 1000,
+  };
+
   const entriesQ = useQuery({
-    queryKey: ["report-entries", millId, dateFrom, dateTo, shift, department],
-    queryFn: () => productionApi.getEntries({
-      mill_id: millId,
-      ...(dateFrom ? { date_from: dateFrom } : {}),
-      ...(dateTo   ? { date_to: dateTo }     : {}),
-      ...(shift !== "_all" ? { shift } : {}),
-      ...(department ? { department } : {}),
-      page_size: 500,
-    }),
+    queryKey: ["report-entries", millId, dateFrom, dateTo, shift, department, machineGroupId, machineCode],
+    queryFn: () => productionApi.getEntries(commonParams),
     enabled: !!millId && recordType === "entries",
     staleTime: 30_000,
   });
 
   const wasteQ = useQuery({
-    queryKey: ["report-waste", millId, dateFrom, dateTo, shift, department],
-    queryFn: () => productionApi.getWasteEntries({
-      mill_id: millId,
-      ...(dateFrom ? { date_from: dateFrom } : {}),
-      ...(dateTo   ? { date_to: dateTo }     : {}),
-      ...(shift !== "_all" ? { shift } : {}),
-      ...(department ? { department } : {}),
-      page_size: 500,
-    }),
+    queryKey: ["report-waste", millId, dateFrom, dateTo, shift, department, machineGroupId, machineCode],
+    queryFn: () => productionApi.getWasteEntries(commonParams),
     enabled: !!millId && recordType === "wastage",
     staleTime: 30_000,
   });
@@ -479,12 +495,7 @@ function ProductionRecordsTab() {
     queryFn: async () => {
       const { api } = await import("@/lib/api");
       const r = await api.get("/production/packing/entries", {
-        params: {
-          mill_id: millId,
-          ...(dateFrom ? { date: dateFrom } : {}),
-          ...(shift !== "_all" ? { shift } : {}),
-          page_size: 500,
-        },
+        params: { mill_id: millId, date_from: dateFrom, date_to: dateTo, ...(shift !== "_all" ? { shift } : {}), page_size: 1000 },
       });
       return r.data;
     },
@@ -492,28 +503,47 @@ function ProductionRecordsTab() {
     staleTime: 30_000,
   });
 
+  const stoppageQ = useQuery({
+    queryKey: ["report-stoppage", millId, dateFrom, dateTo, shift, department, machineGroupId, machineCode],
+    queryFn: () => productionApi.getDowntimeLogs({
+      mill_id: millId,
+      date_from: dateFrom,
+      date_to: dateTo,
+      ...(shift !== "_all" ? { shift } : {}),
+      ...(department ? { department } : {}),
+      ...(machineCode ? { machine_code: machineCode } : {}),
+      page_size: 1000,
+    }),
+    enabled: !!millId && recordType === "stoppage",
+    staleTime: 30_000,
+  });
+
   const manpowerQ = useQuery({
-    queryKey: ["report-manpower", millId, dateFrom, shift],
+    queryKey: ["report-manpower", millId, dateFrom, dateTo, shift],
     queryFn: () => productionApi.getRFManpower({
       mill_id: millId,
-      ...(dateFrom ? { date: dateFrom } : {}),
+      date_from: dateFrom,
+      date_to: dateTo,
       ...(shift !== "_all" ? { shift } : {}),
     }),
     enabled: !!millId && recordType === "manpower",
     staleTime: 30_000,
   });
 
-  const entryRows  = (entriesQ.data?.data  ?? []) as any[];
-  const wasteRows  = (wasteQ.data?.data   ?? []) as any[];
-  const packingRows = (packingQ.data?.data ?? []) as any[];
-  const manpowerRows = (manpowerQ.data?.data ?? []) as any[];
+  const entryRows    = (entriesQ.data?.data   ?? entriesQ.data   ?? []) as any[];
+  const wasteRows    = (wasteQ.data?.data     ?? wasteQ.data     ?? []) as any[];
+  const packingRows  = (packingQ.data?.data   ?? packingQ.data   ?? []) as any[];
+  const stoppageRows = (Array.isArray(stoppageQ.data) ? stoppageQ.data : (stoppageQ.data?.data ?? [])) as any[];
+  const manpowerRows = (manpowerQ.data?.data  ?? []) as any[];
 
-  const isLoading = (recordType === "entries"  && entriesQ.isLoading)
-    || (recordType === "wastage" && wasteQ.isLoading)
+  const isLoading =
+    (recordType === "entries"  && entriesQ.isLoading)
+    || (recordType === "wastage"  && wasteQ.isLoading)
     || (recordType === "packing"  && packingQ.isLoading)
+    || (recordType === "stoppage" && stoppageQ.isLoading)
     || (recordType === "manpower" && manpowerQ.isLoading);
 
-  // Column configs per record type
+  // Column configs
   const colConfig: Record<RecordType, { key: string; label: string }[]> = {
     entries: [
       { key: "date", label: "Date" },
@@ -523,6 +553,7 @@ function ProductionRecordsTab() {
       { key: "count_ne", label: "Count (Ne)" },
       { key: "produced_kg", label: "Produced (kg)" },
       { key: "target_kg", label: "Target (kg)" },
+      { key: "efficiency_pct", label: "Eff %" },
       { key: "status", label: "Status" },
       { key: "entered_by", label: "By" },
     ],
@@ -535,7 +566,7 @@ function ProductionRecordsTab() {
       { key: "waste_kg", label: "Waste (kg)" },
       { key: "lot_no", label: "Lot" },
       { key: "ratio", label: "Ratio" },
-      { key: "status", label: "Status" },
+      { key: "remarks", label: "Remarks" },
       { key: "entered_by", label: "By" },
     ],
     packing: [
@@ -549,6 +580,17 @@ function ProductionRecordsTab() {
       { key: "total_bags", label: "Total Bags" },
       { key: "operator", label: "Operator" },
     ],
+    stoppage: [
+      { key: "date", label: "Date" },
+      { key: "shift", label: "Shift" },
+      { key: "machine_code", label: "Machine" },
+      { key: "datalog_code", label: "Stop Code" },
+      { key: "stop_from", label: "From" },
+      { key: "stop_to", label: "To" },
+      { key: "duration_min", label: "Duration (min)" },
+      { key: "production_loss_kg", label: "Loss (kg)" },
+      { key: "remarks", label: "Remarks" },
+    ],
     manpower: [
       { key: "date", label: "Date" },
       { key: "shift", label: "Shift" },
@@ -561,40 +603,43 @@ function ProductionRecordsTab() {
     ],
   };
 
-  const activeRows = recordType === "entries" ? entryRows
-    : recordType === "wastage" ? wasteRows
-    : recordType === "packing" ? packingRows
-    : recordType === "manpower" ? manpowerRows
-    : [];
+  const activeRows =
+    recordType === "entries"  ? entryRows
+    : recordType === "wastage"  ? wasteRows
+    : recordType === "packing"  ? packingRows
+    : recordType === "stoppage" ? stoppageRows
+    : manpowerRows;
 
   const cols = colConfig[recordType];
+  const hasDeptFilter = ["entries", "wastage", "stoppage"].includes(recordType);
+  const hasMachineFilter = ["entries", "wastage", "stoppage"].includes(recordType);
 
   return (
     <div className="space-y-4">
       {/* Filters */}
       <Card>
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-3">
+          {/* Record type selector */}
+          <div className="flex flex-wrap gap-1.5">
+            {RECORD_TYPES.map((rt) => (
+              <button
+                key={rt.value}
+                onClick={() => setRecordType(rt.value)}
+                className={[
+                  "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border transition-colors font-medium",
+                  recordType === rt.value
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background border-border text-muted-foreground hover:border-primary/50",
+                ].join(" ")}
+              >
+                <rt.icon className="size-3" />
+                {rt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Filter row */}
           <div className="flex flex-wrap gap-3 items-end">
-            <div className="space-y-1">
-              <Label className="text-xs">Record Type</Label>
-              <div className="flex gap-1">
-                {RECORD_TYPES.map((rt) => (
-                  <button
-                    key={rt.value}
-                    onClick={() => setRecordType(rt.value)}
-                    className={[
-                      "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border transition-colors",
-                      recordType === rt.value
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background border-border text-muted-foreground hover:border-primary/50",
-                    ].join(" ")}
-                  >
-                    <rt.icon className="size-3" />
-                    {rt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
             <div className="space-y-1">
               <Label className="text-xs">From</Label>
               <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs w-36" />
@@ -615,11 +660,40 @@ function ProductionRecordsTab() {
                 </SelectContent>
               </Select>
             </div>
-            {recordType === "wastage" && (
+            {hasDeptFilter && (
               <div className="space-y-1">
                 <Label className="text-xs">Department</Label>
-                <Input value={department} onChange={(e) => setDepartment(e.target.value)}
-                  placeholder="e.g. Ring Frame" className="h-8 text-xs w-36" />
+                <Select value={department || "_all"} onValueChange={(v) => setDepartment(v === "_all" ? "" : v)}>
+                  <SelectTrigger className="h-8 text-xs w-40"><SelectValue placeholder="All depts" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all">All Departments</SelectItem>
+                    {deptOptions.map((d: any) => {
+                      const name = typeof d === "string" ? d : d.name;
+                      return <SelectItem key={name} value={name}>{name}</SelectItem>;
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {hasMachineFilter && machineGroups.length > 0 && (
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1"><Layers className="size-3" /> Machine Group</Label>
+                <Select value={machineGroupId || "_all"} onValueChange={(v) => { setMachineGroupId(v === "_all" ? "" : v); setMachineCode(""); }}>
+                  <SelectTrigger className="h-8 text-xs w-44"><SelectValue placeholder="All groups" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all">All Groups</SelectItem>
+                    {machineGroups.map((g: any) => (
+                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {hasMachineFilter && (
+              <div className="space-y-1">
+                <Label className="text-xs">Machine</Label>
+                <Input value={machineCode} onChange={(e) => setMachineCode(e.target.value)}
+                  placeholder="e.g. CD_001" className="h-8 text-xs w-28" />
               </div>
             )}
           </div>
@@ -639,7 +713,7 @@ function ProductionRecordsTab() {
             <ExportMenu
               filename={`${recordType}_report_${dateFrom}_${dateTo}`}
               title={`${RECORD_TYPES.find((r) => r.value === recordType)?.label} Report`}
-              subtitle={`${dateFrom} to ${dateTo}${shift !== "_all" ? `  Shift: ${shift}` : ""}`}
+              subtitle={`${dateFrom} to ${dateTo}${shift !== "_all" ? `  Shift: ${shift}` : ""}${department ? `  Dept: ${department}` : ""}`}
               columns={cols}
               rows={activeRows}
             />
@@ -649,10 +723,6 @@ function ProductionRecordsTab() {
           {isLoading ? (
             <div className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" /> Loading…
-            </div>
-          ) : recordType === "entries" ? (
-            <div className="p-6 text-sm text-muted-foreground">
-              Use the Shift Entries Log tab on the Production page for detailed shift entry records.
             </div>
           ) : activeRows.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground text-center">

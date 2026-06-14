@@ -196,9 +196,12 @@ async def _background_init():
             await asyncio.to_thread(_run_alembic_upgrade)
             logger.info("END step 1: Alembic migration OK")
         except Exception as alembic_exc:
-            logger.error("Alembic upgrade failed (%s) — applying raw SQL fallback for migration 040", alembic_exc)
-            await _apply_migration_040_raw()
-            logger.info("END step 1: raw SQL fallback applied")
+            logger.error("Alembic upgrade failed (%s) — will apply raw SQL fallback", alembic_exc)
+        # Always run raw DDL for migration 040 — fully idempotent (IF NOT EXISTS).
+        # Handles case where Alembic reports "already at head" but DDL never actually ran.
+        logger.info("START step 1b: ensure migration 040 DDL")
+        await _apply_migration_040_raw()
+        logger.info("END step 1b: migration 040 DDL confirmed")
 
         from app.db.session import get_db
         from app.services.pricing_service import PricingService
