@@ -163,13 +163,42 @@ async def lifespan(app: FastAPI):
     await engine.dispose()
 
 
+async def _apply_migration_040_raw() -> None:
+    """Fallback: apply migration 040 DDL directly if Alembic fails."""
+    from sqlalchemy import text
+    from app.db.session import engine as _engine
+    async with _engine.begin() as conn:
+        await conn.execute(text("ALTER TABLE waste_entries ADD COLUMN IF NOT EXISTS waste_type VARCHAR(100)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_waste_entries_type ON waste_entries (mill_id, waste_type)"))
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS manpower_categories (
+                id VARCHAR PRIMARY KEY,
+                mill_id VARCHAR NOT NULL,
+                department VARCHAR(100) NOT NULL,
+                category VARCHAR(100) NOT NULL,
+                label VARCHAR(200) NOT NULL,
+                sort_order INTEGER DEFAULT 0,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                CONSTRAINT uq_manpower_cat_mill_dept_cat UNIQUE (mill_id, department, category)
+            )
+        """))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_manpower_categories_mill_dept ON manpower_categories (mill_id, department)"))
+    logger.info("migration 040 raw SQL fallback: done")
+
+
 async def _background_init():
     global _app_started, _app_init_error
     try:
         # ── Step 1: Alembic migration ───────────────────────────────────
         logger.info("START step 1: Alembic migration")
-        await asyncio.to_thread(_run_alembic_upgrade)
-        logger.info("END step 1: Alembic migration")
+        try:
+            await asyncio.to_thread(_run_alembic_upgrade)
+            logger.info("END step 1: Alembic migration OK")
+        except Exception as alembic_exc:
+            logger.error("Alembic upgrade failed (%s) — applying raw SQL fallback for migration 040", alembic_exc)
+            await _apply_migration_040_raw()
+            logger.info("END step 1: raw SQL fallback applied")
 
         from app.db.session import get_db
         from app.services.pricing_service import PricingService
