@@ -439,13 +439,27 @@ function ProductionRecordsTab() {
   const thirtyDaysAgo = new Date(today.getTime() - 30 * 86400_000);
   const defaultFrom = new Date(thirtyDaysAgo.getTime() - thirtyDaysAgo.getTimezoneOffset() * 60000).toISOString().split("T")[0];
 
-  const [recordType, setRecordType] = useState<RecordType>("entries");
+  const [recordType, setRecordType] = useState<RecordType>("wastage");
   const [dateFrom, setDateFrom] = useState(defaultFrom);
   const [dateTo, setDateTo]     = useState(localDate);
   const [shift, setShift]       = useState<string>("_all");
   const [department, setDepartment] = useState<string>("");
 
   // Load data based on record type
+  const entriesQ = useQuery({
+    queryKey: ["report-entries", millId, dateFrom, dateTo, shift, department],
+    queryFn: () => productionApi.getEntries({
+      mill_id: millId,
+      ...(dateFrom ? { date_from: dateFrom } : {}),
+      ...(dateTo   ? { date_to: dateTo }     : {}),
+      ...(shift !== "_all" ? { shift } : {}),
+      ...(department ? { department } : {}),
+      page_size: 500,
+    }),
+    enabled: !!millId && recordType === "entries",
+    staleTime: 30_000,
+  });
+
   const wasteQ = useQuery({
     queryKey: ["report-waste", millId, dateFrom, dateTo, shift, department],
     queryFn: () => productionApi.getWasteEntries({
@@ -489,17 +503,29 @@ function ProductionRecordsTab() {
     staleTime: 30_000,
   });
 
+  const entryRows  = (entriesQ.data?.data  ?? []) as any[];
   const wasteRows  = (wasteQ.data?.data   ?? []) as any[];
   const packingRows = (packingQ.data?.data ?? []) as any[];
   const manpowerRows = (manpowerQ.data?.data ?? []) as any[];
 
-  const isLoading = (recordType === "wastage" && wasteQ.isLoading)
+  const isLoading = (recordType === "entries"  && entriesQ.isLoading)
+    || (recordType === "wastage" && wasteQ.isLoading)
     || (recordType === "packing"  && packingQ.isLoading)
     || (recordType === "manpower" && manpowerQ.isLoading);
 
   // Column configs per record type
   const colConfig: Record<RecordType, { key: string; label: string }[]> = {
-    entries: [],
+    entries: [
+      { key: "date", label: "Date" },
+      { key: "shift", label: "Shift" },
+      { key: "department", label: "Dept" },
+      { key: "machine_code", label: "Machine" },
+      { key: "count_ne", label: "Count (Ne)" },
+      { key: "produced_kg", label: "Produced (kg)" },
+      { key: "target_kg", label: "Target (kg)" },
+      { key: "status", label: "Status" },
+      { key: "entered_by", label: "By" },
+    ],
     wastage: [
       { key: "date", label: "Date" },
       { key: "shift", label: "Shift" },
@@ -535,7 +561,8 @@ function ProductionRecordsTab() {
     ],
   };
 
-  const activeRows = recordType === "wastage" ? wasteRows
+  const activeRows = recordType === "entries" ? entryRows
+    : recordType === "wastage" ? wasteRows
     : recordType === "packing" ? packingRows
     : recordType === "manpower" ? manpowerRows
     : [];

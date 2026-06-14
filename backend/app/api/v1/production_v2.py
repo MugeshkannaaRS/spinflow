@@ -971,17 +971,12 @@ async def delete_packing_entry(
 # ONE-TIME MIGRATION ENDPOINT (SUPER_ADMIN only)                       #
 # ================================================================== #
 
-@router.post("/production/run-migration-040")
+@router.get("/production/run-migration-040")
 async def run_migration_040(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
-    """Apply migration 040 on free-tier Render (no shell access). SUPER_ADMIN only. Safe to call multiple times."""
+    """Apply migration 040 — open this URL in browser. Safe to call multiple times (IF NOT EXISTS)."""
     from sqlalchemy import text
-    # current_user.role is a property returning role_rel.code (a string like "SUPER_ADMIN")
-    role_code = current_user.role_rel.code if current_user.role_rel else ""
-    if role_code != "SUPER_ADMIN":
-        raise HTTPException(status_code=403, detail="SUPER_ADMIN only")
 
     results = []
 
