@@ -978,7 +978,8 @@ async def run_migration_040(
 ):
     """Apply migration 040 on free-tier Render (no shell access). SUPER_ADMIN only. Safe to call multiple times."""
     from sqlalchemy import text
-    role_code = getattr(current_user.role, "code", None) or getattr(current_user, "role_code", None)
+    # current_user.role is a property returning role_rel.code (a string like "SUPER_ADMIN")
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
     if role_code != "SUPER_ADMIN":
         raise HTTPException(status_code=403, detail="SUPER_ADMIN only")
 

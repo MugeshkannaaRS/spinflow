@@ -276,44 +276,6 @@ function LoginPage() {
             </button>
           </form>
 
-          {/* Demo accounts */}
-          <div className="mt-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="flex-1 h-px bg-[#e2e8f0]" />
-              <span className="text-[12px] font-semibold text-[#94a3b8] uppercase tracking-wide">
-                Demo accounts
-              </span>
-              <div className="flex-1 h-px bg-[#e2e8f0]" />
-            </div>
-
-            <p className="text-[12px] text-[#94a3b8] text-center mb-3">
-              Password for all demos: <span className="font-mono font-semibold text-[#64748b]">Admin@1234</span>
-            </p>
-
-            <div className="grid grid-cols-2 gap-2">
-              {DEMO_ACCOUNTS.map((demo) => (
-                <button
-                  key={demo.id}
-                  type="button"
-                  onClick={() => handleDemoLogin(demo)}
-                  disabled={m.isPending}
-                  className={cn(
-                    "text-left p-3 rounded-lg border bg-white hover:shadow-sm transition-all",
-                    "disabled:opacity-50 disabled:cursor-not-allowed",
-                    "border-[#e2e8f0] hover:border-blue-200",
-                  )}
-                >
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className={cn("inline-block rounded text-[10px] font-semibold uppercase px-1.5 py-0.5", demo.color)}>
-                      {demo.label}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-[#94a3b8] leading-snug">{demo.desc}</p>
-                  <p className="text-[11px] text-[#64748b] mt-1 font-mono truncate">{demo.email}</p>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     </div>
