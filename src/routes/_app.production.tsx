@@ -1988,7 +1988,10 @@ function ManpowerGrid() {
   const [department, setDepartment] = useState<string>("Ring Frame");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  // Machine group support
+
+  // Mode: individual machine OR machine group (like Stoppage)
+  const [manpowerMode, setManpowerMode] = useState<"individual" | "group">("individual");
+  const [selectedMachine, setSelectedMachine] = useState<string>("");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
 
   const { data: millMasters } = useMillMasters();
@@ -2096,24 +2099,61 @@ function ManpowerGrid() {
   }, [existingQ.data]);
 
   const bulkMutation = useMutation({
-    mutationFn: () => {
-      const filled = rows.filter((r) => Number(r.headcount) > 0 || r.mcIdFrom);
+    mutationFn: async () => {
+      const filled = rows.filter((r) => Number(r.headcount) > 0);
       if (!date || !shift) throw new Error("Date and Shift are required");
-      return productionApi.upsertRFManpowerBulk({
-        date, shift,
-        rows: filled.map((r) => ({
-          category: r.category,
-          mc_id_from: r.mcIdFrom || undefined,
-          mc_id_to: r.mcIdTo || undefined,
-          total_machines: r.totalMachines ? Number(r.totalMachines) : 0,
-          headcount: Number(r.headcount) || 0,
-          supervisor: r.supervisor || undefined,
-        })),
-      }, millId ?? "");
+      if (filled.length === 0) throw new Error("Enter headcount for at least one category");
+
+      const buildRows = (machineCodes?: string) => filled.map((r) => ({
+        category: r.category,
+        mc_id_from: manpowerMode === "individual" ? (selectedMachine || undefined) : (r.mcIdFrom || undefined),
+        mc_id_to: manpowerMode === "individual" ? undefined : (r.mcIdTo || undefined),
+        total_machines: r.totalMachines ? Number(r.totalMachines) : 0,
+        headcount: Number(r.headcount) || 0,
+        supervisor: r.supervisor || undefined,
+      }));
+
+      if (manpowerMode === "individual") {
+        if (!selectedMachine) throw new Error("Select a machine first");
+        const res = await productionApi.upsertRFManpowerBulk({ date, shift, rows: buildRows() }, millId ?? "");
+        return { upserted: res.upserted, errors: res.errors ?? [], machines: 1 };
+      } else {
+        // Group mode: one bulk call per machine in the selected group
+        if (!selectedGroupId) throw new Error("Select a machine group first");
+        const groupMachines = (Array.isArray(mpMachinesQ.data) ? mpMachinesQ.data : (mpMachinesQ.data?.data ?? [])) as any[];
+        if (groupMachines.length === 0) throw new Error("No machines found in selected group");
+        const machineCodes = groupMachines.map((m: any) => m.code).filter(Boolean);
+
+        const calls = machineCodes.map((mc: string) =>
+          productionApi.upsertRFManpowerBulk({
+            date, shift,
+            rows: filled.map((r) => ({
+              category: r.category,
+              mc_id_from: mc,
+              mc_id_to: undefined,
+              total_machines: 1,
+              headcount: Number(r.headcount) || 0,
+              supervisor: r.supervisor || undefined,
+            })),
+          }, millId ?? "")
+        );
+        const results = await Promise.allSettled(calls);
+        const succeeded = results.filter((r) => r.status === "fulfilled").length;
+        const failed = results.filter((r) => r.status === "rejected");
+        if (succeeded === 0 && failed.length > 0) {
+          const firstErr = (failed[0] as PromiseRejectedResult).reason;
+          throw new Error(firstErr?.response?.data?.detail || `All ${failed.length} machines failed`);
+        }
+        const totalUpserted = results.reduce((s, r) => s + (r.status === "fulfilled" ? (r.value as any).upserted : 0), 0);
+        return { upserted: totalUpserted, errors: failed.map((f) => (f as PromiseRejectedResult).reason?.message ?? "error"), machines: machineCodes.length };
+      }
     },
-    onSuccess: (res: any) => {
-      toast.success(`${res.upserted} manpower rows saved`);
-      if (res.errors?.length) res.errors.forEach((e: string) => toast.warning(e));
+    onSuccess: ({ upserted, errors: errs, machines }) => {
+      const label = manpowerMode === "group"
+        ? `${upserted} rows saved across ${machines} machines`
+        : `${upserted} manpower rows saved for ${selectedMachine}`;
+      toast.success(label);
+      if (errs.length > 0) toast.warning(`${errs.length} machine(s) had errors`);
       qc.invalidateQueries({ queryKey: ["rf-manpower"] });
     },
     onError: (err: Error) => toast.error(err.message),
@@ -2171,108 +2211,198 @@ function ManpowerGrid() {
               <div className="text-xl font-semibold mt-0.5">{totalHeadcount} workers</div>
             </div>
           </div>
-          {machineGroups.length > 0 && (
-            <div className="mt-3 flex items-center gap-3">
-              <Layers className="size-4 text-muted-foreground shrink-0" />
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Machine Group <span className="text-[10px]">(filters MC From/To dropdowns)</span></Label>
-                <Select value={selectedGroupId || "_all"} onValueChange={(v) => setSelectedGroupId(v === "_all" ? "" : v)}>
-                  <SelectTrigger className="h-8 text-sm w-64"><SelectValue placeholder="— All machines —" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_all">— All machines in department —</SelectItem>
-                    {machineGroups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
+      {/* ── Machine selector — mode-aware (like Stoppage) ── */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between py-3">
+        <CardHeader className="py-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
             <Users2 className="size-4 text-muted-foreground" />
             {department} — Manpower Plan
             {categoriesQ.isLoading && <span className="text-xs text-muted-foreground font-normal">(loading…)</span>}
           </CardTitle>
-          <Button size="sm" onClick={handleSubmit} disabled={bulkMutation.isPending || rows.length === 0}>
-            <Save className="size-3.5 mr-1.5" />
-            {bulkMutation.isPending ? "Saving…" : "Save Plan"}
-          </Button>
+          <div className="flex items-center gap-3">
+            {/* Mode toggle */}
+            <div className="flex rounded-md border overflow-hidden text-xs">
+              <button
+                className={`px-3 py-1.5 font-medium transition-colors ${manpowerMode === "individual" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                onClick={() => { setManpowerMode("individual"); setSelectedGroupId(""); }}
+              >
+                Individual
+              </button>
+              <button
+                className={`px-3 py-1.5 font-medium transition-colors border-l ${manpowerMode === "group" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
+                onClick={() => { setManpowerMode("group"); setSelectedMachine(""); }}
+              >
+                Machine Group
+              </button>
+            </div>
+            <Button size="sm" onClick={handleSubmit} disabled={bulkMutation.isPending || rows.length === 0}>
+              <Save className="size-3.5 mr-1.5" />
+              {bulkMutation.isPending
+                ? "Saving…"
+                : manpowerMode === "group" && selectedGroupId && mpMachines.length > 0
+                  ? `Log for ${mpMachines.length} machines`
+                  : "Save Plan"}
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="p-0">
-          {rows.length === 0 && !categoriesQ.isLoading ? (
-            <div className="p-6 text-sm text-muted-foreground text-center">
-              No categories found for <strong>{department}</strong>.
-              Add them in Masters → Manpower Categories.
+
+        <CardContent className="space-y-4 pt-0 px-4 pb-4">
+          {/* Individual mode: optional group filter + machine selector */}
+          {manpowerMode === "individual" ? (
+            <div className="space-y-3">
+              {machineGroups.length > 0 && (
+                <div className="flex items-center gap-3">
+                  <Layers className="size-4 text-muted-foreground shrink-0" />
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Machine Group <span className="text-[10px]">(filter machines)</span></Label>
+                    <Select value={selectedGroupId || "_all"} onValueChange={(v) => { setSelectedGroupId(v === "_all" ? "" : v); setSelectedMachine(""); }}>
+                      <SelectTrigger className="h-8 text-sm w-64"><SelectValue placeholder="— All machines —" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_all">— All machines in department —</SelectItem>
+                        {machineGroups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">
+                  Machine <span className="text-destructive">*</span>
+                  {department && <span className="text-muted-foreground font-normal ml-1">({department})</span>}
+                </Label>
+                <Select value={selectedMachine} onValueChange={setSelectedMachine} disabled={!department && !selectedGroupId}>
+                  <SelectTrigger className="h-9 text-sm border-primary/40 font-medium">
+                    <SelectValue placeholder={department || selectedGroupId ? "Select machine…" : "Select a department first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {mpMachines.length === 0
+                      ? <SelectItem value="_none" disabled>No machines found</SelectItem>
+                      : mpMachines.map((m: any) => (
+                          <SelectItem key={m.code} value={m.code}>{m.code}{m.name ? ` — ${m.name}` : ""}</SelectItem>
+                        ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           ) : (
-          <div className="w-full overflow-x-auto">
-            <Table className="min-w-[720px] w-full text-sm">
-              <TableHeader>
-                <TableRow className="bg-muted/40">
-                  <TableHead className="pl-4 w-52">Category</TableHead>
-                  <TableHead className="w-36">MC From</TableHead>
-                  <TableHead className="w-36">MC To</TableHead>
-                  <TableHead className="w-28">Total Machines</TableHead>
-                  <TableHead className="w-28">Headcount</TableHead>
-                  <TableHead>Supervisor</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row, idx) => (
-                  <TableRow key={row.category} className={Number(row.headcount) > 0 ? "bg-primary/5" : undefined}>
-                    <TableCell className="pl-4 font-medium text-xs">{row.categoryLabel}</TableCell>
-                    <TableCell>
-                      <Select value={row.mcIdFrom} onValueChange={(v) => updateRow(idx, "mcIdFrom", v)}>
-                        <SelectTrigger className="h-7 text-xs w-full">
-                          <SelectValue placeholder={mpMachines.length ? "From" : "—"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {mpMachines.map((m: any) => (
-                            <SelectItem key={m.code} value={m.code}>{m.code}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Select value={row.mcIdTo} onValueChange={(v) => updateRow(idx, "mcIdTo", v)}>
-                        <SelectTrigger className="h-7 text-xs w-full">
-                          <SelectValue placeholder={mpMachines.length ? "To" : "—"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {mpMachines.map((m: any) => (
-                            <SelectItem key={m.code} value={m.code}>{m.code}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell>
-                      <Input type="number" min={0} value={row.totalMachines}
-                        onChange={(e) => updateRow(idx, "totalMachines", e.target.value)}
-                        placeholder="0" className="h-7 text-xs w-full" />
-                    </TableCell>
-                    <TableCell>
-                      <Input type="number" min={0} value={row.headcount}
-                        onChange={(e) => updateRow(idx, "headcount", e.target.value)}
-                        placeholder="0" className="h-7 text-xs w-full font-medium" />
-                    </TableCell>
-                    <TableCell>
-                      <Input value={row.supervisor} onChange={(e) => updateRow(idx, "supervisor", e.target.value)}
-                        placeholder="Name" className="h-7 text-xs w-full" />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+            /* Group mode: select group → chip list → form for all machines */
+            <div className="space-y-2">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">
+                  Machine Group <span className="text-destructive">*</span>
+                  <span className="text-muted-foreground font-normal ml-1 text-[10px]">(manpower logged for every machine in this group)</span>
+                </Label>
+                <Select value={selectedGroupId || ""} onValueChange={(v) => setSelectedGroupId(v)}>
+                  <SelectTrigger className="h-9 text-sm border-primary/40 font-medium">
+                    <SelectValue placeholder="Select machine group…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {machineGroups.length === 0
+                      ? <SelectItem value="_none" disabled>No machine groups configured</SelectItem>
+                      : machineGroups.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                        ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedGroupId && mpMachines.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <span className="text-xs text-muted-foreground">Will log for:</span>
+                  {mpMachines.slice(0, 14).map((m: any) => (
+                    <span key={m.code} className="text-xs bg-amber-100 text-amber-800 rounded px-1.5 py-0.5 font-mono">{m.code}</span>
+                  ))}
+                  {mpMachines.length > 14 && (
+                    <span className="text-xs text-muted-foreground">+{mpMachines.length - 14} more</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Category rows — shown once machine/group selected */}
+          {(manpowerMode === "individual" ? !!selectedMachine : !!selectedGroupId) && (
+            <>
+              {rows.length === 0 && !categoriesQ.isLoading ? (
+                <div className="p-4 text-sm text-muted-foreground text-center border rounded-md">
+                  No categories for <strong>{department}</strong>. Add them in Masters → Manpower Categories.
+                </div>
+              ) : (
+                <div className="w-full overflow-x-auto rounded-md border">
+                  <Table className="min-w-[520px] w-full text-sm">
+                    <TableHeader>
+                      <TableRow className="bg-muted/40">
+                        <TableHead className="pl-4 w-52">Category</TableHead>
+                        {manpowerMode === "individual" && (
+                          <>
+                            <TableHead className="w-28">MC From</TableHead>
+                            <TableHead className="w-28">MC To</TableHead>
+                            <TableHead className="w-28">Total Machines</TableHead>
+                          </>
+                        )}
+                        <TableHead className="w-28">Headcount</TableHead>
+                        <TableHead>Supervisor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((row, idx) => (
+                        <TableRow key={row.category} className={Number(row.headcount) > 0 ? "bg-primary/5" : undefined}>
+                          <TableCell className="pl-4 font-medium text-xs">{row.categoryLabel}</TableCell>
+                          {manpowerMode === "individual" && (
+                            <>
+                              <TableCell>
+                                <Select value={row.mcIdFrom} onValueChange={(v) => updateRow(idx, "mcIdFrom", v)}>
+                                  <SelectTrigger className="h-7 text-xs w-full"><SelectValue placeholder="From" /></SelectTrigger>
+                                  <SelectContent>
+                                    {mpMachines.map((m: any) => <SelectItem key={m.code} value={m.code}>{m.code}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Select value={row.mcIdTo} onValueChange={(v) => updateRow(idx, "mcIdTo", v)}>
+                                  <SelectTrigger className="h-7 text-xs w-full"><SelectValue placeholder="To" /></SelectTrigger>
+                                  <SelectContent>
+                                    {mpMachines.map((m: any) => <SelectItem key={m.code} value={m.code}>{m.code}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Input type="number" min={0} value={row.totalMachines}
+                                  onChange={(e) => updateRow(idx, "totalMachines", e.target.value)}
+                                  placeholder="0" className="h-7 text-xs w-full" />
+                              </TableCell>
+                            </>
+                          )}
+                          <TableCell>
+                            <Input type="number" min={0} value={row.headcount}
+                              onChange={(e) => updateRow(idx, "headcount", e.target.value)}
+                              placeholder="0" className="h-7 text-xs w-full font-medium" />
+                          </TableCell>
+                          <TableCell>
+                            <Input value={row.supervisor} onChange={(e) => updateRow(idx, "supervisor", e.target.value)}
+                              placeholder="Name" className="h-7 text-xs w-full" />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </>
+          )}
+
+          {(manpowerMode === "individual" ? !selectedMachine : !selectedGroupId) && (
+            <p className="text-xs text-muted-foreground text-center py-2">
+              {manpowerMode === "individual" ? "Select a machine above to enter headcount" : "Select a machine group above to enter headcount for all machines"}
+            </p>
           )}
         </CardContent>
       </Card>
+
       <p className="text-xs text-muted-foreground">
-        Rows auto-load if a plan already exists for this date + shift. Saving overwrites existing entries.
-        Categories are per-department and customisable in Masters.
+        Categories are per-department and customisable in Masters → Manpower Categories.
       </p>
     </div>
   );
