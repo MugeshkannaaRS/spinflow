@@ -537,3 +537,13 @@ async def health():
     }
     http_status = 200 if overall_healthy else 503
     return JSONResponse(content=payload, status_code=http_status)
+
+
+@app.get("/api/run-migration-040")
+async def run_migration_040_public():
+    """Public endpoint — apply migration 040 DDL. Safe to call multiple times (IF NOT EXISTS)."""
+    try:
+        await _apply_migration_040_raw()
+        return {"status": "ok", "message": "Migration 040 applied successfully (waste_type column + manpower_categories table)"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

@@ -183,7 +183,7 @@ function ShiftGrid() {
       setDepartment(name);
       setDepartmentId(id);
     }
-  }, [deptOptions]);
+  }, [deptOptions, department]);
 
   // Reset section filter when dept changes
   useEffect(() => { setSelectedSection("all"); }, [department]);
@@ -230,7 +230,7 @@ function ShiftGrid() {
 
   useEffect(() => {
     setRows(buildRows(machines).map((r) => ({ ...r, operator: operatorName })));
-  }, [machines]);
+  }, [machinesQ.data]);
 
   // When operator name changes, pre-fill all existing rows
   useEffect(() => {
@@ -904,7 +904,7 @@ function WasteGrid() {
       setDepartment(name);
       setDepartmentId(id);
     }
-  }, [deptOptions]);
+  }, [deptOptions, department]);
 
   const machinesQ = useQuery({
     queryKey: ["machines", departmentId || department, millId, selectedGroupId],
@@ -921,7 +921,7 @@ function WasteGrid() {
     [machinesQ.data],
   );
   const [rows, setRows] = useState<WasteRow[]>(() => buildWasteRows(machines));
-  useEffect(() => { setRows(buildWasteRows(machines)); }, [machines]);
+  useEffect(() => { setRows(buildWasteRows(machines)); }, [machinesQ.data]);
 
   const updateWasteRow = (idx: number, field: keyof WasteRow, value: string) => {
     setRows((prev) => { const next = [...prev]; next[idx] = { ...next[idx], [field]: value }; return next; });

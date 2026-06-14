@@ -120,8 +120,9 @@ RF_CATEGORY_LABELS: Dict[str, str] = {
 
 
 class RFManpowerCreate(BaseModel):
-    date: str
-    shift: str = Field(..., pattern="^(A|B|C)$")
+    # date/shift optional here — inherited from parent RFManpowerBulkCreate
+    date: Optional[str] = None
+    shift: Optional[str] = None
     category: str
     mc_id_from: Optional[str] = None
     mc_id_to: Optional[str] = None
