@@ -272,27 +272,28 @@ _waste_type_col_exists: Optional[bool] = None  # module-level cache
 
 
 async def _check_waste_type_col(db: AsyncSession) -> bool:
-    """Check once whether waste_type column exists; cache result."""
+    """Check once whether waste_type column exists; cache result. Uses a separate connection to avoid txn issues."""
     global _waste_type_col_exists
     if _waste_type_col_exists is None:
         from sqlalchemy import text
+        from app.db.session import engine as _engine
         try:
-            result = await db.execute(text(
-                "SELECT 1 FROM information_schema.columns "
-                "WHERE table_name='waste_entries' AND column_name='waste_type' LIMIT 1"
-            ))
-            _waste_type_col_exists = result.scalar() is not None
-            if not _waste_type_col_exists:
-                # Try to add it now — opportunistic migration
-                try:
-                    await db.execute(text("ALTER TABLE waste_entries ADD COLUMN IF NOT EXISTS waste_type VARCHAR(100)"))
-                    await db.commit()
-                    _waste_type_col_exists = True
-                    logger.info("waste_type column added on-the-fly during bulk insert")
-                except Exception as add_err:
-                    logger.warning("Could not add waste_type column: %s", add_err)
-                    await db.rollback()
-        except Exception:
+            async with _engine.connect() as conn:
+                result = await conn.execute(text(
+                    "SELECT 1 FROM information_schema.columns "
+                    "WHERE table_name='waste_entries' AND column_name='waste_type' LIMIT 1"
+                ))
+                _waste_type_col_exists = result.scalar() is not None
+                if not _waste_type_col_exists:
+                    try:
+                        await conn.execute(text("ALTER TABLE waste_entries ADD COLUMN IF NOT EXISTS waste_type VARCHAR(100)"))
+                        await conn.commit()
+                        _waste_type_col_exists = True
+                        logger.info("waste_type column added on-the-fly")
+                    except Exception as add_err:
+                        logger.warning("Could not add waste_type column: %s", add_err)
+        except Exception as e:
+            logger.warning("_check_waste_type_col failed: %s", e)
             _waste_type_col_exists = False
     return _waste_type_col_exists
 
@@ -848,7 +849,7 @@ async def list_packing_entries(
     lot_no: Optional[str] = Query(None),
     mill_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(100, ge=1, le=500),
+    page_size: int = Query(100, ge=1, le=2000),
     scope: tuple = Depends(get_mill_scope),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_module("production")),
