@@ -114,7 +114,7 @@ export const productionApi = {
   getPageInit: (millId: string) => api.get("/production/v2/page-init", { params: { mill_id: millId } }).then((r) => r.data),
   getWasteEntries: (params?: Record<string, any>) => api.get("/production/waste-entries", { params }).then((r) => r.data),
   getWasteTypes: (params?: Record<string, any>) => api.get("/production/waste-entries/types", { params }).then((r) => r.data),
-  createWasteBulk: (data: any) => api.post("/production/waste-entries/bulk", data).then((r) => r.data),
+  createWasteBulk: (data: any, millId?: string) => api.post("/production/waste-entries/bulk", data, { params: millId ? { mill_id: millId } : {} }).then((r) => r.data),
   approveWasteEntry: (id: string) => api.patch(`/production/waste-entries/${id}/approve`).then((r) => r.data),
   getManpowerCategories: (params?: Record<string, any>) => api.get("/production/manpower-categories", { params }).then((r) => r.data),
   createManpowerCategory: (data: any, millId: string) => api.post(`/production/manpower-categories?mill_id=${millId}`, data).then((r) => r.data),

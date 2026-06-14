@@ -846,16 +846,17 @@ async def list_packing_entries(
     date: Optional[str] = Query(None),
     shift: Optional[str] = Query(None),
     lot_no: Optional[str] = Query(None),
+    mill_id: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=500),
     scope: tuple = Depends(get_mill_scope),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_module("production")),
 ):
-    mill_id, company_id = scope
+    scoped_mill_id = mill_id or scope[0]
     stmt = select(PackingShiftEntry)
-    if mill_id:
-        stmt = stmt.where(PackingShiftEntry.mill_id == mill_id)
+    if scoped_mill_id:
+        stmt = stmt.where(PackingShiftEntry.mill_id == scoped_mill_id)
     if date:
         stmt = stmt.where(PackingShiftEntry.date == date)
     if shift:
@@ -879,18 +880,19 @@ async def get_last_bag_for_lot(
     lot_no: str,
     date: Optional[str] = Query(None),
     shift: Optional[str] = Query(None),
+    mill_id: Optional[str] = Query(None),
     scope: tuple = Depends(get_mill_scope),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_module("production")),
 ):
     """Return the highest bag_to for this lot scoped to date+shift (for auto-fill logic)."""
-    mill_id, _ = scope
+    scoped_mill_id = mill_id or scope[0]
     stmt = (
         select(func.max(PackingShiftEntry.bag_to))
         .where(PackingShiftEntry.lot_no == lot_no)
     )
-    if mill_id:
-        stmt = stmt.where(PackingShiftEntry.mill_id == mill_id)
+    if scoped_mill_id:
+        stmt = stmt.where(PackingShiftEntry.mill_id == scoped_mill_id)
     if date:
         stmt = stmt.where(PackingShiftEntry.date == date)
     if shift:
@@ -902,15 +904,14 @@ async def get_last_bag_for_lot(
 @router.post("/production/packing/entries/bulk", status_code=201)
 async def bulk_create_packing_entries(
     body: dict,
-    scope: tuple = Depends(get_mill_scope),
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production", write=True)),
 ):
     """Bulk-create packing entries for one shift.
     body = { date, shift, supervisor?, entries: [{lot_no, count_ne, ...}] }
     """
-    mill_id, _ = scope
-    resolved_mill_id = await _resolve_mill(current_user, db, None) if not mill_id else mill_id
+    resolved_mill_id = await _resolve_mill(current_user, db, mill_id)
     entries = body.get("entries", [])
     if not entries:
         raise HTTPException(status_code=400, detail="entries list is empty")

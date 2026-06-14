@@ -953,7 +953,7 @@ function WasteGrid() {
               waste_kg: Number(groupWasteKg),
               remarks: groupRemarks || undefined,
             }],
-          })
+          }, millId ?? undefined)
         );
         const results = await Promise.allSettled(calls);
         const succeeded = results.filter((r) => r.status === "fulfilled").length;
@@ -980,7 +980,7 @@ function WasteGrid() {
             waste_kg: Number(r.wasteKg),
             remarks: r.remarks || undefined,
           })),
-        });
+        }, millId ?? undefined);
       }
     },
     onSuccess: (res: any) => {
@@ -2952,7 +2952,7 @@ function PackingGrid() {
     try {
       const r = await api.get(
         `/production/packing/last-bag/${encodeURIComponent(lot)}`,
-        { params: { date, shift } }
+        { params: { date, shift, ...(millId ? { mill_id: millId } : {}) } }
       );
       const last = r.data?.last_bag_to;
       if (last != null) {
@@ -3031,7 +3031,7 @@ function PackingGrid() {
             supervisor: supervisor || null,
             remarks: r.remarks || null,
           })),
-        });
+        }, { params: { mill_id: millId } });
       }
 
       for (const r of existingRows) {
