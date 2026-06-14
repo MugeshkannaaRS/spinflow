@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, field_validator, model_validator
-from typing import Optional, List, Dict
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
+from typing import Optional, List, Dict, Any
 from datetime import date, datetime
 
 
@@ -278,9 +278,31 @@ class LeaveRequestOut(BaseModel):
         from_attributes = True
 
 
+def _to_float(v: Any) -> Optional[float]:
+    """Coerce Excel string/int/float → float, silently return None on blank/invalid."""
+    if v is None or v == "" or v != v:  # v != v catches NaN
+        return None
+    try:
+        return float(str(v).replace(",", "").strip())
+    except (ValueError, TypeError):
+        return None
+
+def _to_int(v: Any) -> Optional[int]:
+    f = _to_float(v)
+    return int(f) if f is not None else None
+
+def _to_str(v: Any) -> Optional[str]:
+    if v is None or str(v).strip() in ("", "nan", "NaN", "None"):
+        return None
+    return str(v).strip()
+
+
 class EmployeeBulkItem(BaseModel):
-    employee_code: str
-    full_name: str
+    # Extra fields from user's Excel (unknown column names) go silently to custom_fields
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    employee_code: str = ""
+    full_name: str = ""
     department: str = "General"
     designation: Optional[str] = None
     section: Optional[str] = None
@@ -291,24 +313,10 @@ class EmployeeBulkItem(BaseModel):
     age: Optional[int] = None
     gender: Optional[str] = None
     grade: Optional[str] = None
-    custom_fields: Optional[Dict[str, str]] = None
-
-    @field_validator("employee_code", mode="before")
-    @classmethod
-    def coerce_employee_code(cls, v):
-        if v is None or v == "":
-            return ""
-        return str(v).strip()
-
-    @field_validator("gen", "grade", mode="before")
-    @classmethod
-    def coerce_optional_str(cls, v):
-        if v is None or v == "":
-            return None
-        return str(v).strip()
     phone: Optional[str] = None
     sl_no: Optional[int] = None
     bank_account_no: Optional[str] = None
+    # Salary fields — all coerced from string (Excel sends numbers as strings sometimes)
     basic: Optional[float] = None
     house_rent: Optional[float] = None
     medical: Optional[float] = None
@@ -325,6 +333,7 @@ class EmployeeBulkItem(BaseModel):
     shift_tk: Optional[float] = None
     roster_qty: Optional[int] = None
     roster_tk: Optional[float] = None
+    # Payroll fields (optional — used when Excel has payroll data)
     calculate_days: Optional[float] = None
     actual_attendance: Optional[int] = None
     day_off: Optional[int] = None
@@ -349,6 +358,46 @@ class EmployeeBulkItem(BaseModel):
     advance_deduction: Optional[float] = None
     tax_deduction: Optional[float] = None
     net_payable: Optional[float] = None
+    custom_fields: Optional[Dict[str, str]] = None
+
+    # ── Validators ────────────────────────────────────────────────────────────
+
+    @field_validator("employee_code", "full_name", mode="before")
+    @classmethod
+    def coerce_required_str(cls, v):
+        if v is None:
+            return ""
+        return str(v).strip()
+
+    @field_validator("gen", "grade", "designation", "section", "phone",
+                     "bank_account_no", "gender", "department", "shift", mode="before")
+    @classmethod
+    def coerce_optional_str_field(cls, v):
+        return _to_str(v)
+
+    @field_validator(
+        "basic", "house_rent", "medical", "conveyance", "food_allowance",
+        "wages", "increment", "total_salary", "wages_of_month", "mobile_bill",
+        "shift_benefit", "shift_tk", "roster_tk", "calculate_days", "payable_days",
+        "payable_salary", "ot_hours", "ot_amount", "festival_duty_benefit",
+        "festival_holiday_allowance", "ifter_allowance", "special_food",
+        "attendance_bonus", "arrear_others", "absent_deduction", "advance_deduction",
+        "tax_deduction", "net_payable",
+        mode="before",
+    )
+    @classmethod
+    def coerce_float_field(cls, v):
+        return _to_float(v)
+
+    @field_validator(
+        "age", "sl_no", "days_of_month", "shift_qty", "roster_qty",
+        "actual_attendance", "day_off", "cl", "sl", "el", "comp_leave",
+        "festival_holiday", "absent_days", "ifter_days",
+        mode="before",
+    )
+    @classmethod
+    def coerce_int_field(cls, v):
+        return _to_int(v)
 
 
 class PayrollBulkItem(BaseModel):
