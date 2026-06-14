@@ -199,11 +199,14 @@ async def stop_codes_by_department(
 async def list_waste_entries(
     mill_id: Optional[str] = Query(None),
     date: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     shift: Optional[str] = Query(None),
     department: Optional[str] = Query(None),
+    machine_code: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=500),
+    page_size: int = Query(50, ge=1, le=2000),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
@@ -211,10 +214,16 @@ async def list_waste_entries(
     q = select(WasteEntry).where(WasteEntry.mill_id == effective_mill_id)
     if date:
         q = q.where(WasteEntry.date == date)
+    if date_from:
+        q = q.where(WasteEntry.date >= date_from)
+    if date_to:
+        q = q.where(WasteEntry.date <= date_to)
     if shift:
         q = q.where(WasteEntry.shift == shift)
     if department:
         q = q.where(WasteEntry.department == department)
+    if machine_code:
+        q = q.where(WasteEntry.machine_code == machine_code)
     if status:
         q = q.where(WasteEntry.status == status)
     q = q.order_by(WasteEntry.date.desc(), WasteEntry.department, WasteEntry.machine_code)
