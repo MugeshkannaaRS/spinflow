@@ -2564,15 +2564,15 @@ const PROD_REPORT_COLS: Record<ReportRecordType, { key: string; label: string }[
     { key: "operator",     label: "Operator" },
   ],
   stoppage: [
-    { key: "date",              label: "Date" },
-    { key: "shift",             label: "Shift" },
-    { key: "machine_code",      label: "Machine" },
-    { key: "datalog_code",      label: "Stop Code" },
-    { key: "stop_from",         label: "From" },
-    { key: "stop_to",           label: "To" },
-    { key: "duration_min",      label: "Duration (min)" },
+    { key: "date",               label: "Date" },
+    { key: "machine_code",       label: "Machine" },
+    { key: "datalog_code",       label: "Stop Code" },
+    { key: "reason",             label: "Reason" },
+    { key: "started_at",         label: "From" },
+    { key: "ended_at",           label: "To" },
+    { key: "duration_min",       label: "Duration (min)" },
     { key: "production_loss_kg", label: "Loss (kg)" },
-    { key: "remarks",           label: "Remarks" },
+    { key: "stop_type",          label: "Type" },
   ],
   manpower: [
     { key: "date",          label: "Date" },
@@ -2804,11 +2804,25 @@ function ProductionReportsTab() {
                 <TableBody>
                   {activeRows.map((row: any, i: number) => (
                     <TableRow key={row.id ?? i} className="hover:bg-muted/30">
-                      {cols.map((c) => (
-                        <TableCell key={c.key} className="px-3 py-1.5 whitespace-nowrap">
-                          {row[c.key] != null && row[c.key] !== "" ? String(row[c.key]) : "—"}
-                        </TableCell>
-                      ))}
+                      {cols.map((c) => {
+                        let val = row[c.key];
+                        // Derive date/shift from started_at if missing (stoppage records)
+                        if (c.key === "date" && (val == null || val === "") && row.started_at) {
+                          val = row.started_at.slice(0, 10);
+                        }
+                        if (c.key === "shift" && (val == null || val === "") && row.stop_type) {
+                          val = row.stop_type;
+                        }
+                        // Format timestamps
+                        if (typeof val === "string" && val.length > 10 && val.includes("T")) {
+                          try { val = val.slice(0, 16).replace("T", " "); } catch {}
+                        }
+                        return (
+                          <TableCell key={c.key} className="px-3 py-1.5 whitespace-nowrap">
+                            {val != null && val !== "" ? String(val) : "—"}
+                          </TableCell>
+                        );
+                      })}
                     </TableRow>
                   ))}
                 </TableBody>

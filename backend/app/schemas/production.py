@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 
@@ -143,6 +143,19 @@ class DowntimeResponse(BaseModel):
     is_utility_breakdown: bool = False
     utility_ref_id: Optional[str] = None
     mill_id: Optional[str] = None
+    # v2 DATALOG fields (migration 020) — were missing from response
+    datalog_code: Optional[int] = None
+    stop_from: Optional[str] = None
+    stop_to: Optional[str] = None
+    # Derived fields for Reports tab
+    date: Optional[str] = None
+    shift: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _derive_fields(self) -> "DowntimeResponse":
+        if self.started_at and not self.date:
+            self.date = self.started_at.strftime("%Y-%m-%d")
+        return self
 
     class Config:
         from_attributes = True
