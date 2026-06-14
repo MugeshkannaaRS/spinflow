@@ -49,7 +49,7 @@ import { useState, useMemo, useEffect } from "react";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, ArrowDown, ArrowUp, Trash2, Clock, Users2, UserCircle, Layers, PowerOff } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, ArrowDown, ArrowUp, Trash2, Clock, Users2, UserCircle, Layers, PowerOff, FileText } from "lucide-react";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useActiveMill } from "@/hooks/useActiveMill";
@@ -1961,6 +1961,20 @@ function StoppageForm() {
 // MANPOWER TAB — RF Common Category
 // ─────────────────────────────────────────────────────────────────
 
+// Declared outside component to avoid infinite useEffect loop (stable reference)
+const RF_DEFAULT_CATEGORIES = [
+  { id: "line_man",              category: "line_man",              label: "Line Man" },
+  { id: "doffer",                category: "doffer",                label: "Doffer" },
+  { id: "house_keeper",          category: "house_keeper",          label: "House Keeper" },
+  { id: "pneumafil_collection",  category: "pneumafil_collection",  label: "Pneumafil Collection" },
+  { id: "floor_cleaner",         category: "floor_cleaner",         label: "Floor Cleaner" },
+  { id: "gripperman",            category: "gripperman",            label: "Gripperman" },
+  { id: "cope_carrier",          category: "cope_carrier",          label: "Cope Carrier" },
+  { id: "robo_doffer",           category: "robo_doffer",           label: "Robo Doffer" },
+  { id: "roving_carrier",        category: "roving_carrier",        label: "Roving Carrier" },
+  { id: "maintenance_assi",      category: "maintenance_assi",      label: "Maintenance Assistant" },
+];
+
 type ManpowerRow = {
   category: string;
   categoryLabel: string;
@@ -2011,18 +2025,6 @@ function ManpowerGrid() {
   }, [deptOptions]);
 
   // Per-dept categories from API (auto-seeds RF defaults if empty)
-  const RF_DEFAULT_CATEGORIES = [
-    { id: "line_man", category: "line_man", label: "Line Man" },
-    { id: "doffer", category: "doffer", label: "Doffer" },
-    { id: "house_keeper", category: "house_keeper", label: "House Keeper" },
-    { id: "pneumafil_collection", category: "pneumafil_collection", label: "Pneumafil Collection" },
-    { id: "floor_cleaner", category: "floor_cleaner", label: "Floor Cleaner" },
-    { id: "gripperman", category: "gripperman", label: "Gripperman" },
-    { id: "cope_carrier", category: "cope_carrier", label: "Cope Carrier" },
-    { id: "robo_doffer", category: "robo_doffer", label: "Robo Doffer" },
-    { id: "roving_carrier", category: "roving_carrier", label: "Roving Carrier" },
-    { id: "maintenance_assi", category: "maintenance_assi", label: "Maintenance Assistant" },
-  ];
   const categoriesQ = useQuery({
     queryKey: ["manpower-categories", millId, department],
     queryFn: () => productionApi.getManpowerCategories({ mill_id: millId, department }),
@@ -2426,6 +2428,314 @@ function ImportShiftEntriesDialog() {
         title="Import Production Entries"
       />
     </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRODUCTION REPORTS TAB
+// ─────────────────────────────────────────────────────────────────────────────
+
+type ReportRecordType = "entries" | "wastage" | "packing" | "stoppage" | "manpower";
+
+const PROD_REPORT_TYPES: { value: ReportRecordType; label: string; icon: any }[] = [
+  { value: "entries",  label: "Shift Entries", icon: LayoutGrid },
+  { value: "wastage",  label: "Wastage",       icon: Trash2 },
+  { value: "packing",  label: "Packing",       icon: Save },
+  { value: "stoppage", label: "Stoppage",      icon: Clock },
+  { value: "manpower", label: "Manpower",      icon: Users2 },
+];
+
+const PROD_REPORT_COLS: Record<ReportRecordType, { key: string; label: string }[]> = {
+  entries: [
+    { key: "date",         label: "Date" },
+    { key: "shift",        label: "Shift" },
+    { key: "department",   label: "Dept" },
+    { key: "machine_code", label: "Machine" },
+    { key: "count_ne",     label: "Count (Ne)" },
+    { key: "produced_kg",  label: "Produced (kg)" },
+    { key: "target_kg",    label: "Target (kg)" },
+    { key: "efficiency_pct", label: "Eff %" },
+    { key: "status",       label: "Status" },
+    { key: "entered_by",   label: "By" },
+  ],
+  wastage: [
+    { key: "date",         label: "Date" },
+    { key: "shift",        label: "Shift" },
+    { key: "department",   label: "Dept" },
+    { key: "machine_code", label: "Machine" },
+    { key: "waste_type",   label: "Waste Type" },
+    { key: "waste_kg",     label: "Waste (kg)" },
+    { key: "lot_no",       label: "Lot" },
+    { key: "ratio",        label: "Ratio" },
+    { key: "remarks",      label: "Remarks" },
+    { key: "entered_by",   label: "By" },
+  ],
+  packing: [
+    { key: "date",         label: "Date" },
+    { key: "shift",        label: "Shift" },
+    { key: "lot_no",       label: "Lot No" },
+    { key: "count_ne",     label: "Count Ne" },
+    { key: "count_desc",   label: "Count Desc" },
+    { key: "bag_from",     label: "Bag From" },
+    { key: "bag_to",       label: "Bag To" },
+    { key: "total_bags",   label: "Total Bags" },
+    { key: "operator",     label: "Operator" },
+  ],
+  stoppage: [
+    { key: "date",              label: "Date" },
+    { key: "shift",             label: "Shift" },
+    { key: "machine_code",      label: "Machine" },
+    { key: "datalog_code",      label: "Stop Code" },
+    { key: "stop_from",         label: "From" },
+    { key: "stop_to",           label: "To" },
+    { key: "duration_min",      label: "Duration (min)" },
+    { key: "production_loss_kg", label: "Loss (kg)" },
+    { key: "remarks",           label: "Remarks" },
+  ],
+  manpower: [
+    { key: "date",          label: "Date" },
+    { key: "shift",         label: "Shift" },
+    { key: "category",      label: "Category" },
+    { key: "mc_id_from",    label: "MC From" },
+    { key: "mc_id_to",      label: "MC To" },
+    { key: "total_machines", label: "Machines" },
+    { key: "headcount",     label: "Headcount" },
+    { key: "supervisor",    label: "Supervisor" },
+  ],
+};
+
+function ProductionReportsTab() {
+  const { millId } = useActiveMill();
+  const today = new Date();
+  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+  const sevenDaysAgo = new Date(today.getTime() - 7 * 86400_000);
+  const defaultFrom = new Date(sevenDaysAgo.getTime() - sevenDaysAgo.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+
+  const [recordType, setRecordType] = useState<ReportRecordType>("wastage");
+  const [dateFrom, setDateFrom] = useState(defaultFrom);
+  const [dateTo, setDateTo] = useState(localDate);
+  const [shift, setShift] = useState<string>("_all");
+  const [department, setDepartment] = useState<string>("");
+  const [machineCode, setMachineCode] = useState<string>("");
+
+  const { data: millMasters } = useMillMasters();
+  const deptOptions = (millMasters?.department ?? []) as any[];
+
+  const machineGroupsQ = useQuery({
+    queryKey: ["machine-groups", millId],
+    queryFn: () => productionApi.getMachineGroups({ mill_id: millId, active_only: true }),
+    staleTime: 60_000,
+    enabled: !!millId,
+  });
+  const machineGroups = (machineGroupsQ.data ?? []) as MachineGroup[];
+  const [machineGroupId, setMachineGroupId] = useState<string>("");
+
+  const baseParams = {
+    mill_id: millId,
+    date_from: dateFrom,
+    date_to: dateTo,
+    ...(shift !== "_all" ? { shift } : {}),
+    ...(department ? { department } : {}),
+    ...(machineCode ? { machine_code: machineCode } : {}),
+    page_size: 1000,
+  };
+
+  const entriesQ = useQuery({
+    queryKey: ["prod-report-entries", millId, dateFrom, dateTo, shift, department, machineCode],
+    queryFn: () => productionApi.getEntries(baseParams),
+    enabled: !!millId && recordType === "entries",
+    staleTime: 30_000,
+  });
+  const wasteQ = useQuery({
+    queryKey: ["prod-report-waste", millId, dateFrom, dateTo, shift, department, machineCode],
+    queryFn: () => productionApi.getWasteEntries(baseParams),
+    enabled: !!millId && recordType === "wastage",
+    staleTime: 30_000,
+  });
+  const packingQ = useQuery({
+    queryKey: ["prod-report-packing", millId, dateFrom, dateTo, shift],
+    queryFn: async () => {
+      const { api } = await import("@/lib/api");
+      const r = await api.get("/production/packing/entries", { params: { mill_id: millId, date_from: dateFrom, date_to: dateTo, ...(shift !== "_all" ? { shift } : {}), page_size: 1000 } });
+      return r.data;
+    },
+    enabled: !!millId && recordType === "packing",
+    staleTime: 30_000,
+  });
+  const stoppageQ = useQuery({
+    queryKey: ["prod-report-stoppage", millId, dateFrom, dateTo, shift, department, machineCode],
+    queryFn: () => productionApi.getDowntimeLogs({ mill_id: millId, date_from: dateFrom, date_to: dateTo, ...(shift !== "_all" ? { shift } : {}), ...(machineCode ? { machine_code: machineCode } : {}), page_size: 1000 }),
+    enabled: !!millId && recordType === "stoppage",
+    staleTime: 30_000,
+  });
+  const manpowerQ = useQuery({
+    queryKey: ["prod-report-manpower", millId, dateFrom, dateTo, shift],
+    queryFn: () => productionApi.getRFManpower({ mill_id: millId, date_from: dateFrom, date_to: dateTo, ...(shift !== "_all" ? { shift } : {}) }),
+    enabled: !!millId && recordType === "manpower",
+    staleTime: 30_000,
+  });
+
+  const entryRows    = (entriesQ.data?.data  ?? entriesQ.data  ?? []) as any[];
+  const wasteRows    = (wasteQ.data?.data    ?? wasteQ.data    ?? []) as any[];
+  const packingRows  = (packingQ.data?.data  ?? packingQ.data  ?? []) as any[];
+  const stoppageRows = (Array.isArray(stoppageQ.data) ? stoppageQ.data : (stoppageQ.data?.data ?? [])) as any[];
+  const manpowerRows = (manpowerQ.data?.data ?? []) as any[];
+
+  const activeRows =
+    recordType === "entries"  ? entryRows
+    : recordType === "wastage"  ? wasteRows
+    : recordType === "packing"  ? packingRows
+    : recordType === "stoppage" ? stoppageRows
+    : manpowerRows;
+
+  const isLoading =
+    (recordType === "entries"  && entriesQ.isLoading)
+    || (recordType === "wastage"  && wasteQ.isLoading)
+    || (recordType === "packing"  && packingQ.isLoading)
+    || (recordType === "stoppage" && stoppageQ.isLoading)
+    || (recordType === "manpower" && manpowerQ.isLoading);
+
+  const cols = PROD_REPORT_COLS[recordType];
+  const hasDeptFilter = ["entries", "wastage", "stoppage"].includes(recordType);
+  const hasMachineFilter = ["entries", "wastage", "stoppage"].includes(recordType);
+
+  return (
+    <div className="space-y-4">
+      {/* Filter bar */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          {/* Record type pills */}
+          <div className="flex flex-wrap gap-1.5">
+            {PROD_REPORT_TYPES.map((rt) => (
+              <button
+                key={rt.value}
+                onClick={() => setRecordType(rt.value)}
+                className={[
+                  "flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border font-medium transition-colors",
+                  recordType === rt.value
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background border-border text-muted-foreground hover:border-primary/40",
+                ].join(" ")}
+              >
+                <rt.icon className="size-3" />
+                {rt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Date / Shift / Dept / Machine filters */}
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="space-y-1">
+              <Label className="text-xs">From</Label>
+              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs w-36" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">To</Label>
+              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs w-36" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Shift</Label>
+              <Select value={shift} onValueChange={setShift}>
+                <SelectTrigger className="h-8 text-xs w-28"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_all">All Shifts</SelectItem>
+                  <SelectItem value="A">A — Morning</SelectItem>
+                  <SelectItem value="B">B — Afternoon</SelectItem>
+                  <SelectItem value="C">C — Night</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {hasDeptFilter && (
+              <div className="space-y-1">
+                <Label className="text-xs">Department</Label>
+                <Select value={department || "_all"} onValueChange={(v) => setDepartment(v === "_all" ? "" : v)}>
+                  <SelectTrigger className="h-8 text-xs w-40"><SelectValue placeholder="All depts" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all">All Departments</SelectItem>
+                    {deptOptions.map((d: any) => {
+                      const name = typeof d === "string" ? d : d.name;
+                      return <SelectItem key={name} value={name}>{name}</SelectItem>;
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {hasMachineFilter && machineGroups.length > 0 && (
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center gap-1"><Layers className="size-3" /> Machine Group</Label>
+                <Select value={machineGroupId || "_all"} onValueChange={(v) => { setMachineGroupId(v === "_all" ? "" : v); setMachineCode(""); }}>
+                  <SelectTrigger className="h-8 text-xs w-44"><SelectValue placeholder="All groups" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_all">All Groups</SelectItem>
+                    {machineGroups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {hasMachineFilter && (
+              <div className="space-y-1">
+                <Label className="text-xs">Machine</Label>
+                <Input value={machineCode} onChange={(e) => setMachineCode(e.target.value)}
+                  placeholder="e.g. CD_001" className="h-8 text-xs w-28" />
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Results table */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between py-3">
+          <CardTitle className="text-sm">
+            {PROD_REPORT_TYPES.find((r) => r.value === recordType)?.label} Records
+            {!isLoading && activeRows.length > 0 && (
+              <span className="ml-2 text-xs font-normal text-muted-foreground">({activeRows.length} rows)</span>
+            )}
+          </CardTitle>
+          {activeRows.length > 0 && (
+            <ExportMenu
+              filename={`${recordType}_${dateFrom}_${dateTo}`}
+              title={`${PROD_REPORT_TYPES.find((r) => r.value === recordType)?.label} Report`}
+              subtitle={`${dateFrom} to ${dateTo}${shift !== "_all" ? `  Shift ${shift}` : ""}${department ? `  ${department}` : ""}`}
+              columns={cols}
+              rows={activeRows}
+            />
+          )}
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
+              <Activity className="size-4 animate-spin" /> Loading…
+            </div>
+          ) : activeRows.length === 0 ? (
+            <div className="p-6 text-sm text-muted-foreground text-center">No records found for the selected filters.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table className="text-xs min-w-max">
+                <TableHeader>
+                  <TableRow className="bg-muted/40">
+                    {cols.map((c) => (
+                      <TableHead key={c.key} className="px-3 py-2 whitespace-nowrap">{c.label}</TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activeRows.map((row: any, i: number) => (
+                    <TableRow key={row.id ?? i} className="hover:bg-muted/30">
+                      {cols.map((c) => (
+                        <TableCell key={c.key} className="px-3 py-1.5 whitespace-nowrap">
+                          {row[c.key] != null && row[c.key] !== "" ? String(row[c.key]) : "—"}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -3174,6 +3484,10 @@ function ProductionPage() {
               <TabsTrigger value="machines">Machines</TabsTrigger>
               <TabsTrigger value="shifts">Entries Log</TabsTrigger>
               <TabsTrigger value="downtime">Downtime Log</TabsTrigger>
+              <TabsTrigger value="reports" className="gap-1.5">
+                <FileText className="size-3.5" />
+                Reports
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="entry">
@@ -3816,6 +4130,13 @@ function ProductionPage() {
                 </SheetContent>
               </Sheet>
             </TabsContent>
+
+            <TabsContent value="reports">
+              <ErrorBoundary key="reports" inline label="Reports">
+                <ProductionReportsTab />
+              </ErrorBoundary>
+            </TabsContent>
+
           </Tabs>
         </div>
       </AccessGuard>
