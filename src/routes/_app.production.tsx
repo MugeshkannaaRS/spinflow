@@ -188,6 +188,19 @@ function ShiftGrid() {
   // Reset section filter when dept changes
   useEffect(() => { setSelectedSection("all"); }, [department]);
 
+  // Clear entered production values when date or shift changes so previous entry data doesn't bleed in
+  useEffect(() => {
+    setRows((prev) =>
+      prev.map((r) => ({
+        ...r,
+        producedKg: "",
+        wasteKg: "",
+        stoppageMins: "",
+        stoppageReason: "",
+      })),
+    );
+  }, [date, shift]);
+
   const [count, setCount] = useState("30s");
   const config = useColumnConfig("production_entries");
 
@@ -1309,18 +1322,22 @@ function StoppageForm() {
         )
       );
       const results = await Promise.allSettled(calls);
-      const failed = results.filter((r) => r.status === "rejected");
-      if (failed.length > 0) {
-        const firstErr = (failed[0] as PromiseRejectedResult).reason;
-        throw new Error(firstErr?.response?.data?.detail || `${failed.length} row(s) failed`);
+      const succeeded = results.filter((r) => r.status === "fulfilled").length;
+      const failedResults = results.filter((r) => r.status === "rejected");
+      if (succeeded === 0 && failedResults.length > 0) {
+        const firstErr = (failedResults[0] as PromiseRejectedResult).reason;
+        throw new Error(firstErr?.response?.data?.detail || `All ${failedResults.length} row(s) failed to save`);
       }
-      return { total: results.length, machines: machineCodes.length };
+      return { total: succeeded, failed: failedResults.length, machines: machineCodes.length };
     },
-    onSuccess: ({ total, machines }) => {
+    onSuccess: ({ total, failed, machines }) => {
       const label = stoppageMode === "group"
         ? `${total} stoppages logged across ${machines} machines`
         : `${total} stoppage${total !== 1 ? "s" : ""} saved for ${selectedMachine}`;
       toast.success(label);
+      if (failed > 0) {
+        toast.warning(`${failed} row(s) could not be saved — they may already exist or the machine was not found.`);
+      }
       setRows([makeStopRow()]);
       qc.invalidateQueries({ queryKey: ["downtime"] });
     },
@@ -2476,6 +2493,7 @@ function ProductionPage() {
   const user = useAuth((s) => s.user);
   const canEdit = canWrite(user?.role ?? "OPERATOR", "production");
   const { millId } = useActiveMill();
+  const [activeTab, setActiveTab] = useState<string>("entry");
   const machinesQ = useQuery({
     queryKey: ["machines", millId],
     queryFn: () => productionApi.getMachines({ mill_id: millId, page_size: 1000, page: 1 }),
@@ -2769,7 +2787,7 @@ function ProductionPage() {
             </Card>
           </div>
 
-          <Tabs defaultValue="entry">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="flex-wrap h-auto gap-1">
               <TabsTrigger value="entry" className="gap-1.5">
                 <LayoutGrid className="size-3.5" />
@@ -2797,7 +2815,7 @@ function ProductionPage() {
             </TabsList>
 
             <TabsContent value="entry">
-              <ErrorBoundary inline label="Shift Grid">
+              <ErrorBoundary key={`entry-${activeTab}`} inline label="Shift Grid">
               {canEdit ? (
                 <ShiftGrid />
               ) : (
@@ -2809,7 +2827,7 @@ function ProductionPage() {
             </TabsContent>
 
             <TabsContent value="waste">
-              <ErrorBoundary inline label="Waste">
+              <ErrorBoundary key={`waste-${activeTab}`} inline label="Waste">
               {canEdit ? (
                 <WasteGrid />
               ) : (
@@ -2821,7 +2839,7 @@ function ProductionPage() {
             </TabsContent>
 
             <TabsContent value="stoppage">
-              <ErrorBoundary inline label="Stoppage">
+              <ErrorBoundary key={`stoppage-${activeTab}`} inline label="Stoppage">
               {canEdit ? (
                 <StoppageForm />
               ) : (
@@ -2833,7 +2851,7 @@ function ProductionPage() {
             </TabsContent>
 
             <TabsContent value="manpower">
-              <ErrorBoundary inline label="Shift Planning">
+              <ErrorBoundary key={`manpower-${activeTab}`} inline label="Shift Planning">
               {canEdit ? (
                 <ManpowerGrid />
               ) : (
@@ -2845,7 +2863,7 @@ function ProductionPage() {
             </TabsContent>
 
             <TabsContent value="packing">
-              <ErrorBoundary inline label="Packing">
+              <ErrorBoundary key={`packing-${activeTab}`} inline label="Packing">
               {canEdit ? (
                 <PackingGrid />
               ) : (

@@ -91,6 +91,12 @@ class VerifyOTPRequest(BaseModel):
     otp: str
 
 
+class OTPResetRequest(BaseModel):
+    email: str
+    otp: str
+    new_password: str = Field(..., min_length=6)
+
+
 class UserCreateRequest(BaseModel):
     name: str = Field(..., max_length=200)
     email: str = Field(..., max_length=200)

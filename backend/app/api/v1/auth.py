@@ -23,7 +23,7 @@ from app.models.user import User, Role, UserSession
 from app.schemas.auth import (
     LoginRequest, LoginResponse, TokenResponse, RefreshRequest,
     UserResponse, ChangePasswordRequest, ForgotPasswordRequest,
-    ResetPasswordRequest, VerifyOTPRequest, UserCreateRequest, UserUpdateRequest,
+    ResetPasswordRequest, VerifyOTPRequest, OTPResetRequest, UserCreateRequest, UserUpdateRequest,
     MeResponse, MillSettingsOut, CompanyInfo,
 )
 
@@ -427,6 +427,23 @@ async def forgot_password(req: ForgotPasswordRequest, request: Request, db: Asyn
             logger = __import__("logging").getLogger("spinflow")
             logger.exception("Failed to send OTP email to %s", user.email)
     return {"message": "If email exists, OTP will be sent"}
+
+
+@router.post("/auth/verify-otp-reset")
+async def verify_otp_reset(req: OTPResetRequest, db: AsyncSession = Depends(get_db)):
+    """Verify a forgot-password OTP and set a new password in one step."""
+    result = await db.execute(select(User).where(User.email == req.email, User.deleted_at.is_(None)))
+    user = result.scalar_one_or_none()
+    if not user or not user.otp_code or user.otp_code != req.otp:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+    if user.otp_expires_at and datetime.now(timezone.utc) > user.otp_expires_at:
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+    user.password_hash = hash_password(req.new_password)
+    user.otp_code = None
+    user.otp_expires_at = None
+    user.force_password_reset = False
+    await db.commit()
+    return {"message": "Password reset successfully. You can now log in."}
 
 
 @router.post("/auth/reset-password")

@@ -58,6 +58,10 @@ export const authApi = {
   me: () => api.get("/auth/me").then((r) => r.data),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post("/auth/change-password", { current_password: currentPassword, new_password: newPassword }).then((r) => r.data),
+  forgotPassword: (email: string) =>
+    api.post("/auth/forgot-password", { email }).then((r) => r.data),
+  verifyOtpAndReset: (email: string, otp: string, newPassword: string) =>
+    api.post("/auth/verify-otp-reset", { email, otp, new_password: newPassword }).then((r: any) => r.data),
 };
 
 // Production

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, redirect, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -86,8 +86,8 @@ const FEATURES = [
 function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuth((s) => s.login);
-  const [email, setEmail] = useState("admin@mill.spinflow");
-  const [password, setPassword] = useState("Admin@1234");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [failedAttempts, setFailedAttempts] = useState(0);
   const isLockedOut = failedAttempts >= 5;
 
@@ -191,7 +191,7 @@ function LoginPage() {
           </div>
 
           <h1 className="text-[26px] font-bold text-[#0f172a] leading-tight">Sign in to SpinFlow</h1>
-          <p className="text-[14px] text-[#64748b] mt-1">Use your mill credentials or a demo account below.</p>
+          <p className="text-[14px] text-[#64748b] mt-1">Enter your mill credentials to continue.</p>
 
           {/* Lockout warning */}
           {isLockedOut && (
@@ -247,6 +247,14 @@ function LoginPage() {
                 )}
                 placeholder="••••••••"
               />
+              <div className="flex justify-end mt-1">
+                <Link
+                  to="/forgot-password"
+                  className="text-[13px] text-blue-600 hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
             </div>
             <button
               type="submit"
