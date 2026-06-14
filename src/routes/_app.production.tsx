@@ -869,10 +869,14 @@ function WasteGrid() {
   const [department, setDepartment] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  // Group-entry mode: one waste type applied to entire machine group at once
-  const [groupEntryMode, setGroupEntryMode] = useState(false);
+  // Entry mode: "individual" (per-machine table) or "group" (single form → all machines)
+  const [wasteMode, setWasteMode] = useState<"individual" | "group">("individual");
+  // Group mode single-form state
   const [groupWasteType, setGroupWasteType] = useState("");
+  const [groupLotNo, setGroupLotNo] = useState("");
+  const [groupRatio, setGroupRatio] = useState("");
   const [groupWasteKg, setGroupWasteKg] = useState("");
+  const [groupRemarks, setGroupRemarks] = useState("");
   // Waste type autocomplete history
   const wasteTypesQ = useQuery({
     queryKey: ["waste-types", millId, department],
@@ -929,27 +933,66 @@ function WasteGrid() {
   }), [rows]);
 
   const bulkMutation = useMutation({
-    mutationFn: () => {
-      const active = rows.filter((r) => Number(r.wasteKg) >= 0 && r.machineCode);
+    mutationFn: async () => {
       if (!date || !shift || !department) throw new Error("Date, Shift and Department are required");
-      if (active.length === 0) throw new Error("No rows to submit");
-      return productionApi.createWasteBulk({
-        date, shift, department,
-        entries: active.map((r) => ({
-          machine_code: r.machineCode,
-          waste_type: r.wasteType || undefined,
-          lot_no: r.lotNo || undefined,
-          ratio: r.ratio || undefined,
-          waste_kg: Number(r.wasteKg) || 0,
-          remarks: r.remarks || undefined,
-        })),
-      });
+      if (wasteMode === "group") {
+        // Group mode: single form entry → log for every machine in selected group
+        if (!selectedGroupId) throw new Error("Select a machine group");
+        if (!groupWasteKg || Number(groupWasteKg) <= 0) throw new Error("Enter waste (kg)");
+        const groupMachines = machines;
+        if (groupMachines.length === 0) throw new Error("No machines found in selected group");
+        const machineCodes = groupMachines.map((m: any) => m.code).filter(Boolean);
+        const calls = machineCodes.map((mc: string) =>
+          productionApi.createWasteBulk({
+            date, shift, department,
+            entries: [{
+              machine_code: mc,
+              waste_type: groupWasteType || undefined,
+              lot_no: groupLotNo || undefined,
+              ratio: groupRatio || undefined,
+              waste_kg: Number(groupWasteKg),
+              remarks: groupRemarks || undefined,
+            }],
+          })
+        );
+        const results = await Promise.allSettled(calls);
+        const succeeded = results.filter((r) => r.status === "fulfilled").length;
+        const failed = results.filter((r) => r.status === "rejected");
+        if (succeeded > 0) {
+          toast.success(`Waste logged for ${succeeded} of ${machineCodes.length} machines`);
+        }
+        failed.forEach((r) => {
+          if (r.status === "rejected") toast.warning(`Error: ${r.reason?.message ?? "unknown"}`);
+        });
+        if (succeeded === 0) throw new Error("All submissions failed");
+        return { created: succeeded };
+      } else {
+        // Individual mode: per-machine table
+        const active = rows.filter((r) => Number(r.wasteKg) > 0 && r.machineCode);
+        if (active.length === 0) throw new Error("Fill at least one machine's waste (kg)");
+        return productionApi.createWasteBulk({
+          date, shift, department,
+          entries: active.map((r) => ({
+            machine_code: r.machineCode,
+            waste_type: r.wasteType || undefined,
+            lot_no: r.lotNo || undefined,
+            ratio: r.ratio || undefined,
+            waste_kg: Number(r.wasteKg),
+            remarks: r.remarks || undefined,
+          })),
+        });
+      }
     },
     onSuccess: (res: any) => {
-      toast.success(`${res.created} waste entries submitted`);
-      if (res.errors?.length) res.errors.forEach((e: string) => toast.warning(e));
+      if (wasteMode === "individual") {
+        toast.success(`${res.created} waste entries submitted`);
+        if (res.errors?.length) res.errors.forEach((e: string) => toast.warning(e));
+        setRows(buildWasteRows(machines));
+      } else {
+        // Reset group form
+        setGroupWasteType(""); setGroupLotNo(""); setGroupRatio(""); setGroupWasteKg(""); setGroupRemarks("");
+      }
       qc.invalidateQueries({ queryKey: ["waste-entries"] });
-      setRows(buildWasteRows(machines));
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -1017,149 +1060,211 @@ function WasteGrid() {
               <Layers className="size-4 text-muted-foreground shrink-0 mt-2" />
               <div className="flex-1 space-y-1 min-w-[180px]">
                 <Label className="text-xs text-muted-foreground">
-                  Machine Group <span className="text-[10px]">(select to filter machines)</span>
+                  Entry Mode
                 </Label>
-                <Select
-                  value={selectedGroupId || "_all"}
-                  onValueChange={(v) => { setSelectedGroupId(v === "_all" ? "" : v); setGroupEntryMode(false); }}
-                >
-                  <SelectTrigger className="h-8 text-sm w-64">
-                    <SelectValue placeholder="— All machines in department —" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="_all">— All machines in department —</SelectItem>
-                    {machineGroups.map((g) => (
-                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {selectedGroupId && (
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setGroupEntryMode((v) => !v)}
+                    onClick={() => { setWasteMode("individual"); setSelectedGroupId(""); }}
                     className={[
-                      "text-xs px-2.5 py-1 rounded border transition-colors",
-                      groupEntryMode
-                        ? "bg-amber-100 border-amber-400 text-amber-800"
+                      "text-xs px-3 py-1.5 rounded border transition-colors",
+                      wasteMode === "individual"
+                        ? "bg-primary text-primary-foreground border-primary"
                         : "bg-muted border-border text-muted-foreground hover:border-primary"
                     ].join(" ")}
                   >
-                    {groupEntryMode ? "Group Mode ON" : "Group Entry Mode"}
+                    Individual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWasteMode("group")}
+                    className={[
+                      "text-xs px-3 py-1.5 rounded border transition-colors",
+                      wasteMode === "group"
+                        ? "bg-amber-500 text-white border-amber-500"
+                        : "bg-muted border-border text-muted-foreground hover:border-amber-400"
+                    ].join(" ")}
+                  >
+                    Group Entry
                   </button>
                 </div>
-              )}
-            </div>
-          )}
-          {groupEntryMode && (
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-2">
-              <div className="text-xs font-semibold text-amber-800">Group Entry — applies to all {rows.length} machines in group</div>
-              <div className="flex flex-wrap gap-2 items-end">
-                <div className="space-y-1">
-                  <Label className="text-xs">Waste Type</Label>
-                  <Input value={groupWasteType} onChange={(e) => setGroupWasteType(e.target.value)}
-                    placeholder="e.g. Fly waste" className="h-7 text-xs w-40"
-                    list="waste-type-suggestions-group" />
-                  <datalist id="waste-type-suggestions-group">
-                    {(wasteTypesQ.data?.types ?? []).map((t: string) => <option key={t} value={t} />)}
-                  </datalist>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Waste (kg) each</Label>
-                  <Input type="number" min={0} step="0.01" value={groupWasteKg}
-                    onChange={(e) => setGroupWasteKg(e.target.value)}
-                    placeholder="0" className="h-7 text-xs w-28" />
-                </div>
-                <Button size="sm" variant="outline" className="h-7 text-xs border-amber-400 text-amber-800" onClick={() => {
-                  setRows((prev) => prev.map((r) => ({
-                    ...r,
-                    wasteType: groupWasteType || r.wasteType,
-                    wasteKg: groupWasteKg || r.wasteKg,
-                  })));
-                }}>Apply to All</Button>
               </div>
+              {wasteMode === "group" && (
+                <div className="flex-1 space-y-1 min-w-[200px]">
+                  <Label className="text-xs text-muted-foreground">
+                    Machine Group <span className="text-destructive">*</span>
+                    <span className="text-[10px] ml-1">(waste logged for all machines in group)</span>
+                  </Label>
+                  <Select
+                    value={selectedGroupId || ""}
+                    onValueChange={(v) => setSelectedGroupId(v)}
+                  >
+                    <SelectTrigger className="h-8 text-sm w-64 border-amber-400 font-medium">
+                      <SelectValue placeholder="Select machine group…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {machineGroups.length === 0
+                        ? <SelectItem value="_none" disabled>No groups configured</SelectItem>
+                        : machineGroups.map((g) => (
+                            <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                          ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedGroupId && machines.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      <span className="text-xs text-muted-foreground">Will log for:</span>
+                      {machines.slice(0, 12).map((m: any) => (
+                        <span key={m.code} className="text-xs bg-amber-100 text-amber-800 rounded px-1.5 py-0.5 font-mono">{m.code}</span>
+                      ))}
+                      {machines.length > 12 && (
+                        <span className="text-xs text-muted-foreground">+{machines.length - 12} more</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-2 gap-3 text-sm">
-        <div className="rounded-lg border bg-card p-3">
-          <div className="text-xs text-muted-foreground uppercase font-medium">Total Waste</div>
-          <div className="text-lg font-semibold mt-1">{summary.totalWaste.toFixed(2)} kg</div>
+      {wasteMode === "individual" && (
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded-lg border bg-card p-3">
+            <div className="text-xs text-muted-foreground uppercase font-medium">Total Waste</div>
+            <div className="text-lg font-semibold mt-1">{summary.totalWaste.toFixed(2)} kg</div>
+          </div>
+          <div className="rounded-lg border bg-card p-3">
+            <div className="text-xs text-muted-foreground uppercase font-medium">Machines Filled</div>
+            <div className="text-lg font-semibold mt-1">{summary.filled} / {rows.length}</div>
+          </div>
         </div>
-        <div className="rounded-lg border bg-card p-3">
-          <div className="text-xs text-muted-foreground uppercase font-medium">Machines Filled</div>
-          <div className="text-lg font-semibold mt-1">{summary.filled} / {rows.length}</div>
-        </div>
-      </div>
+      )}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between py-3">
           <CardTitle className="text-sm">Waste Entry — {department} · Shift {shift} · {date}</CardTitle>
-          <Button size="sm" onClick={handleSubmit} disabled={bulkMutation.isPending || summary.filled === 0}>
-            <Save className="size-3.5 mr-1.5" />
-            {bulkMutation.isPending ? "Saving…" : `Submit (${summary.filled})`}
-          </Button>
+          {wasteMode === "individual" ? (
+            <Button size="sm" onClick={handleSubmit} disabled={bulkMutation.isPending || summary.filled === 0}>
+              <Save className="size-3.5 mr-1.5" />
+              {bulkMutation.isPending ? "Saving…" : `Submit (${summary.filled})`}
+            </Button>
+          ) : (
+            <Button size="sm" onClick={handleSubmit}
+              disabled={bulkMutation.isPending || !selectedGroupId || !groupWasteKg}
+              className="bg-amber-500 hover:bg-amber-600 text-white">
+              <Save className="size-3.5 mr-1.5" />
+              {bulkMutation.isPending ? "Saving…" : `Log for ${machines.length} machines`}
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="p-0">
-          {rows.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground text-center">
-              No machines in <strong>{department}</strong>. Add them in Masters → Machines.
-            </div>
+          {wasteMode === "group" ? (
+            /* ── Group mode: single form ── */
+            selectedGroupId && machines.length > 0 ? (
+              <div className="p-4 space-y-3">
+                <div className="text-xs text-muted-foreground mb-1">
+                  Fill in one set of values — they will be logged for all {machines.length} machines in the selected group.
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Waste Type</Label>
+                    <Input value={groupWasteType} onChange={(e) => setGroupWasteType(e.target.value)}
+                      placeholder="e.g. Fly waste" className="h-8 text-sm"
+                      list="waste-type-suggestions-group" autoComplete="off" />
+                    <datalist id="waste-type-suggestions-group">
+                      {(wasteTypesQ.data?.types ?? []).map((t: string) => <option key={t} value={t} />)}
+                    </datalist>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Lot No</Label>
+                    <Input value={groupLotNo} onChange={(e) => setGroupLotNo(e.target.value)}
+                      placeholder="e.g. L001" className="h-8 text-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Ratio</Label>
+                    <Input value={groupRatio} onChange={(e) => setGroupRatio(e.target.value)}
+                      placeholder="60:40" className="h-8 text-sm" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Waste (kg) <span className="text-destructive">*</span></Label>
+                    <Input type="number" min={0} step="0.01" value={groupWasteKg}
+                      onChange={(e) => setGroupWasteKg(e.target.value)}
+                      placeholder="0" className="h-8 text-sm font-medium" />
+                  </div>
+                  <div className="space-y-1 col-span-2">
+                    <Label className="text-xs">Remarks</Label>
+                    <Input value={groupRemarks} onChange={(e) => setGroupRemarks(e.target.value)}
+                      placeholder="Remarks…" className="h-8 text-sm" />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="p-6 text-sm text-muted-foreground text-center">
+                {!selectedGroupId
+                  ? "Select a machine group above to log waste for all machines at once."
+                  : "No machines found in selected group."}
+              </div>
+            )
           ) : (
-            <div className="w-full overflow-x-auto">
-              <Table className="min-w-[800px] w-full text-sm">
-                <TableHeader>
-                  <TableRow className="bg-muted/40">
-                    <TableHead className="w-24 pl-4">Machine</TableHead>
-                    <TableHead className="w-36">Waste Type</TableHead>
-                    <TableHead className="w-32">Lot No</TableHead>
-                    <TableHead className="w-24">Ratio</TableHead>
-                    <TableHead className="w-28">Waste (kg) *</TableHead>
-                    <TableHead>Remarks</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row, idx) => (
-                    <TableRow key={row.machineCode} className={Number(row.wasteKg) > 0 ? "bg-amber-50/50" : undefined}>
-                      <TableCell className="pl-4 font-mono text-xs font-medium">{row.machineCode}</TableCell>
-                      <TableCell className="relative">
-                        <Input
-                          value={row.wasteType}
-                          onChange={(e) => updateWasteRow(idx, "wasteType", e.target.value)}
-                          placeholder="e.g. Fly waste"
-                          className="h-7 text-xs w-full"
-                          list={`wt-suggestions-${idx}`}
-                          autoComplete="off"
-                        />
-                        <datalist id={`wt-suggestions-${idx}`}>
-                          {(wasteTypesQ.data?.types ?? []).map((t: string) => <option key={t} value={t} />)}
-                        </datalist>
-                      </TableCell>
-                      <TableCell>
-                        <Input value={row.lotNo} onChange={(e) => updateWasteRow(idx, "lotNo", e.target.value)}
-                          placeholder="e.g. L001" className="h-7 text-xs w-full" />
-                      </TableCell>
-                      <TableCell>
-                        <Input value={row.ratio} onChange={(e) => updateWasteRow(idx, "ratio", e.target.value)}
-                          placeholder="60:40" className="h-7 text-xs w-full" />
-                      </TableCell>
-                      <TableCell>
-                        <Input type="number" min={0} step="0.01" value={row.wasteKg}
-                          onChange={(e) => updateWasteRow(idx, "wasteKg", e.target.value)}
-                          placeholder="0" className="h-7 text-xs w-full" />
-                      </TableCell>
-                      <TableCell>
-                        <Input value={row.remarks} onChange={(e) => updateWasteRow(idx, "remarks", e.target.value)}
-                          placeholder="Remarks…" className="h-7 text-xs w-full" />
-                      </TableCell>
+            /* ── Individual mode: per-machine table ── */
+            rows.length === 0 ? (
+              <div className="p-6 text-sm text-muted-foreground text-center">
+                No machines in <strong>{department}</strong>. Add them in Masters → Machines.
+              </div>
+            ) : (
+              <div className="w-full overflow-x-auto">
+                <Table className="min-w-[800px] w-full text-sm">
+                  <TableHeader>
+                    <TableRow className="bg-muted/40">
+                      <TableHead className="w-24 pl-4">Machine</TableHead>
+                      <TableHead className="w-36">Waste Type</TableHead>
+                      <TableHead className="w-32">Lot No</TableHead>
+                      <TableHead className="w-24">Ratio</TableHead>
+                      <TableHead className="w-28">Waste (kg) *</TableHead>
+                      <TableHead>Remarks</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.map((row, idx) => (
+                      <TableRow key={row.machineCode} className={Number(row.wasteKg) > 0 ? "bg-amber-50/50" : undefined}>
+                        <TableCell className="pl-4 font-mono text-xs font-medium">{row.machineCode}</TableCell>
+                        <TableCell className="relative">
+                          <Input
+                            value={row.wasteType}
+                            onChange={(e) => updateWasteRow(idx, "wasteType", e.target.value)}
+                            placeholder="e.g. Fly waste"
+                            className="h-7 text-xs w-full"
+                            list={`wt-suggestions-${idx}`}
+                            autoComplete="off"
+                          />
+                          <datalist id={`wt-suggestions-${idx}`}>
+                            {(wasteTypesQ.data?.types ?? []).map((t: string) => <option key={t} value={t} />)}
+                          </datalist>
+                        </TableCell>
+                        <TableCell>
+                          <Input value={row.lotNo} onChange={(e) => updateWasteRow(idx, "lotNo", e.target.value)}
+                            placeholder="e.g. L001" className="h-7 text-xs w-full" />
+                        </TableCell>
+                        <TableCell>
+                          <Input value={row.ratio} onChange={(e) => updateWasteRow(idx, "ratio", e.target.value)}
+                            placeholder="60:40" className="h-7 text-xs w-full" />
+                        </TableCell>
+                        <TableCell>
+                          <Input type="number" min={0} step="0.01" value={row.wasteKg}
+                            onChange={(e) => updateWasteRow(idx, "wasteKg", e.target.value)}
+                            placeholder="0" className="h-7 text-xs w-full" />
+                        </TableCell>
+                        <TableCell>
+                          <Input value={row.remarks} onChange={(e) => updateWasteRow(idx, "remarks", e.target.value)}
+                            placeholder="Remarks…" className="h-7 text-xs w-full" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )
           )}
         </CardContent>
       </Card>
@@ -1903,13 +2008,30 @@ function ManpowerGrid() {
   }, [deptOptions]);
 
   // Per-dept categories from API (auto-seeds RF defaults if empty)
+  const RF_DEFAULT_CATEGORIES = [
+    { id: "line_man", category: "line_man", label: "Line Man" },
+    { id: "doffer", category: "doffer", label: "Doffer" },
+    { id: "house_keeper", category: "house_keeper", label: "House Keeper" },
+    { id: "pneumafil_collection", category: "pneumafil_collection", label: "Pneumafil Collection" },
+    { id: "floor_cleaner", category: "floor_cleaner", label: "Floor Cleaner" },
+    { id: "gripperman", category: "gripperman", label: "Gripperman" },
+    { id: "cope_carrier", category: "cope_carrier", label: "Cope Carrier" },
+    { id: "robo_doffer", category: "robo_doffer", label: "Robo Doffer" },
+    { id: "roving_carrier", category: "roving_carrier", label: "Roving Carrier" },
+    { id: "maintenance_assi", category: "maintenance_assi", label: "Maintenance Assistant" },
+  ];
   const categoriesQ = useQuery({
     queryKey: ["manpower-categories", millId, department],
     queryFn: () => productionApi.getManpowerCategories({ mill_id: millId, department }),
     staleTime: 60_000,
     enabled: !!millId && !!department,
   });
-  const deptCategories = (categoriesQ.data?.data ?? []) as { id: string; category: string; label: string }[];
+  // Fallback to RF defaults if API fails (e.g. migration not yet run) or returns empty
+  const deptCategories = (
+    categoriesQ.isError || (categoriesQ.data?.data ?? []).length === 0
+      ? RF_DEFAULT_CATEGORIES
+      : (categoriesQ.data?.data ?? [])
+  ) as { id: string; category: string; label: string }[];
 
   // Machine groups for this dept
   const machineGroupsQ = useQuery({
@@ -1933,9 +2055,9 @@ function ManpowerGrid() {
   });
   const mpMachines = (Array.isArray(mpMachinesQ.data) ? mpMachinesQ.data : (mpMachinesQ.data?.data ?? [])) as any[];
 
-  const [rows, setRows] = useState<ManpowerRow[]>([]);
+  const [rows, setRows] = useState<ManpowerRow[]>(() => buildManpowerRows(RF_DEFAULT_CATEGORIES));
 
-  // Rebuild rows when categories change
+  // Rebuild rows when categories load or change
   useEffect(() => {
     if (deptCategories.length > 0) {
       setRows(buildManpowerRows(deptCategories));
