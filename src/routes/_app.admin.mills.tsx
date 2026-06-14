@@ -141,7 +141,7 @@ function MillsPage() {
 function MigrationPanel() {
   const [results, setResults] = useState<{ step: string; status: string; detail?: string }[]>([]);
   const mutation = useMutation({
-    mutationFn: () => api.post("/production/run-migration-040").then((r) => r.data),
+    mutationFn: () => api.get("/production/run-migration-040").then((r) => r.data),
     onSuccess: (data) => {
       setResults(data.results ?? []);
       const allOk = (data.results ?? []).every((r: any) => r.status === "ok");
