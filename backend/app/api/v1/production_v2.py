@@ -268,6 +268,35 @@ async def create_waste_entry(
     return entry
 
 
+_waste_type_col_exists: Optional[bool] = None  # module-level cache
+
+
+async def _check_waste_type_col(db: AsyncSession) -> bool:
+    """Check once whether waste_type column exists; cache result."""
+    global _waste_type_col_exists
+    if _waste_type_col_exists is None:
+        from sqlalchemy import text
+        try:
+            result = await db.execute(text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_name='waste_entries' AND column_name='waste_type' LIMIT 1"
+            ))
+            _waste_type_col_exists = result.scalar() is not None
+            if not _waste_type_col_exists:
+                # Try to add it now — opportunistic migration
+                try:
+                    await db.execute(text("ALTER TABLE waste_entries ADD COLUMN IF NOT EXISTS waste_type VARCHAR(100)"))
+                    await db.commit()
+                    _waste_type_col_exists = True
+                    logger.info("waste_type column added on-the-fly during bulk insert")
+                except Exception as add_err:
+                    logger.warning("Could not add waste_type column: %s", add_err)
+                    await db.rollback()
+        except Exception:
+            _waste_type_col_exists = False
+    return _waste_type_col_exists
+
+
 @router.post("/production/waste-entries/bulk")
 async def create_waste_entries_bulk(
     req: WasteEntryBulkCreate,
@@ -280,16 +309,17 @@ async def create_waste_entries_bulk(
     created = 0
     errors: List[str] = []
 
+    has_waste_type = await _check_waste_type_col(db)
+
     for i, item in enumerate(req.entries):
         try:
-            entry = WasteEntry(
+            kwargs: dict = dict(
                 id=generate_uuid(),
                 mill_id=effective_mill_id,
                 date=req.date,
                 shift=req.shift,
                 department=req.department,
                 machine_code=item.machine_code,
-                waste_type=item.waste_type,
                 lot_no=item.lot_no,
                 ratio=item.ratio,
                 target_kg=item.target_kg,
@@ -298,6 +328,9 @@ async def create_waste_entries_bulk(
                 operator_name=item.operator_name,
                 entered_by=entered_by,
             )
+            if has_waste_type:
+                kwargs["waste_type"] = item.waste_type
+            entry = WasteEntry(**kwargs)
             db.add(entry)
             created += 1
             if i % 50 == 0:
