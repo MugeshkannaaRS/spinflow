@@ -967,6 +967,64 @@ async def delete_packing_entry(
     return FastAPIResponse(status_code=204)
 
 
+# ================================================================== #
+# ONE-TIME MIGRATION ENDPOINT (SUPER_ADMIN only)                       #
+# ================================================================== #
+
+@router.post("/production/run-migration-040")
+async def run_migration_040(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Apply migration 040 on free-tier Render (no shell access). SUPER_ADMIN only. Safe to call multiple times."""
+    from sqlalchemy import text
+    role_code = getattr(current_user.role, "code", None) or getattr(current_user, "role_code", None)
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="SUPER_ADMIN only")
+
+    results = []
+
+    steps = [
+        ("waste_entries.waste_type column", """
+            ALTER TABLE waste_entries
+            ADD COLUMN IF NOT EXISTS waste_type VARCHAR(100)
+        """),
+        ("ix_waste_entries_type index", """
+            CREATE INDEX IF NOT EXISTS ix_waste_entries_type
+            ON waste_entries (mill_id, waste_type)
+        """),
+        ("manpower_categories table", """
+            CREATE TABLE IF NOT EXISTS manpower_categories (
+                id VARCHAR PRIMARY KEY,
+                mill_id VARCHAR NOT NULL,
+                department VARCHAR(100) NOT NULL,
+                category VARCHAR(100) NOT NULL,
+                label VARCHAR(200) NOT NULL,
+                sort_order INTEGER DEFAULT 0,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                CONSTRAINT uq_manpower_cat_mill_dept_cat
+                    UNIQUE (mill_id, department, category)
+            )
+        """),
+        ("ix_manpower_categories index", """
+            CREATE INDEX IF NOT EXISTS ix_manpower_categories_mill_dept
+            ON manpower_categories (mill_id, department)
+        """),
+    ]
+
+    for label, sql in steps:
+        try:
+            await db.execute(text(sql))
+            await db.commit()
+            results.append({"step": label, "status": "ok"})
+        except Exception as e:
+            await db.rollback()
+            results.append({"step": label, "status": "error", "detail": str(e)})
+
+    return {"migration": "040", "results": results}
+
+
 def _pse_dict(r: PackingShiftEntry) -> dict:
     return {
         "id": r.id,
