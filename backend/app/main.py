@@ -164,10 +164,35 @@ async def lifespan(app: FastAPI):
 
 
 async def _apply_migration_040_raw() -> None:
-    """Fallback: apply migration 040 DDL directly if Alembic fails."""
+    """Fallback: apply migration 039+040 DDL directly if Alembic fails. All idempotent (IF NOT EXISTS)."""
     from sqlalchemy import text
     from app.db.session import engine as _engine
     async with _engine.begin() as conn:
+        # migration 039 — packing_shift_entries table
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS packing_shift_entries (
+                id VARCHAR(36) PRIMARY KEY,
+                mill_id VARCHAR(36) NOT NULL REFERENCES mills(id),
+                date VARCHAR(10) NOT NULL,
+                shift VARCHAR(5) NOT NULL,
+                lot_no VARCHAR(50) NOT NULL,
+                count_ne FLOAT,
+                count_desc VARCHAR(200),
+                bag_from INTEGER,
+                bag_to INTEGER,
+                total_bags INTEGER,
+                machine_code VARCHAR(20),
+                operator VARCHAR(100),
+                supervisor VARCHAR(100),
+                remarks TEXT,
+                status VARCHAR(20) DEFAULT 'draft',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+        """))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_pse_mill_date_shift ON packing_shift_entries (mill_id, date, shift)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_pse_mill_lot ON packing_shift_entries (mill_id, lot_no)"))
+        # migration 040 — waste_type column + manpower_categories table
         await conn.execute(text("ALTER TABLE waste_entries ADD COLUMN IF NOT EXISTS waste_type VARCHAR(100)"))
         await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_waste_entries_type ON waste_entries (mill_id, waste_type)"))
         await conn.execute(text("""
@@ -184,7 +209,7 @@ async def _apply_migration_040_raw() -> None:
             )
         """))
         await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_manpower_categories_mill_dept ON manpower_categories (mill_id, department)"))
-    logger.info("migration 040 raw SQL fallback: done")
+    logger.info("migration 039+040 raw SQL fallback: done")
 
 
 async def _background_init():
