@@ -49,7 +49,7 @@ import { useState, useMemo, useEffect } from "react";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, ArrowDown, ArrowUp, Trash2, Clock, Users2, UserCircle, Layers, PowerOff, FileText } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, ArrowDown, ArrowUp, Trash2, Clock, Users2, UserCircle, Layers, PowerOff, FileText, Settings2, X } from "lucide-react";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useActiveMill } from "@/hooks/useActiveMill";
@@ -1992,6 +1992,141 @@ function buildManpowerRows(categories: { category: string; label: string }[]): M
   }));
 }
 
+// ── ManpowerCategoryEditor — inline add/edit/delete categories per dept ──────
+
+function ManpowerCategoryEditor({
+  department, millId, onClose,
+}: { department: string; millId: string; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [newLabel, setNewLabel] = useState("");
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+
+  const catQ = useQuery({
+    queryKey: ["manpower-categories", millId, department],
+    queryFn: () => productionApi.getManpowerCategories({ mill_id: millId, department }),
+    staleTime: 0,
+    enabled: !!millId && !!department,
+  });
+  const cats = ((catQ.data?.data ?? []).length > 0
+    ? catQ.data?.data
+    : RF_DEFAULT_CATEGORIES
+  ) as { id: string; category: string; label: string }[];
+
+  const addMut = useMutation({
+    mutationFn: (label: string) => {
+      const category = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/, "");
+      return productionApi.createManpowerCategory({ department, category, label, sort_order: cats.length }, millId);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["manpower-categories"] }); setNewLabel(""); toast.success("Category added"); },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to add"),
+  });
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, label }: { id: string; label: string }) =>
+      productionApi.updateManpowerCategory(id, { label }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["manpower-categories"] }); setEditId(null); toast.success("Updated"); },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to update"),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => productionApi.deleteManpowerCategory(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["manpower-categories"] }); toast.success("Removed"); },
+    onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to delete"),
+  });
+
+  const seedMut = useMutation({
+    mutationFn: () => productionApi.getManpowerCategories({ mill_id: millId, department, seed: true }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["manpower-categories"] }); toast.success("Default categories seeded"); },
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-background rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b">
+          <div>
+            <p className="font-semibold text-sm">Manpower Categories</p>
+            <p className="text-xs text-muted-foreground">{department}</p>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {/* Category list */}
+        <div className="divide-y max-h-80 overflow-y-auto">
+          {catQ.isLoading ? (
+            <div className="p-4 text-sm text-muted-foreground text-center">Loading…</div>
+          ) : cats.length === 0 ? (
+            <div className="p-4 text-sm text-muted-foreground text-center">
+              No categories yet.{" "}
+              <button onClick={() => seedMut.mutate()} className="text-primary underline">Seed defaults</button>
+            </div>
+          ) : cats.map((cat) => (
+            <div key={cat.id} className="flex items-center gap-2 px-4 py-2.5">
+              {editId === cat.id ? (
+                <>
+                  <Input
+                    value={editLabel}
+                    onChange={(e) => setEditLabel(e.target.value)}
+                    className="h-7 text-sm flex-1"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") updateMut.mutate({ id: cat.id, label: editLabel });
+                      if (e.key === "Escape") setEditId(null);
+                    }}
+                  />
+                  <Button size="sm" variant="default" className="h-7 px-2 text-xs"
+                    onClick={() => updateMut.mutate({ id: cat.id, label: editLabel })}
+                    disabled={updateMut.isPending}>Save</Button>
+                  <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditId(null)}>✕</Button>
+                </>
+              ) : (
+                <>
+                  <span className="flex-1 text-sm">{cat.label}</span>
+                  <button onClick={() => { setEditId(cat.id); setEditLabel(cat.label); }}
+                    className="text-muted-foreground hover:text-foreground p-1 rounded">
+                    <Pencil className="size-3.5" />
+                  </button>
+                  <button onClick={() => { if (confirm(`Remove "${cat.label}"?`)) deleteMut.mutate(cat.id); }}
+                    className="text-muted-foreground hover:text-destructive p-1 rounded"
+                    disabled={deleteMut.isPending}>
+                    <Trash2 className="size-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Add new */}
+        <div className="border-t px-4 py-3 space-y-2">
+          <div className="flex gap-2">
+            <Input
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              placeholder="New category name…"
+              className="h-8 text-sm flex-1"
+              onKeyDown={(e) => { if (e.key === "Enter" && newLabel.trim()) addMut.mutate(newLabel.trim()); }}
+            />
+            <Button size="sm" onClick={() => newLabel.trim() && addMut.mutate(newLabel.trim())}
+              disabled={addMut.isPending || !newLabel.trim()}>
+              <Plus className="size-3.5 mr-1" /> Add
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Changes apply only to <strong>{department}</strong>.
+            {cats === RF_DEFAULT_CATEGORIES && (
+              <> Using defaults. <button onClick={() => seedMut.mutate()} className="text-primary underline ml-1">Save to DB</button></>
+            )}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ManpowerGrid() {
   const qc = useQueryClient();
   const { millId } = useActiveMill();
@@ -2134,6 +2269,8 @@ function ManpowerGrid() {
     return row.mcIdTo || undefined;
   }
 
+  const [showCatEditor, setShowCatEditor] = useState(false);
+
   const readyToFill = manpowerMode === "individual" ? !!selectedMachine : !!selectedGroupId;
   const saveLabel = bulkMutation.isPending ? "Saving…"
     : manpowerMode === "group" && selectedGroupId && mpMachines.length > 0
@@ -2142,6 +2279,13 @@ function ManpowerGrid() {
 
   return (
     <div className="space-y-4">
+      {showCatEditor && millId && department && (
+        <ManpowerCategoryEditor
+          department={department}
+          millId={millId}
+          onClose={() => setShowCatEditor(false)}
+        />
+      )}
       {/* ── Header card: date / shift / dept ── */}
       <Card>
         <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
@@ -2273,10 +2417,16 @@ function ManpowerGrid() {
               </span>
             )}
           </CardTitle>
-          <Button size="sm" onClick={() => bulkMutation.mutate()} disabled={bulkMutation.isPending || !readyToFill || totalHeadcount === 0}>
-            <Save className="size-3.5 mr-1.5" />
-            {saveLabel}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setShowCatEditor(true)} disabled={!department}>
+              <Settings2 className="size-3.5 mr-1.5" />
+              Manage
+            </Button>
+            <Button size="sm" onClick={() => bulkMutation.mutate()} disabled={bulkMutation.isPending || !readyToFill || totalHeadcount === 0}>
+              <Save className="size-3.5 mr-1.5" />
+              {saveLabel}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {!readyToFill ? (
