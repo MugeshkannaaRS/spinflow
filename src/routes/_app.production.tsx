@@ -2932,14 +2932,30 @@ function PackingGrid() {
   // Auto-suggest next bag_from when lot_no loses focus — scoped to same shift+date
   async function onLotBlur(idx: number) {
     const lot = rows[idx].lot_no.trim();
-    if (!lot) return;
+    if (!lot || rows[idx].bag_from) return; // skip if already filled
+
+    // 1. Check other local rows first (same lot, same session — not yet saved)
+    let localMax: number | null = null;
+    rows.forEach((r, i) => {
+      if (i === idx) return;
+      if (r.lot_no.trim().toLowerCase() !== lot.toLowerCase()) return;
+      const t = parseInt(r.bag_to, 10);
+      if (!isNaN(t) && (localMax === null || t > localMax)) localMax = t;
+    });
+
+    if (localMax !== null) {
+      updateRow(idx, "bag_from", String(localMax + 1));
+      return; // local rows are authoritative for this session
+    }
+
+    // 2. Fall back to DB — last saved bag for this lot+date+shift
     try {
       const r = await api.get(
         `/production/packing/last-bag/${encodeURIComponent(lot)}`,
         { params: { date, shift } }
       );
       const last = r.data?.last_bag_to;
-      if (last != null && !rows[idx].bag_from) {
+      if (last != null) {
         updateRow(idx, "bag_from", String(last + 1));
       }
     } catch {
