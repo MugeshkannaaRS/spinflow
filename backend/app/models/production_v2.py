@@ -1,6 +1,6 @@
 """
 Production v2 models: DatalogStopCode, WasteEntry, RFManpowerPlan, MixingChangeFibreRow,
-PackingShiftEntry (migration 039)
+PackingShiftEntry (migration 039), ManpowerCategory (migration 040)
 """
 from sqlalchemy import (
     String, Float, Integer, Boolean, DateTime, ForeignKey,
@@ -39,6 +39,7 @@ class WasteEntry(Base):
     lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     ratio: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     target_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    waste_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     waste_kg: Mapped[float] = mapped_column(Float, nullable=False)
     remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     operator_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
@@ -98,6 +99,25 @@ class PackingShiftEntry(Base):
     status: Mapped[str] = mapped_column(String(20), default="draft")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class ManpowerCategory(Base):
+    """Per-department customizable manpower categories (replaces hardcoded RF_CATEGORIES)."""
+    __tablename__ = "manpower_categories"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
+    department: Mapped[str] = mapped_column(String(50), nullable=False)
+    category: Mapped[str] = mapped_column(String(50), nullable=False)   # snake_case key
+    label: Mapped[str] = mapped_column(String(100), nullable=False)     # display name
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("mill_id", "department", "category",
+                         name="uq_manpower_cat_mill_dept_cat"),
+    )
 
 
 class MixingChangeFibreRow(Base):

@@ -19,6 +19,7 @@ from app.models.production_v2 import (
     DatalogStopCode,
     WasteEntry,
     RFManpowerPlan,
+    ManpowerCategory,
     MixingChangeFibreRow,
     PackingShiftEntry,
 )
@@ -27,6 +28,7 @@ from app.schemas.production_v2 import (
     DatalogStopCodeOut, DatalogStopCodeCreate, DatalogStopCodeUpdate,
     WasteEntryCreate, WasteEntryBulkCreate, WasteEntryOut,
     RFManpowerCreate, RFManpowerBulkCreate, RFManpowerOut,
+    ManpowerCategoryCreate, ManpowerCategoryUpdate, ManpowerCategoryOut,
     MixingFibreRowCreate, MixingFibreRowOut,
     RF_CATEGORY_LABELS,
 )
@@ -287,6 +289,7 @@ async def create_waste_entries_bulk(
                 shift=req.shift,
                 department=req.department,
                 machine_code=item.machine_code,
+                waste_type=item.waste_type,
                 lot_no=item.lot_no,
                 ratio=item.ratio,
                 target_kg=item.target_kg,
@@ -321,6 +324,137 @@ async def approve_waste_entry(
     await db.commit()
     await db.refresh(entry)
     return entry
+
+
+# ------------------------------------------------------------------ #
+# Waste type history (autocomplete source)                             #
+# ------------------------------------------------------------------ #
+
+@router.get("/production/waste-entries/types")
+async def list_waste_types(
+    mill_id: Optional[str] = Query(None),
+    department: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production")),
+):
+    """Return distinct waste_type values for autocomplete, most-recently-used first."""
+    effective_mill_id = await _resolve_mill(current_user, db, mill_id)
+    q = (
+        select(WasteEntry.waste_type, func.max(WasteEntry.created_at).label("last_used"))
+        .where(
+            WasteEntry.mill_id == effective_mill_id,
+            WasteEntry.waste_type.isnot(None),
+            WasteEntry.waste_type != "",
+        )
+        .group_by(WasteEntry.waste_type)
+        .order_by(func.max(WasteEntry.created_at).desc())
+        .limit(50)
+    )
+    if department:
+        q = q.where(WasteEntry.department == department)
+    rows = (await db.execute(q)).all()
+    return {"types": [r[0] for r in rows]}
+
+
+# ================================================================== #
+# MANPOWER CATEGORIES (per-dept master)                                #
+# ================================================================== #
+
+@router.get("/production/manpower-categories")
+async def list_manpower_categories(
+    mill_id: Optional[str] = Query(None),
+    department: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production")),
+):
+    effective_mill_id = await _resolve_mill(current_user, db, mill_id)
+    q = (
+        select(ManpowerCategory)
+        .where(ManpowerCategory.mill_id == effective_mill_id, ManpowerCategory.is_active == True)
+        .order_by(ManpowerCategory.department, ManpowerCategory.sort_order, ManpowerCategory.label)
+    )
+    if department:
+        q = q.where(ManpowerCategory.department == department)
+    items = (await db.execute(q)).scalars().all()
+    data = [ManpowerCategoryOut.model_validate(i).model_dump() for i in items]
+    # If no custom categories exist for a dept, fall back to RF defaults
+    if not data and department:
+        # Seed RF defaults on-the-fly and return them
+        defaults = [
+            ("line_man", "Line Man"), ("doffer", "Doffer"), ("house_keeper", "House Keeper"),
+            ("pneumafil_collection", "Pneumafil Collection"), ("floor_cleaner", "Floor Cleaner"),
+            ("gripperman", "Gripperman"), ("cope_carrier", "Cope Carrier"),
+            ("robo_doffer", "Robo Doffer"), ("roving_carrier", "Roving Carrier"),
+            ("maintenance_assi", "Maintenance Assistant"),
+        ]
+        for idx, (cat, lbl) in enumerate(defaults):
+            obj = ManpowerCategory(
+                id=generate_uuid(),
+                mill_id=effective_mill_id,
+                department=department,
+                category=cat,
+                label=lbl,
+                sort_order=idx,
+                is_active=True,
+            )
+            db.add(obj)
+        try:
+            await db.commit()
+        except Exception:
+            await db.rollback()
+        items = (await db.execute(
+            select(ManpowerCategory)
+            .where(ManpowerCategory.mill_id == effective_mill_id, ManpowerCategory.department == department)
+            .order_by(ManpowerCategory.sort_order)
+        )).scalars().all()
+        data = [ManpowerCategoryOut.model_validate(i).model_dump() for i in items]
+    return {"total": len(data), "data": data}
+
+
+@router.post("/production/manpower-categories", response_model=ManpowerCategoryOut)
+async def create_manpower_category(
+    req: ManpowerCategoryCreate,
+    mill_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    effective_mill_id = await _resolve_mill(current_user, db, mill_id)
+    obj = ManpowerCategory(id=generate_uuid(), mill_id=effective_mill_id, **req.model_dump())
+    db.add(obj)
+    await db.commit()
+    await db.refresh(obj)
+    return obj
+
+
+@router.patch("/production/manpower-categories/{cat_id}", response_model=ManpowerCategoryOut)
+async def update_manpower_category(
+    cat_id: str,
+    req: ManpowerCategoryUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    obj = (await db.execute(select(ManpowerCategory).where(ManpowerCategory.id == cat_id))).scalar_one_or_none()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Category not found")
+    for field, val in req.model_dump(exclude_unset=True).items():
+        setattr(obj, field, val)
+    await db.commit()
+    await db.refresh(obj)
+    return obj
+
+
+@router.delete("/production/manpower-categories/{cat_id}")
+async def delete_manpower_category(
+    cat_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    obj = (await db.execute(select(ManpowerCategory).where(ManpowerCategory.id == cat_id))).scalar_one_or_none()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Category not found")
+    obj.is_active = False
+    await db.commit()
+    return {"deleted": cat_id}
 
 
 # ================================================================== #
@@ -710,11 +844,13 @@ async def list_packing_entries(
 @router.get("/production/packing/last-bag/{lot_no}")
 async def get_last_bag_for_lot(
     lot_no: str,
+    date: Optional[str] = Query(None),
+    shift: Optional[str] = Query(None),
     scope: tuple = Depends(get_mill_scope),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_module("production")),
 ):
-    """Return the highest bag_to for this lot so frontend can auto-suggest next bag_from."""
+    """Return the highest bag_to for this lot scoped to date+shift (for auto-fill logic)."""
     mill_id, _ = scope
     stmt = (
         select(func.max(PackingShiftEntry.bag_to))
@@ -722,8 +858,12 @@ async def get_last_bag_for_lot(
     )
     if mill_id:
         stmt = stmt.where(PackingShiftEntry.mill_id == mill_id)
+    if date:
+        stmt = stmt.where(PackingShiftEntry.date == date)
+    if shift:
+        stmt = stmt.where(PackingShiftEntry.shift == shift)
     last = (await db.execute(stmt)).scalar()
-    return {"lot_no": lot_no, "last_bag_to": last}
+    return {"lot_no": lot_no, "last_bag_to": last, "date": date, "shift": shift}
 
 
 @router.post("/production/packing/entries/bulk", status_code=201)

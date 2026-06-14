@@ -1,4 +1,4 @@
-"""Schemas for DatalogStopCode, WasteEntry, RFManpowerPlan, MixingChangeFibreRow."""
+"""Schemas for DatalogStopCode, WasteEntry, RFManpowerPlan, ManpowerCategory, MixingChangeFibreRow."""
 from pydantic import BaseModel, Field
 from typing import Optional, List, Any, Dict
 from datetime import datetime, time
@@ -42,6 +42,7 @@ class WasteEntryCreate(BaseModel):
     shift: str = Field(..., pattern="^(A|B|C)$")
     department: str
     machine_code: str
+    waste_type: Optional[str] = None
     lot_no: Optional[str] = None
     ratio: Optional[str] = None
     target_kg: Optional[float] = None
@@ -53,6 +54,7 @@ class WasteEntryCreate(BaseModel):
 
 class WasteEntryBulkItem(BaseModel):
     machine_code: str
+    waste_type: Optional[str] = None
     lot_no: Optional[str] = None
     ratio: Optional[str] = None
     target_kg: Optional[float] = None
@@ -75,6 +77,7 @@ class WasteEntryOut(BaseModel):
     shift: str
     department: str
     machine_code: str
+    waste_type: Optional[str] = None
     lot_no: Optional[str] = None
     ratio: Optional[str] = None
     target_kg: Optional[float] = None
@@ -146,6 +149,38 @@ class RFManpowerOut(BaseModel):
     headcount: int
     supervisor: Optional[str] = None
     remarks: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ------------------------------------------------------------------ #
+# Manpower Categories (per-dept, per-mill master)                      #
+# ------------------------------------------------------------------ #
+
+class ManpowerCategoryCreate(BaseModel):
+    department: str
+    category: str = Field(..., min_length=1, max_length=50)
+    label: str = Field(..., min_length=1, max_length=100)
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class ManpowerCategoryUpdate(BaseModel):
+    label: Optional[str] = None
+    sort_order: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+class ManpowerCategoryOut(BaseModel):
+    id: str
+    mill_id: str
+    department: str
+    category: str
+    label: str
+    sort_order: int
+    is_active: bool
     created_at: Optional[datetime] = None
 
     class Config:

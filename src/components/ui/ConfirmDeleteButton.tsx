@@ -1,10 +1,16 @@
 /**
- * ConfirmDeleteButton — reusable trash-icon button with AlertDialog confirmation.
+ * ConfirmDeleteButton — reusable button with AlertDialog confirmation.
  *
  * Usage:
  *   <ConfirmDeleteButton
  *     onConfirm={async () => { await api.delete(...); qc.invalidateQueries(...); }}
  *     label="Are you sure you want to delete this item?"
+ *   />
+ *
+ *   // Custom trigger (e.g. Deactivate button):
+ *   <ConfirmDeleteButton
+ *     trigger={<Button variant="outline">Deactivate</Button>}
+ *     onConfirm={...}
  *   />
  */
 import { useState } from "react";
@@ -38,6 +44,11 @@ interface ConfirmDeleteButtonProps {
   successMessage?: string;
   /** Error toast message */
   errorMessage?: string;
+  /**
+   * Custom trigger element. When provided, replaces the default Trash2 icon button.
+   * The element is wrapped in AlertDialogTrigger asChild, so it must accept onClick.
+   */
+  trigger?: React.ReactNode;
 }
 
 export function ConfirmDeleteButton({
@@ -48,6 +59,7 @@ export function ConfirmDeleteButton({
   disabled = false,
   successMessage = "Deleted successfully",
   errorMessage = "Delete failed",
+  trigger,
 }: ConfirmDeleteButtonProps) {
   const [loading, setLoading] = useState(false);
 
@@ -67,15 +79,17 @@ export function ConfirmDeleteButton({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-          disabled={disabled || loading}
-          title="Delete"
-        >
-          <Trash2 className="size-3.5" />
-        </Button>
+        {trigger ?? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+            disabled={disabled || loading}
+            title="Delete"
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        )}
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -88,7 +102,7 @@ export function ConfirmDeleteButton({
             onClick={handleConfirm}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {loading ? "Deleting…" : confirmText}
+            {loading ? "Processing…" : confirmText}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
