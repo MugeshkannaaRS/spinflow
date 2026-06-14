@@ -25,7 +25,8 @@ import {
 } from "@/components/ui/select";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, Factory } from "lucide-react";
+import { Plus, Factory, DatabaseZap, CheckCircle2, XCircle } from "lucide-react";
+import { api } from "@/lib/api";
 import type { Mill } from "@/lib/types";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 
@@ -110,6 +111,8 @@ function MillsPage() {
         </Button>
       </div>
 
+      <MigrationPanel />
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">All Mills ({mills.length})</CardTitle>
@@ -131,6 +134,69 @@ function MillsPage() {
 
       <AddMillDialog open={addOpen} onOpenChange={setAddOpen} companies={companies} />
     </div>
+  );
+}
+
+// ─── One-time migration runner ───────────────────────────────────────────────
+function MigrationPanel() {
+  const [results, setResults] = useState<{ step: string; status: string; detail?: string }[]>([]);
+  const mutation = useMutation({
+    mutationFn: () => api.post("/production/run-migration-040").then((r) => r.data),
+    onSuccess: (data) => {
+      setResults(data.results ?? []);
+      const allOk = (data.results ?? []).every((r: any) => r.status === "ok");
+      if (allOk) toast.success("Migration 040 applied successfully!");
+      else toast.warning("Migration ran with some issues — check results below.");
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.detail ?? "Migration failed"),
+  });
+
+  return (
+    <Card className="border-amber-200 bg-amber-50/40">
+      <CardHeader className="pb-2 pt-4 px-4">
+        <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
+          <DatabaseZap className="size-4" />
+          Database Migrations
+        </CardTitle>
+        <p className="text-xs text-amber-700 mt-0.5">
+          Run pending migrations that require a database schema change.
+        </p>
+      </CardHeader>
+      <CardContent className="px-4 pb-4 space-y-3">
+        <div className="flex items-center justify-between rounded-md border border-amber-200 bg-white p-3">
+          <div>
+            <div className="text-sm font-medium">Migration 040 — Waste Type + Manpower Categories</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              Adds <code>waste_type</code> column to waste_entries · Creates <code>manpower_categories</code> table
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-amber-400 text-amber-800 hover:bg-amber-100 shrink-0 ml-4"
+            onClick={() => mutation.mutate()}
+            disabled={mutation.isPending}
+          >
+            <DatabaseZap className="size-3.5 mr-1.5" />
+            {mutation.isPending ? "Running…" : "Run Migration"}
+          </Button>
+        </div>
+        {results.length > 0 && (
+          <div className="space-y-1.5">
+            {results.map((r, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs">
+                {r.status === "ok"
+                  ? <CheckCircle2 className="size-3.5 text-green-600 shrink-0 mt-0.5" />
+                  : <XCircle className="size-3.5 text-destructive shrink-0 mt-0.5" />}
+                <span className={r.status === "ok" ? "text-green-800" : "text-destructive"}>
+                  {r.step}: {r.status === "ok" ? "✓" : r.detail}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
