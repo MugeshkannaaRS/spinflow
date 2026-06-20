@@ -1,7 +1,8 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_, asc, desc
+from sqlalchemy import select, func, or_, asc, desc, update as sa_update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timezone, date as date_type
 from pydantic import BaseModel
@@ -577,65 +578,67 @@ async def bulk_create_employees(
     created_count = 0
     updated = 0
     emp_id_map: Dict[str, str] = {}
-    for idx, emp in enumerate(employees_to_add):
-        row_num = idx + 1
-        try:
-            async with await db.begin_nested():
-                if emp.code in existing_codes:
-                    existing_result = await db.execute(
-                        select(Employee).where(
-                            Employee.code == emp.code,
-                            Employee.mill_id == mill_id,
-                        )
-                    )
-                    existing = existing_result.scalar_one_or_none()
-                    if existing:
-                        if existing.mill_id is None and emp.mill_id:
-                            existing.mill_id = emp.mill_id
-                        for field in ["name", "department", "designation", "section", "shift",
-                                      "joining_date", "dob", "gen", "age", "gender", "grade",
-                                      "phone", "bank_account_no", "basic", "house_rent", "medical",
-                                      "conveyance", "food_allowance", "wages", "increment",
-                                      "total_salary", "mobile_bill", "shift_benefit", "wages_of_month",
-                                      "days_of_month", "sl_no"]:
-                            val = getattr(emp, field, None)
-                            if val is not None:
-                                setattr(existing, field, val)
-                        db.add(existing)
-                        await db.flush()
-                        emp_id_map[emp.code] = existing.id
-                        existing_codes.add(emp.code)
-                        updated += 1
-                else:
-                    db.add(emp)
-                    await db.flush()
-                    emp_id_map[emp.code] = emp.id
-                    existing_codes.add(emp.code)
-                    created_count += 1
 
-                if resolved_company_id:
+    # ── Batch upsert: single round-trip for all rows ──────────────────────
+    # Split into new vs existing to count creates/updates accurately
+    new_emps = [e for e in employees_to_add if e.code not in existing_codes]
+    upd_emps = [e for e in employees_to_add if e.code in existing_codes]
+
+    UPSERT_FIELDS = [
+        "name", "department", "department_name", "designation", "section", "shift",
+        "joining_date", "dob", "gen", "age", "gender", "grade", "phone",
+        "bank_account_no", "basic", "house_rent", "medical", "conveyance",
+        "food_allowance", "wages", "increment", "total_salary", "wages_of_month",
+        "days_of_month", "mobile_bill", "shift_benefit", "sl_no", "mill_id",
+        "is_active", "salary",
+    ]
+
+    try:
+        if employees_to_add:
+            rows = []
+            for emp in employees_to_add:
+                row: Dict[str, Any] = {"id": emp.id, "code": emp.code}
+                for f in UPSERT_FIELDS:
+                    row[f] = getattr(emp, f, None)
+                rows.append(row)
+
+            stmt = pg_insert(Employee).values(rows)
+            update_dict = {f: stmt.excluded[f] for f in UPSERT_FIELDS}
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["code", "mill_id"],
+                set_=update_dict,
+            ).returning(Employee.id, Employee.code)
+
+            result = await db.execute(stmt)
+            returned_rows = result.fetchall()
+
+            # Build emp_id_map from returned ids
+            returned_codes = {row[1]: row[0] for row in returned_rows}
+            emp_id_map = returned_codes
+
+            created_count = len(new_emps)
+            updated = len(upd_emps)
+
+            # Custom fields — add in one flush after we have all ids
+            if resolved_company_id:
+                for emp in employees_to_add:
                     cf_fields = custom_fields_map.get(emp.code)
-                    if cf_fields:
-                        actual_emp_id = emp_id_map.get(emp.code)
-                        if actual_emp_id:
-                            for fname, fval in cf_fields.items():
-                                field = existing_field_names.get(fname)
-                                if not field:
-                                    continue
-                                cv = EmployeeCustomValue(
-                                    employee_id=actual_emp_id,
-                                    field_id=field.id,
-                                    value=str(fval) if fval is not None else None,
-                                )
-                                db.add(cv)
-        except Exception as exc:
-            try:
-                db.expunge(emp)
-            except Exception:
-                pass
-            logger.exception("Employee import failed", extra={"row": row_num, "code": emp.code})
-            errors.append(_err(row_num, str(exc)))
-            continue
+                    actual_emp_id = emp_id_map.get(emp.code)
+                    if cf_fields and actual_emp_id:
+                        for fname, fval in cf_fields.items():
+                            field = existing_field_names.get(fname)
+                            if not field:
+                                continue
+                            cv = EmployeeCustomValue(
+                                employee_id=actual_emp_id,
+                                field_id=field.id,
+                                value=str(fval) if fval is not None else None,
+                            )
+                            db.add(cv)
+
+    except Exception as exc:
+        logger.exception("Employee bulk upsert failed")
+        errors.append(_err(0, f"Bulk insert failed: {exc}"))
 
     for emp, item in payroll_records:
         if emp.code not in emp_id_map:
