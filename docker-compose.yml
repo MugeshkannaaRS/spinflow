@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: spinflow
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-X7k9mP2qR5vB8wN1fL4jH6cY3aE0gT8uWxZ}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       POSTGRES_DB: spinflow_db
     ports:
       - "127.0.0.1:5433:5432"
@@ -28,13 +28,13 @@ services:
     image: redis:7-alpine
     container_name: spinflow-redis
     restart: unless-stopped
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-X8kLm9pQ4rT2vB6nW1cY3zA7eR5fH0jG}"]
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
     ports:
       - "127.0.0.1:6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-X8kLm9pQ4rT2vB6nW1cY3zA7eR5fH0jG}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -56,8 +56,8 @@ services:
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://spinflow:${POSTGRES_PASSWORD:-X7k9mP2qR5vB8wN1fL4jH6cY3aE0gT8uWxZ}@postgres:5432/spinflow_db
-      REDIS_URL: redis://:${REDIS_PASSWORD:-X8kLm9pQ4rT2vB6nW1cY3zA7eR5fH0jG}@redis:6379/0
+      DATABASE_URL: postgresql+asyncpg://spinflow:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/spinflow_db
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
       SECRET_KEY: ${SECRET_KEY}
       DEBUG: "false"
       CORS_ORIGINS: https://millflow.yourdomain.com

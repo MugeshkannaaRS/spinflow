@@ -50,12 +50,10 @@ function RegisterPage() {
             </div>
             <CardTitle className="text-xl">Demo Account Created</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Your demo environment is ready. Check your email for login details or
-              proceed to sign in.
+              Your demo environment is ready. Check your email for login details or proceed to sign
+              in.
             </p>
-            <Button onClick={() => navigate({ to: "/login" })}>
-              Sign In
-            </Button>
+            <Button onClick={() => navigate({ to: "/login" })}>Sign In</Button>
           </CardContent>
         </Card>
       </div>
@@ -131,7 +129,10 @@ function RegisterPage() {
               {loading ? "Creating Account…" : "Start Free Trial"}
             </Button>
             <p className="text-center text-[10px] text-muted-foreground">
-              Already have an account? <a href="/login" className="text-blue-600 hover:underline">Sign in</a>
+              Already have an account?{" "}
+              <a href="/login" className="text-blue-600 hover:underline">
+                Sign in
+              </a>
             </p>
           </form>
         </CardContent>

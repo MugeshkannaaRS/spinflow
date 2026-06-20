@@ -29,18 +29,33 @@ function InvoicesPage() {
   });
 
   if (!user || user.role !== "SUPER_ADMIN") {
-    return <div className="p-6 text-destructive text-lg font-medium">Only Super Admin can access this page.</div>;
+    return (
+      <div className="p-6 text-destructive text-lg font-medium">
+        Only Super Admin can access this page.
+      </div>
+    );
   }
 
   if (q.isError) {
     return (
       <div className="p-6 space-y-4">
-        <div><h1 className="text-xl font-bold">Invoices</h1><p className="text-sm text-muted-foreground">All invoices generated across companies.</p></div>
+        <div>
+          <h1 className="text-xl font-bold">Invoices</h1>
+          <p className="text-sm text-muted-foreground">All invoices generated across companies.</p>
+        </div>
         <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800 p-8 text-center">
           <AlertTriangle className="size-8 mx-auto mb-2 text-red-500" />
-          <p className="text-sm font-medium text-red-700 dark:text-red-400">Failed to load invoices.</p>
-          <p className="text-xs text-red-500 mt-1 mb-3">{(q.error as any)?.response?.data?.detail ?? (q.error as any)?.message ?? "Request failed"}</p>
-          <Button variant="outline" size="sm" onClick={() => q.refetch()}>Retry</Button>
+          <p className="text-sm font-medium text-red-700 dark:text-red-400">
+            Failed to load invoices.
+          </p>
+          <p className="text-xs text-red-500 mt-1 mb-3">
+            {(q.error as any)?.response?.data?.detail ??
+              (q.error as any)?.message ??
+              "Request failed"}
+          </p>
+          <Button variant="outline" size="sm" onClick={() => q.refetch()}>
+            Retry
+          </Button>
         </div>
       </div>
     );
@@ -49,8 +64,13 @@ function InvoicesPage() {
   if (q.isLoading) {
     return (
       <div className="p-6 space-y-4">
-        <div><h1 className="text-xl font-bold">Invoices</h1><p className="text-sm text-muted-foreground">All invoices generated across companies.</p></div>
-        <div className="rounded-lg border p-12 text-center text-sm text-muted-foreground">Loading invoices…</div>
+        <div>
+          <h1 className="text-xl font-bold">Invoices</h1>
+          <p className="text-sm text-muted-foreground">All invoices generated across companies.</p>
+        </div>
+        <div className="rounded-lg border p-12 text-center text-sm text-muted-foreground">
+          Loading invoices…
+        </div>
       </div>
     );
   }
@@ -78,28 +98,38 @@ function InvoicesPage() {
           </thead>
           <tbody className="divide-y">
             {rows.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">No invoices found.</td></tr>
-            ) : rows.map((r: any) => (
-              <tr key={r.id} className="hover:bg-muted/30">
-                <td className="px-4 py-3 font-mono text-xs">{r.invoice_number}</td>
-                <td className="px-4 py-3 font-medium">{r.company_name}</td>
-                <td className="px-4 py-3 text-right font-medium">₹{(r.amount ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</td>
-                <td className="px-4 py-3 text-muted-foreground text-xs">
-                  {r.issue_date ? new Date(r.issue_date).toLocaleDateString() : "—"}
-                </td>
-                <td className="px-4 py-3 text-muted-foreground text-xs">
-                  {r.paid_at ? new Date(r.paid_at).toLocaleDateString() : "—"}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={cn(
-                    "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold capitalize",
-                    STATUS_COLORS[r.status] ?? "bg-gray-100 text-gray-600",
-                  )}>
-                    {r.status}
-                  </span>
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
+                  No invoices found.
                 </td>
               </tr>
-            ))}
+            ) : (
+              rows.map((r: any) => (
+                <tr key={r.id} className="hover:bg-muted/30">
+                  <td className="px-4 py-3 font-mono text-xs">{r.invoice_number}</td>
+                  <td className="px-4 py-3 font-medium">{r.company_name}</td>
+                  <td className="px-4 py-3 text-right font-medium">
+                    ₹{(r.amount ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs">
+                    {r.issue_date ? new Date(r.issue_date).toLocaleDateString() : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs">
+                    {r.paid_at ? new Date(r.paid_at).toLocaleDateString() : "—"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={cn(
+                        "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold capitalize",
+                        STATUS_COLORS[r.status] ?? "bg-gray-100 text-gray-600",
+                      )}
+                    >
+                      {r.status}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

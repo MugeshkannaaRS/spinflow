@@ -148,13 +148,14 @@ function PurchasePage() {
     { key: "status" as const, label: "Status" },
   ];
 
-  if (!user) return (
-    <div className="p-6 space-y-4">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-96 w-full" />
-    </div>
-  );
+  if (!user)
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
 
   if (purchasesQ.isLoading)
     return (
@@ -505,7 +506,8 @@ function NewPurchaseDialog() {
         setOpen(false);
       },
       onError: (err: any) => {
-        const msg = err?.response?.data?.detail || err?.message || "Failed to create purchase entry";
+        const msg =
+          err?.response?.data?.detail || err?.message || "Failed to create purchase entry";
         toast.error(typeof msg === "string" ? msg : "Failed to create purchase entry");
       },
     });

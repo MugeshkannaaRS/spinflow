@@ -1,4 +1,5 @@
 import logging
+import hmac
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Header, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -378,8 +379,14 @@ async def change_password(
         if not verify_password(req.current_password, current_user.password_hash):
             raise SpinFlowException.bad_request("Current password is incorrect", ErrorCode.INVALID_VALUE)
 
-        if len(req.new_password) < 6:
-            raise SpinFlowException.bad_request("New password must be at least 6 characters", ErrorCode.INVALID_VALUE)
+        if len(req.new_password) < 8:
+            raise SpinFlowException.bad_request("New password must be at least 8 characters", ErrorCode.INVALID_VALUE)
+        if not re.search(r"[A-Z]", req.new_password):
+            raise SpinFlowException.bad_request("Password must contain at least one uppercase letter", ErrorCode.INVALID_VALUE)
+        if not re.search(r"\d", req.new_password):
+            raise SpinFlowException.bad_request("Password must contain at least one digit", ErrorCode.INVALID_VALUE)
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>_\-+=\[\]\\';/`~]", req.new_password):
+            raise SpinFlowException.bad_request("Password must contain at least one special character", ErrorCode.INVALID_VALUE)
 
         current_user.password_hash = hash_password(req.new_password)
         current_user.must_change_password = False
@@ -430,11 +437,12 @@ async def forgot_password(req: ForgotPasswordRequest, request: Request, db: Asyn
 
 
 @router.post("/auth/verify-otp-reset")
-async def verify_otp_reset(req: OTPResetRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def verify_otp_reset(req: OTPResetRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """Verify a forgot-password OTP and set a new password in one step."""
     result = await db.execute(select(User).where(User.email == req.email, User.deleted_at.is_(None)))
     user = result.scalar_one_or_none()
-    if not user or not user.otp_code or user.otp_code != req.otp:
+    if not user or not user.otp_code or not hmac.compare_digest(str(user.otp_code), str(req.otp)):
         raise HTTPException(status_code=400, detail="Invalid or expired OTP")
     if user.otp_expires_at and datetime.now(timezone.utc) > user.otp_expires_at:
         raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
@@ -608,6 +616,17 @@ async def force_change_password(
     user.failed_login_attempts = 0
     user.locked_until = None
     user.last_login = datetime.now(timezone.utc)
+
+    # Revoke all existing sessions so old tokens remain valid
+    existing_sessions = await db.execute(
+        select(UserSession).where(
+            UserSession.user_id == user.id,
+            UserSession.is_active == True,
+        )
+    )
+    for s in existing_sessions.scalars().all():
+        s.is_active = False
+
     await db.flush()
 
     role_code = user.role_rel.code if user.role_rel else "UNKNOWN"
@@ -623,7 +642,7 @@ async def force_change_password(
     db.add(session)
     await db.flush()
     client_ip = "0.0.0.0"
-    await log_audit(db, user.id, role_code, "force_change_password", "auth", user.id, "Password changed via force change", ip_address=client_ip)
+    await log_audit(db, user.id, role_code, "force_change_password", "auth", user.id, "Password changed via force change — all prior sessions revoked", ip_address=client_ip)
     _set_refresh_cookie(response, refresh_token)
     return LoginResponse(
         access_token=access_token,

@@ -59,11 +59,10 @@ function ForgotPasswordPage() {
         <div className="w-full max-w-sm text-center space-y-4">
           <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
           <h1 className="text-2xl font-bold text-[#0f172a]">Password reset!</h1>
-          <p className="text-[#64748b] text-sm">Your password has been updated. You can now sign in with your new password.</p>
-          <button
-            onClick={() => navigate({ to: "/login" })}
-            className={btnCls}
-          >
+          <p className="text-[#64748b] text-sm">
+            Your password has been updated. You can now sign in with your new password.
+          </p>
+          <button onClick={() => navigate({ to: "/login" })} className={btnCls}>
             Go to Sign In
           </button>
         </div>
@@ -76,7 +75,9 @@ function ForgotPasswordPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex items-center gap-2 mb-8">
-          <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">S</div>
+          <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">
+            S
+          </div>
           <span className="font-bold text-lg text-[#0f172a]">SpinFlow ERP</span>
         </div>
 
@@ -96,7 +97,10 @@ function ForgotPasswordPage() {
               className="mt-6 space-y-4"
             >
               <div>
-                <label htmlFor="email" className="block text-[14px] font-semibold text-[#374151] mb-1">
+                <label
+                  htmlFor="email"
+                  className="block text-[14px] font-semibold text-[#374151] mb-1"
+                >
                   Email address
                 </label>
                 <input
@@ -112,8 +116,12 @@ function ForgotPasswordPage() {
               </div>
               <button type="submit" disabled={sendOtpMutation.isPending} className={btnCls}>
                 {sendOtpMutation.isPending ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Sending OTP…</>
-                ) : "Send OTP"}
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Sending OTP…
+                  </>
+                ) : (
+                  "Send OTP"
+                )}
               </button>
             </form>
           </>
@@ -121,7 +129,8 @@ function ForgotPasswordPage() {
           <>
             <h1 className="text-[26px] font-bold text-[#0f172a]">Enter OTP</h1>
             <p className="text-[14px] text-[#64748b] mt-1">
-              We sent a 6-digit code to <span className="font-medium text-[#0f172a]">{email}</span>. Enter it below along with your new password.
+              We sent a 6-digit code to <span className="font-medium text-[#0f172a]">{email}</span>.
+              Enter it below along with your new password.
             </p>
 
             <form
@@ -133,7 +142,10 @@ function ForgotPasswordPage() {
               className="mt-6 space-y-4"
             >
               <div>
-                <label htmlFor="otp" className="block text-[14px] font-semibold text-[#374151] mb-1">
+                <label
+                  htmlFor="otp"
+                  className="block text-[14px] font-semibold text-[#374151] mb-1"
+                >
                   6-digit OTP
                 </label>
                 <input
@@ -150,7 +162,10 @@ function ForgotPasswordPage() {
                 />
               </div>
               <div>
-                <label htmlFor="newPassword" className="block text-[14px] font-semibold text-[#374151] mb-1">
+                <label
+                  htmlFor="newPassword"
+                  className="block text-[14px] font-semibold text-[#374151] mb-1"
+                >
                   New password
                 </label>
                 <input
@@ -166,7 +181,10 @@ function ForgotPasswordPage() {
                 />
               </div>
               <div>
-                <label htmlFor="confirmPassword" className="block text-[14px] font-semibold text-[#374151] mb-1">
+                <label
+                  htmlFor="confirmPassword"
+                  className="block text-[14px] font-semibold text-[#374151] mb-1"
+                >
                   Confirm new password
                 </label>
                 <input
@@ -185,12 +203,22 @@ function ForgotPasswordPage() {
               </div>
               <button
                 type="submit"
-                disabled={resetMutation.isPending || !otp || otp.length < 6 || !newPassword || newPassword !== confirmPassword}
+                disabled={
+                  resetMutation.isPending ||
+                  !otp ||
+                  otp.length < 6 ||
+                  !newPassword ||
+                  newPassword !== confirmPassword
+                }
                 className={btnCls}
               >
                 {resetMutation.isPending ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Resetting…</>
-                ) : "Reset Password"}
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Resetting…
+                  </>
+                ) : (
+                  "Reset Password"
+                )}
               </button>
 
               <button
@@ -206,7 +234,10 @@ function ForgotPasswordPage() {
         )}
 
         <div className="mt-6 flex items-center justify-center">
-          <Link to="/login" className="flex items-center gap-1.5 text-sm text-[#64748b] hover:text-[#0f172a] transition-colors">
+          <Link
+            to="/login"
+            className="flex items-center gap-1.5 text-sm text-[#64748b] hover:text-[#0f172a] transition-colors"
+          >
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to Sign In
           </Link>

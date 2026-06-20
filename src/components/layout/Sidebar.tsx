@@ -48,12 +48,7 @@ import {
   TrendingUp as TrendUpIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "@tanstack/react-router";
 
 type NavItem = {
@@ -71,111 +66,129 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "Operations",
     items: [
-      { to: "/production", label: "Production",   icon: Factory,     module: "production" },
-      { to: "/quality",    label: "Quality",       icon: BadgeCheck,  module: "quality" },
-      { to: "/maintenance",label: "Maintenance",   icon: Wrench,      module: "maintenance" },
-      { to: "/alerts",     label: "Alerts",        icon: Siren,       module: "alerts" },
+      { to: "/production", label: "Production", icon: Factory, module: "production" },
+      { to: "/quality", label: "Quality", icon: BadgeCheck, module: "quality" },
+      { to: "/maintenance", label: "Maintenance", icon: Wrench, module: "maintenance" },
+      { to: "/alerts", label: "Alerts", icon: Siren, module: "alerts" },
     ],
   },
   {
     label: "People",
     items: [
-      { to: "/hr",      label: "Human Resources", icon: Users,   module: "hr" },
-      { to: "/payroll", label: "Payroll",          icon: Banknote, module: "payroll" },
+      { to: "/hr", label: "Human Resources", icon: Users, module: "hr" },
+      { to: "/payroll", label: "Payroll", icon: Banknote, module: "payroll" },
     ],
   },
   {
     label: "Supply Chain",
     items: [
-      { to: "/purchase",   label: "Cotton Purchase", icon: Package,   module: "purchase" },
-      { to: "/stores",     label: "Stores",          icon: Warehouse,  module: "stores" },
-      { to: "/inventory",  label: "Inventory",       icon: Boxes,      module: "inventory" },
-      { to: "/dispatch",   label: "Dispatch",        icon: Truck,      module: "dispatch" },
-      { to: "/lotrac",     label: "LoTrac",          icon: QrCode,     module: "lotrac" },
+      { to: "/purchase", label: "Cotton Purchase", icon: Package, module: "purchase" },
+      { to: "/stores", label: "Stores", icon: Warehouse, module: "stores" },
+      { to: "/inventory", label: "Inventory", icon: Boxes, module: "inventory" },
+      { to: "/dispatch", label: "Dispatch", icon: Truck, module: "dispatch" },
+      { to: "/lotrac", label: "LoTrac", icon: QrCode, module: "lotrac" },
     ],
   },
   {
     label: "Finance",
     items: [
-      { to: "/accounts", label: "Accounts", icon: Receipt,    module: "accounts" },
-      { to: "/sales",    label: "Sales",    icon: TrendingUp, module: "sales" },
+      { to: "/accounts", label: "Accounts", icon: Receipt, module: "accounts" },
+      { to: "/sales", label: "Sales", icon: TrendingUp, module: "sales" },
     ],
   },
   {
     label: "Settings",
     items: [
-      { to: "/masters", label: "Masters",       icon: Settings2,  module: "masters" },
-      { to: "/users",   label: "Users & Roles", icon: UserCog,    module: "users" },
-      { to: "/audit",   label: "Audit Logs",    icon: ClipboardList, module: "audit" },
+      { to: "/masters", label: "Masters", icon: Settings2, module: "masters" },
+      { to: "/users", label: "Users & Roles", icon: UserCog, module: "users" },
+      { to: "/audit", label: "Audit Logs", icon: ClipboardList, module: "audit" },
     ],
   },
   {
     label: "Success",
     items: [
-      { to: "/onboarding",           label: "Setup Wizard",       icon: Rocket,     module: "dashboard" },
-      { to: "/import-hub",           label: "Import Hub",         icon: Upload,     module: "dashboard" },
-      { to: "/recommendations",      label: "Recommendations",    icon: Lightbulb,  module: "dashboard" },
-      { to: "/executive-dashboard",  label: "Executive Dashboard",icon: Gauge,      module: "dashboard" },
-      { to: "/help-center",          label: "Help Center",        icon: BookOpen,   module: "dashboard" },
+      { to: "/onboarding", label: "Setup Wizard", icon: Rocket, module: "dashboard" },
+      { to: "/import-hub", label: "Import Hub", icon: Upload, module: "dashboard" },
+      { to: "/recommendations", label: "Recommendations", icon: Lightbulb, module: "dashboard" },
+      {
+        to: "/executive-dashboard",
+        label: "Executive Dashboard",
+        icon: Gauge,
+        module: "dashboard",
+      },
+      { to: "/help-center", label: "Help Center", icon: BookOpen, module: "dashboard" },
     ],
   },
 ];
 
 // Admin sub-items shown inside the collapsible Admin group (SUPER_ADMIN only)
 const ADMIN_SUB_ITEMS = [
-  { to: "/admin",                label: "Dashboard",       icon: LayoutDashboard,  exact: true },
-  { to: "/admin/companies",      label: "Companies",       icon: Building2,        exact: false },
-  { to: "/admin/users",          label: "Users",           icon: Users,            exact: false },
-  { to: "/admin/roles",          label: "Role Permissions", icon: Shield,          exact: false },
-  { to: "/admin/analytics",      label: "Analytics",       icon: BarChart3,        exact: false },
-  { to: "/admin/billing",        label: "Billing",         icon: CreditCard,       exact: false },
-  { to: "/admin/approvals",      label: "Approvals",       icon: CheckSquare,      exact: false },
-  { to: "/admin/alert-ops",      label: "Alert Ops",       icon: Bell,             exact: false },
-  { to: "/admin/incidents",      label: "Incidents",       icon: Flag,             exact: false },
-  { to: "/admin/backups",        label: "Backups",         icon: Database,         exact: false },
-  { to: "/admin/health",         label: "Health",          icon: Activity,         exact: false },
-  { to: "/admin/archive",        label: "Archive",         icon: Archive,          exact: false },
-  { to: "/admin/column-config",  label: "Column Config",   icon: SlidersHorizontal, exact: false },
-  { to: "/admin/sales",          label: "Sales Center",    icon: TrendUpIcon,       exact: false },
+  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { to: "/admin/companies", label: "Companies", icon: Building2, exact: false },
+  { to: "/admin/users", label: "Users", icon: Users, exact: false },
+  { to: "/admin/roles", label: "Role Permissions", icon: Shield, exact: false },
+  { to: "/admin/analytics", label: "Analytics", icon: BarChart3, exact: false },
+  { to: "/admin/billing", label: "Billing", icon: CreditCard, exact: false },
+  { to: "/admin/approvals", label: "Approvals", icon: CheckSquare, exact: false },
+  { to: "/admin/alert-ops", label: "Alert Ops", icon: Bell, exact: false },
+  { to: "/admin/incidents", label: "Incidents", icon: Flag, exact: false },
+  { to: "/admin/backups", label: "Backups", icon: Database, exact: false },
+  { to: "/admin/health", label: "Health", icon: Activity, exact: false },
+  { to: "/admin/archive", label: "Archive", icon: Archive, exact: false },
+  { to: "/admin/column-config", label: "Column Config", icon: SlidersHorizontal, exact: false },
+  { to: "/admin/sales", label: "Sales Center", icon: TrendUpIcon, exact: false },
 ];
 
 const COMPANY_OWNER_ROLES = new Set(["MILL_OWNER", "SUPER_ADMIN"]);
 
 // Role → badge color
 const ROLE_BADGE_COLORS: Record<string, string> = {
-  SUPER_ADMIN:          "bg-purple-600 text-white",
-  MILL_OWNER:           "bg-blue-600 text-white",
-  GENERAL_MANAGER:      "bg-cyan-600 text-white",
-  PRODUCTION_MANAGER:   "bg-green-600 text-white",
-  QUALITY_MANAGER:      "bg-yellow-500 text-white",
-  DISPATCH_MANAGER:     "bg-orange-600 text-white",
-  HR_MANAGER:           "bg-pink-600 text-white",
-  ACCOUNTANT:           "bg-indigo-600 text-white",
-  MAINTENANCE_MANAGER:  "bg-red-600 text-white",
-  STORE_MANAGER:        "bg-teal-600 text-white",
-  SUPERVISOR:           "bg-slate-500 text-white",
-  MACHINE_OPERATOR:     "bg-slate-400 text-white",
-  SECURITY_GATE:        "bg-slate-400 text-white",
-  AUDITOR:              "bg-slate-400 text-white",
+  SUPER_ADMIN: "bg-purple-600 text-white",
+  MILL_OWNER: "bg-blue-600 text-white",
+  GENERAL_MANAGER: "bg-cyan-600 text-white",
+  PRODUCTION_MANAGER: "bg-green-600 text-white",
+  QUALITY_MANAGER: "bg-yellow-500 text-white",
+  DISPATCH_MANAGER: "bg-orange-600 text-white",
+  HR_MANAGER: "bg-pink-600 text-white",
+  ACCOUNTANT: "bg-indigo-600 text-white",
+  MAINTENANCE_MANAGER: "bg-red-600 text-white",
+  STORE_MANAGER: "bg-teal-600 text-white",
+  SUPERVISOR: "bg-slate-500 text-white",
+  MACHINE_OPERATOR: "bg-slate-400 text-white",
+  SECURITY_GATE: "bg-slate-400 text-white",
+  AUDITOR: "bg-slate-400 text-white",
 };
 
 function RoleBadge({ role, small = false }: { role: string; small?: boolean }) {
   const colorClass = ROLE_BADGE_COLORS[role] ?? "bg-slate-500 text-white";
   const label = role.replace(/_/g, " ");
   return (
-    <span className={cn(
-      "inline-block rounded font-semibold uppercase tracking-wider leading-none",
-      small ? "text-[9px] px-1.5 py-0.5" : "text-[10px] px-2 py-0.5",
-      colorClass,
-    )}>
+    <span
+      className={cn(
+        "inline-block rounded font-semibold uppercase tracking-wider leading-none",
+        small ? "text-[9px] px-1.5 py-0.5" : "text-[10px] px-2 py-0.5",
+        colorClass,
+      )}
+    >
       {label}
     </span>
   );
 }
 
-function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavClick?: () => void }) {
+function SidebarContent({
+  collapsed,
+  onNavClick,
+}: {
+  collapsed: boolean;
+  onNavClick?: () => void;
+}) {
   const { user, logout } = useAuth();
-  const { canAccess: rbacCanAccess, isSuperAdmin, companyModulesLoaded, isDashboardOnly } = useRBAC();
+  const {
+    canAccess: rbacCanAccess,
+    isSuperAdmin,
+    companyModulesLoaded,
+    isDashboardOnly,
+  } = useRBAC();
   const { canAccess: moduleCanAccess } = useModuleAccess();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
@@ -199,7 +212,10 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
   if (!isSuperAdmin && !companyModulesLoaded) {
     return (
       <div className="flex flex-col h-full" style={{ backgroundColor: "#0f172a" }}>
-        <div className="flex-shrink-0 px-4 py-4 border-b" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+        <div
+          className="flex-shrink-0 px-4 py-4 border-b"
+          style={{ borderColor: "rgba(255,255,255,0.08)" }}
+        >
           {collapsed ? (
             <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center">
               <span className="text-white font-bold text-sm">S</span>
@@ -213,25 +229,27 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
         </div>
         <nav className="flex-1 py-3 px-2">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-10 rounded-lg animate-pulse mx-1 mb-1" style={{ backgroundColor: "#1e293b" }} />
+            <div
+              key={i}
+              className="h-10 rounded-lg animate-pulse mx-1 mb-1"
+              style={{ backgroundColor: "#1e293b" }}
+            />
           ))}
         </nav>
       </div>
     );
   }
 
-  const filteredGroups = NAV_GROUPS
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => {
-        if (isDashboardOnly()) return item.module === "dashboard";
-        // SUPER_ADMIN: dashboard + users + audit shown flat; admin sub-items in collapsible group
-        const SA_MODULES = new Set(["dashboard", "users", "audit"]);
-        if (isSuperAdmin) return SA_MODULES.has(item.module);
-        return moduleCanAccess(item.module);
-      }),
-    }))
-    .filter((group) => group.items.length > 0);
+  const filteredGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      if (isDashboardOnly()) return item.module === "dashboard";
+      // SUPER_ADMIN: dashboard + users + audit shown flat; admin sub-items in collapsible group
+      const SA_MODULES = new Set(["dashboard", "users", "audit"]);
+      if (isSuperAdmin) return SA_MODULES.has(item.module);
+      return moduleCanAccess(item.module);
+    }),
+  })).filter((group) => group.items.length > 0);
 
   // SUPER_ADMIN uses /admin/billing (Settings > Billing); only MILL_OWNER gets the Company Billing section
   const showBilling = user.role === "MILL_OWNER" && !isDashboardOnly();
@@ -254,12 +272,14 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
             <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
               S
             </div>
-              <div className="min-w-0">
-                <div className="text-white font-semibold text-base leading-tight truncate">SpinFlow ERP</div>
-                <div className="text-[#94a3b8] text-xs mt-0.5 truncate">
-                  {user?.role === "SUPER_ADMIN" ? "Vendor" : (user?.millName ?? "Your mill")}
-                </div>
+            <div className="min-w-0">
+              <div className="text-white font-semibold text-base leading-tight truncate">
+                SpinFlow ERP
               </div>
+              <div className="text-[#94a3b8] text-xs mt-0.5 truncate">
+                {user?.role === "SUPER_ADMIN" ? "Vendor" : (user?.millName ?? "Your mill")}
+              </div>
+            </div>
           </Link>
         )}
       </div>
@@ -287,21 +307,23 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                   className={cn(
                     "flex items-center rounded-md transition-all duration-150 mb-0.5 cursor-pointer min-h-[40px]",
                     collapsed ? "justify-center px-2" : "px-3",
-                    active
-                      ? "text-white"
-                      : "hover:text-white",
+                    active ? "text-white" : "hover:text-white",
                   )}
-                  style={
+                  style={active ? { backgroundColor: "#3b82f6" } : undefined}
+                  onMouseEnter={
                     active
-                      ? { backgroundColor: "#3b82f6" }
-                      : undefined
+                      ? undefined
+                      : (e) => {
+                          (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
+                        }
                   }
-                  onMouseEnter={active ? undefined : (e) => {
-                    (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
-                  }}
-                  onMouseLeave={active ? undefined : (e) => {
-                    (e.currentTarget as HTMLElement).style.backgroundColor = "";
-                  }}
+                  onMouseLeave={
+                    active
+                      ? undefined
+                      : (e) => {
+                          (e.currentTarget as HTMLElement).style.backgroundColor = "";
+                        }
+                  }
                 >
                   <Icon
                     className={cn(
@@ -311,7 +333,12 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                     )}
                   />
                   {!collapsed && (
-                    <span className={cn("text-[14px] font-medium truncate", active ? "text-white" : "text-[#94a3b8]")}>
+                    <span
+                      className={cn(
+                        "text-[14px] font-medium truncate",
+                        active ? "text-white" : "text-[#94a3b8]",
+                      )}
+                    >
                       {item.label}
                     </span>
                   )}
@@ -325,7 +352,11 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                       <TooltipContent
                         side="right"
                         className="text-xs"
-                        style={{ backgroundColor: "#0f172a", color: "white", border: "1px solid rgba(255,255,255,0.1)" }}
+                        style={{
+                          backgroundColor: "#0f172a",
+                          color: "white",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                        }}
                       >
                         {item.label}
                       </TooltipContent>
@@ -342,7 +373,10 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
         {isSuperAdmin && !isDashboardOnly() && (
           <div className="mb-1">
             {!collapsed && (
-              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "#475569" }}>
+              <div
+                className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em]"
+                style={{ color: "#475569" }}
+              >
                 Admin
               </div>
             )}
@@ -356,26 +390,51 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
               )}
               style={isOnAdminRoute ? { backgroundColor: "#1e3a5f" } : undefined}
               onMouseEnter={(e) => {
-                if (!isOnAdminRoute) (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
+                if (!isOnAdminRoute)
+                  (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
               }}
               onMouseLeave={(e) => {
                 if (!isOnAdminRoute) (e.currentTarget as HTMLElement).style.backgroundColor = "";
               }}
             >
-              <Shield className={cn("shrink-0", collapsed ? "w-5 h-5" : "w-[18px] h-[18px] mr-3", isOnAdminRoute ? "text-blue-400" : "text-[#94a3b8]")} />
+              <Shield
+                className={cn(
+                  "shrink-0",
+                  collapsed ? "w-5 h-5" : "w-[18px] h-[18px] mr-3",
+                  isOnAdminRoute ? "text-blue-400" : "text-[#94a3b8]",
+                )}
+              />
               {!collapsed && (
                 <>
-                  <span className={cn("text-[14px] font-medium truncate flex-1 text-left", isOnAdminRoute ? "text-white" : "text-[#94a3b8]")}>
+                  <span
+                    className={cn(
+                      "text-[14px] font-medium truncate flex-1 text-left",
+                      isOnAdminRoute ? "text-white" : "text-[#94a3b8]",
+                    )}
+                  >
                     Admin Panel
                   </span>
-                  <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-200 shrink-0", adminOpen ? "rotate-0" : "-rotate-90", isOnAdminRoute ? "text-blue-400" : "text-[#64748b]")} />
+                  <ChevronDown
+                    className={cn(
+                      "w-3.5 h-3.5 transition-transform duration-200 shrink-0",
+                      adminOpen ? "rotate-0" : "-rotate-90",
+                      isOnAdminRoute ? "text-blue-400" : "text-[#64748b]",
+                    )}
+                  />
                 </>
               )}
             </button>
 
             {/* Sub-items */}
             {(adminOpen || collapsed) && (
-              <div className={cn("overflow-hidden", !collapsed && "ml-3 border-l pl-2", collapsed && "mt-0.5")} style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+              <div
+                className={cn(
+                  "overflow-hidden",
+                  !collapsed && "ml-3 border-l pl-2",
+                  collapsed && "mt-0.5",
+                )}
+                style={{ borderColor: "rgba(255,255,255,0.08)" }}
+              >
                 {ADMIN_SUB_ITEMS.map((sub) => {
                   const Icon = sub.icon;
                   const active = isActive(sub.to, sub.exact);
@@ -390,16 +449,35 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                         active ? "text-white" : "text-[#94a3b8] hover:text-white",
                       )}
                       style={active ? { backgroundColor: "#3b82f6" } : undefined}
-                      onMouseEnter={active ? undefined : (e) => {
-                        (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
-                      }}
-                      onMouseLeave={active ? undefined : (e) => {
-                        (e.currentTarget as HTMLElement).style.backgroundColor = "";
-                      }}
+                      onMouseEnter={
+                        active
+                          ? undefined
+                          : (e) => {
+                              (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
+                            }
+                      }
+                      onMouseLeave={
+                        active
+                          ? undefined
+                          : (e) => {
+                              (e.currentTarget as HTMLElement).style.backgroundColor = "";
+                            }
+                      }
                     >
-                      <Icon className={cn("shrink-0", collapsed ? "w-4 h-4" : "w-[15px] h-[15px] mr-2.5", active ? "text-white" : "text-[#64748b]")} />
+                      <Icon
+                        className={cn(
+                          "shrink-0",
+                          collapsed ? "w-4 h-4" : "w-[15px] h-[15px] mr-2.5",
+                          active ? "text-white" : "text-[#64748b]",
+                        )}
+                      />
                       {!collapsed && (
-                        <span className={cn("text-[13px] font-medium truncate", active ? "text-white" : "text-[#94a3b8]")}>
+                        <span
+                          className={cn(
+                            "text-[13px] font-medium truncate",
+                            active ? "text-white" : "text-[#94a3b8]",
+                          )}
+                        >
                           {sub.label}
                         </span>
                       )}
@@ -410,7 +488,15 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                       <TooltipProvider key={sub.to}>
                         <Tooltip>
                           <TooltipTrigger asChild>{link}</TooltipTrigger>
-                          <TooltipContent side="right" className="text-xs" style={{ backgroundColor: "#0f172a", color: "white", border: "1px solid rgba(255,255,255,0.1)" }}>
+                          <TooltipContent
+                            side="right"
+                            className="text-xs"
+                            style={{
+                              backgroundColor: "#0f172a",
+                              color: "white",
+                              border: "1px solid rgba(255,255,255,0.1)",
+                            }}
+                          >
                             {sub.label}
                           </TooltipContent>
                         </Tooltip>
@@ -428,7 +514,10 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
         {showBilling && (
           <div className="mb-1">
             {!collapsed && (
-              <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: "#475569" }}>
+              <div
+                className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em]"
+                style={{ color: "#475569" }}
+              >
                 Company
               </div>
             )}
@@ -443,15 +532,38 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                     collapsed ? "justify-center px-2" : "px-3",
                   )}
                   style={active ? { backgroundColor: "#3b82f6" } : undefined}
-                  onMouseEnter={active ? undefined : (e) => {
-                    (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
-                  }}
-                  onMouseLeave={active ? undefined : (e) => {
-                    (e.currentTarget as HTMLElement).style.backgroundColor = "";
-                  }}
+                  onMouseEnter={
+                    active
+                      ? undefined
+                      : (e) => {
+                          (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
+                        }
+                  }
+                  onMouseLeave={
+                    active
+                      ? undefined
+                      : (e) => {
+                          (e.currentTarget as HTMLElement).style.backgroundColor = "";
+                        }
+                  }
                 >
-                  <CreditCard className={cn("shrink-0", collapsed ? "w-5 h-5" : "w-[18px] h-[18px] mr-3", active ? "text-white" : "text-[#94a3b8]")} />
-                  {!collapsed && <span className={cn("text-[14px] font-medium truncate", active ? "text-white" : "text-[#94a3b8]")}>Billing</span>}
+                  <CreditCard
+                    className={cn(
+                      "shrink-0",
+                      collapsed ? "w-5 h-5" : "w-[18px] h-[18px] mr-3",
+                      active ? "text-white" : "text-[#94a3b8]",
+                    )}
+                  />
+                  {!collapsed && (
+                    <span
+                      className={cn(
+                        "text-[14px] font-medium truncate",
+                        active ? "text-white" : "text-[#94a3b8]",
+                      )}
+                    >
+                      Billing
+                    </span>
+                  )}
                 </Link>
               );
               if (collapsed) {
@@ -459,7 +571,15 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>{link}</TooltipTrigger>
-                      <TooltipContent side="right" className="text-xs" style={{ backgroundColor: "#0f172a", color: "white", border: "1px solid rgba(255,255,255,0.1)" }}>
+                      <TooltipContent
+                        side="right"
+                        className="text-xs"
+                        style={{
+                          backgroundColor: "#0f172a",
+                          color: "white",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                        }}
+                      >
                         Billing
                       </TooltipContent>
                     </Tooltip>
@@ -473,14 +593,21 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
       </nav>
 
       {/* Bottom — user info + role badge + collapse toggle */}
-      <div className="flex-shrink-0 px-3 py-3 border-t space-y-1" style={{ borderColor: "rgba(255,255,255,0.08)" }}>
+      <div
+        className="flex-shrink-0 px-3 py-3 border-t space-y-1"
+        style={{ borderColor: "rgba(255,255,255,0.08)" }}
+      >
         {!collapsed ? (
           <Link
             to="/profile"
             onClick={onNavClick}
             className="flex items-center gap-3 px-2 py-2 rounded-lg transition-colors"
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = ""; }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.backgroundColor = "";
+            }}
           >
             <div
               className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
@@ -506,7 +633,15 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
                   </div>
                 </Link>
               </TooltipTrigger>
-              <TooltipContent side="right" className="text-xs" style={{ backgroundColor: "#0f172a", color: "white", border: "1px solid rgba(255,255,255,0.1)" }}>
+              <TooltipContent
+                side="right"
+                className="text-xs"
+                style={{
+                  backgroundColor: "#0f172a",
+                  color: "white",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
                 {user?.name}
               </TooltipContent>
             </Tooltip>
@@ -518,8 +653,12 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[#94a3b8] hover:text-red-400 transition-colors text-[13px]"
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b"; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = ""; }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.backgroundColor = "";
+            }}
           >
             <LogOut className="w-4 h-4 shrink-0" />
             <span>Logout</span>
@@ -534,8 +673,12 @@ function SidebarContent({ collapsed, onNavClick }: { collapsed: boolean; onNavCl
             window.dispatchEvent(new Event("sidebar-collapse-change"));
           }}
           className="hidden lg:flex w-full items-center justify-center py-1.5 rounded-lg text-[#94a3b8] hover:text-white transition-colors min-h-[40px]"
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b"; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = ""; }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.backgroundColor = "";
+          }}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}

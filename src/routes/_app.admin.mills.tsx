@@ -119,15 +119,15 @@ function MillsPage() {
         </CardHeader>
         <CardContent>
           <ErrorBoundary inline label="Mills">
-          <DataTable
-            tableId="admin_mills"
-            columns={columns}
-            data={mills}
-            isLoading={isLoading}
-            emptyMessage="No mills found."
-            exportFilename="admin_mills"
-            rowKey={(m) => m.id}
-          />
+            <DataTable
+              tableId="admin_mills"
+              columns={columns}
+              data={mills}
+              isLoading={isLoading}
+              emptyMessage="No mills found."
+              exportFilename="admin_mills"
+              rowKey={(m) => m.id}
+            />
           </ErrorBoundary>
         </CardContent>
       </Card>
@@ -165,9 +165,12 @@ function MigrationPanel() {
       <CardContent className="px-4 pb-4 space-y-3">
         <div className="flex items-center justify-between rounded-md border border-amber-200 bg-white p-3">
           <div>
-            <div className="text-sm font-medium">Migration 040 — Waste Type + Manpower Categories</div>
+            <div className="text-sm font-medium">
+              Migration 040 — Waste Type + Manpower Categories
+            </div>
             <div className="text-xs text-muted-foreground mt-0.5">
-              Adds <code>waste_type</code> column to waste_entries · Creates <code>manpower_categories</code> table
+              Adds <code>waste_type</code> column to waste_entries · Creates{" "}
+              <code>manpower_categories</code> table
             </div>
           </div>
           <Button
@@ -185,9 +188,11 @@ function MigrationPanel() {
           <div className="space-y-1.5">
             {results.map((r, i) => (
               <div key={i} className="flex items-start gap-2 text-xs">
-                {r.status === "ok"
-                  ? <CheckCircle2 className="size-3.5 text-green-600 shrink-0 mt-0.5" />
-                  : <XCircle className="size-3.5 text-destructive shrink-0 mt-0.5" />}
+                {r.status === "ok" ? (
+                  <CheckCircle2 className="size-3.5 text-green-600 shrink-0 mt-0.5" />
+                ) : (
+                  <XCircle className="size-3.5 text-destructive shrink-0 mt-0.5" />
+                )}
                 <span className={r.status === "ok" ? "text-green-800" : "text-destructive"}>
                   {r.step}: {r.status === "ok" ? "✓" : r.detail}
                 </span>
@@ -264,9 +269,7 @@ function AddMillDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Add Mill</DialogTitle>
-          <DialogDescription>
-            Create a new mill under an existing company.
-          </DialogDescription>
+          <DialogDescription>Create a new mill under an existing company.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -325,11 +328,7 @@ function AddMillDialog({
             </div>
           </div>
           <DialogFooter className="pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={createMutation.isPending}>

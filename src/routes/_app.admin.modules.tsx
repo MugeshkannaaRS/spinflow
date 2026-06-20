@@ -5,17 +5,34 @@ import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { useState } from "react";
 
 const MODULE_LABELS: Record<string, string> = {
-  dashboard: "Dashboard", production: "Production", quality: "Quality",
-  stock: "Stock", inventory: "Inventory", lotrac: "LoTrac",
-  dispatch: "Dispatch", purchase: "Purchase", stores: "Stores",
-  hr: "HR", payroll: "Payroll", accounts: "Accounts",
-  maintenance: "Maintenance", reports: "Reports", audit: "Audit",
-  users: "Users", masters: "Masters",
+  dashboard: "Dashboard",
+  production: "Production",
+  quality: "Quality",
+  stock: "Stock",
+  inventory: "Inventory",
+  lotrac: "LoTrac",
+  dispatch: "Dispatch",
+  purchase: "Purchase",
+  stores: "Stores",
+  hr: "HR",
+  payroll: "Payroll",
+  accounts: "Accounts",
+  maintenance: "Maintenance",
+  reports: "Reports",
+  audit: "Audit",
+  users: "Users",
+  masters: "Masters",
 };
 const ALL_MODULES = Object.keys(MODULE_LABELS);
 
@@ -64,9 +81,7 @@ function ModuleManagerPage() {
 
   const companies: any[] = (companiesQ.data ?? []) as any[];
 
-  const isDirty = modulesQ.data
-    ? JSON.stringify(modules) !== JSON.stringify(modulesQ.data)
-    : false;
+  const isDirty = modulesQ.data ? JSON.stringify(modules) !== JSON.stringify(modulesQ.data) : false;
 
   if (!companyId) {
     return (
@@ -82,7 +97,9 @@ function ModuleManagerPage() {
             </SelectTrigger>
             <SelectContent>
               {companies.map((c: any) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -103,7 +120,9 @@ function ModuleManagerPage() {
             </SelectTrigger>
             <SelectContent>
               {companies.map((c: any) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -135,7 +154,9 @@ function ModuleManagerPage() {
             </SelectTrigger>
             <SelectContent>
               {companies.map((c: any) => (
-                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

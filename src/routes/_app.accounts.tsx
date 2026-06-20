@@ -96,16 +96,23 @@ function AccountsPage() {
     },
   });
 
-  const handleEdit = (inv: any) => { setEditingInv(inv); setInvSlideOpen(true); };
-  const handleNew = () => { setEditingInv(null); setInvSlideOpen(true); };
+  const handleEdit = (inv: any) => {
+    setEditingInv(inv);
+    setInvSlideOpen(true);
+  };
+  const handleNew = () => {
+    setEditingInv(null);
+    setInvSlideOpen(true);
+  };
 
-  if (!user) return (
-    <div className="p-6 space-y-4">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-96 w-full" />
-    </div>
-  );
+  if (!user)
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
 
   if (invQ.isLoading)
     return (
@@ -139,7 +146,8 @@ function AccountsPage() {
                   Total Sales
                 </div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <IndianRupee className="size-5 text-primary" />{fmtLakh(totalSales)}
+                  <IndianRupee className="size-5 text-primary" />
+                  {fmtLakh(totalSales)}
                 </div>
               </CardContent>
             </Card>
@@ -148,9 +156,7 @@ function AccountsPage() {
                 <div className="text-xs uppercase text-muted-foreground font-medium">
                   Total Purchases
                 </div>
-                <div className="text-2xl font-semibold mt-2">
-                  {fmtLakh(totalPurchases)}
-                </div>
+                <div className="text-2xl font-semibold mt-2">{fmtLakh(totalPurchases)}</div>
               </CardContent>
             </Card>
             <Card>
@@ -159,7 +165,8 @@ function AccountsPage() {
                   Outstanding
                 </div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <AlertTriangle className="size-5 text-warning" />{fmtLakh(outstandingTotal)}
+                  <AlertTriangle className="size-5 text-warning" />
+                  {fmtLakh(outstandingTotal)}
                 </div>
               </CardContent>
             </Card>
@@ -190,44 +197,93 @@ function AccountsPage() {
                 </CardHeader>
                 <CardContent>
                   <ErrorBoundary inline label="Invoices">
-                  <DataTable
-                    tableId="accounts_invoices"
-                    columns={[
-                      { key: "invoiceNo", label: invColConfig.getLabel('invoice_no'), className: "font-mono text-xs" },
-                      { key: "date", label: invColConfig.getLabel('date'), type: "date" },
-                      { key: "customer", label: invColConfig.getLabel('customer'), render: (inv: any) => <span className="font-medium">{inv.customer}</span> },
-                      { key: "type", label: invColConfig.getLabel('type'), type: "status", render: (inv: any) => <StatusBadge status={inv.type === "sales" ? "active" : "idle"} label={inv.type} size="sm" /> },
-                      { key: "amount", label: invColConfig.getLabel('amount'), render: (inv: any) => `₹${(inv.amount ?? 0).toLocaleString()}` },
-                      { key: "gst", label: invColConfig.getLabel('gst'), render: (inv: any) => `₹${(inv.gst ?? 0).toLocaleString()}` },
-                      { key: "total", label: invColConfig.getLabel('total'), render: (inv: any) => <span className="font-medium">₹{(inv.total ?? 0).toLocaleString()}</span> },
-                      { key: "status", label: invColConfig.getLabel('status'), type: "status", render: (inv: any) => <StatusBadge status={inv.status} size="sm" /> },
-                    ] satisfies ColDef[]}
-                    data={invoices}
-                    loading={invQ.isLoading}
-                    rowKey={(inv) => inv.id}
-                    exportFilename="invoices"
-                    toolbar={
-                      <Button size="sm" className="h-8 text-xs gap-1" onClick={handleNew}>
-                        <Plus className="size-3.5" /> New Invoice
-                      </Button>
-                    }
-                    rowActions={(inv: any) => (
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="size-7" onClick={() => handleEdit(inv)}>
-                          <Pencil className="size-3" />
+                    <DataTable
+                      tableId="accounts_invoices"
+                      columns={
+                        [
+                          {
+                            key: "invoiceNo",
+                            label: invColConfig.getLabel("invoice_no"),
+                            className: "font-mono text-xs",
+                          },
+                          { key: "date", label: invColConfig.getLabel("date"), type: "date" },
+                          {
+                            key: "customer",
+                            label: invColConfig.getLabel("customer"),
+                            render: (inv: any) => (
+                              <span className="font-medium">{inv.customer}</span>
+                            ),
+                          },
+                          {
+                            key: "type",
+                            label: invColConfig.getLabel("type"),
+                            type: "status",
+                            render: (inv: any) => (
+                              <StatusBadge
+                                status={inv.type === "sales" ? "active" : "idle"}
+                                label={inv.type}
+                                size="sm"
+                              />
+                            ),
+                          },
+                          {
+                            key: "amount",
+                            label: invColConfig.getLabel("amount"),
+                            render: (inv: any) => `₹${(inv.amount ?? 0).toLocaleString()}`,
+                          },
+                          {
+                            key: "gst",
+                            label: invColConfig.getLabel("gst"),
+                            render: (inv: any) => `₹${(inv.gst ?? 0).toLocaleString()}`,
+                          },
+                          {
+                            key: "total",
+                            label: invColConfig.getLabel("total"),
+                            render: (inv: any) => (
+                              <span className="font-medium">
+                                ₹{(inv.total ?? 0).toLocaleString()}
+                              </span>
+                            ),
+                          },
+                          {
+                            key: "status",
+                            label: invColConfig.getLabel("status"),
+                            type: "status",
+                            render: (inv: any) => <StatusBadge status={inv.status} size="sm" />,
+                          },
+                        ] satisfies ColDef[]
+                      }
+                      data={invoices}
+                      loading={invQ.isLoading}
+                      rowKey={(inv) => inv.id}
+                      exportFilename="invoices"
+                      toolbar={
+                        <Button size="sm" className="h-8 text-xs gap-1" onClick={handleNew}>
+                          <Plus className="size-3.5" /> New Invoice
                         </Button>
-                        <ConfirmDeleteButton
-                          onConfirm={async () => {
-                            await deleteM.mutateAsync(inv.id);
-                          }}
-                          title="Delete invoice?"
-                          label={`Delete invoice ${inv.invoiceNo ?? ""}?`}
-                          confirmText="Delete"
-                          successMessage="Invoice deleted"
-                        />
-                      </div>
-                    )}
-                  />
+                      }
+                      rowActions={(inv: any) => (
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-7"
+                            onClick={() => handleEdit(inv)}
+                          >
+                            <Pencil className="size-3" />
+                          </Button>
+                          <ConfirmDeleteButton
+                            onConfirm={async () => {
+                              await deleteM.mutateAsync(inv.id);
+                            }}
+                            title="Delete invoice?"
+                            label={`Delete invoice ${inv.invoiceNo ?? ""}?`}
+                            confirmText="Delete"
+                            successMessage="Invoice deleted"
+                          />
+                        </div>
+                      )}
+                    />
                   </ErrorBoundary>
                 </CardContent>
               </Card>
@@ -235,26 +291,70 @@ function AccountsPage() {
 
             <TabsContent value="receivables">
               <Card>
-                <CardHeader><CardTitle className="text-base">Outstanding Receivables</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle className="text-base">Outstanding Receivables</CardTitle>
+                </CardHeader>
                 <CardContent>
                   <ErrorBoundary inline label="Receivables">
-                  <DataTable
-                    tableId="accounts_receivables"
-                    columns={[
-                      { key: "customer", label: recvColConfig.getLabel('customer'), render: (r: any) => <span className="font-medium">{r.customer}</span> },
-                      { key: "invoiceNo", label: recvColConfig.getLabel('invoice_no'), className: "font-mono text-xs" },
-                      { key: "date", label: recvColConfig.getLabel('date'), type: "date" },
-                      { key: "dueDate", label: recvColConfig.getLabel('due_date'), type: "date" },
-                      { key: "amount", label: recvColConfig.getLabel('amount'), render: (r: any) => `₹${(r.amount ?? 0).toLocaleString()}` },
-                      { key: "outstanding", label: recvColConfig.getLabel('outstanding'), render: (r: any) => <span className="font-medium text-destructive">₹{(r.outstanding ?? 0).toLocaleString()}</span> },
-                      { key: "status", label: recvColConfig.getLabel('status'), type: "status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
-                      { key: "daysOverdue", label: recvColConfig.getLabel('days_overdue'), render: (r: any) => r.daysOverdue > 0 ? <span className="text-destructive font-medium">{r.daysOverdue}d</span> : "—" },
-                    ] satisfies ColDef[]}
-                    data={receivables as any[]}
-                    loading={recvQ.isLoading}
-                    rowKey={(r) => r.id}
-                    exportFilename="receivables"
-                  />
+                    <DataTable
+                      tableId="accounts_receivables"
+                      columns={
+                        [
+                          {
+                            key: "customer",
+                            label: recvColConfig.getLabel("customer"),
+                            render: (r: any) => <span className="font-medium">{r.customer}</span>,
+                          },
+                          {
+                            key: "invoiceNo",
+                            label: recvColConfig.getLabel("invoice_no"),
+                            className: "font-mono text-xs",
+                          },
+                          { key: "date", label: recvColConfig.getLabel("date"), type: "date" },
+                          {
+                            key: "dueDate",
+                            label: recvColConfig.getLabel("due_date"),
+                            type: "date",
+                          },
+                          {
+                            key: "amount",
+                            label: recvColConfig.getLabel("amount"),
+                            render: (r: any) => `₹${(r.amount ?? 0).toLocaleString()}`,
+                          },
+                          {
+                            key: "outstanding",
+                            label: recvColConfig.getLabel("outstanding"),
+                            render: (r: any) => (
+                              <span className="font-medium text-destructive">
+                                ₹{(r.outstanding ?? 0).toLocaleString()}
+                              </span>
+                            ),
+                          },
+                          {
+                            key: "status",
+                            label: recvColConfig.getLabel("status"),
+                            type: "status",
+                            render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                          },
+                          {
+                            key: "daysOverdue",
+                            label: recvColConfig.getLabel("days_overdue"),
+                            render: (r: any) =>
+                              r.daysOverdue > 0 ? (
+                                <span className="text-destructive font-medium">
+                                  {r.daysOverdue}d
+                                </span>
+                              ) : (
+                                "—"
+                              ),
+                          },
+                        ] satisfies ColDef[]
+                      }
+                      data={receivables as any[]}
+                      loading={recvQ.isLoading}
+                      rowKey={(r) => r.id}
+                      exportFilename="receivables"
+                    />
                   </ErrorBoundary>
                 </CardContent>
               </Card>
@@ -268,7 +368,10 @@ function AccountsPage() {
       </AccessGuard>
       <InvoiceSlideOver
         open={invSlideOpen}
-        onOpenChange={(open) => { setInvSlideOpen(open); if (!open) setEditingInv(null); }}
+        onOpenChange={(open) => {
+          setInvSlideOpen(open);
+          if (!open) setEditingInv(null);
+        }}
         invoice={editingInv}
       />
     </>
@@ -283,7 +386,15 @@ interface InvItem {
   amount: number;
 }
 
-function InvoiceSlideOver({ open, onOpenChange, invoice }: { open: boolean; onOpenChange: (v: boolean) => void; invoice?: any }) {
+function InvoiceSlideOver({
+  open,
+  onOpenChange,
+  invoice,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  invoice?: any;
+}) {
   const qc = useQueryClient();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -321,12 +432,15 @@ function InvoiceSlideOver({ open, onOpenChange, invoice }: { open: boolean; onOp
     },
     onError: (err: any) => {
       const detail = err?.response?.data?.detail;
-      const msg = Array.isArray(detail) ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ") : detail || err?.message || "Failed to save invoice";
+      const msg = Array.isArray(detail)
+        ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ")
+        : detail || err?.message || "Failed to save invoice";
       toast.error(msg);
     },
   });
 
-  const addItem = () => setItems([...items, { description: "", hsn: "", qty: 1, rate: 0, amount: 0 }]);
+  const addItem = () =>
+    setItems([...items, { description: "", hsn: "", qty: 1, rate: 0, amount: 0 }]);
 
   const removeItem = (idx: number) => {
     if (items.length > 1) setItems(items.filter((_, i) => i !== idx));
@@ -336,7 +450,10 @@ function InvoiceSlideOver({ open, onOpenChange, invoice }: { open: boolean; onOp
     setItems(
       items.map((it, i) => {
         if (i !== idx) return it;
-        const updated = { ...it, [field]: field === "qty" || field === "rate" ? Number(value) : value };
+        const updated = {
+          ...it,
+          [field]: field === "qty" || field === "rate" ? Number(value) : value,
+        };
         if (field === "qty") updated.amount = Number(value) * it.rate;
         else if (field === "rate") updated.amount = it.qty * Number(value);
         return updated;
@@ -352,7 +469,8 @@ function InvoiceSlideOver({ open, onOpenChange, invoice }: { open: boolean; onOp
     const errs: Record<string, string> = {};
     if (!customerName.trim()) errs.customerName = "Customer name is required";
     if (!invoiceDate) errs.invoiceDate = "Invoice date is required";
-    if (items.length === 0 || items.every((it) => !it.description.trim())) errs.items = "Add at least one line item";
+    if (items.length === 0 || items.every((it) => !it.description.trim()))
+      errs.items = "Add at least one line item";
     setFormErrors(errs);
     if (Object.keys(errs).length > 0) return;
     m.mutate({
@@ -386,20 +504,42 @@ function InvoiceSlideOver({ open, onOpenChange, invoice }: { open: boolean; onOp
         <form onSubmit={handleSubmit} className="space-y-4 mt-6">
           <div className="space-y-1">
             <Label>Customer Name *</Label>
-            <Input value={customerName} onChange={(e) => { setCustomerName(e.target.value); setFormErrors((p) => ({ ...p, customerName: "" })); }} placeholder="Customer name" className={formErrors.customerName ? "border-destructive" : ""} />
-            {formErrors.customerName && <p className="text-xs text-destructive">{formErrors.customerName}</p>}
+            <Input
+              value={customerName}
+              onChange={(e) => {
+                setCustomerName(e.target.value);
+                setFormErrors((p) => ({ ...p, customerName: "" }));
+              }}
+              placeholder="Customer name"
+              className={formErrors.customerName ? "border-destructive" : ""}
+            />
+            {formErrors.customerName && (
+              <p className="text-xs text-destructive">{formErrors.customerName}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label>Invoice Date *</Label>
-              <Input type="date" value={invoiceDate} onChange={(e) => { setInvoiceDate(e.target.value); setFormErrors((p) => ({ ...p, invoiceDate: "" })); }} className={formErrors.invoiceDate ? "border-destructive" : ""} />
-              {formErrors.invoiceDate && <p className="text-xs text-destructive">{formErrors.invoiceDate}</p>}
+              <Input
+                type="date"
+                value={invoiceDate}
+                onChange={(e) => {
+                  setInvoiceDate(e.target.value);
+                  setFormErrors((p) => ({ ...p, invoiceDate: "" }));
+                }}
+                className={formErrors.invoiceDate ? "border-destructive" : ""}
+              />
+              {formErrors.invoiceDate && (
+                <p className="text-xs text-destructive">{formErrors.invoiceDate}</p>
+              )}
             </div>
             <div className="space-y-1">
               <Label>Invoice Type</Label>
               <Select value={invoiceType} onValueChange={setInvoiceType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sale">Sale</SelectItem>
                   <SelectItem value="purchase">Purchase</SelectItem>
@@ -443,7 +583,14 @@ function InvoiceSlideOver({ open, onOpenChange, invoice }: { open: boolean; onOp
                 <div className="h-8 flex items-center text-xs font-medium tabular-nums w-20 shrink-0 justify-end">
                   ₹{it.amount.toFixed(2)}
                 </div>
-                <Button type="button" variant="ghost" size="icon" className="size-8 shrink-0" onClick={() => removeItem(idx)} disabled={items.length === 1}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 shrink-0"
+                  onClick={() => removeItem(idx)}
+                  disabled={items.length === 1}
+                >
                   <Trash2 className="size-3" />
                 </Button>
               </div>
@@ -461,15 +608,30 @@ function InvoiceSlideOver({ open, onOpenChange, invoice }: { open: boolean; onOp
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-1">
               <Label>CGST (₹)</Label>
-              <Input type="number" value={cgst} onChange={(e) => setCgst(+e.target.value)} className="h-8 text-xs" />
+              <Input
+                type="number"
+                value={cgst}
+                onChange={(e) => setCgst(+e.target.value)}
+                className="h-8 text-xs"
+              />
             </div>
             <div className="space-y-1">
               <Label>SGST (₹)</Label>
-              <Input type="number" value={sgst} onChange={(e) => setSgst(+e.target.value)} className="h-8 text-xs" />
+              <Input
+                type="number"
+                value={sgst}
+                onChange={(e) => setSgst(+e.target.value)}
+                className="h-8 text-xs"
+              />
             </div>
             <div className="space-y-1">
               <Label>IGST (₹)</Label>
-              <Input type="number" value={igst} onChange={(e) => setIgst(+e.target.value)} className="h-8 text-xs" />
+              <Input
+                type="number"
+                value={igst}
+                onChange={(e) => setIgst(+e.target.value)}
+                className="h-8 text-xs"
+              />
             </div>
           </div>
 
@@ -481,16 +643,29 @@ function InvoiceSlideOver({ open, onOpenChange, invoice }: { open: boolean; onOp
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label>Due Date</Label>
-              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-8 text-xs" />
+              <Input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="h-8 text-xs"
+              />
             </div>
             <div className="space-y-1">
               <Label>Payment Status</Label>
               <Select value={paymentStatus} onValueChange={setPaymentStatus}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="unpaid" className="text-xs">Unpaid</SelectItem>
-                  <SelectItem value="paid" className="text-xs">Paid</SelectItem>
-                  <SelectItem value="partial" className="text-xs">Partial</SelectItem>
+                  <SelectItem value="unpaid" className="text-xs">
+                    Unpaid
+                  </SelectItem>
+                  <SelectItem value="paid" className="text-xs">
+                    Paid
+                  </SelectItem>
+                  <SelectItem value="partial" className="text-xs">
+                    Partial
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -498,12 +673,19 @@ function InvoiceSlideOver({ open, onOpenChange, invoice }: { open: boolean; onOp
 
           <div className="space-y-1">
             <Label>Notes</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional notes" className="text-xs" />
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Optional notes"
+              className="text-xs"
+            />
           </div>
 
           <SheetFooter className="pt-2">
             <SheetClose asChild>
-              <Button type="button" variant="outline" size="sm">Cancel</Button>
+              <Button type="button" variant="outline" size="sm">
+                Cancel
+              </Button>
             </SheetClose>
             <Button type="submit" size="sm" disabled={!canSubmit || m.isPending}>
               {m.isPending ? "Saving..." : invoice ? "Update Invoice" : "Create Invoice"}

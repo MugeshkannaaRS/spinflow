@@ -373,13 +373,14 @@ function MaintenancePage() {
   ).length;
   const totalDownTime = tasks.reduce((s, t) => s + (t.downtimeMin ?? 0), 0);
 
-  if (!user) return (
-    <div className="p-6 space-y-4">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-96 w-full" />
-    </div>
-  );
+  if (!user)
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
 
   if (maintQ.isLoading)
     return (
@@ -487,41 +488,94 @@ function MaintenancePage() {
                 </CardHeader>
                 <CardContent>
                   <ErrorBoundary inline label="Maintenance Tasks">
-                  <DataTable
-                    tableId="maintenance_tasks"
-                    columns={[
-                      { key: "date", label: taskColConfig.getLabel("date"), type: "date" },
-                      { key: "type", label: taskColConfig.getLabel("type"), render: (t: any) => <Badge variant={t.type === "breakdown" ? "destructive" : t.type === "preventive" ? "default" : "secondary"}>{t.type}</Badge> },
-                      { key: "machine_code", label: taskColConfig.getLabel("machine_code"), className: "font-mono text-xs" },
-                      { key: "department", label: taskColConfig.getLabel("department"), type: "status" },
-                      { key: "description", label: taskColConfig.getLabel("description"), className: "max-w-[250px] truncate" },
-                      { key: "technician_name", label: taskColConfig.getLabel("technician") },
-                      { key: "downtime_min", label: taskColConfig.getLabel("downtime_min"), render: (t: any) => `${t.downtime_min ?? 0} min` },
-                      { key: "spare_used", label: taskColConfig.getLabel("spare_used"), render: (t: any) => t.spare_used || "—" },
-                      { key: "status", label: taskColConfig.getLabel("status"), type: "status", render: (t: any) => <StatusBadge status={t.status} size="sm" /> },
-                    ] satisfies ColDef[]}
-                    data={tasks}
-                    loading={maintQ.isLoading}
-                    rowKey={(t: any) => t.id}
-                    exportFilename="maintenance_tasks"
-                    disableExport={true}
-                    toolbar={<ExportDateRangeButton onExportXlsx={(f, t) => exportApi.maintenanceXlsx(f, t)} />}
-                    actions={canEdit ? (t: any) => (
-                      <div className="flex gap-1 items-center">
-                        {t.status !== "completed" && <StatusSelect taskId={t.id} currentStatus={t.status} />}
-                        {t.status !== "completed" && (
-                          <ConfirmDeleteButton
-                            onConfirm={async () => {
-                              await maintenanceApi.deleteTask(t.id);
-                              qc.invalidateQueries({ queryKey: ["maintenance-tasks"] });
-                            }}
-                            label={`Delete maintenance task for ${t.machine_code}?`}
-                            successMessage="Task deleted"
-                          />
-                        )}
-                      </div>
-                    ) : undefined}
-                  />
+                    <DataTable
+                      tableId="maintenance_tasks"
+                      columns={
+                        [
+                          { key: "date", label: taskColConfig.getLabel("date"), type: "date" },
+                          {
+                            key: "type",
+                            label: taskColConfig.getLabel("type"),
+                            render: (t: any) => (
+                              <Badge
+                                variant={
+                                  t.type === "breakdown"
+                                    ? "destructive"
+                                    : t.type === "preventive"
+                                      ? "default"
+                                      : "secondary"
+                                }
+                              >
+                                {t.type}
+                              </Badge>
+                            ),
+                          },
+                          {
+                            key: "machine_code",
+                            label: taskColConfig.getLabel("machine_code"),
+                            className: "font-mono text-xs",
+                          },
+                          {
+                            key: "department",
+                            label: taskColConfig.getLabel("department"),
+                            type: "status",
+                          },
+                          {
+                            key: "description",
+                            label: taskColConfig.getLabel("description"),
+                            className: "max-w-[250px] truncate",
+                          },
+                          { key: "technician_name", label: taskColConfig.getLabel("technician") },
+                          {
+                            key: "downtime_min",
+                            label: taskColConfig.getLabel("downtime_min"),
+                            render: (t: any) => `${t.downtime_min ?? 0} min`,
+                          },
+                          {
+                            key: "spare_used",
+                            label: taskColConfig.getLabel("spare_used"),
+                            render: (t: any) => t.spare_used || "—",
+                          },
+                          {
+                            key: "status",
+                            label: taskColConfig.getLabel("status"),
+                            type: "status",
+                            render: (t: any) => <StatusBadge status={t.status} size="sm" />,
+                          },
+                        ] satisfies ColDef[]
+                      }
+                      data={tasks}
+                      loading={maintQ.isLoading}
+                      rowKey={(t: any) => t.id}
+                      exportFilename="maintenance_tasks"
+                      disableExport={true}
+                      toolbar={
+                        <ExportDateRangeButton
+                          onExportXlsx={(f, t) => exportApi.maintenanceXlsx(f, t)}
+                        />
+                      }
+                      actions={
+                        canEdit
+                          ? (t: any) => (
+                              <div className="flex gap-1 items-center">
+                                {t.status !== "completed" && (
+                                  <StatusSelect taskId={t.id} currentStatus={t.status} />
+                                )}
+                                {t.status !== "completed" && (
+                                  <ConfirmDeleteButton
+                                    onConfirm={async () => {
+                                      await maintenanceApi.deleteTask(t.id);
+                                      qc.invalidateQueries({ queryKey: ["maintenance-tasks"] });
+                                    }}
+                                    label={`Delete maintenance task for ${t.machine_code}?`}
+                                    successMessage="Task deleted"
+                                  />
+                                )}
+                              </div>
+                            )
+                          : undefined
+                      }
+                    />
                   </ErrorBoundary>
                 </CardContent>
               </Card>
@@ -536,33 +590,71 @@ function MaintenancePage() {
                 </CardHeader>
                 <CardContent>
                   <ErrorBoundary inline label="PM Schedules">
-                  <DataTable
-                    tableId="maintenance_schedules"
-                    columns={[
-                      { key: "machine_code", label: schedColConfig.getLabel("machine_code"), className: "font-mono text-xs" },
-                      { key: "type", label: schedColConfig.getLabel("type"), render: (s: any) => <Badge variant="secondary">{s.type}</Badge> },
-                      { key: "frequency_days", label: schedColConfig.getLabel("frequency_days") },
-                      { key: "last_done", label: schedColConfig.getLabel("last_done"), render: (s: any) => s.last_done || "—" },
-                      { key: "next_due", label: schedColConfig.getLabel("next_due"), render: (s: any) => s.next_due || "—" },
-                      { key: "description", label: schedColConfig.getLabel("description"), className: "max-w-[300px] truncate" },
-                      { key: "is_active", label: schedColConfig.getLabel("is_active"), render: (s: any) => <Badge variant={s.is_active ? "default" : "secondary"}>{s.is_active ? "Active" : "Inactive"}</Badge> },
-                    ] satisfies ColDef[]}
-                    data={schedules}
-                    loading={schedulesQ.isLoading}
-                    rowKey={(s: any) => s.id}
-                    exportFilename="pm_schedules"
-                    emptyMessage='No schedules yet. Use "Import Schedule" to upload from Excel.'
-                    actions={canEdit ? (s: any) => s.is_active ? (
-                      <ConfirmDeleteButton
-                        onConfirm={async () => {
-                          await maintenanceApi.deleteSchedule(s.id);
-                          qc.invalidateQueries({ queryKey: ["maintenance-schedules"] });
-                        }}
-                        label={`Remove PM schedule for ${s.machine_code}?`}
-                        successMessage="Schedule removed"
-                      />
-                    ) : null : undefined}
-                  />
+                    <DataTable
+                      tableId="maintenance_schedules"
+                      columns={
+                        [
+                          {
+                            key: "machine_code",
+                            label: schedColConfig.getLabel("machine_code"),
+                            className: "font-mono text-xs",
+                          },
+                          {
+                            key: "type",
+                            label: schedColConfig.getLabel("type"),
+                            render: (s: any) => <Badge variant="secondary">{s.type}</Badge>,
+                          },
+                          {
+                            key: "frequency_days",
+                            label: schedColConfig.getLabel("frequency_days"),
+                          },
+                          {
+                            key: "last_done",
+                            label: schedColConfig.getLabel("last_done"),
+                            render: (s: any) => s.last_done || "—",
+                          },
+                          {
+                            key: "next_due",
+                            label: schedColConfig.getLabel("next_due"),
+                            render: (s: any) => s.next_due || "—",
+                          },
+                          {
+                            key: "description",
+                            label: schedColConfig.getLabel("description"),
+                            className: "max-w-[300px] truncate",
+                          },
+                          {
+                            key: "is_active",
+                            label: schedColConfig.getLabel("is_active"),
+                            render: (s: any) => (
+                              <Badge variant={s.is_active ? "default" : "secondary"}>
+                                {s.is_active ? "Active" : "Inactive"}
+                              </Badge>
+                            ),
+                          },
+                        ] satisfies ColDef[]
+                      }
+                      data={schedules}
+                      loading={schedulesQ.isLoading}
+                      rowKey={(s: any) => s.id}
+                      exportFilename="pm_schedules"
+                      emptyMessage='No schedules yet. Use "Import Schedule" to upload from Excel.'
+                      actions={
+                        canEdit
+                          ? (s: any) =>
+                              s.is_active ? (
+                                <ConfirmDeleteButton
+                                  onConfirm={async () => {
+                                    await maintenanceApi.deleteSchedule(s.id);
+                                    qc.invalidateQueries({ queryKey: ["maintenance-schedules"] });
+                                  }}
+                                  label={`Remove PM schedule for ${s.machine_code}?`}
+                                  successMessage="Schedule removed"
+                                />
+                              ) : null
+                          : undefined
+                      }
+                    />
                   </ErrorBoundary>
                 </CardContent>
               </Card>
@@ -581,22 +673,54 @@ function MaintenancePage() {
                 </CardHeader>
                 <CardContent>
                   <ErrorBoundary inline label="Machine Parameters">
-                  <DataTable
-                    tableId="maintenance_parameters"
-                    columns={[
-                      { key: "machine_code", label: "Machine Code", className: "font-mono text-xs" },
-                      { key: "parameter_name", label: "Parameter Name", render: (p: any) => <span className="font-medium">{p.parameter_name}</span> },
-                      { key: "standard_value", label: "Standard Value", render: (p: any) => p.standard_value || "—" },
-                      { key: "min_value", label: "Min", render: (p: any) => <span className="text-muted-foreground">{p.min_value || "—"}</span> },
-                      { key: "max_value", label: "Max", render: (p: any) => <span className="text-muted-foreground">{p.max_value || "—"}</span> },
-                      { key: "unit", label: "Unit", render: (p: any) => <Badge variant="outline">{p.unit || "—"}</Badge> },
-                    ] satisfies ColDef[]}
-                    data={parameters}
-                    loading={paramsQ.isLoading}
-                    rowKey={(p: any) => p.id}
-                    exportFilename="machine_parameters"
-                    emptyMessage='No parameters yet. Use "Import Parameters" to upload from Excel.'
-                  />
+                    <DataTable
+                      tableId="maintenance_parameters"
+                      columns={
+                        [
+                          {
+                            key: "machine_code",
+                            label: "Machine Code",
+                            className: "font-mono text-xs",
+                          },
+                          {
+                            key: "parameter_name",
+                            label: "Parameter Name",
+                            render: (p: any) => (
+                              <span className="font-medium">{p.parameter_name}</span>
+                            ),
+                          },
+                          {
+                            key: "standard_value",
+                            label: "Standard Value",
+                            render: (p: any) => p.standard_value || "—",
+                          },
+                          {
+                            key: "min_value",
+                            label: "Min",
+                            render: (p: any) => (
+                              <span className="text-muted-foreground">{p.min_value || "—"}</span>
+                            ),
+                          },
+                          {
+                            key: "max_value",
+                            label: "Max",
+                            render: (p: any) => (
+                              <span className="text-muted-foreground">{p.max_value || "—"}</span>
+                            ),
+                          },
+                          {
+                            key: "unit",
+                            label: "Unit",
+                            render: (p: any) => <Badge variant="outline">{p.unit || "—"}</Badge>,
+                          },
+                        ] satisfies ColDef[]
+                      }
+                      data={parameters}
+                      loading={paramsQ.isLoading}
+                      rowKey={(p: any) => p.id}
+                      exportFilename="machine_parameters"
+                      emptyMessage='No parameters yet. Use "Import Parameters" to upload from Excel.'
+                    />
                   </ErrorBoundary>
                 </CardContent>
               </Card>
@@ -614,29 +738,51 @@ function MaintenancePage() {
                 </CardHeader>
                 <CardContent>
                   <ErrorBoundary inline label="Maintenance Machines">
-                  <DataTable
-                    tableId="maintenance_machines"
-                    columns={[
-                      { key: "code", label: machineColConfig.getLabel("code"), className: "font-mono text-xs" },
-                      { key: "name", label: machineColConfig.getLabel("name") },
-                      { key: "machine_type", label: machineColConfig.getLabel("machine_type") },
-                      { key: "department", label: machineColConfig.getLabel("department") },
-                      { key: "target_kg", label: machineColConfig.getLabel("target_kg") },
-                      { key: "current_status", label: "Status", render: (m: any) => (
-                        <Badge variant={m.current_status === "running" ? "default" : m.current_status === "idle" ? "secondary" : "outline"}>
-                          {m.current_status ?? "unknown"}
-                        </Badge>
-                      )},
-                    ] satisfies ColDef[]}
-                    data={machinesData}
-                    loading={machinesQ.isLoading}
-                    rowKey={(m: any) => m.id}
-                    exportFilename="machines"
-                    actions={canEdit ? (m: any) => (
-                      <MachineDialog item={m as MasterMachine} departments={deptsData} />
-                    ) : undefined}
-                    emptyMessage="No machines registered yet."
-                  />
+                    <DataTable
+                      tableId="maintenance_machines"
+                      columns={
+                        [
+                          {
+                            key: "code",
+                            label: machineColConfig.getLabel("code"),
+                            className: "font-mono text-xs",
+                          },
+                          { key: "name", label: machineColConfig.getLabel("name") },
+                          { key: "machine_type", label: machineColConfig.getLabel("machine_type") },
+                          { key: "department", label: machineColConfig.getLabel("department") },
+                          { key: "target_kg", label: machineColConfig.getLabel("target_kg") },
+                          {
+                            key: "current_status",
+                            label: "Status",
+                            render: (m: any) => (
+                              <Badge
+                                variant={
+                                  m.current_status === "running"
+                                    ? "default"
+                                    : m.current_status === "idle"
+                                      ? "secondary"
+                                      : "outline"
+                                }
+                              >
+                                {m.current_status ?? "unknown"}
+                              </Badge>
+                            ),
+                          },
+                        ] satisfies ColDef[]
+                      }
+                      data={machinesData}
+                      loading={machinesQ.isLoading}
+                      rowKey={(m: any) => m.id}
+                      exportFilename="machines"
+                      actions={
+                        canEdit
+                          ? (m: any) => (
+                              <MachineDialog item={m as MasterMachine} departments={deptsData} />
+                            )
+                          : undefined
+                      }
+                      emptyMessage="No machines registered yet."
+                    />
                   </ErrorBoundary>
                 </CardContent>
               </Card>
@@ -713,10 +859,11 @@ function MachineDialog({ item, departments }: { item?: MasterMachine; department
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const { data: machineTypes } = useMillMasterCategory("machine_type");
-  const MACHINE_TYPES = (machineTypes?.length ? machineTypes : [
-    "Blowroom", "Carding", "Drawing", "Simplex", "Ring Frame",
-    "Autoconer", "Winding",
-  ]) as string[];
+  const MACHINE_TYPES = (
+    machineTypes?.length
+      ? machineTypes
+      : ["Blowroom", "Carding", "Drawing", "Simplex", "Ring Frame", "Autoconer", "Winding"]
+  ) as string[];
   const requiredFields = ["code"];
   const [form, setForm] = useState({
     code: item?.code ?? "",
@@ -725,7 +872,7 @@ function MachineDialog({ item, departments }: { item?: MasterMachine; department
     department: item?.department ?? "",
     make: item?.make ?? "",
     model: item?.model ?? "",
-    spindles: item?.spindles ?? undefined as number | undefined,
+    spindles: item?.spindles ?? (undefined as number | undefined),
     installation_date: item?.installation_date ?? "",
     amc_expiry: item?.amc_expiry ?? "",
     target_kg: item?.target_kg ?? 0,
@@ -769,9 +916,13 @@ function MachineDialog({ item, departments }: { item?: MasterMachine; department
   };
 
   const trigger = item ? (
-    <Button size="sm" variant="outline" onClick={() => setOpen(true)}><Pencil className="size-3.5 mr-1" /> Edit</Button>
+    <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+      <Pencil className="size-3.5 mr-1" /> Edit
+    </Button>
   ) : (
-    <Button size="sm" onClick={() => setOpen(true)}><Plus className="size-4 mr-1" /> Add Machine</Button>
+    <Button size="sm" onClick={() => setOpen(true)}>
+      <Plus className="size-4 mr-1" /> Add Machine
+    </Button>
   );
 
   return (
@@ -808,32 +959,47 @@ function MachineDialog({ item, departments }: { item?: MasterMachine; department
               </SelectTrigger>
               <SelectContent>
                 {MACHINE_TYPES.map((t: string) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
             <Label>Department</Label>
-            <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
+            <Select
+              value={form.department}
+              onValueChange={(v) => setForm({ ...form, department: v })}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
-                {departments.filter((d: any) => d?.code).map((d: any) => (
-                  <SelectItem key={d.id} value={d.code}>{d.name}</SelectItem>
-                ))}
+                {departments
+                  .filter((d: any) => d?.code)
+                  .map((d: any) => (
+                    <SelectItem key={d.id} value={d.code}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Make</Label>
-              <Input value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} />
+              <Input
+                value={form.make}
+                onChange={(e) => setForm({ ...form, make: e.target.value })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Model</Label>
-              <Input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
+              <Input
+                value={form.model}
+                onChange={(e) => setForm({ ...form, model: e.target.value })}
+              />
             </div>
           </div>
           {form.machine_type === "Ring Frame" && (
@@ -843,7 +1009,10 @@ function MachineDialog({ item, departments }: { item?: MasterMachine; department
                 type="number"
                 value={form.spindles ?? ""}
                 onChange={(e) =>
-                  setForm({ ...form, spindles: e.target.value ? parseInt(e.target.value) : undefined })
+                  setForm({
+                    ...form,
+                    spindles: e.target.value ? parseInt(e.target.value) : undefined,
+                  })
                 }
               />
             </div>

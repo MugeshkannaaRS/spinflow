@@ -2,39 +2,47 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 const ALL_TABS = [
-  "companies", "mills", "departments", "yarn-counts", "customers",
-  "vehicles", "routes", "machines", "shifts", "warehouses",
+  "companies",
+  "mills",
+  "departments",
+  "yarn-counts",
+  "customers",
+  "vehicles",
+  "routes",
+  "machines",
+  "shifts",
+  "warehouses",
 ];
 
 describe("Masters - Super Admin tab filtering", () => {
   it("SUPER_ADMIN sees only Companies + Mills tabs", () => {
     const isSuperAdmin = true;
-    const visibleTabs = ALL_TABS.filter(t =>
-      isSuperAdmin ? ["companies", "mills"].includes(t) : true
+    const visibleTabs = ALL_TABS.filter((t) =>
+      isSuperAdmin ? ["companies", "mills"].includes(t) : true,
     );
     expect(visibleTabs).toEqual(["companies", "mills"]);
   });
 
   it("MILL_OWNER sees all tabs", () => {
     const isSuperAdmin = false;
-    const visibleTabs = ALL_TABS.filter(t =>
-      isSuperAdmin ? ["companies", "mills"].includes(t) : true
+    const visibleTabs = ALL_TABS.filter((t) =>
+      isSuperAdmin ? ["companies", "mills"].includes(t) : true,
     );
     expect(visibleTabs).toEqual(ALL_TABS);
   });
 
   it("non-super-admin sees all 10 tabs", () => {
     const isSuperAdmin = false;
-    const visibleTabs = ALL_TABS.filter(t =>
-      isSuperAdmin ? ["companies", "mills"].includes(t) : true
+    const visibleTabs = ALL_TABS.filter((t) =>
+      isSuperAdmin ? ["companies", "mills"].includes(t) : true,
     );
     expect(visibleTabs.length).toBe(10);
   });
 
   it("SUPER_ADMIN sees exactly 2 tabs", () => {
     const isSuperAdmin = true;
-    const visibleTabs = ALL_TABS.filter(t =>
-      isSuperAdmin ? ["companies", "mills"].includes(t) : true
+    const visibleTabs = ALL_TABS.filter((t) =>
+      isSuperAdmin ? ["companies", "mills"].includes(t) : true,
     );
     expect(visibleTabs.length).toBe(2);
   });
@@ -51,9 +59,10 @@ describe("Masters - Add Company button text", () => {
 describe("Masters - GSTIN validation", () => {
   it("accepts empty GSTIN value", () => {
     const gstin = "";
-    const isValid = !gstin || gstin.trim() === ""
-      ? true
-      : /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin);
+    const isValid =
+      !gstin || gstin.trim() === ""
+        ? true
+        : /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin);
     expect(isValid).toBe(true);
   });
 
@@ -81,7 +90,11 @@ describe("Masters - Numeric field coercion", () => {
   it("accepts empty value for capacity field", () => {
     const coerceNumeric = (v: any) => {
       if (v === null || v === "") return null;
-      try { return parseFloat(v); } catch { return null; }
+      try {
+        return parseFloat(v);
+      } catch {
+        return null;
+      }
     };
     expect(coerceNumeric("")).toBeNull();
     expect(coerceNumeric(null)).toBeNull();
@@ -90,7 +103,11 @@ describe("Masters - Numeric field coercion", () => {
   it("accepts number for capacity field", () => {
     const coerceNumeric = (v: any) => {
       if (v === null || v === "") return null;
-      try { return parseFloat(v); } catch { return null; }
+      try {
+        return parseFloat(v);
+      } catch {
+        return null;
+      }
     };
     expect(coerceNumeric("500")).toBe(500);
     expect(coerceNumeric(500)).toBe(500);

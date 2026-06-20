@@ -24,61 +24,61 @@ import { useActiveMill } from "@/hooks/useActiveMill";
 
 // Role → badge color (matches Sidebar)
 const ROLE_BADGE_COLORS: Record<string, string> = {
-  SUPER_ADMIN:          "bg-purple-100 text-purple-700",
-  MILL_OWNER:           "bg-blue-100 text-blue-700",
-  GENERAL_MANAGER:      "bg-cyan-100 text-cyan-700",
-  PRODUCTION_MANAGER:   "bg-green-100 text-green-700",
-  QUALITY_MANAGER:      "bg-yellow-100 text-yellow-700",
-  DISPATCH_MANAGER:     "bg-orange-100 text-orange-700",
-  HR_MANAGER:           "bg-pink-100 text-pink-700",
-  ACCOUNTANT:           "bg-indigo-100 text-indigo-700",
-  MAINTENANCE_MANAGER:  "bg-red-100 text-red-700",
-  STORE_MANAGER:        "bg-teal-100 text-teal-700",
-  SUPERVISOR:           "bg-slate-100 text-slate-600",
-  MACHINE_OPERATOR:     "bg-slate-100 text-slate-500",
-  SECURITY_GATE:        "bg-slate-100 text-slate-500",
-  AUDITOR:              "bg-slate-100 text-slate-500",
+  SUPER_ADMIN: "bg-purple-100 text-purple-700",
+  MILL_OWNER: "bg-blue-100 text-blue-700",
+  GENERAL_MANAGER: "bg-cyan-100 text-cyan-700",
+  PRODUCTION_MANAGER: "bg-green-100 text-green-700",
+  QUALITY_MANAGER: "bg-yellow-100 text-yellow-700",
+  DISPATCH_MANAGER: "bg-orange-100 text-orange-700",
+  HR_MANAGER: "bg-pink-100 text-pink-700",
+  ACCOUNTANT: "bg-indigo-100 text-indigo-700",
+  MAINTENANCE_MANAGER: "bg-red-100 text-red-700",
+  STORE_MANAGER: "bg-teal-100 text-teal-700",
+  SUPERVISOR: "bg-slate-100 text-slate-600",
+  MACHINE_OPERATOR: "bg-slate-100 text-slate-500",
+  SECURITY_GATE: "bg-slate-100 text-slate-500",
+  AUDITOR: "bg-slate-100 text-slate-500",
 };
 
 const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
-  "/dashboard":          { title: "Dashboard",        subtitle: "Live operations overview" },
-  "/production":         { title: "Production",        subtitle: "Daily output & efficiency" },
-  "/quality":            { title: "Quality",           subtitle: "Tests & approvals" },
-  "/maintenance":        { title: "Maintenance",       subtitle: "Machine upkeep & logs" },
-  "/hr":                 { title: "Human Resources",   subtitle: "Employees & attendance" },
-  "/payroll":            { title: "Payroll",           subtitle: "Monthly salary processing" },
-  "/purchase":           { title: "Cotton Purchase",   subtitle: "Procurement & suppliers" },
-  "/stores":             { title: "Stores",            subtitle: "Receipts, issues & balance" },
-  "/inventory":          { title: "Inventory",         subtitle: "Stock levels & reorder" },
-  "/dispatch":           { title: "Dispatch",          subtitle: "Trips, trucks & delivery" },
-  "/lotrac":             { title: "LoTrac",            subtitle: "QR sack tracking" },
-  "/accounts":           { title: "Accounts",          subtitle: "Invoices & receivables" },
-  "/sales":              { title: "Sales",             subtitle: "Orders & revenue" },
-  "/masters":            { title: "Masters",           subtitle: "Reference data & config" },
-  "/users":              { title: "Users & Roles",     subtitle: "Access management" },
-  "/audit":              { title: "Audit Logs",        subtitle: "Activity history" },
-  "/admin":              { title: "Admin Panel",       subtitle: "System administration" },
-  "/admin/column-config":{ title: "Column Config",     subtitle: "Field customization" },
-  "/company/billing":    { title: "Billing",           subtitle: "Subscription & payments" },
-  "/profile":            { title: "My Profile",        subtitle: "Account settings" },
-  "/reports":            { title: "Reports",           subtitle: "Analytics & exports" },
-  "/notifications":      { title: "Notifications",     subtitle: "Alerts & system messages" },
-  "/alerts":             { title: "Operations Center", subtitle: "Live alerts, escalations & rules" },
-  "/stock":              { title: "Stock",             subtitle: "Lot & warehouse tracking" },
+  "/dashboard": { title: "Dashboard", subtitle: "Live operations overview" },
+  "/production": { title: "Production", subtitle: "Daily output & efficiency" },
+  "/quality": { title: "Quality", subtitle: "Tests & approvals" },
+  "/maintenance": { title: "Maintenance", subtitle: "Machine upkeep & logs" },
+  "/hr": { title: "Human Resources", subtitle: "Employees & attendance" },
+  "/payroll": { title: "Payroll", subtitle: "Monthly salary processing" },
+  "/purchase": { title: "Cotton Purchase", subtitle: "Procurement & suppliers" },
+  "/stores": { title: "Stores", subtitle: "Receipts, issues & balance" },
+  "/inventory": { title: "Inventory", subtitle: "Stock levels & reorder" },
+  "/dispatch": { title: "Dispatch", subtitle: "Trips, trucks & delivery" },
+  "/lotrac": { title: "LoTrac", subtitle: "QR sack tracking" },
+  "/accounts": { title: "Accounts", subtitle: "Invoices & receivables" },
+  "/sales": { title: "Sales", subtitle: "Orders & revenue" },
+  "/masters": { title: "Masters", subtitle: "Reference data & config" },
+  "/users": { title: "Users & Roles", subtitle: "Access management" },
+  "/audit": { title: "Audit Logs", subtitle: "Activity history" },
+  "/admin": { title: "Admin Panel", subtitle: "System administration" },
+  "/admin/column-config": { title: "Column Config", subtitle: "Field customization" },
+  "/company/billing": { title: "Billing", subtitle: "Subscription & payments" },
+  "/profile": { title: "My Profile", subtitle: "Account settings" },
+  "/reports": { title: "Reports", subtitle: "Analytics & exports" },
+  "/notifications": { title: "Notifications", subtitle: "Alerts & system messages" },
+  "/alerts": { title: "Operations Center", subtitle: "Live alerts, escalations & rules" },
+  "/stock": { title: "Stock", subtitle: "Lot & warehouse tracking" },
 };
 
 const TYPE_COLORS: Record<string, string> = {
   success: "bg-emerald-500",
-  info:    "bg-blue-500",
+  info: "bg-blue-500",
   warning: "bg-amber-500",
-  error:   "bg-red-500",
+  error: "bg-red-500",
 };
 
 const SEVERITY_DOT: Record<string, string> = {
   EMERGENCY: "bg-red-600",
-  CRITICAL:  "bg-red-500",
-  WARNING:   "bg-amber-500",
-  INFO:      "bg-blue-500",
+  CRITICAL: "bg-red-500",
+  WARNING: "bg-amber-500",
+  INFO: "bg-blue-500",
 };
 
 function NotificationsDropdown() {
@@ -120,7 +120,9 @@ function NotificationsDropdown() {
             <div className="flex items-center gap-2">
               {unreadCount > 0 && (
                 <>
-                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{unreadCount}</span>
+                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                    {unreadCount}
+                  </span>
                   <button
                     onClick={() => markAllRead()}
                     className="text-[11px] text-blue-600 hover:underline"
@@ -141,18 +143,27 @@ function NotificationsDropdown() {
               {notifications.map((n) => (
                 <div
                   key={n.id}
-                  onClick={() => { if (!n.is_read) markRead(n.id); }}
+                  onClick={() => {
+                    if (!n.is_read) markRead(n.id);
+                  }}
                   className={cn(
                     "flex items-start gap-3 px-4 py-3 text-sm hover:bg-gray-50 transition-colors cursor-pointer",
-                    !n.is_read && "bg-blue-50/40"
+                    !n.is_read && "bg-blue-50/40",
                   )}
                 >
-                  <span className={cn(
-                    "mt-1.5 w-2 h-2 shrink-0 rounded-full",
-                    SEVERITY_DOT[n.severity] || "bg-gray-300"
-                  )} />
+                  <span
+                    className={cn(
+                      "mt-1.5 w-2 h-2 shrink-0 rounded-full",
+                      SEVERITY_DOT[n.severity] || "bg-gray-300",
+                    )}
+                  />
                   <div className="flex-1 min-w-0">
-                    <p className={cn("text-[13px] truncate", n.is_read ? "text-gray-700" : "font-semibold text-gray-900")}>
+                    <p
+                      className={cn(
+                        "text-[13px] truncate",
+                        n.is_read ? "text-gray-700" : "font-semibold text-gray-900",
+                      )}
+                    >
                       {n.title}
                     </p>
                     {n.message && (
@@ -217,8 +228,7 @@ export function Topbar({
   }, [millDropdownOpen]);
 
   const showMillSwitcher =
-    (user?.role === "MILL_OWNER" || user?.role === "GENERAL_MANAGER") &&
-    mills.length > 1;
+    (user?.role === "MILL_OWNER" || user?.role === "GENERAL_MANAGER") && mills.length > 1;
 
   // Derive page title from route path, falling back to the prop or default
   const pagePath = location.pathname;
@@ -274,7 +284,9 @@ export function Topbar({
       <div className="flex-1 min-w-0">
         <h1 className="text-[18px] font-bold text-[#0f172a] truncate leading-tight">{title}</h1>
         {subtitle && (
-          <p className="text-[12px] text-[#64748b] truncate hidden sm:block leading-tight">{subtitle}</p>
+          <p className="text-[12px] text-[#64748b] truncate hidden sm:block leading-tight">
+            {subtitle}
+          </p>
         )}
       </div>
 
@@ -282,12 +294,11 @@ export function Topbar({
 
       {/* Right cluster */}
       <div className="flex items-center gap-2 flex-shrink-0">
-
         {/* Mill switcher — only for MILL_OWNER / GM with 2+ mills */}
         {showMillSwitcher && (
           <div className="relative hidden sm:block" ref={millDropdownRef}>
             <button
-              onClick={() => setMillDropdownOpen(v => !v)}
+              onClick={() => setMillDropdownOpen((v) => !v)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-[#e2e8f0] bg-white hover:bg-[#f8fafc] transition-colors"
             >
               <Building2 className="w-4 h-4 text-[#64748b] shrink-0" />
@@ -301,7 +312,7 @@ export function Topbar({
                 <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#94a3b8] border-b border-[#f1f5f9]">
                   Switch Mill
                 </div>
-                {mills.map(m => {
+                {mills.map((m) => {
                   const isActive = activeMill?.id === m.id;
                   return (
                     <button
@@ -316,7 +327,12 @@ export function Topbar({
                       <span className="font-mono text-[11px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-semibold shrink-0">
                         {m.code || m.name.slice(0, 3).toUpperCase()}
                       </span>
-                      <span className={cn("flex-1 text-[13px] truncate", isActive ? "font-semibold text-[#0f172a]" : "text-[#374151]")}>
+                      <span
+                        className={cn(
+                          "flex-1 text-[13px] truncate",
+                          isActive ? "font-semibold text-[#0f172a]" : "text-[#374151]",
+                        )}
+                      >
                         {m.name}
                       </span>
                       {isActive && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
@@ -332,10 +348,12 @@ export function Topbar({
 
         {/* Role chip — hidden on very small screens */}
         {user && (
-          <div className={cn(
-            "hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide",
-            roleBadgeClass,
-          )}>
+          <div
+            className={cn(
+              "hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wide",
+              roleBadgeClass,
+            )}
+          >
             {roleLabel}
           </div>
         )}
@@ -361,7 +379,12 @@ export function Topbar({
                     <p className="text-sm font-semibold text-gray-900 truncate">{user.name}</p>
                     <p className="text-xs text-gray-400 truncate mt-0.5">{user.email}</p>
                     <div className="mt-2">
-                      <span className={cn("inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide", roleBadgeClass)}>
+                      <span
+                        className={cn(
+                          "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide",
+                          roleBadgeClass,
+                        )}
+                      >
                         {roleLabel}
                       </span>
                     </div>
@@ -377,13 +400,17 @@ export function Topbar({
                       <span>My Profile</span>
                     </Link>
                     <button
-                      onClick={() => { toggleTheme(); setDropdownOpen(false); }}
+                      onClick={() => {
+                        toggleTheme();
+                        setDropdownOpen(false);
+                      }}
                       className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                     >
-                      {theme === "dark"
-                        ? <Sun className="w-4 h-4 text-gray-400" />
-                        : <Moon className="w-4 h-4 text-gray-400" />
-                      }
+                      {theme === "dark" ? (
+                        <Sun className="w-4 h-4 text-gray-400" />
+                      ) : (
+                        <Moon className="w-4 h-4 text-gray-400" />
+                      )}
                       <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
                     </button>
                     <div className="h-px bg-gray-100 mx-3 my-1" />

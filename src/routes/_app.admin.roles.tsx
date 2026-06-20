@@ -4,11 +4,18 @@ import { adminApi, mastersApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { toast } from "sonner";
 import {
-  Shield, Building2, Loader2, Save, RotateCcw, Info,
-  CheckCircle2, XCircle, Minus,
+  Shield,
+  Building2,
+  Loader2,
+  Save,
+  RotateCcw,
+  Info,
+  CheckCircle2,
+  XCircle,
+  Minus,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/admin/roles")({
@@ -18,57 +25,254 @@ export const Route = createFileRoute("/_app/admin/roles")({
 
 // ── System defaults (mirror of backend rbac.py ACCESS_MATRIX) ─────────────
 const SYSTEM_ACCESS: Record<string, Record<string, true | "read">> = {
-  SUPER_ADMIN:         { dashboard: true, production: true, quality: true, inventory: true, dispatch: true, purchase: true, stores: true, hr: true, accounts: true, maintenance: true, payroll: true, sales: true, lotrac: true, reports: true, stock: true, audit: true, users: true, masters: true, uploads: true, analytics: true, whatsapp: true, lc_tracking: true },
-  MILL_OWNER:          { dashboard: true, production: true, quality: true, inventory: true, dispatch: true, purchase: true, stores: true, hr: true, accounts: true, maintenance: true, payroll: true, sales: true, lotrac: true, reports: true, stock: true, audit: true, users: true, masters: true, uploads: true, analytics: true, whatsapp: true, lc_tracking: true },
-  GENERAL_MANAGER:     { dashboard: true, production: true, quality: true, maintenance: true, stores: true, inventory: true, dispatch: true, purchase: true, lotrac: true, reports: true, stock: true, sales: true, uploads: true, analytics: true, lc_tracking: true, hr: "read", payroll: "read", accounts: "read", audit: "read", masters: "read" },
-  PRODUCTION_MANAGER:  { dashboard: true, production: true, maintenance: "read", quality: "read", inventory: "read", stock: "read", reports: true, uploads: true, analytics: true },
-  QUALITY_MANAGER:     { dashboard: true, quality: true, production: "read", inventory: "read", stock: "read", reports: true, uploads: true },
-  DISPATCH_MANAGER:    { dashboard: true, dispatch: true, lotrac: true, stores: true, inventory: true, sales: "read", stock: "read", reports: true, uploads: true },
-  STORE_MANAGER:       { dashboard: true, stores: true, inventory: true, purchase: "read", maintenance: "read", reports: true, stock: true, uploads: true },
-  HR_MANAGER:          { dashboard: true, hr: true, payroll: true, reports: true, uploads: true },
-  ACCOUNTANT:          { dashboard: true, accounts: true, payroll: true, purchase: "read", dispatch: "read", sales: "read", reports: true, lc_tracking: true, uploads: true },
-  MAINTENANCE_MANAGER: { dashboard: true, maintenance: true, stores: "read", production: "read", reports: true, uploads: true },
-  SUPERVISOR:          { dashboard: true, production: true, reports: true },
-  MACHINE_OPERATOR:    { dashboard: true, production: true },
-  SECURITY_GATE:       { dashboard: true, dispatch: "read", lotrac: true },
-  AUDITOR:             { dashboard: true, production: "read", quality: "read", hr: "read", accounts: "read", reports: true, audit: true, inventory: "read", stores: "read", dispatch: "read", maintenance: "read" },
-  OPERATOR:            { dashboard: true, production: true, quality: "read", stores: "read", reports: "read" },
+  SUPER_ADMIN: {
+    dashboard: true,
+    production: true,
+    quality: true,
+    inventory: true,
+    dispatch: true,
+    purchase: true,
+    stores: true,
+    hr: true,
+    accounts: true,
+    maintenance: true,
+    payroll: true,
+    sales: true,
+    lotrac: true,
+    reports: true,
+    stock: true,
+    audit: true,
+    users: true,
+    masters: true,
+    uploads: true,
+    analytics: true,
+    whatsapp: true,
+    lc_tracking: true,
+  },
+  MILL_OWNER: {
+    dashboard: true,
+    production: true,
+    quality: true,
+    inventory: true,
+    dispatch: true,
+    purchase: true,
+    stores: true,
+    hr: true,
+    accounts: true,
+    maintenance: true,
+    payroll: true,
+    sales: true,
+    lotrac: true,
+    reports: true,
+    stock: true,
+    audit: true,
+    users: true,
+    masters: true,
+    uploads: true,
+    analytics: true,
+    whatsapp: true,
+    lc_tracking: true,
+  },
+  GENERAL_MANAGER: {
+    dashboard: true,
+    production: true,
+    quality: true,
+    maintenance: true,
+    stores: true,
+    inventory: true,
+    dispatch: true,
+    purchase: true,
+    lotrac: true,
+    reports: true,
+    stock: true,
+    sales: true,
+    uploads: true,
+    analytics: true,
+    lc_tracking: true,
+    hr: "read",
+    payroll: "read",
+    accounts: "read",
+    audit: "read",
+    masters: "read",
+  },
+  PRODUCTION_MANAGER: {
+    dashboard: true,
+    production: true,
+    maintenance: "read",
+    quality: "read",
+    inventory: "read",
+    stock: "read",
+    reports: true,
+    uploads: true,
+    analytics: true,
+  },
+  QUALITY_MANAGER: {
+    dashboard: true,
+    quality: true,
+    production: "read",
+    inventory: "read",
+    stock: "read",
+    reports: true,
+    uploads: true,
+  },
+  DISPATCH_MANAGER: {
+    dashboard: true,
+    dispatch: true,
+    lotrac: true,
+    stores: true,
+    inventory: true,
+    sales: "read",
+    stock: "read",
+    reports: true,
+    uploads: true,
+  },
+  STORE_MANAGER: {
+    dashboard: true,
+    stores: true,
+    inventory: true,
+    purchase: "read",
+    maintenance: "read",
+    reports: true,
+    stock: true,
+    uploads: true,
+  },
+  HR_MANAGER: { dashboard: true, hr: true, payroll: true, reports: true, uploads: true },
+  ACCOUNTANT: {
+    dashboard: true,
+    accounts: true,
+    payroll: true,
+    purchase: "read",
+    dispatch: "read",
+    sales: "read",
+    reports: true,
+    lc_tracking: true,
+    uploads: true,
+  },
+  MAINTENANCE_MANAGER: {
+    dashboard: true,
+    maintenance: true,
+    stores: "read",
+    production: "read",
+    reports: true,
+    uploads: true,
+  },
+  SUPERVISOR: { dashboard: true, production: true, reports: true },
+  MACHINE_OPERATOR: { dashboard: true, production: true },
+  SECURITY_GATE: { dashboard: true, dispatch: "read", lotrac: true },
+  AUDITOR: {
+    dashboard: true,
+    production: "read",
+    quality: "read",
+    hr: "read",
+    accounts: "read",
+    reports: true,
+    audit: true,
+    inventory: "read",
+    stores: "read",
+    dispatch: "read",
+    maintenance: "read",
+  },
+  OPERATOR: { dashboard: true, production: true, quality: "read", stores: "read", reports: "read" },
 };
 
 const ROLE_GROUPS = [
   { label: "Admin", roles: ["SUPER_ADMIN", "MILL_OWNER"] },
-  { label: "Management", roles: ["GENERAL_MANAGER", "PRODUCTION_MANAGER", "QUALITY_MANAGER", "DISPATCH_MANAGER", "STORE_MANAGER", "HR_MANAGER", "ACCOUNTANT", "MAINTENANCE_MANAGER"] },
-  { label: "Operations", roles: ["SUPERVISOR", "MACHINE_OPERATOR", "SECURITY_GATE", "AUDITOR", "OPERATOR"] },
+  {
+    label: "Management",
+    roles: [
+      "GENERAL_MANAGER",
+      "PRODUCTION_MANAGER",
+      "QUALITY_MANAGER",
+      "DISPATCH_MANAGER",
+      "STORE_MANAGER",
+      "HR_MANAGER",
+      "ACCOUNTANT",
+      "MAINTENANCE_MANAGER",
+    ],
+  },
+  {
+    label: "Operations",
+    roles: ["SUPERVISOR", "MACHINE_OPERATOR", "SECURITY_GATE", "AUDITOR", "OPERATOR"],
+  },
 ];
 
 const ALL_ROLES = ROLE_GROUPS.flatMap((g) => g.roles);
 
 const ROLE_LABELS: Record<string, string> = {
-  SUPER_ADMIN: "Super Admin", MILL_OWNER: "Mill Owner", GENERAL_MANAGER: "General Manager",
-  PRODUCTION_MANAGER: "Production Mgr", QUALITY_MANAGER: "Quality Mgr",
-  DISPATCH_MANAGER: "Dispatch Mgr", STORE_MANAGER: "Store Mgr",
-  HR_MANAGER: "HR Manager", ACCOUNTANT: "Accountant",
-  MAINTENANCE_MANAGER: "Maintenance Mgr", SUPERVISOR: "Supervisor",
-  MACHINE_OPERATOR: "Machine Op.", SECURITY_GATE: "Security Gate",
-  AUDITOR: "Auditor", OPERATOR: "Operator",
+  SUPER_ADMIN: "Super Admin",
+  MILL_OWNER: "Mill Owner",
+  GENERAL_MANAGER: "General Manager",
+  PRODUCTION_MANAGER: "Production Mgr",
+  QUALITY_MANAGER: "Quality Mgr",
+  DISPATCH_MANAGER: "Dispatch Mgr",
+  STORE_MANAGER: "Store Mgr",
+  HR_MANAGER: "HR Manager",
+  ACCOUNTANT: "Accountant",
+  MAINTENANCE_MANAGER: "Maintenance Mgr",
+  SUPERVISOR: "Supervisor",
+  MACHINE_OPERATOR: "Machine Op.",
+  SECURITY_GATE: "Security Gate",
+  AUDITOR: "Auditor",
+  OPERATOR: "Operator",
 };
 
 const MODULE_GROUPS = [
-  { label: "Core", modules: ["production", "quality", "inventory", "dispatch", "purchase", "stores", "hr", "accounts", "maintenance"] },
-  { label: "Add-ons", modules: ["payroll", "sales", "lotrac", "reports", "stock", "uploads", "analytics", "whatsapp", "lc_tracking"] },
+  {
+    label: "Core",
+    modules: [
+      "production",
+      "quality",
+      "inventory",
+      "dispatch",
+      "purchase",
+      "stores",
+      "hr",
+      "accounts",
+      "maintenance",
+    ],
+  },
+  {
+    label: "Add-ons",
+    modules: [
+      "payroll",
+      "sales",
+      "lotrac",
+      "reports",
+      "stock",
+      "uploads",
+      "analytics",
+      "whatsapp",
+      "lc_tracking",
+    ],
+  },
   { label: "System", modules: ["dashboard", "audit", "users", "masters"] },
 ];
 
 const ALL_MODULES = MODULE_GROUPS.flatMap((g) => g.modules);
 
 const MODULE_LABELS: Record<string, string> = {
-  production: "Production", quality: "Quality", inventory: "Inventory",
-  dispatch: "Dispatch", purchase: "Purchase", stores: "Stores",
-  hr: "HR", accounts: "Accounts", maintenance: "Maintenance",
-  payroll: "Payroll", sales: "Sales", lotrac: "LoTrac",
-  reports: "Reports", stock: "Stock", uploads: "Uploads",
-  analytics: "Analytics", whatsapp: "WhatsApp", lc_tracking: "LC Track",
-  dashboard: "Dashboard", audit: "Audit", users: "Users", masters: "Masters",
+  production: "Production",
+  quality: "Quality",
+  inventory: "Inventory",
+  dispatch: "Dispatch",
+  purchase: "Purchase",
+  stores: "Stores",
+  hr: "HR",
+  accounts: "Accounts",
+  maintenance: "Maintenance",
+  payroll: "Payroll",
+  sales: "Sales",
+  lotrac: "LoTrac",
+  reports: "Reports",
+  stock: "Stock",
+  uploads: "Uploads",
+  analytics: "Analytics",
+  whatsapp: "WhatsApp",
+  lc_tracking: "LC Track",
+  dashboard: "Dashboard",
+  audit: "Audit",
+  users: "Users",
+  masters: "Masters",
 };
 
 type Override = true | false | null;
@@ -79,9 +283,15 @@ function systemLevel(role: string, module: string): true | "read" | null {
 }
 
 function CellChip({
-  role, module, override, onChange,
+  role,
+  module,
+  override,
+  onChange,
 }: {
-  role: string; module: string; override: Override; onChange: (v: Override) => void;
+  role: string;
+  module: string;
+  override: Override;
+  onChange: (v: Override) => void;
 }) {
   const sys = systemLevel(role, module);
   const isProtected = role === "SUPER_ADMIN" || role === "MILL_OWNER";
@@ -105,7 +315,11 @@ function CellChip({
 
   if (override === true) {
     return (
-      <button onClick={cycle} title="Override: ALLOWED — click to cycle" className="flex justify-center w-full">
+      <button
+        onClick={cycle}
+        title="Override: ALLOWED — click to cycle"
+        className="flex justify-center w-full"
+      >
         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500 text-white ring-2 ring-emerald-300">
           <CheckCircle2 className="size-2.5" /> ON
         </span>
@@ -115,7 +329,11 @@ function CellChip({
 
   if (override === false) {
     return (
-      <button onClick={cycle} title="Override: DENIED — click to cycle" className="flex justify-center w-full">
+      <button
+        onClick={cycle}
+        title="Override: DENIED — click to cycle"
+        className="flex justify-center w-full"
+      >
         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-500 text-white ring-2 ring-red-300">
           <XCircle className="size-2.5" /> OFF
         </span>
@@ -125,7 +343,11 @@ function CellChip({
 
   if (sys === true) {
     return (
-      <button onClick={cycle} title="System default: full write — click to override" className="flex justify-center w-full">
+      <button
+        onClick={cycle}
+        title="System default: full write — click to override"
+        className="flex justify-center w-full"
+      >
         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
           <CheckCircle2 className="size-2.5" /> W
         </span>
@@ -135,7 +357,11 @@ function CellChip({
 
   if (sys === "read") {
     return (
-      <button onClick={cycle} title="System default: read-only — click to override" className="flex justify-center w-full">
+      <button
+        onClick={cycle}
+        title="System default: read-only — click to override"
+        className="flex justify-center w-full"
+      >
         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-100 text-sky-700">
           <Info className="size-2.5" /> R
         </span>
@@ -144,7 +370,11 @@ function CellChip({
   }
 
   return (
-    <button onClick={cycle} title="No access — click to grant override" className="flex justify-center w-full">
+    <button
+      onClick={cycle}
+      title="No access — click to grant override"
+      className="flex justify-center w-full"
+    >
       <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] text-gray-300 hover:bg-gray-100 hover:text-gray-500 transition-colors">
         <Minus className="size-2.5" />
       </span>
@@ -246,7 +476,8 @@ function RoleMatrixPage() {
         }
       }
     }
-    adminApi.updateRoleModules(companyId, payload)
+    adminApi
+      .updateRoleModules(companyId, payload)
       .then(() => {
         toast.success(`Overrides cleared for ${ROLE_LABELS[role] ?? role}`);
         qc.invalidateQueries({ queryKey: ["role-modules", companyId] });
@@ -255,7 +486,8 @@ function RoleMatrixPage() {
   };
 
   const dirtyCount = Object.values(localOverrides).reduce(
-    (sum, mods) => sum + Object.keys(mods).length, 0
+    (sum, mods) => sum + Object.keys(mods).length,
+    0,
   );
 
   if (!user || user.role !== "SUPER_ADMIN") {
@@ -271,12 +503,20 @@ function RoleMatrixPage() {
             <Shield className="size-5 text-blue-600" /> Role-Module Matrix
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Per-company overrides of system role defaults. Click cells to cycle: default → allow → deny.
+            Per-company overrides of system role defaults. Click cells to cycle: default → allow →
+            deny.
           </p>
         </div>
         <div className="flex items-center gap-2">
           {isDirty && (
-            <Button variant="outline" size="sm" onClick={() => { setLocalOverrides({}); setIsDirty(false); }}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setLocalOverrides({});
+                setIsDirty(false);
+              }}
+            >
               <RotateCcw className="size-3.5 mr-1.5" /> Discard
             </Button>
           )}
@@ -285,9 +525,11 @@ function RoleMatrixPage() {
             disabled={!companyId || !isDirty || saveMutation.isPending}
             onClick={() => saveMutation.mutate()}
           >
-            {saveMutation.isPending
-              ? <Loader2 className="size-3.5 animate-spin mr-1.5" />
-              : <Save className="size-3.5 mr-1.5" />}
+            {saveMutation.isPending ? (
+              <Loader2 className="size-3.5 animate-spin mr-1.5" />
+            ) : (
+              <Save className="size-3.5 mr-1.5" />
+            )}
             Save{dirtyCount > 0 ? ` (${dirtyCount})` : ""}
           </Button>
         </div>
@@ -312,7 +554,9 @@ function RoleMatrixPage() {
             >
               <option value="">Select a company…</option>
               {companies.map((c: any) => (
-                <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.code})
+                </option>
               ))}
             </select>
           </div>
@@ -322,7 +566,9 @@ function RoleMatrixPage() {
       {!companyId ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <Shield className="size-12 text-muted-foreground/30 mb-4" />
-          <p className="font-medium text-muted-foreground">Select a company to configure its role-module matrix</p>
+          <p className="font-medium text-muted-foreground">
+            Select a company to configure its role-module matrix
+          </p>
         </div>
       ) : roleModulesQ.isLoading ? (
         <div className="space-y-2">
@@ -336,19 +582,27 @@ function RoleMatrixPage() {
           <div className="flex flex-wrap gap-4 text-xs text-muted-foreground items-center">
             <span className="font-medium text-foreground">Legend:</span>
             <span className="flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium text-[10px]">W</span>
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium text-[10px]">
+                W
+              </span>
               System write
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-medium text-[10px]">R</span>
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-medium text-[10px]">
+                R
+              </span>
               System read
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-500 text-white font-semibold text-[10px]">ON</span>
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-500 text-white font-semibold text-[10px]">
+                ON
+              </span>
               Override: allow
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-500 text-white font-semibold text-[10px]">OFF</span>
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-500 text-white font-semibold text-[10px]">
+                OFF
+              </span>
               Override: deny
             </span>
             <span className="flex items-center gap-1.5">
@@ -384,13 +638,13 @@ function RoleMatrixPage() {
                       >
                         {MODULE_LABELS[mod] ?? mod}
                       </th>
-                    ))
+                    )),
                   )}
                 </tr>
               </thead>
               <tbody>
                 {ROLE_GROUPS.map((group) => (
-                  <>
+                  <Fragment key={group.label}>
                     <tr key={`grp-${group.label}`} className="bg-gray-50/70">
                       <td
                         colSpan={ALL_MODULES.length + 1}
@@ -401,26 +655,35 @@ function RoleMatrixPage() {
                     </tr>
                     {group.roles.map((role) => {
                       const hasLocal = Object.keys(localOverrides[role] ?? {}).length > 0;
-                      const hasSaved = Object.values(savedMatrix[role] ?? {}).some((v) => v !== null);
+                      const hasSaved = Object.values(savedMatrix[role] ?? {}).some(
+                        (v) => v !== null,
+                      );
                       return (
-                        <tr key={role} className="border-b border-gray-100 hover:bg-gray-50/40 transition-colors">
+                        <tr
+                          key={role}
+                          className="border-b border-gray-100 hover:bg-gray-50/40 transition-colors"
+                        >
                           <td className="sticky left-0 bg-white border-r border-gray-100 px-3 py-2">
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-1.5">
-                                <Shield className={`size-3 shrink-0 ${role === "SUPER_ADMIN" || role === "MILL_OWNER" ? "text-blue-500" : "text-gray-300"}`} />
+                                <Shield
+                                  className={`size-3 shrink-0 ${role === "SUPER_ADMIN" || role === "MILL_OWNER" ? "text-blue-500" : "text-gray-300"}`}
+                                />
                                 <span className="font-medium text-gray-800 whitespace-nowrap">
                                   {ROLE_LABELS[role] ?? role}
                                 </span>
                               </div>
-                              {(hasLocal || hasSaved) && role !== "SUPER_ADMIN" && role !== "MILL_OWNER" && (
-                                <button
-                                  onClick={() => clearRoleOverrides(role)}
-                                  title="Clear all overrides for this role"
-                                  className="text-gray-300 hover:text-red-400 transition-colors shrink-0"
-                                >
-                                  <RotateCcw className="size-3" />
-                                </button>
-                              )}
+                              {(hasLocal || hasSaved) &&
+                                role !== "SUPER_ADMIN" &&
+                                role !== "MILL_OWNER" && (
+                                  <button
+                                    onClick={() => clearRoleOverrides(role)}
+                                    title="Clear all overrides for this role"
+                                    className="text-gray-300 hover:text-red-400 transition-colors shrink-0"
+                                  >
+                                    <RotateCcw className="size-3" />
+                                  </button>
+                                )}
                             </div>
                           </td>
                           {MODULE_GROUPS.flatMap((g, gi) =>
@@ -436,12 +699,12 @@ function RoleMatrixPage() {
                                   onChange={(v) => handleChange(role, mod, v)}
                                 />
                               </td>
-                            ))
+                            )),
                           )}
                         </tr>
                       );
                     })}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>

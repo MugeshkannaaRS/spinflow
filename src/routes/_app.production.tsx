@@ -34,13 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -49,7 +43,26 @@ import { useState, useMemo, useEffect } from "react";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
-import { Activity, AlertTriangle, CheckCircle2, Save, LayoutGrid, Plus, Pencil, ArrowDown, ArrowUp, Trash2, Clock, Users2, UserCircle, Layers, PowerOff, FileText, Settings2, X } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  Save,
+  LayoutGrid,
+  Plus,
+  Pencil,
+  ArrowDown,
+  ArrowUp,
+  Trash2,
+  Clock,
+  Users2,
+  UserCircle,
+  Layers,
+  PowerOff,
+  FileText,
+  Settings2,
+  X,
+} from "lucide-react";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useActiveMill } from "@/hooks/useActiveMill";
@@ -116,13 +129,17 @@ function ShiftGrid() {
   const [shift, setShift] = useState<"A" | "B" | "C">("A");
   const { data: millMasters } = useMillMasters();
   const deptOptions = millMasters?.department ?? [];
-  const DEPARTMENTS = deptOptions.map((d: any) => typeof d === "string" ? d : d.name);
+  const DEPARTMENTS = deptOptions.map((d: any) => (typeof d === "string" ? d : d.name));
   const [department, setDepartment] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
 
   // Operator identification — free text, persisted per session
   const [operatorName, setOperatorName] = useState<string>(() => {
-    try { return sessionStorage.getItem("sf_operator") ?? ""; } catch { return ""; }
+    try {
+      return sessionStorage.getItem("sf_operator") ?? "";
+    } catch {
+      return "";
+    }
   });
 
   // Machine Groups — selected group IDs (supports multi-group mixing)
@@ -130,7 +147,9 @@ function ShiftGrid() {
     try {
       const raw = sessionStorage.getItem("sf_machine_groups");
       return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
+    } catch {
+      return [];
+    }
   });
 
   // Load all machine groups for this mill
@@ -148,16 +167,28 @@ function ShiftGrid() {
     if (!id || selectedGroupIds.includes(id)) return;
     const next = [...selectedGroupIds, id];
     setSelectedGroupIds(next);
-    try { sessionStorage.setItem("sf_machine_groups", JSON.stringify(next)); } catch {}
+    try {
+      sessionStorage.setItem("sf_machine_groups", JSON.stringify(next));
+    } catch {
+      /* quota exceeded - safe to ignore */
+    }
   }
   function removeGroup(id: string) {
     const next = selectedGroupIds.filter((x) => x !== id);
     setSelectedGroupIds(next);
-    try { sessionStorage.setItem("sf_machine_groups", JSON.stringify(next)); } catch {}
+    try {
+      sessionStorage.setItem("sf_machine_groups", JSON.stringify(next));
+    } catch {
+      /* quota exceeded - safe to ignore */
+    }
   }
   function clearGroups() {
     setSelectedGroupIds([]);
-    try { sessionStorage.removeItem("sf_machine_groups"); } catch {}
+    try {
+      sessionStorage.removeItem("sf_machine_groups");
+    } catch {
+      /* quota exceeded - safe to ignore */
+    }
   }
 
   // Machine section / line filter
@@ -166,10 +197,11 @@ function ShiftGrid() {
   // Section filter only applies when no machine group selected (dept-based flow)
   const sectionsQ = useQuery({
     queryKey: ["machine-sections", departmentId || department, millId],
-    queryFn: () => productionApi.getMachineSections({
-      ...(departmentId ? { department_id: departmentId } : { department }),
-      mill_id: millId,
-    }),
+    queryFn: () =>
+      productionApi.getMachineSections({
+        ...(departmentId ? { department_id: departmentId } : { department }),
+        mill_id: millId,
+      }),
     staleTime: 60_000,
     enabled: !!millId && !!(departmentId || department) && selectedGroupIds.length === 0,
   });
@@ -179,14 +211,16 @@ function ShiftGrid() {
     if (!department && deptOptions.length > 0) {
       const first = deptOptions[0];
       const name = typeof first === "string" ? first : first.name;
-      const id = typeof first === "string" ? null : (first.id || null);
+      const id = typeof first === "string" ? null : first.id || null;
       setDepartment(name);
       setDepartmentId(id);
     }
   }, [deptOptions, department]);
 
   // Reset section filter when dept changes
-  useEffect(() => { setSelectedSection("all"); }, [department]);
+  useEffect(() => {
+    setSelectedSection("all");
+  }, [department]);
 
   // Clear entered production values when date or shift changes so previous entry data doesn't bleed in
   useEffect(() => {
@@ -206,18 +240,19 @@ function ShiftGrid() {
 
   const machinesQ = useQuery({
     queryKey: ["machines", departmentId || department, millId, selectedSection, selectedGroupIds],
-    queryFn: () => productionApi.getMachines({
-      // Machine groups take priority over department filter
-      ...(selectedGroupIds.length > 0
-        ? { machine_group_ids: selectedGroupIds.join(",") }
-        : {
-            ...(departmentId ? { department_id: departmentId } : { department }),
-            ...(selectedSection && selectedSection !== "all" ? { section: selectedSection } : {}),
-          }),
-      mill_id: millId,
-      page_size: 1000,
-      page: 1,
-    }),
+    queryFn: () =>
+      productionApi.getMachines({
+        // Machine groups take priority over department filter
+        ...(selectedGroupIds.length > 0
+          ? { machine_group_ids: selectedGroupIds.join(",") }
+          : {
+              ...(departmentId ? { department_id: departmentId } : { department }),
+              ...(selectedSection && selectedSection !== "all" ? { section: selectedSection } : {}),
+            }),
+        mill_id: millId,
+        page_size: 1000,
+        page: 1,
+      }),
     staleTime: 60_000,
     enabled: !!millId && (!!(departmentId || department) || selectedGroupIds.length > 0),
   });
@@ -235,7 +270,11 @@ function ShiftGrid() {
   // When operator name changes, pre-fill all existing rows
   useEffect(() => {
     setRows((prev) => prev.map((r) => ({ ...r, operator: operatorName })));
-    try { sessionStorage.setItem("sf_operator", operatorName); } catch {}
+    try {
+      sessionStorage.setItem("sf_operator", operatorName);
+    } catch {
+      /* quota exceeded - safe to ignore */
+    }
   }, [operatorName]);
 
   // ── Carding section (visible only when Blowroom is selected) ──────────────
@@ -243,13 +282,22 @@ function ShiftGrid() {
 
   const cardingMachinesQ = useQuery({
     queryKey: ["machines-carding", millId],
-    queryFn: () => productionApi.getMachines({ department: "Carding", mill_id: millId, page_size: 200, page: 1 }),
+    queryFn: () =>
+      productionApi.getMachines({
+        department: "Carding",
+        mill_id: millId,
+        page_size: 200,
+        page: 1,
+      }),
     staleTime: 60_000,
     enabled: !!millId && isBlowroom,
   });
 
   const cardingMachines = useMemo(
-    () => (Array.isArray(cardingMachinesQ.data) ? cardingMachinesQ.data : (cardingMachinesQ.data?.data ?? [])) as any[],
+    () =>
+      (Array.isArray(cardingMachinesQ.data)
+        ? cardingMachinesQ.data
+        : (cardingMachinesQ.data?.data ?? [])) as any[],
     [cardingMachinesQ.data],
   );
 
@@ -325,12 +373,16 @@ function ShiftGrid() {
           machine_status: r.status === "running" ? "running" : "breakdown",
           lot_number: r.lot || undefined,
         }));
-        await productionApi.createBulkEntries({
-          date,
-          shift,
-          department: "Carding",
-          entries: cardingEntries,
-        }).catch(() => { /* carding submit failure non-fatal */ });
+        await productionApi
+          .createBulkEntries({
+            date,
+            shift,
+            department: "Carding",
+            entries: cardingEntries,
+          })
+          .catch(() => {
+            /* carding submit failure non-fatal */
+          });
       }
 
       return res;
@@ -353,16 +405,15 @@ function ShiftGrid() {
 
   // When machine groups are selected, department is optional (derived from machines)
   const usingGroups = selectedGroupIds.length > 0;
-  const effectiveDepartment = usingGroups
-    ? (machines[0]?.department || "Mixed")
-    : department;
+  const effectiveDepartment = usingGroups ? machines[0]?.department || "Mixed" : department;
 
   const requiredBaseFields = ["date", "shift", "count"] as const;
   const allHeaderFilled =
     requiredBaseFields.every((f) => {
       const vals: Record<string, string> = { date, shift, count };
       return typeof vals[f] === "string" && vals[f].trim().length > 0;
-    }) && (usingGroups || !!department.trim());
+    }) &&
+    (usingGroups || !!department.trim());
 
   const handleSubmit = () => {
     const errors: Record<string, string> = {};
@@ -383,7 +434,8 @@ function ShiftGrid() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">
-                {config.getLabel('date')}{config.isRequired('date') && <span className="text-destructive"> *</span>}
+                {config.getLabel("date")}
+                {config.isRequired("date") && <span className="text-destructive"> *</span>}
               </Label>
               <Input
                 type="date"
@@ -393,16 +445,30 @@ function ShiftGrid() {
                   setRequiredErrors((prev) => ({ ...prev, date: "" }));
                 }}
                 className={["h-8 text-sm", requiredErrors.date ? "border-destructive" : ""]
-                  .filter(Boolean).join(" ")}
+                  .filter(Boolean)
+                  .join(" ")}
               />
-              {requiredErrors.date && <p className="text-xs text-destructive">{requiredErrors.date}</p>}
+              {requiredErrors.date && (
+                <p className="text-xs text-destructive">{requiredErrors.date}</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">
-                {config.getLabel('shift')}{config.isRequired('shift') && <span className="text-destructive"> *</span>}
+                {config.getLabel("shift")}
+                {config.isRequired("shift") && <span className="text-destructive"> *</span>}
               </Label>
-              <Select value={shift} onValueChange={(v) => { setShift(v as "A" | "B" | "C"); setRequiredErrors((prev) => ({ ...prev, shift: "" })); }}>
-                <SelectTrigger className={["h-8 text-sm", requiredErrors.shift ? "border-destructive" : ""].filter(Boolean).join(" ")}>
+              <Select
+                value={shift}
+                onValueChange={(v) => {
+                  setShift(v as "A" | "B" | "C");
+                  setRequiredErrors((prev) => ({ ...prev, shift: "" }));
+                }}
+              >
+                <SelectTrigger
+                  className={["h-8 text-sm", requiredErrors.shift ? "border-destructive" : ""]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -411,50 +477,79 @@ function ShiftGrid() {
                   <SelectItem value="C">C — Night</SelectItem>
                 </SelectContent>
               </Select>
-              {requiredErrors.shift && <p className="text-xs text-destructive">{requiredErrors.shift}</p>}
+              {requiredErrors.shift && (
+                <p className="text-xs text-destructive">{requiredErrors.shift}</p>
+              )}
             </div>
             {/* Department — only shown when no machine groups selected */}
             {!usingGroups && (
               <div className="space-y-1.5">
                 <Label className="text-xs">
-                  {config.getLabel('department')}<span className="text-destructive"> *</span>
+                  {config.getLabel("department")}
+                  <span className="text-destructive"> *</span>
                 </Label>
                 <Select
                   value={department}
                   onValueChange={(v) => {
                     setDepartment(v);
-                    const dOpt = deptOptions.find((d: any) => (typeof d === "string" ? d : d.name) === v);
-                    setDepartmentId(dOpt && typeof dOpt !== "string" ? (dOpt.id || null) : null);
+                    const dOpt = deptOptions.find(
+                      (d: any) => (typeof d === "string" ? d : d.name) === v,
+                    );
+                    setDepartmentId(dOpt && typeof dOpt !== "string" ? dOpt.id || null : null);
                     setRequiredErrors((prev) => ({ ...prev, department: "" }));
                   }}
                 >
-                  <SelectTrigger className={["h-8 text-sm", requiredErrors.department ? "border-destructive" : ""].filter(Boolean).join(" ")}>
+                  <SelectTrigger
+                    className={[
+                      "h-8 text-sm",
+                      requiredErrors.department ? "border-destructive" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {deptOptions.length === 0
-                      ? <SelectItem value="_empty" disabled>Import machines to see departments</SelectItem>
-                      : deptOptions.map((d: any) => {
-                          const name = typeof d === "string" ? d : d.name;
-                          return <SelectItem key={name} value={name}>{name}</SelectItem>;
-                        })
-                    }
+                    {deptOptions.length === 0 ? (
+                      <SelectItem value="_empty" disabled>
+                        Import machines to see departments
+                      </SelectItem>
+                    ) : (
+                      deptOptions.map((d: any) => {
+                        const name = typeof d === "string" ? d : d.name;
+                        return (
+                          <SelectItem key={name} value={name}>
+                            {name}
+                          </SelectItem>
+                        );
+                      })
+                    )}
                   </SelectContent>
                 </Select>
-                {requiredErrors.department && <p className="text-xs text-destructive">{requiredErrors.department}</p>}
+                {requiredErrors.department && (
+                  <p className="text-xs text-destructive">{requiredErrors.department}</p>
+                )}
               </div>
             )}
             <div className="space-y-1.5">
               <Label className="text-xs">
-                {config.getLabel('count')}{config.isRequired('count') && <span className="text-destructive"> *</span>}
+                {config.getLabel("count")}
+                {config.isRequired("count") && <span className="text-destructive"> *</span>}
               </Label>
               <Input
                 value={count}
-                onChange={(e) => { setCount(e.target.value); setRequiredErrors((prev) => ({ ...prev, count: "" })); }}
+                onChange={(e) => {
+                  setCount(e.target.value);
+                  setRequiredErrors((prev) => ({ ...prev, count: "" }));
+                }}
                 placeholder="e.g. 30s"
-                className={["h-8 text-sm", requiredErrors.count ? "border-destructive" : ""].filter(Boolean).join(" ")}
+                className={["h-8 text-sm", requiredErrors.count ? "border-destructive" : ""]
+                  .filter(Boolean)
+                  .join(" ")}
               />
-              {requiredErrors.count && <p className="text-xs text-destructive">{requiredErrors.count}</p>}
+              {requiredErrors.count && (
+                <p className="text-xs text-destructive">{requiredErrors.count}</p>
+              )}
             </div>
           </div>
 
@@ -475,7 +570,10 @@ function ShiftGrid() {
                   {selectedGroupIds.map((gid) => {
                     const g = machineGroups.find((x) => x.id === gid);
                     return g ? (
-                      <span key={gid} className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full border border-blue-200">
+                      <span
+                        key={gid}
+                        className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full border border-blue-200"
+                      >
                         {g.name}
                         <button
                           type="button"
@@ -499,7 +597,11 @@ function ShiftGrid() {
                         e.target.value = "";
                       }}
                     >
-                      <option value="">{selectedGroupIds.length === 0 ? "— Select machine group —" : "+ Mix another group"}</option>
+                      <option value="">
+                        {selectedGroupIds.length === 0
+                          ? "— Select machine group —"
+                          : "+ Mix another group"}
+                      </option>
                       {machineGroups
                         .filter((g) => !selectedGroupIds.includes(g.id))
                         .map((g) => (
@@ -511,7 +613,10 @@ function ShiftGrid() {
                   )}
                   {!hasMachineGroups && (
                     <span className="text-xs text-muted-foreground italic">
-                      No machine groups — <a href="/masters" className="underline text-primary">create them in Masters</a>
+                      No machine groups —{" "}
+                      <a href="/masters" className="underline text-primary">
+                        create them in Masters
+                      </a>
                     </span>
                   )}
                   {selectedGroupIds.length > 0 && (
@@ -553,8 +658,12 @@ function ShiftGrid() {
               </div>
               <button
                 onClick={() => setSelectedSection("all")}
-                className={["px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
-                  selectedSection === "all" ? "bg-primary text-primary-foreground border-primary" : "bg-white border-gray-200 text-muted-foreground hover:border-gray-400"].join(" ")}
+                className={[
+                  "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                  selectedSection === "all"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-white border-gray-200 text-muted-foreground hover:border-gray-400",
+                ].join(" ")}
               >
                 All Lines
               </button>
@@ -562,8 +671,12 @@ function ShiftGrid() {
                 <button
                   key={s}
                   onClick={() => setSelectedSection(s === selectedSection ? "all" : s)}
-                  className={["px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
-                    selectedSection === s ? "bg-blue-600 text-white border-blue-600" : "bg-white border-blue-200 text-blue-700 hover:border-blue-400"].join(" ")}
+                  className={[
+                    "px-2.5 py-1 rounded-full text-xs font-medium border transition-colors",
+                    selectedSection === s
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white border-blue-200 text-blue-700 hover:border-blue-400",
+                  ].join(" ")}
                 >
                   {s}
                 </button>
@@ -656,10 +769,10 @@ function ShiftGrid() {
                 </table>
                 <div className="px-4 pt-2 flex gap-4 text-xs text-blue-700">
                   <span className="font-medium">
-                    ✓ Running: {cardingRows.filter(r => r.status === "running").length}
+                    ✓ Running: {cardingRows.filter((r) => r.status === "running").length}
                   </span>
                   <span className="font-medium text-red-600">
-                    ✕ Stopped: {cardingRows.filter(r => r.status === "stopped").length}
+                    ✕ Stopped: {cardingRows.filter((r) => r.status === "stopped").length}
                   </span>
                 </div>
               </div>
@@ -698,10 +811,11 @@ function ShiftGrid() {
           <CardTitle className="text-sm">
             Machine Grid —{" "}
             {usingGroups
-              ? selectedGroupIds.map((gid) => machineGroups.find((x) => x.id === gid)?.name ?? gid).join(" + ")
-              : department
-            }
-            {" "}· Shift {shift} · {date}
+              ? selectedGroupIds
+                  .map((gid) => machineGroups.find((x) => x.id === gid)?.name ?? gid)
+                  .join(" + ")
+              : department}{" "}
+            · Shift {shift} · {date}
           </CardTitle>
           <Button
             size="sm"
@@ -718,16 +832,28 @@ function ShiftGrid() {
               {usingGroups ? (
                 <>
                   <p>No machines found in the selected group(s). Check Masters → Machine Groups.</p>
-                  <Link to="/masters" className="text-primary underline text-xs inline-block">Go to Masters</Link>
+                  <Link to="/masters" className="text-primary underline text-xs inline-block">
+                    Go to Masters
+                  </Link>
                 </>
               ) : !department ? (
-                hasMachineGroups
-                  ? <p>Select a <strong>Machine Group</strong> above to load machines.</p>
-                  : <p>Select a <strong>Department</strong> or create Machine Groups in Masters.</p>
+                hasMachineGroups ? (
+                  <p>
+                    Select a <strong>Machine Group</strong> above to load machines.
+                  </p>
+                ) : (
+                  <p>
+                    Select a <strong>Department</strong> or create Machine Groups in Masters.
+                  </p>
+                )
               ) : (
                 <>
-                  <p>No machines in <strong>{department}</strong>. Add them in Masters → Machines.</p>
-                  <Link to="/masters" className="text-primary underline text-xs inline-block">Go to Masters</Link>
+                  <p>
+                    No machines in <strong>{department}</strong>. Add them in Masters → Machines.
+                  </p>
+                  <Link to="/masters" className="text-primary underline text-xs inline-block">
+                    Go to Masters
+                  </Link>
                 </>
               )}
             </div>
@@ -736,15 +862,20 @@ function ShiftGrid() {
               <Table className="min-w-[1050px] w-full text-sm">
                 <TableHeader>
                   <TableRow className="bg-muted/40">
-                    <TableHead className="w-24 pl-4">{config.getLabel('machine_code')}</TableHead>
-                    <TableHead className="w-36">{(() => { const l = config.getLabel('machine_name'); return l === 'machine_name' ? 'name' : l; })()}</TableHead>
-                    <TableHead className="w-32">{config.getLabel('operator')}</TableHead>
-                    <TableHead className="w-20">{config.getLabel('count')}</TableHead>
+                    <TableHead className="w-24 pl-4">{config.getLabel("machine_code")}</TableHead>
+                    <TableHead className="w-36">
+                      {(() => {
+                        const l = config.getLabel("machine_name");
+                        return l === "machine_name" ? "name" : l;
+                      })()}
+                    </TableHead>
+                    <TableHead className="w-32">{config.getLabel("operator")}</TableHead>
+                    <TableHead className="w-20">{config.getLabel("count")}</TableHead>
                     <TableHead className="w-24">Target (kg)</TableHead>
-                    <TableHead className="w-28">{config.getLabel('produced_kg')}</TableHead>
+                    <TableHead className="w-28">{config.getLabel("produced_kg")}</TableHead>
                     <TableHead className="w-20">Efficiency</TableHead>
-                    <TableHead className="w-24">{config.getLabel('waste_kg')}</TableHead>
-                    <TableHead className="w-32">{config.getLabel('machine_status')}</TableHead>
+                    <TableHead className="w-24">{config.getLabel("waste_kg")}</TableHead>
+                    <TableHead className="w-32">{config.getLabel("machine_status")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -780,7 +911,9 @@ function ShiftGrid() {
                             type="number"
                             min={0}
                             value={row.targetKg || ""}
-                            onChange={(e) => updateRow(idx, "targetKg", Number(e.target.value) || 0)}
+                            onChange={(e) =>
+                              updateRow(idx, "targetKg", Number(e.target.value) || 0)
+                            }
                             placeholder="0"
                             className="h-7 text-xs w-full"
                           />
@@ -797,10 +930,20 @@ function ShiftGrid() {
                         </TableCell>
                         <TableCell className="text-xs font-semibold">
                           {effPct !== null ? (
-                            <span className={effPct >= 90 ? "text-green-600" : effPct >= 75 ? "text-amber-600" : "text-destructive"}>
+                            <span
+                              className={
+                                effPct >= 90
+                                  ? "text-green-600"
+                                  : effPct >= 75
+                                    ? "text-amber-600"
+                                    : "text-destructive"
+                              }
+                            >
                               {effPct}%
                             </span>
-                          ) : <span className="text-muted-foreground font-normal">—</span>}
+                          ) : (
+                            <span className="text-muted-foreground font-normal">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Input
@@ -847,13 +990,25 @@ function ShiftGrid() {
 // WASTE ENTRY TAB
 // ─────────────────────────────────────────────────────────────────
 
-type WasteRow = { machineCode: string; machineName: string; wasteType: string; lotNo: string; ratio: string; wasteKg: string; remarks: string };
+type WasteRow = {
+  machineCode: string;
+  machineName: string;
+  wasteType: string;
+  lotNo: string;
+  ratio: string;
+  wasteKg: string;
+  remarks: string;
+};
 
 function buildWasteRows(machines: any[]): WasteRow[] {
   return (machines ?? []).map((m: any) => ({
     machineCode: m.code ?? "",
     machineName: m.name ?? m.code ?? "",
-    wasteType: "", lotNo: "", ratio: "", wasteKg: "", remarks: "",
+    wasteType: "",
+    lotNo: "",
+    ratio: "",
+    wasteKg: "",
+    remarks: "",
   }));
 }
 
@@ -861,7 +1016,9 @@ function WasteGrid() {
   const qc = useQueryClient();
   const { millId } = useActiveMill();
   const today = new Date();
-  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
   const [date, setDate] = useState(localDate);
   const [shift, setShift] = useState<"A" | "B" | "C">("A");
   const { data: millMasters } = useMillMasters();
@@ -900,7 +1057,7 @@ function WasteGrid() {
     if (!department && deptOptions.length > 0) {
       const first = deptOptions[0];
       const name = typeof first === "string" ? first : first.name;
-      const id = typeof first === "string" ? null : (first.id || null);
+      const id = typeof first === "string" ? null : first.id || null;
       setDepartment(name);
       setDepartmentId(id);
     }
@@ -908,11 +1065,17 @@ function WasteGrid() {
 
   const machinesQ = useQuery({
     queryKey: ["machines", departmentId || department, millId, selectedGroupId],
-    queryFn: () => productionApi.getMachines(
-      selectedGroupId
-        ? { machine_group_ids: selectedGroupId, mill_id: millId, page_size: 1000, page: 1 }
-        : { ...(departmentId ? { department_id: departmentId } : { department }), mill_id: millId, page_size: 1000, page: 1 }
-    ),
+    queryFn: () =>
+      productionApi.getMachines(
+        selectedGroupId
+          ? { machine_group_ids: selectedGroupId, mill_id: millId, page_size: 1000, page: 1 }
+          : {
+              ...(departmentId ? { department_id: departmentId } : { department }),
+              mill_id: millId,
+              page_size: 1000,
+              page: 1,
+            },
+      ),
     staleTime: 60_000,
     enabled: !!millId && !!(selectedGroupId || departmentId || department),
   });
@@ -921,20 +1084,30 @@ function WasteGrid() {
     [machinesQ.data],
   );
   const [rows, setRows] = useState<WasteRow[]>(() => buildWasteRows(machines));
-  useEffect(() => { setRows(buildWasteRows(machines)); }, [machinesQ.data]);
+  useEffect(() => {
+    setRows(buildWasteRows(machines));
+  }, [machinesQ.data]);
 
   const updateWasteRow = (idx: number, field: keyof WasteRow, value: string) => {
-    setRows((prev) => { const next = [...prev]; next[idx] = { ...next[idx], [field]: value }; return next; });
+    setRows((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: value };
+      return next;
+    });
   };
 
-  const summary = useMemo(() => ({
-    totalWaste: rows.reduce((s, r) => s + (Number(r.wasteKg) || 0), 0),
-    filled: rows.filter((r) => Number(r.wasteKg) > 0).length,
-  }), [rows]);
+  const summary = useMemo(
+    () => ({
+      totalWaste: rows.reduce((s, r) => s + (Number(r.wasteKg) || 0), 0),
+      filled: rows.filter((r) => Number(r.wasteKg) > 0).length,
+    }),
+    [rows],
+  );
 
   const bulkMutation = useMutation({
     mutationFn: async () => {
-      if (!date || !shift || !department) throw new Error("Date, Shift and Department are required");
+      if (!date || !shift || !department)
+        throw new Error("Date, Shift and Department are required");
       if (wasteMode === "group") {
         // Group mode: single form entry → log for every machine in selected group
         if (!selectedGroupId) throw new Error("Select a machine group");
@@ -943,17 +1116,24 @@ function WasteGrid() {
         if (groupMachines.length === 0) throw new Error("No machines found in selected group");
         const machineCodes = groupMachines.map((m: any) => m.code).filter(Boolean);
         const calls = machineCodes.map((mc: string) =>
-          productionApi.createWasteBulk({
-            date, shift, department,
-            entries: [{
-              machine_code: mc,
-              waste_type: groupWasteType || undefined,
-              lot_no: groupLotNo || undefined,
-              ratio: groupRatio || undefined,
-              waste_kg: Number(groupWasteKg),
-              remarks: groupRemarks || undefined,
-            }],
-          }, millId ?? undefined)
+          productionApi.createWasteBulk(
+            {
+              date,
+              shift,
+              department,
+              entries: [
+                {
+                  machine_code: mc,
+                  waste_type: groupWasteType || undefined,
+                  lot_no: groupLotNo || undefined,
+                  ratio: groupRatio || undefined,
+                  waste_kg: Number(groupWasteKg),
+                  remarks: groupRemarks || undefined,
+                },
+              ],
+            },
+            millId ?? undefined,
+          ),
         );
         const results = await Promise.allSettled(calls);
         const succeeded = results.filter((r) => r.status === "fulfilled").length;
@@ -970,17 +1150,22 @@ function WasteGrid() {
         // Individual mode: per-machine table
         const active = rows.filter((r) => Number(r.wasteKg) > 0 && r.machineCode);
         if (active.length === 0) throw new Error("Fill at least one machine's waste (kg)");
-        return productionApi.createWasteBulk({
-          date, shift, department,
-          entries: active.map((r) => ({
-            machine_code: r.machineCode,
-            waste_type: r.wasteType || undefined,
-            lot_no: r.lotNo || undefined,
-            ratio: r.ratio || undefined,
-            waste_kg: Number(r.wasteKg),
-            remarks: r.remarks || undefined,
-          })),
-        }, millId ?? undefined);
+        return productionApi.createWasteBulk(
+          {
+            date,
+            shift,
+            department,
+            entries: active.map((r) => ({
+              machine_code: r.machineCode,
+              waste_type: r.wasteType || undefined,
+              lot_no: r.lotNo || undefined,
+              ratio: r.ratio || undefined,
+              waste_kg: Number(r.wasteKg),
+              remarks: r.remarks || undefined,
+            })),
+          },
+          millId ?? undefined,
+        );
       }
     },
     onSuccess: (res: any) => {
@@ -990,7 +1175,11 @@ function WasteGrid() {
         setRows(buildWasteRows(machines));
       } else {
         // Reset group form
-        setGroupWasteType(""); setGroupLotNo(""); setGroupRatio(""); setGroupWasteKg(""); setGroupRemarks("");
+        setGroupWasteType("");
+        setGroupLotNo("");
+        setGroupRatio("");
+        setGroupWasteKg("");
+        setGroupRemarks("");
       }
       qc.invalidateQueries({ queryKey: ["waste-entries"] });
     },
@@ -1010,7 +1199,8 @@ function WasteGrid() {
   // Past entries
   const entriesQ = useQuery({
     queryKey: ["waste-entries", date, shift, department, millId],
-    queryFn: () => productionApi.getWasteEntries({ date, shift, department, mill_id: millId, page_size: 200 }),
+    queryFn: () =>
+      productionApi.getWasteEntries({ date, shift, department, mill_id: millId, page_size: 200 }),
     staleTime: 30_000,
     enabled: !!millId && !!date,
   });
@@ -1023,13 +1213,21 @@ function WasteGrid() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Date *</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                className={["h-8 text-sm", errors.date ? "border-destructive" : ""].filter(Boolean).join(" ")} />
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className={["h-8 text-sm", errors.date ? "border-destructive" : ""]
+                  .filter(Boolean)
+                  .join(" ")}
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Shift *</Label>
-              <Select value={shift} onValueChange={(v) => setShift(v as "A"|"B"|"C")}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+              <Select value={shift} onValueChange={(v) => setShift(v as "A" | "B" | "C")}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="A">A — Morning</SelectItem>
                   <SelectItem value="B">B — Afternoon</SelectItem>
@@ -1039,17 +1237,28 @@ function WasteGrid() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Department *</Label>
-              <Select value={department} onValueChange={(v) => {
-                setDepartment(v);
-                setSelectedGroupId("");
-                const d = deptOptions.find((x: any) => (typeof x === "string" ? x : x.name) === v);
-                setDepartmentId(d && typeof d !== "string" ? (d.id || null) : null);
-              }}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+              <Select
+                value={department}
+                onValueChange={(v) => {
+                  setDepartment(v);
+                  setSelectedGroupId("");
+                  const d = deptOptions.find(
+                    (x: any) => (typeof x === "string" ? x : x.name) === v,
+                  );
+                  setDepartmentId(d && typeof d !== "string" ? d.id || null : null);
+                }}
+              >
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {deptOptions.map((d: any) => {
                     const name = typeof d === "string" ? d : d.name;
-                    return <SelectItem key={name} value={name}>{name}</SelectItem>;
+                    return (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    );
                   })}
                 </SelectContent>
               </Select>
@@ -1059,18 +1268,19 @@ function WasteGrid() {
             <div className="flex items-start gap-3 flex-wrap">
               <Layers className="size-4 text-muted-foreground shrink-0 mt-2" />
               <div className="flex-1 space-y-1 min-w-[180px]">
-                <Label className="text-xs text-muted-foreground">
-                  Entry Mode
-                </Label>
+                <Label className="text-xs text-muted-foreground">Entry Mode</Label>
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => { setWasteMode("individual"); setSelectedGroupId(""); }}
+                    onClick={() => {
+                      setWasteMode("individual");
+                      setSelectedGroupId("");
+                    }}
                     className={[
                       "text-xs px-3 py-1.5 rounded border transition-colors",
                       wasteMode === "individual"
                         ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-muted border-border text-muted-foreground hover:border-primary"
+                        : "bg-muted border-border text-muted-foreground hover:border-primary",
                     ].join(" ")}
                   >
                     Individual
@@ -1082,7 +1292,7 @@ function WasteGrid() {
                       "text-xs px-3 py-1.5 rounded border transition-colors",
                       wasteMode === "group"
                         ? "bg-amber-500 text-white border-amber-500"
-                        : "bg-muted border-border text-muted-foreground hover:border-amber-400"
+                        : "bg-muted border-border text-muted-foreground hover:border-amber-400",
                     ].join(" ")}
                   >
                     Group Entry
@@ -1093,7 +1303,9 @@ function WasteGrid() {
                 <div className="flex-1 space-y-1 min-w-[200px]">
                   <Label className="text-xs text-muted-foreground">
                     Machine Group <span className="text-destructive">*</span>
-                    <span className="text-[10px] ml-1">(waste logged for all machines in group)</span>
+                    <span className="text-[10px] ml-1">
+                      (waste logged for all machines in group)
+                    </span>
                   </Label>
                   <Select
                     value={selectedGroupId || ""}
@@ -1103,21 +1315,34 @@ function WasteGrid() {
                       <SelectValue placeholder="Select machine group…" />
                     </SelectTrigger>
                     <SelectContent>
-                      {machineGroups.length === 0
-                        ? <SelectItem value="_none" disabled>No groups configured</SelectItem>
-                        : machineGroups.map((g) => (
-                            <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                          ))}
+                      {machineGroups.length === 0 ? (
+                        <SelectItem value="_none" disabled>
+                          No groups configured
+                        </SelectItem>
+                      ) : (
+                        machineGroups.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   {selectedGroupId && machines.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 pt-1">
                       <span className="text-xs text-muted-foreground">Will log for:</span>
                       {machines.slice(0, 12).map((m: any) => (
-                        <span key={m.code} className="text-xs bg-amber-100 text-amber-800 rounded px-1.5 py-0.5 font-mono">{m.code}</span>
+                        <span
+                          key={m.code}
+                          className="text-xs bg-amber-100 text-amber-800 rounded px-1.5 py-0.5 font-mono"
+                        >
+                          {m.code}
+                        </span>
                       ))}
                       {machines.length > 12 && (
-                        <span className="text-xs text-muted-foreground">+{machines.length - 12} more</span>
+                        <span className="text-xs text-muted-foreground">
+                          +{machines.length - 12} more
+                        </span>
                       )}
                     </div>
                   )}
@@ -1135,24 +1360,37 @@ function WasteGrid() {
             <div className="text-lg font-semibold mt-1">{summary.totalWaste.toFixed(2)} kg</div>
           </div>
           <div className="rounded-lg border bg-card p-3">
-            <div className="text-xs text-muted-foreground uppercase font-medium">Machines Filled</div>
-            <div className="text-lg font-semibold mt-1">{summary.filled} / {rows.length}</div>
+            <div className="text-xs text-muted-foreground uppercase font-medium">
+              Machines Filled
+            </div>
+            <div className="text-lg font-semibold mt-1">
+              {summary.filled} / {rows.length}
+            </div>
           </div>
         </div>
       )}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between py-3">
-          <CardTitle className="text-sm">Waste Entry — {department} · Shift {shift} · {date}</CardTitle>
+          <CardTitle className="text-sm">
+            Waste Entry — {department} · Shift {shift} · {date}
+          </CardTitle>
           {wasteMode === "individual" ? (
-            <Button size="sm" onClick={handleSubmit} disabled={bulkMutation.isPending || summary.filled === 0}>
+            <Button
+              size="sm"
+              onClick={handleSubmit}
+              disabled={bulkMutation.isPending || summary.filled === 0}
+            >
               <Save className="size-3.5 mr-1.5" />
               {bulkMutation.isPending ? "Saving…" : `Submit (${summary.filled})`}
             </Button>
           ) : (
-            <Button size="sm" onClick={handleSubmit}
+            <Button
+              size="sm"
+              onClick={handleSubmit}
               disabled={bulkMutation.isPending || !selectedGroupId || !groupWasteKg}
-              className="bg-amber-500 hover:bg-amber-600 text-white">
+              className="bg-amber-500 hover:bg-amber-600 text-white"
+            >
               <Save className="size-3.5 mr-1.5" />
               {bulkMutation.isPending ? "Saving…" : `Log for ${machines.length} machines`}
             </Button>
@@ -1164,38 +1402,66 @@ function WasteGrid() {
             selectedGroupId && machines.length > 0 ? (
               <div className="p-4 space-y-3">
                 <div className="text-xs text-muted-foreground mb-1">
-                  Fill in one set of values — they will be logged for all {machines.length} machines in the selected group.
+                  Fill in one set of values — they will be logged for all {machines.length} machines
+                  in the selected group.
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs">Waste Type</Label>
-                    <Input value={groupWasteType} onChange={(e) => setGroupWasteType(e.target.value)}
-                      placeholder="e.g. Fly waste" className="h-8 text-sm"
-                      list="waste-type-suggestions-group" autoComplete="off" />
+                    <Input
+                      value={groupWasteType}
+                      onChange={(e) => setGroupWasteType(e.target.value)}
+                      placeholder="e.g. Fly waste"
+                      className="h-8 text-sm"
+                      list="waste-type-suggestions-group"
+                      autoComplete="off"
+                    />
                     <datalist id="waste-type-suggestions-group">
-                      {(wasteTypesQ.data?.types ?? []).map((t: string) => <option key={t} value={t} />)}
+                      {(wasteTypesQ.data?.types ?? []).map((t: string) => (
+                        <option key={t} value={t} />
+                      ))}
                     </datalist>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Lot No</Label>
-                    <Input value={groupLotNo} onChange={(e) => setGroupLotNo(e.target.value)}
-                      placeholder="e.g. L001" className="h-8 text-sm" />
+                    <Input
+                      value={groupLotNo}
+                      onChange={(e) => setGroupLotNo(e.target.value)}
+                      placeholder="e.g. L001"
+                      className="h-8 text-sm"
+                    />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Ratio</Label>
-                    <Input value={groupRatio} onChange={(e) => setGroupRatio(e.target.value)}
-                      placeholder="60:40" className="h-8 text-sm" />
+                    <Input
+                      value={groupRatio}
+                      onChange={(e) => setGroupRatio(e.target.value)}
+                      placeholder="60:40"
+                      className="h-8 text-sm"
+                    />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Waste (kg) <span className="text-destructive">*</span></Label>
-                    <Input type="number" min={0} step="0.01" value={groupWasteKg}
+                    <Label className="text-xs">
+                      Waste (kg) <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={groupWasteKg}
                       onChange={(e) => setGroupWasteKg(e.target.value)}
-                      placeholder="0" className="h-8 text-sm font-medium" />
+                      placeholder="0"
+                      className="h-8 text-sm font-medium"
+                    />
                   </div>
                   <div className="space-y-1 col-span-2">
                     <Label className="text-xs">Remarks</Label>
-                    <Input value={groupRemarks} onChange={(e) => setGroupRemarks(e.target.value)}
-                      placeholder="Remarks…" className="h-8 text-sm" />
+                    <Input
+                      value={groupRemarks}
+                      onChange={(e) => setGroupRemarks(e.target.value)}
+                      placeholder="Remarks…"
+                      className="h-8 text-sm"
+                    />
                   </div>
                 </div>
               </div>
@@ -1206,65 +1472,88 @@ function WasteGrid() {
                   : "No machines found in selected group."}
               </div>
             )
+          ) : /* ── Individual mode: per-machine table ── */
+          rows.length === 0 ? (
+            <div className="p-6 text-sm text-muted-foreground text-center">
+              No machines in <strong>{department}</strong>. Add them in Masters → Machines.
+            </div>
           ) : (
-            /* ── Individual mode: per-machine table ── */
-            rows.length === 0 ? (
-              <div className="p-6 text-sm text-muted-foreground text-center">
-                No machines in <strong>{department}</strong>. Add them in Masters → Machines.
-              </div>
-            ) : (
-              <div className="w-full overflow-x-auto">
-                <Table className="min-w-[800px] w-full text-sm">
-                  <TableHeader>
-                    <TableRow className="bg-muted/40">
-                      <TableHead className="w-24 pl-4">Machine</TableHead>
-                      <TableHead className="w-36">Waste Type</TableHead>
-                      <TableHead className="w-32">Lot No</TableHead>
-                      <TableHead className="w-24">Ratio</TableHead>
-                      <TableHead className="w-28">Waste (kg) *</TableHead>
-                      <TableHead>Remarks</TableHead>
+            <div className="w-full overflow-x-auto">
+              <Table className="min-w-[800px] w-full text-sm">
+                <TableHeader>
+                  <TableRow className="bg-muted/40">
+                    <TableHead className="w-24 pl-4">Machine</TableHead>
+                    <TableHead className="w-36">Waste Type</TableHead>
+                    <TableHead className="w-32">Lot No</TableHead>
+                    <TableHead className="w-24">Ratio</TableHead>
+                    <TableHead className="w-28">Waste (kg) *</TableHead>
+                    <TableHead>Remarks</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((row, idx) => (
+                    <TableRow
+                      key={row.machineCode}
+                      className={Number(row.wasteKg) > 0 ? "bg-amber-50/50" : undefined}
+                    >
+                      <TableCell className="pl-4 font-mono text-xs font-medium">
+                        {row.machineCode}
+                      </TableCell>
+                      <TableCell className="relative">
+                        <Input
+                          value={row.wasteType}
+                          onChange={(e) => updateWasteRow(idx, "wasteType", e.target.value)}
+                          placeholder="e.g. Fly waste"
+                          className="h-7 text-xs w-full"
+                          list={`wt-suggestions-${idx}`}
+                          autoComplete="off"
+                        />
+                        <datalist id={`wt-suggestions-${idx}`}>
+                          {(wasteTypesQ.data?.types ?? []).map((t: string) => (
+                            <option key={t} value={t} />
+                          ))}
+                        </datalist>
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={row.lotNo}
+                          onChange={(e) => updateWasteRow(idx, "lotNo", e.target.value)}
+                          placeholder="e.g. L001"
+                          className="h-7 text-xs w-full"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={row.ratio}
+                          onChange={(e) => updateWasteRow(idx, "ratio", e.target.value)}
+                          placeholder="60:40"
+                          className="h-7 text-xs w-full"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={row.wasteKg}
+                          onChange={(e) => updateWasteRow(idx, "wasteKg", e.target.value)}
+                          placeholder="0"
+                          className="h-7 text-xs w-full"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={row.remarks}
+                          onChange={(e) => updateWasteRow(idx, "remarks", e.target.value)}
+                          placeholder="Remarks…"
+                          className="h-7 text-xs w-full"
+                        />
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((row, idx) => (
-                      <TableRow key={row.machineCode} className={Number(row.wasteKg) > 0 ? "bg-amber-50/50" : undefined}>
-                        <TableCell className="pl-4 font-mono text-xs font-medium">{row.machineCode}</TableCell>
-                        <TableCell className="relative">
-                          <Input
-                            value={row.wasteType}
-                            onChange={(e) => updateWasteRow(idx, "wasteType", e.target.value)}
-                            placeholder="e.g. Fly waste"
-                            className="h-7 text-xs w-full"
-                            list={`wt-suggestions-${idx}`}
-                            autoComplete="off"
-                          />
-                          <datalist id={`wt-suggestions-${idx}`}>
-                            {(wasteTypesQ.data?.types ?? []).map((t: string) => <option key={t} value={t} />)}
-                          </datalist>
-                        </TableCell>
-                        <TableCell>
-                          <Input value={row.lotNo} onChange={(e) => updateWasteRow(idx, "lotNo", e.target.value)}
-                            placeholder="e.g. L001" className="h-7 text-xs w-full" />
-                        </TableCell>
-                        <TableCell>
-                          <Input value={row.ratio} onChange={(e) => updateWasteRow(idx, "ratio", e.target.value)}
-                            placeholder="60:40" className="h-7 text-xs w-full" />
-                        </TableCell>
-                        <TableCell>
-                          <Input type="number" min={0} step="0.01" value={row.wasteKg}
-                            onChange={(e) => updateWasteRow(idx, "wasteKg", e.target.value)}
-                            placeholder="0" className="h-7 text-xs w-full" />
-                        </TableCell>
-                        <TableCell>
-                          <Input value={row.remarks} onChange={(e) => updateWasteRow(idx, "remarks", e.target.value)}
-                            placeholder="Remarks…" className="h-7 text-xs w-full" />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -1272,7 +1561,9 @@ function WasteGrid() {
       {pastEntries.length > 0 && (
         <Card>
           <CardHeader className="py-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm">Submitted Entries — {date} · {shift}</CardTitle>
+            <CardTitle className="text-sm">
+              Submitted Entries — {date} · {shift}
+            </CardTitle>
             <ExportMenu
               filename={`waste_entries_${date}_${shift}`}
               title="Waste Entries"
@@ -1311,8 +1602,12 @@ function WasteGrid() {
                       <TableCell className="text-xs">{e.lot_no || "—"}</TableCell>
                       <TableCell className="text-xs">{e.ratio || "—"}</TableCell>
                       <TableCell className="text-xs font-medium">{e.waste_kg} kg</TableCell>
-                      <TableCell><StatusBadge status={e.status} size="sm" /></TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{e.entered_by}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={e.status} size="sm" />
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {e.entered_by}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1330,19 +1625,25 @@ function WasteGrid() {
 // ─────────────────────────────────────────────────────────────────
 
 const STOP_CATEGORIES: Record<string, string> = {
-  normal:                  "Normal",
-  planned:                 "Planned",
-  breakdown_mechanical:    "Breakdown — Mechanical",
-  breakdown_electrical:    "Breakdown — Electrical",
-  production_change:       "Production Change",
-  quality:                 "Quality",
-  utility:                 "Utility",
-  misc:                    "Misc",
+  normal: "Normal",
+  planned: "Planned",
+  breakdown_mechanical: "Breakdown — Mechanical",
+  breakdown_electrical: "Breakdown — Electrical",
+  production_change: "Production Change",
+  quality: "Quality",
+  utility: "Utility",
+  misc: "Misc",
 };
 
 /** Auto-formats 4-digit input → HH:MM. Avoids slow native scroll picker. */
-function TimeInput({ value, onChange, className = "" }: {
-  value: string; onChange: (v: string) => void; className?: string;
+function TimeInput({
+  value,
+  onChange,
+  className = "",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  className?: string;
 }) {
   const handle = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/[^0-9]/g, "").slice(0, 4);
@@ -1350,8 +1651,12 @@ function TimeInput({ value, onChange, className = "" }: {
   };
   return (
     <input
-      type="text" inputMode="numeric" value={value} onChange={handle}
-      placeholder="HH:MM" maxLength={5}
+      type="text"
+      inputMode="numeric"
+      value={value}
+      onChange={handle}
+      placeholder="HH:MM"
+      maxLength={5}
       className={className}
     />
   );
@@ -1372,9 +1677,13 @@ type StopRow = {
 function makeStopRow(): StopRow {
   return {
     id: Math.random().toString(36).slice(2),
-    stop_from: "", stop_to: "", datalog_code: "",
-    codeSearch: "", showDropdown: false,
-    section: "", production_loss_kg: "",
+    stop_from: "",
+    stop_to: "",
+    datalog_code: "",
+    codeSearch: "",
+    showDropdown: false,
+    section: "",
+    production_loss_kg: "",
     dropdownPos: null,
   };
 }
@@ -1383,7 +1692,9 @@ function StoppageForm() {
   const qc = useQueryClient();
   const { millId } = useActiveMill();
   const today = new Date();
-  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
 
   // Mode: individual machine OR machine group
   const [stoppageMode, setStoppageMode] = useState<"individual" | "group">("individual");
@@ -1401,7 +1712,8 @@ function StoppageForm() {
   const setRowField = (id: string, field: keyof StopRow, value: any) =>
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
   const addRow = () => setRows((prev) => [...prev, makeStopRow()]);
-  const removeRow = (id: string) => setRows((prev) => prev.length > 1 ? prev.filter((r) => r.id !== id) : prev);
+  const removeRow = (id: string) =>
+    setRows((prev) => (prev.length > 1 ? prev.filter((r) => r.id !== id) : prev));
 
   // Mill masters
   const { data: millMasters } = useMillMasters();
@@ -1410,7 +1722,7 @@ function StoppageForm() {
     if (!department && deptOptions.length > 0) {
       const first = deptOptions[0];
       const name = typeof first === "string" ? first : first.name;
-      const id = typeof first === "string" ? null : (first.id || null);
+      const id = typeof first === "string" ? null : first.id || null;
       setDepartment(name);
       setDepartmentId(id);
     }
@@ -1438,17 +1750,27 @@ function StoppageForm() {
   // Machines — filtered by group OR department
   const machinesQ = useQuery({
     queryKey: ["machines", departmentId || department, millId, "stoppage", selectedGroupId],
-    queryFn: () => productionApi.getMachines(
-      selectedGroupId
-        ? { machine_group_ids: selectedGroupId, mill_id: millId, page_size: 1000, page: 1 }
-        : { ...(departmentId ? { department_id: departmentId } : { department }), mill_id: millId, page_size: 1000, page: 1 }
-    ),
+    queryFn: () =>
+      productionApi.getMachines(
+        selectedGroupId
+          ? { machine_group_ids: selectedGroupId, mill_id: millId, page_size: 1000, page: 1 }
+          : {
+              ...(departmentId ? { department_id: departmentId } : { department }),
+              mill_id: millId,
+              page_size: 1000,
+              page: 1,
+            },
+      ),
     staleTime: 60_000,
     enabled: !!millId && !!(selectedGroupId || departmentId || department),
   });
-  const machines = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[];
+  const machines = (
+    Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])
+  ) as any[];
 
-  useEffect(() => { setSelectedMachine(""); }, [department, selectedGroupId]);
+  useEffect(() => {
+    setSelectedMachine("");
+  }, [department, selectedGroupId]);
 
   // Stoppage log date range
   const [logDateFrom, setLogDateFrom] = useState(localDate);
@@ -1456,19 +1778,30 @@ function StoppageForm() {
 
   const stoppageLogQ = useQuery({
     queryKey: ["downtime", millId, logDateFrom, logDateTo],
-    queryFn: () => productionApi.getDowntimeLogs({ mill_id: millId, page_size: 500, date_from: logDateFrom, date_to: logDateTo }),
+    queryFn: () =>
+      productionApi.getDowntimeLogs({
+        mill_id: millId,
+        page_size: 500,
+        date_from: logDateFrom,
+        date_to: logDateTo,
+      }),
     staleTime: 20_000,
     enabled: !!millId,
   });
-  const stoppageLogs = (Array.isArray(stoppageLogQ.data) ? stoppageLogQ.data : (stoppageLogQ.data?.data ?? [])) as any[];
-  const todayTotal = useMemo(() => stoppageLogs.reduce((s: number, r: any) => s + (r.duration_min || 0), 0), [stoppageLogs]);
+  const stoppageLogs = (
+    Array.isArray(stoppageLogQ.data) ? stoppageLogQ.data : (stoppageLogQ.data?.data ?? [])
+  ) as any[];
+  const todayTotal = useMemo(
+    () => stoppageLogs.reduce((s: number, r: any) => s + (r.duration_min || 0), 0),
+    [stoppageLogs],
+  );
 
   // Helper: auto-calc minutes for a row
   const calcMin = (from: string, to: string) => {
     if (!from || !to) return null;
     const [fh, fm] = from.split(":").map(Number);
     const [th, tm] = to.split(":").map(Number);
-    const diff = (th * 60 + tm) - (fh * 60 + fm);
+    const diff = th * 60 + tm - (fh * 60 + fm);
     return diff > 0 ? diff : null;
   };
 
@@ -1484,40 +1817,51 @@ function StoppageForm() {
         machineCodes = [selectedMachine];
       } else {
         // Group mode: apply stoppage to all machines in the selected group
-        const groupMachines = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[];
+        const groupMachines = (
+          Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])
+        ) as any[];
         if (groupMachines.length === 0) throw new Error("No machines found in selected group");
         machineCodes = groupMachines.map((m: any) => m.code).filter(Boolean);
       }
 
       const calls = machineCodes.flatMap((machine_code) =>
         validRows.map((r) =>
-          productionApi.logDatalogDowntime({
-            machine_code,
-            datalog_code: Number(r.datalog_code),
-            stop_from: r.stop_from || undefined,
-            stop_to: r.stop_to || undefined,
-            date, shift,
-            production_loss_kg: r.production_loss_kg ? Number(r.production_loss_kg) : 0,
-            remarks: r.section || undefined,
-          }, millId ?? "")
-        )
+          productionApi.logDatalogDowntime(
+            {
+              machine_code,
+              datalog_code: Number(r.datalog_code),
+              stop_from: r.stop_from || undefined,
+              stop_to: r.stop_to || undefined,
+              date,
+              shift,
+              production_loss_kg: r.production_loss_kg ? Number(r.production_loss_kg) : 0,
+              remarks: r.section || undefined,
+            },
+            millId ?? "",
+          ),
+        ),
       );
       const results = await Promise.allSettled(calls);
       const succeeded = results.filter((r) => r.status === "fulfilled").length;
       const failedResults = results.filter((r) => r.status === "rejected");
       if (succeeded === 0 && failedResults.length > 0) {
         const firstErr = (failedResults[0] as PromiseRejectedResult).reason;
-        throw new Error(firstErr?.response?.data?.detail || `All ${failedResults.length} row(s) failed to save`);
+        throw new Error(
+          firstErr?.response?.data?.detail || `All ${failedResults.length} row(s) failed to save`,
+        );
       }
       return { total: succeeded, failed: failedResults.length, machines: machineCodes.length };
     },
     onSuccess: ({ total, failed, machines }) => {
-      const label = stoppageMode === "group"
-        ? `${total} stoppages logged across ${machines} machines`
-        : `${total} stoppage${total !== 1 ? "s" : ""} saved for ${selectedMachine}`;
+      const label =
+        stoppageMode === "group"
+          ? `${total} stoppages logged across ${machines} machines`
+          : `${total} stoppage${total !== 1 ? "s" : ""} saved for ${selectedMachine}`;
       toast.success(label);
       if (failed > 0) {
-        toast.warning(`${failed} row(s) could not be saved — they may already exist or the machine was not found.`);
+        toast.warning(
+          `${failed} row(s) could not be saved — they may already exist or the machine was not found.`,
+        );
       }
       setRows([makeStopRow()]);
       qc.invalidateQueries({ queryKey: ["downtime"] });
@@ -1540,20 +1884,29 @@ function StoppageForm() {
           <div className="flex items-center gap-3">
             {todayTotal > 0 && (
               <span className="text-xs text-muted-foreground bg-muted/50 rounded px-2 py-1">
-                Today: <strong>{stoppageLogs.length} stops · {todayTotal} min total</strong>
+                Today:{" "}
+                <strong>
+                  {stoppageLogs.length} stops · {todayTotal} min total
+                </strong>
               </span>
             )}
             {/* Mode toggle */}
             <div className="flex rounded-md border overflow-hidden text-xs">
               <button
                 className={`px-3 py-1.5 font-medium transition-colors ${stoppageMode === "individual" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
-                onClick={() => { setStoppageMode("individual"); setSelectedGroupId(""); }}
+                onClick={() => {
+                  setStoppageMode("individual");
+                  setSelectedGroupId("");
+                }}
               >
                 Individual
               </button>
               <button
                 className={`px-3 py-1.5 font-medium transition-colors border-l ${stoppageMode === "group" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
-                onClick={() => { setStoppageMode("group"); setSelectedMachine(""); }}
+                onClick={() => {
+                  setStoppageMode("group");
+                  setSelectedMachine("");
+                }}
               >
                 Machine Group
               </button>
@@ -1561,17 +1914,23 @@ function StoppageForm() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-
           {/* ── Header: Date / Shift / Department ── */}
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Date</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-8 text-sm" />
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="h-8 text-sm"
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Shift</Label>
               <Select value={shift} onValueChange={(v) => setShift(v as "A" | "B" | "C")}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="A">A — Morning</SelectItem>
                   <SelectItem value="B">B — Afternoon</SelectItem>
@@ -1581,17 +1940,28 @@ function StoppageForm() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Department</Label>
-              <Select value={department} onValueChange={(v) => {
-                setDepartment(v);
-                setSelectedGroupId("");
-                const d = deptOptions.find((x: any) => (typeof x === "string" ? x : x.name) === v);
-                setDepartmentId(d && typeof d !== "string" ? (d.id || null) : null);
-              }}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select dept" /></SelectTrigger>
+              <Select
+                value={department}
+                onValueChange={(v) => {
+                  setDepartment(v);
+                  setSelectedGroupId("");
+                  const d = deptOptions.find(
+                    (x: any) => (typeof x === "string" ? x : x.name) === v,
+                  );
+                  setDepartmentId(d && typeof d !== "string" ? d.id || null : null);
+                }}
+              >
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Select dept" />
+                </SelectTrigger>
                 <SelectContent>
                   {deptOptions.map((d: any) => {
                     const name = typeof d === "string" ? d : d.name;
-                    return <SelectItem key={name} value={name}>{name}</SelectItem>;
+                    return (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    );
                   })}
                 </SelectContent>
               </Select>
@@ -1611,7 +1981,10 @@ function StoppageForm() {
                     </Label>
                     <Select
                       value={selectedGroupId || "_all"}
-                      onValueChange={(v) => { setSelectedGroupId(v === "_all" ? "" : v); setSelectedMachine(""); }}
+                      onValueChange={(v) => {
+                        setSelectedGroupId(v === "_all" ? "" : v);
+                        setSelectedMachine("");
+                      }}
                     >
                       <SelectTrigger className="h-8 text-sm w-64">
                         <SelectValue placeholder="— All machines in department —" />
@@ -1619,7 +1992,9 @@ function StoppageForm() {
                       <SelectContent>
                         <SelectItem value="_all">— All machines in department —</SelectItem>
                         {machineGroups.map((g) => (
-                          <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1630,18 +2005,37 @@ function StoppageForm() {
                 <div className="flex-1 space-y-1.5">
                   <Label className="text-xs font-semibold">
                     Machine <span className="text-destructive">*</span>
-                    {department && <span className="text-muted-foreground font-normal ml-1">({department})</span>}
+                    {department && (
+                      <span className="text-muted-foreground font-normal ml-1">({department})</span>
+                    )}
                   </Label>
-                  <Select value={selectedMachine} onValueChange={setSelectedMachine} disabled={!department && !selectedGroupId}>
+                  <Select
+                    value={selectedMachine}
+                    onValueChange={setSelectedMachine}
+                    disabled={!department && !selectedGroupId}
+                  >
                     <SelectTrigger className="h-9 text-sm border-primary/40 font-medium">
-                      <SelectValue placeholder={department || selectedGroupId ? "Select machine to log stoppages…" : "Select a department first"} />
+                      <SelectValue
+                        placeholder={
+                          department || selectedGroupId
+                            ? "Select machine to log stoppages…"
+                            : "Select a department first"
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {machines.length === 0
-                        ? <SelectItem value="_none" disabled>No machines found</SelectItem>
-                        : machines.map((m: any) => (
-                            <SelectItem key={m.code} value={m.code}>{m.code}{m.name ? ` — ${m.name}` : ""}</SelectItem>
-                          ))}
+                      {machines.length === 0 ? (
+                        <SelectItem value="_none" disabled>
+                          No machines found
+                        </SelectItem>
+                      ) : (
+                        machines.map((m: any) => (
+                          <SelectItem key={m.code} value={m.code}>
+                            {m.code}
+                            {m.name ? ` — ${m.name}` : ""}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1658,21 +2052,26 @@ function StoppageForm() {
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">
                   Machine Group <span className="text-destructive">*</span>
-                  <span className="text-muted-foreground font-normal ml-1 text-[10px]">(stoppage will be logged for all machines in this group)</span>
+                  <span className="text-muted-foreground font-normal ml-1 text-[10px]">
+                    (stoppage will be logged for all machines in this group)
+                  </span>
                 </Label>
-                <Select
-                  value={selectedGroupId || ""}
-                  onValueChange={(v) => setSelectedGroupId(v)}
-                >
+                <Select value={selectedGroupId || ""} onValueChange={(v) => setSelectedGroupId(v)}>
                   <SelectTrigger className="h-9 text-sm border-primary/40 font-medium">
                     <SelectValue placeholder="Select machine group…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {machineGroups.length === 0
-                      ? <SelectItem value="_none" disabled>No machine groups configured</SelectItem>
-                      : machineGroups.map((g) => (
-                          <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
-                        ))}
+                    {machineGroups.length === 0 ? (
+                      <SelectItem value="_none" disabled>
+                        No machine groups configured
+                      </SelectItem>
+                    ) : (
+                      machineGroups.map((g) => (
+                        <SelectItem key={g.id} value={g.id}>
+                          {g.name}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -1680,10 +2079,14 @@ function StoppageForm() {
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   <span className="text-xs text-muted-foreground">Will log for:</span>
                   {machines.slice(0, 12).map((m: any) => (
-                    <span key={m.code} className="text-xs bg-muted rounded px-1.5 py-0.5 font-mono">{m.code}</span>
+                    <span key={m.code} className="text-xs bg-muted rounded px-1.5 py-0.5 font-mono">
+                      {m.code}
+                    </span>
                   ))}
                   {machines.length > 12 && (
-                    <span className="text-xs text-muted-foreground">+{machines.length - 12} more</span>
+                    <span className="text-xs text-muted-foreground">
+                      +{machines.length - 12} more
+                    </span>
                   )}
                 </div>
               )}
@@ -1700,40 +2103,63 @@ function StoppageForm() {
                       <th className="text-left px-2 py-1.5 font-medium border-b w-[88px]">From</th>
                       <th className="text-left px-2 py-1.5 font-medium border-b w-[88px]">To</th>
                       <th className="text-center px-2 py-1.5 font-medium border-b w-[52px]">Min</th>
-                      <th className="text-left px-2 py-1.5 font-medium border-b min-w-[180px]">Stop Code <span className="text-destructive">*</span></th>
-                      <th className="text-left px-2 py-1.5 font-medium border-b w-[88px]">Section</th>
-                      <th className="text-left px-2 py-1.5 font-medium border-b w-[80px]">Loss (kg)</th>
+                      <th className="text-left px-2 py-1.5 font-medium border-b min-w-[180px]">
+                        Stop Code <span className="text-destructive">*</span>
+                      </th>
+                      <th className="text-left px-2 py-1.5 font-medium border-b w-[88px]">
+                        Section
+                      </th>
+                      <th className="text-left px-2 py-1.5 font-medium border-b w-[80px]">
+                        Loss (kg)
+                      </th>
                       <th className="border-b w-[28px]" />
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((row, idx) => {
                       const min = calcMin(row.stop_from, row.stop_to);
-                      const selectedCode = stopCodes.find((c: any) => String(c.code) === row.datalog_code);
+                      const selectedCode = stopCodes.find(
+                        (c: any) => String(c.code) === row.datalog_code,
+                      );
                       const filteredCodes = stopCodes
                         .filter((c: any) => {
                           const q = row.codeSearch.toLowerCase();
-                          return !q || String(c.code).includes(q) || (c.name ?? "").toLowerCase().includes(q);
+                          return (
+                            !q ||
+                            String(c.code).includes(q) ||
+                            (c.name ?? "").toLowerCase().includes(q)
+                          );
                         })
                         .slice(0, 8);
 
                       return (
-                        <tr key={row.id} className={idx % 2 === 0 ? "bg-background" : "bg-muted/20"}>
+                        <tr
+                          key={row.id}
+                          className={idx % 2 === 0 ? "bg-background" : "bg-muted/20"}
+                        >
                           {/* From */}
                           <td className="px-1.5 py-1 border-b">
-                            <TimeInput value={row.stop_from}
+                            <TimeInput
+                              value={row.stop_from}
                               onChange={(v) => setRowField(row.id, "stop_from", v)}
-                              className="w-full h-7 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                              className="w-full h-7 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                            />
                           </td>
                           {/* To */}
                           <td className="px-1.5 py-1 border-b">
-                            <TimeInput value={row.stop_to}
+                            <TimeInput
+                              value={row.stop_to}
                               onChange={(v) => setRowField(row.id, "stop_to", v)}
-                              className="w-full h-7 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                              className="w-full h-7 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                            />
                           </td>
                           {/* Min (auto) */}
                           <td className="px-1.5 py-1 border-b text-center">
-                            <span className={min ? "font-semibold text-amber-600" : "text-muted-foreground"}>
+                            <span
+                              className={
+                                min ? "font-semibold text-amber-600" : "text-muted-foreground"
+                              }
+                            >
                               {min ?? "—"}
                             </span>
                           </td>
@@ -1742,11 +2168,22 @@ function StoppageForm() {
                             <div className="relative">
                               {selectedCode ? (
                                 <div className="flex items-center gap-1 h-7 px-2 rounded border border-primary/40 bg-primary/5 text-xs">
-                                  <span className="font-mono font-bold text-primary shrink-0">[{selectedCode.code}]</span>
-                                  <span className="truncate text-muted-foreground">{selectedCode.name}</span>
-                                  <button type="button"
-                                    onClick={() => { setRowField(row.id, "datalog_code", ""); setRowField(row.id, "codeSearch", ""); }}
-                                    className="ml-auto text-muted-foreground hover:text-destructive shrink-0 text-base leading-none">×</button>
+                                  <span className="font-mono font-bold text-primary shrink-0">
+                                    [{selectedCode.code}]
+                                  </span>
+                                  <span className="truncate text-muted-foreground">
+                                    {selectedCode.name}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setRowField(row.id, "datalog_code", "");
+                                      setRowField(row.id, "codeSearch", "");
+                                    }}
+                                    className="ml-auto text-muted-foreground hover:text-destructive shrink-0 text-base leading-none"
+                                  >
+                                    ×
+                                  </button>
                                 </div>
                               ) : (
                                 <>
@@ -1754,13 +2191,25 @@ function StoppageForm() {
                                     type="text"
                                     value={row.codeSearch}
                                     placeholder="Type code or name…"
-                                    onChange={(e) => { setRowField(row.id, "codeSearch", e.target.value); setRowField(row.id, "showDropdown", true); }}
-                                    onFocus={(e) => {
-                                      const rect = e.currentTarget.getBoundingClientRect();
-                                      setRowField(row.id, "dropdownPos", { top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 260) });
+                                    onChange={(e) => {
+                                      setRowField(row.id, "codeSearch", e.target.value);
                                       setRowField(row.id, "showDropdown", true);
                                     }}
-                                    onBlur={() => setTimeout(() => setRowField(row.id, "showDropdown", false), 200)}
+                                    onFocus={(e) => {
+                                      const rect = e.currentTarget.getBoundingClientRect();
+                                      setRowField(row.id, "dropdownPos", {
+                                        top: rect.bottom + 4,
+                                        left: rect.left,
+                                        width: Math.max(rect.width, 260),
+                                      });
+                                      setRowField(row.id, "showDropdown", true);
+                                    }}
+                                    onBlur={() =>
+                                      setTimeout(
+                                        () => setRowField(row.id, "showDropdown", false),
+                                        200,
+                                      )
+                                    }
                                     onKeyDown={(e) => {
                                       if (e.key === "Enter" && filteredCodes.length > 0) {
                                         const top = filteredCodes[0];
@@ -1772,57 +2221,90 @@ function StoppageForm() {
                                     }}
                                     className="w-full h-7 rounded border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                                   />
-                                  {row.showDropdown && row.dropdownPos && createPortal(
-                                    <div style={{
-                                      position: "fixed",
-                                      top: row.dropdownPos.top,
-                                      left: row.dropdownPos.left,
-                                      width: row.dropdownPos.width,
-                                      zIndex: 9999,
-                                    }} className="bg-popover border rounded-md shadow-lg overflow-hidden">
-                                      {stopCodesQ.isLoading ? (
-                                        <div className="px-3 py-2 text-xs text-muted-foreground">Loading…</div>
-                                      ) : filteredCodes.length === 0 ? (
-                                        <div className="px-3 py-2 text-xs text-muted-foreground">No codes match — type a code number or name</div>
-                                      ) : filteredCodes.map((c: any) => (
-                                        <button key={c.code} type="button"
-                                          onMouseDown={(e) => {
-                                            e.preventDefault();
-                                            setRowField(row.id, "datalog_code", String(c.code));
-                                            setRowField(row.id, "codeSearch", "");
-                                            setRowField(row.id, "showDropdown", false);
-                                          }}
-                                          className="w-full text-left px-3 py-2 text-xs hover:bg-accent flex items-center gap-2 cursor-pointer">
-                                          <span className="font-mono font-bold text-primary w-8 shrink-0">{c.code}</span>
-                                          <span className="text-foreground truncate">{c.name}</span>
-                                        </button>
-                                      ))}
-                                    </div>,
-                                    document.body
-                                  )}
+                                  {row.showDropdown &&
+                                    row.dropdownPos &&
+                                    createPortal(
+                                      <div
+                                        style={{
+                                          position: "fixed",
+                                          top: row.dropdownPos.top,
+                                          left: row.dropdownPos.left,
+                                          width: row.dropdownPos.width,
+                                          zIndex: 9999,
+                                        }}
+                                        className="bg-popover border rounded-md shadow-lg overflow-hidden"
+                                      >
+                                        {stopCodesQ.isLoading ? (
+                                          <div className="px-3 py-2 text-xs text-muted-foreground">
+                                            Loading…
+                                          </div>
+                                        ) : filteredCodes.length === 0 ? (
+                                          <div className="px-3 py-2 text-xs text-muted-foreground">
+                                            No codes match — type a code number or name
+                                          </div>
+                                        ) : (
+                                          filteredCodes.map((c: any) => (
+                                            <button
+                                              key={c.code}
+                                              type="button"
+                                              onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                setRowField(row.id, "datalog_code", String(c.code));
+                                                setRowField(row.id, "codeSearch", "");
+                                                setRowField(row.id, "showDropdown", false);
+                                              }}
+                                              className="w-full text-left px-3 py-2 text-xs hover:bg-accent flex items-center gap-2 cursor-pointer"
+                                            >
+                                              <span className="font-mono font-bold text-primary w-8 shrink-0">
+                                                {c.code}
+                                              </span>
+                                              <span className="text-foreground truncate">
+                                                {c.name}
+                                              </span>
+                                            </button>
+                                          ))
+                                        )}
+                                      </div>,
+                                      document.body,
+                                    )}
                                 </>
                               )}
                             </div>
                           </td>
                           {/* Section */}
                           <td className="px-1.5 py-1 border-b">
-                            <input type="text" value={row.section}
+                            <input
+                              type="text"
+                              value={row.section}
                               onChange={(e) => setRowField(row.id, "section", e.target.value)}
                               placeholder="e.g. A1"
-                              className="w-full h-7 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                              className="w-full h-7 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                            />
                           </td>
                           {/* Loss */}
                           <td className="px-1.5 py-1 border-b">
-                            <input type="number" min={0} step="0.01" value={row.production_loss_kg}
-                              onChange={(e) => setRowField(row.id, "production_loss_kg", e.target.value)}
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={row.production_loss_kg}
+                              onChange={(e) =>
+                                setRowField(row.id, "production_loss_kg", e.target.value)
+                              }
                               placeholder="0"
-                              className="w-full h-7 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+                              className="w-full h-7 rounded border border-input bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                            />
                           </td>
                           {/* Delete row */}
                           <td className="px-1 py-1 border-b text-center">
-                            <button type="button" onClick={() => removeRow(row.id)}
+                            <button
+                              type="button"
+                              onClick={() => removeRow(row.id)}
                               disabled={rows.length === 1}
-                              className="text-muted-foreground hover:text-destructive disabled:opacity-20 px-1 text-base leading-none">×</button>
+                              className="text-muted-foreground hover:text-destructive disabled:opacity-20 px-1 text-base leading-none"
+                            >
+                              ×
+                            </button>
                           </td>
                         </tr>
                       );
@@ -1833,7 +2315,13 @@ function StoppageForm() {
 
               {/* Actions row */}
               <div className="flex items-center justify-between gap-3">
-                <Button type="button" variant="outline" size="sm" onClick={addRow} className="gap-1.5 text-xs h-8">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addRow}
+                  className="gap-1.5 text-xs h-8"
+                >
                   <Plus className="size-3.5" />
                   Add Row
                 </Button>
@@ -1851,8 +2339,12 @@ function StoppageForm() {
           ) : (
             <div className="text-center py-8 text-sm text-muted-foreground">
               {stoppageMode === "group"
-                ? (!selectedGroupId ? "Select a machine group above to log stoppages" : "Add rows above and click Save All")
-                : (!department ? "Select a department above to get started" : "Select a machine above to log stoppages")}
+                ? !selectedGroupId
+                  ? "Select a machine group above to log stoppages"
+                  : "Add rows above and click Save All"
+                : !department
+                  ? "Select a department above to get started"
+                  : "Select a machine above to log stoppages"}
             </div>
           )}
         </CardContent>
@@ -1876,7 +2368,10 @@ function StoppageForm() {
         />
         {(logDateFrom !== localDate || logDateTo !== localDate) && (
           <button
-            onClick={() => { setLogDateFrom(localDate); setLogDateTo(localDate); }}
+            onClick={() => {
+              setLogDateFrom(localDate);
+              setLogDateTo(localDate);
+            }}
             className="text-xs text-muted-foreground underline hover:text-foreground"
           >
             Reset to today
@@ -1888,20 +2383,40 @@ function StoppageForm() {
       {stoppageLogs.length > 0 && (
         <Card>
           <CardHeader className="py-3 flex flex-row items-center justify-between">
-            <CardTitle className="text-sm">Stoppage Log ({stoppageLogs.length} entries · {todayTotal} min)</CardTitle>
+            <CardTitle className="text-sm">
+              Stoppage Log ({stoppageLogs.length} entries · {todayTotal} min)
+            </CardTitle>
             <ExportMenu
               filename={`stoppage_log_${logDateFrom}_${logDateTo}`}
               title="Stoppage Log"
-              subtitle={logDateFrom === logDateTo ? `Date: ${logDateFrom}` : `Date: ${logDateFrom} to ${logDateTo}`}
+              subtitle={
+                logDateFrom === logDateTo
+                  ? `Date: ${logDateFrom}`
+                  : `Date: ${logDateFrom} to ${logDateTo}`
+              }
               columns={[
                 { key: "machine_code", label: "Machine" },
                 { key: "datalog_code", label: "Code" },
                 { key: "reason", label: "Reason" },
-                { key: "started_at", label: "From", format: (v) => v ? new Date(v).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "" },
-                { key: "ended_at", label: "To", format: (v) => v ? new Date(v).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "" },
+                {
+                  key: "started_at",
+                  label: "From",
+                  format: (v) =>
+                    v
+                      ? new Date(v).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                      : "",
+                },
+                {
+                  key: "ended_at",
+                  label: "To",
+                  format: (v) =>
+                    v
+                      ? new Date(v).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                      : "",
+                },
                 { key: "duration_min", label: "Min" },
                 { key: "production_loss_kg", label: "Loss (kg)" },
-                { key: "resolved", label: "Status", format: (v) => v ? "Done" : "Open" },
+                { key: "resolved", label: "Status", format: (v) => (v ? "Done" : "Open") },
               ]}
               rows={stoppageLogs}
             />
@@ -1925,14 +2440,42 @@ function StoppageForm() {
                 <TableBody>
                   {stoppageLogs.map((r: any) => (
                     <TableRow key={r.id}>
-                      <TableCell className="pl-4 font-mono text-xs font-medium">{r.machine_code}</TableCell>
-                      <TableCell className="text-xs font-mono text-muted-foreground">{r.datalog_code ?? "—"}</TableCell>
+                      <TableCell className="pl-4 font-mono text-xs font-medium">
+                        {r.machine_code}
+                      </TableCell>
+                      <TableCell className="text-xs font-mono text-muted-foreground">
+                        {r.datalog_code ?? "—"}
+                      </TableCell>
                       <TableCell className="text-xs">{r.reason ?? r.code_name ?? "—"}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.started_at ? new Date(r.started_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{r.ended_at ? new Date(r.ended_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</TableCell>
-                      <TableCell className="text-xs font-medium text-amber-600">{r.duration_min ?? "—"}</TableCell>
-                      <TableCell className="text-xs">{r.production_loss_kg ? `${r.production_loss_kg} kg` : "—"}</TableCell>
-                      <TableCell><StatusBadge status={r.resolved ? "active" : "pending"} label={r.resolved ? "Done" : "Open"} size="sm" /></TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.started_at
+                          ? new Date(r.started_at).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.ended_at
+                          ? new Date(r.ended_at).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-xs font-medium text-amber-600">
+                        {r.duration_min ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {r.production_loss_kg ? `${r.production_loss_kg} kg` : "—"}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge
+                          status={r.resolved ? "active" : "pending"}
+                          label={r.resolved ? "Done" : "Open"}
+                          size="sm"
+                        />
+                      </TableCell>
                       <TableCell>
                         <ConfirmDeleteButton
                           onConfirm={async () => {
@@ -1963,16 +2506,16 @@ function StoppageForm() {
 
 // Declared outside component to avoid infinite useEffect loop (stable reference)
 const RF_DEFAULT_CATEGORIES = [
-  { id: "line_man",              category: "line_man",              label: "Line Man" },
-  { id: "doffer",                category: "doffer",                label: "Doffer" },
-  { id: "house_keeper",          category: "house_keeper",          label: "House Keeper" },
-  { id: "pneumafil_collection",  category: "pneumafil_collection",  label: "Pneumafil Collection" },
-  { id: "floor_cleaner",         category: "floor_cleaner",         label: "Floor Cleaner" },
-  { id: "gripperman",            category: "gripperman",            label: "Gripperman" },
-  { id: "cope_carrier",          category: "cope_carrier",          label: "Cope Carrier" },
-  { id: "robo_doffer",           category: "robo_doffer",           label: "Robo Doffer" },
-  { id: "roving_carrier",        category: "roving_carrier",        label: "Roving Carrier" },
-  { id: "maintenance_assi",      category: "maintenance_assi",      label: "Maintenance Assistant" },
+  { id: "line_man", category: "line_man", label: "Line Man" },
+  { id: "doffer", category: "doffer", label: "Doffer" },
+  { id: "house_keeper", category: "house_keeper", label: "House Keeper" },
+  { id: "pneumafil_collection", category: "pneumafil_collection", label: "Pneumafil Collection" },
+  { id: "floor_cleaner", category: "floor_cleaner", label: "Floor Cleaner" },
+  { id: "gripperman", category: "gripperman", label: "Gripperman" },
+  { id: "cope_carrier", category: "cope_carrier", label: "Cope Carrier" },
+  { id: "robo_doffer", category: "robo_doffer", label: "Robo Doffer" },
+  { id: "roving_carrier", category: "roving_carrier", label: "Roving Carrier" },
+  { id: "maintenance_assi", category: "maintenance_assi", label: "Maintenance Assistant" },
 ];
 
 type ManpowerRow = {
@@ -1987,16 +2530,27 @@ type ManpowerRow = {
 
 function buildManpowerRows(categories: { category: string; label: string }[]): ManpowerRow[] {
   return categories.map((c) => ({
-    category: c.category, categoryLabel: c.label,
-    mcIdFrom: "", mcIdTo: "", totalMachines: "", headcount: "", supervisor: "",
+    category: c.category,
+    categoryLabel: c.label,
+    mcIdFrom: "",
+    mcIdTo: "",
+    totalMachines: "",
+    headcount: "",
+    supervisor: "",
   }));
 }
 
 // ── ManpowerCategoryEditor — inline add/edit/delete categories per dept ──────
 
 function ManpowerCategoryEditor({
-  department, millId, onClose,
-}: { department: string; millId: string; onClose: () => void }) {
+  department,
+  millId,
+  onClose,
+}: {
+  department: string;
+  millId: string;
+  onClose: () => void;
+}) {
   const qc = useQueryClient();
   const [newLabel, setNewLabel] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
@@ -2008,48 +2562,79 @@ function ManpowerCategoryEditor({
     staleTime: 0,
     enabled: !!millId && !!department,
   });
-  const cats = ((catQ.data?.data ?? []).length > 0
-    ? catQ.data?.data
-    : RF_DEFAULT_CATEGORIES
-  ) as { id: string; category: string; label: string }[];
+  const cats = ((catQ.data?.data ?? []).length > 0 ? catQ.data?.data : RF_DEFAULT_CATEGORIES) as {
+    id: string;
+    category: string;
+    label: string;
+  }[];
 
   const addMut = useMutation({
     mutationFn: (label: string) => {
-      const category = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/, "");
-      return productionApi.createManpowerCategory({ department, category, label, sort_order: cats.length }, millId);
+      const category = label
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_|_$/, "");
+      return productionApi.createManpowerCategory(
+        { department, category, label, sort_order: cats.length },
+        millId,
+      );
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["manpower-categories"] }); setNewLabel(""); toast.success("Category added"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["manpower-categories"] });
+      setNewLabel("");
+      toast.success("Category added");
+    },
     onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to add"),
   });
 
   const updateMut = useMutation({
     mutationFn: ({ id, label }: { id: string; label: string }) =>
       productionApi.updateManpowerCategory(id, { label }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["manpower-categories"] }); setEditId(null); toast.success("Updated"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["manpower-categories"] });
+      setEditId(null);
+      toast.success("Updated");
+    },
     onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to update"),
   });
 
   const deleteMut = useMutation({
     mutationFn: (id: string) => productionApi.deleteManpowerCategory(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["manpower-categories"] }); toast.success("Removed"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["manpower-categories"] });
+      toast.success("Removed");
+    },
     onError: (e: any) => toast.error(e?.response?.data?.detail || "Failed to delete"),
   });
 
   const seedMut = useMutation({
-    mutationFn: () => productionApi.getManpowerCategories({ mill_id: millId, department, seed: true }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["manpower-categories"] }); toast.success("Default categories seeded"); },
+    mutationFn: () =>
+      productionApi.getManpowerCategories({ mill_id: millId, department, seed: true }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["manpower-categories"] });
+      toast.success("Default categories seeded");
+    },
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-background rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="bg-background rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <div>
             <p className="font-semibold text-sm">Manpower Categories</p>
             <p className="text-xs text-muted-foreground">{department}</p>
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1 rounded">
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground p-1 rounded"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -2061,43 +2646,69 @@ function ManpowerCategoryEditor({
           ) : cats.length === 0 ? (
             <div className="p-4 text-sm text-muted-foreground text-center">
               No categories yet.{" "}
-              <button onClick={() => seedMut.mutate()} className="text-primary underline">Seed defaults</button>
+              <button onClick={() => seedMut.mutate()} className="text-primary underline">
+                Seed defaults
+              </button>
             </div>
-          ) : cats.map((cat) => (
-            <div key={cat.id} className="flex items-center gap-2 px-4 py-2.5">
-              {editId === cat.id ? (
-                <>
-                  <Input
-                    value={editLabel}
-                    onChange={(e) => setEditLabel(e.target.value)}
-                    className="h-7 text-sm flex-1"
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") updateMut.mutate({ id: cat.id, label: editLabel });
-                      if (e.key === "Escape") setEditId(null);
-                    }}
-                  />
-                  <Button size="sm" variant="default" className="h-7 px-2 text-xs"
-                    onClick={() => updateMut.mutate({ id: cat.id, label: editLabel })}
-                    disabled={updateMut.isPending}>Save</Button>
-                  <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setEditId(null)}>✕</Button>
-                </>
-              ) : (
-                <>
-                  <span className="flex-1 text-sm">{cat.label}</span>
-                  <button onClick={() => { setEditId(cat.id); setEditLabel(cat.label); }}
-                    className="text-muted-foreground hover:text-foreground p-1 rounded">
-                    <Pencil className="size-3.5" />
-                  </button>
-                  <button onClick={() => { if (confirm(`Remove "${cat.label}"?`)) deleteMut.mutate(cat.id); }}
-                    className="text-muted-foreground hover:text-destructive p-1 rounded"
-                    disabled={deleteMut.isPending}>
-                    <Trash2 className="size-3.5" />
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
+          ) : (
+            cats.map((cat) => (
+              <div key={cat.id} className="flex items-center gap-2 px-4 py-2.5">
+                {editId === cat.id ? (
+                  <>
+                    <Input
+                      value={editLabel}
+                      onChange={(e) => setEditLabel(e.target.value)}
+                      className="h-7 text-sm flex-1"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") updateMut.mutate({ id: cat.id, label: editLabel });
+                        if (e.key === "Escape") setEditId(null);
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => updateMut.mutate({ id: cat.id, label: editLabel })}
+                      disabled={updateMut.isPending}
+                    >
+                      Save
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setEditId(null)}
+                    >
+                      ✕
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <span className="flex-1 text-sm">{cat.label}</span>
+                    <button
+                      onClick={() => {
+                        setEditId(cat.id);
+                        setEditLabel(cat.label);
+                      }}
+                      className="text-muted-foreground hover:text-foreground p-1 rounded"
+                    >
+                      <Pencil className="size-3.5" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm(`Remove "${cat.label}"?`)) deleteMut.mutate(cat.id);
+                      }}
+                      className="text-muted-foreground hover:text-destructive p-1 rounded"
+                      disabled={deleteMut.isPending}
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
+            ))
+          )}
         </div>
 
         {/* Add new */}
@@ -2108,17 +2719,28 @@ function ManpowerCategoryEditor({
               onChange={(e) => setNewLabel(e.target.value)}
               placeholder="New category name…"
               className="h-8 text-sm flex-1"
-              onKeyDown={(e) => { if (e.key === "Enter" && newLabel.trim()) addMut.mutate(newLabel.trim()); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newLabel.trim()) addMut.mutate(newLabel.trim());
+              }}
             />
-            <Button size="sm" onClick={() => newLabel.trim() && addMut.mutate(newLabel.trim())}
-              disabled={addMut.isPending || !newLabel.trim()}>
+            <Button
+              size="sm"
+              onClick={() => newLabel.trim() && addMut.mutate(newLabel.trim())}
+              disabled={addMut.isPending || !newLabel.trim()}
+            >
               <Plus className="size-3.5 mr-1" /> Add
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
             Changes apply only to <strong>{department}</strong>.
             {cats === RF_DEFAULT_CATEGORIES && (
-              <> Using defaults. <button onClick={() => seedMut.mutate()} className="text-primary underline ml-1">Save to DB</button></>
+              <>
+                {" "}
+                Using defaults.{" "}
+                <button onClick={() => seedMut.mutate()} className="text-primary underline ml-1">
+                  Save to DB
+                </button>
+              </>
             )}
           </p>
         </div>
@@ -2131,7 +2753,9 @@ function ManpowerGrid() {
   const qc = useQueryClient();
   const { millId } = useActiveMill();
   const today = new Date();
-  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
   const [date, setDate] = useState(localDate);
   const [shift, setShift] = useState<"A" | "B" | "C">("A");
   const [department, setDepartment] = useState<string>("");
@@ -2147,10 +2771,12 @@ function ManpowerGrid() {
 
   useEffect(() => {
     if (!department && deptOptions.length > 0) {
-      const rfDept = deptOptions.find((d: any) => (typeof d === "string" ? d : d.name).toLowerCase().includes("ring"));
+      const rfDept = deptOptions.find((d: any) =>
+        (typeof d === "string" ? d : d.name).toLowerCase().includes("ring"),
+      );
       const first = rfDept ?? deptOptions[0];
       const name = typeof first === "string" ? first : first.name;
-      const id = typeof first === "string" ? null : (first.id || null);
+      const id = typeof first === "string" ? null : first.id || null;
       setDepartment(name);
       setDepartmentId(id);
     }
@@ -2168,15 +2794,23 @@ function ManpowerGrid() {
   // Machines for dept / group
   const mpMachinesQ = useQuery({
     queryKey: ["machines", departmentId || department, millId, "manpower", selectedGroupId],
-    queryFn: () => productionApi.getMachines(
-      selectedGroupId
-        ? { machine_group_ids: selectedGroupId, mill_id: millId, page_size: 1000, page: 1 }
-        : { ...(departmentId ? { department_id: departmentId } : { department }), mill_id: millId, page_size: 1000, page: 1 }
-    ),
+    queryFn: () =>
+      productionApi.getMachines(
+        selectedGroupId
+          ? { machine_group_ids: selectedGroupId, mill_id: millId, page_size: 1000, page: 1 }
+          : {
+              ...(departmentId ? { department_id: departmentId } : { department }),
+              mill_id: millId,
+              page_size: 1000,
+              page: 1,
+            },
+      ),
     staleTime: 60_000,
     enabled: !!millId && !!(selectedGroupId || departmentId || department),
   });
-  const mpMachines = (Array.isArray(mpMachinesQ.data) ? mpMachinesQ.data : (mpMachinesQ.data?.data ?? [])) as any[];
+  const mpMachines = (
+    Array.isArray(mpMachinesQ.data) ? mpMachinesQ.data : (mpMachinesQ.data?.data ?? [])
+  ) as any[];
 
   // Per-dept categories
   const categoriesQ = useQuery({
@@ -2197,17 +2831,30 @@ function ManpowerGrid() {
   const deptCatKey = deptCategories.map((c) => c.category).join(",");
   useEffect(() => {
     setRows(buildManpowerRows(deptCategories));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deptCatKey]);
 
   const updateRow = (idx: number, field: keyof ManpowerRow, value: string) =>
-    setRows((prev) => { const next = [...prev]; next[idx] = { ...next[idx], [field]: value }; return next; });
+    setRows((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: value };
+      return next;
+    });
 
-  const totalHeadcount = useMemo(() => rows.reduce((s, r) => s + (Number(r.headcount) || 0), 0), [rows]);
+  const totalHeadcount = useMemo(
+    () => rows.reduce((s, r) => s + (Number(r.headcount) || 0), 0),
+    [rows],
+  );
 
   // Load existing plan
   const existingQ = useQuery({
-    queryKey: ["rf-manpower", date, shift, millId, department, manpowerMode === "individual" ? selectedMachine : selectedGroupId],
+    queryKey: [
+      "rf-manpower",
+      date,
+      shift,
+      millId,
+      department,
+      manpowerMode === "individual" ? selectedMachine : selectedGroupId,
+    ],
     queryFn: () => productionApi.getRFManpower({ date, shift, mill_id: millId }),
     staleTime: 30_000,
     enabled: !!millId && !!date,
@@ -2217,11 +2864,22 @@ function ManpowerGrid() {
     const existing = (existingQ.data?.data ?? []) as any[];
     if (!existing.length) return;
     const filterKey = manpowerMode === "individual" ? selectedMachine : undefined;
-    setRows((prev) => prev.map((row) => {
-      const match = existing.find((e: any) => e.category === row.category && (!filterKey || e.mc_id_from === filterKey));
-      if (!match) return row;
-      return { ...row, mcIdFrom: match.mc_id_from ?? "", mcIdTo: match.mc_id_to ?? "", totalMachines: String(match.total_machines ?? ""), headcount: String(match.headcount ?? ""), supervisor: match.supervisor ?? "" };
-    }));
+    setRows((prev) =>
+      prev.map((row) => {
+        const match = existing.find(
+          (e: any) => e.category === row.category && (!filterKey || e.mc_id_from === filterKey),
+        );
+        if (!match) return row;
+        return {
+          ...row,
+          mcIdFrom: match.mc_id_from ?? "",
+          mcIdTo: match.mc_id_to ?? "",
+          totalMachines: String(match.total_machines ?? ""),
+          headcount: String(match.headcount ?? ""),
+          supervisor: match.supervisor ?? "",
+        };
+      }),
+    );
   }, [existingQ.data, manpowerMode, selectedMachine]);
 
   const bulkMutation = useMutation({
@@ -2232,28 +2890,64 @@ function ManpowerGrid() {
 
       if (manpowerMode === "individual") {
         if (!selectedMachine) throw new Error("Select a machine first");
-        const res = await productionApi.upsertRFManpowerBulk({
-          date, shift,
-          rows: filled.map((r) => ({ category: r.category, mc_id_from: selectedMachine, mc_id_to: row_mcTo(r, mpMachines, selectedMachine), total_machines: r.totalMachines ? Number(r.totalMachines) : 1, headcount: Number(r.headcount), supervisor: r.supervisor || undefined })),
-        }, millId ?? "");
-        return { upserted: res.upserted, errors: res.errors ?? [], machines: 1, label: `Saved for ${selectedMachine}` };
+        const res = await productionApi.upsertRFManpowerBulk(
+          {
+            date,
+            shift,
+            rows: filled.map((r) => ({
+              category: r.category,
+              mc_id_from: selectedMachine,
+              mc_id_to: row_mcTo(r, mpMachines, selectedMachine),
+              total_machines: r.totalMachines ? Number(r.totalMachines) : 1,
+              headcount: Number(r.headcount),
+              supervisor: r.supervisor || undefined,
+            })),
+          },
+          millId ?? "",
+        );
+        return {
+          upserted: res.upserted,
+          errors: res.errors ?? [],
+          machines: 1,
+          label: `Saved for ${selectedMachine}`,
+        };
       } else {
         if (!selectedGroupId) throw new Error("Select a machine group first");
         const groupMachines = mpMachines;
         if (groupMachines.length === 0) throw new Error("No machines in selected group");
         const codes = groupMachines.map((m: any) => m.code).filter(Boolean);
         const calls = codes.map((mc: string) =>
-          productionApi.upsertRFManpowerBulk({
-            date, shift,
-            rows: filled.map((r) => ({ category: r.category, mc_id_from: mc, mc_id_to: undefined, total_machines: 1, headcount: Number(r.headcount), supervisor: r.supervisor || undefined })),
-          }, millId ?? "")
+          productionApi.upsertRFManpowerBulk(
+            {
+              date,
+              shift,
+              rows: filled.map((r) => ({
+                category: r.category,
+                mc_id_from: mc,
+                mc_id_to: undefined,
+                total_machines: 1,
+                headcount: Number(r.headcount),
+                supervisor: r.supervisor || undefined,
+              })),
+            },
+            millId ?? "",
+          ),
         );
         const results = await Promise.allSettled(calls);
         const succeeded = results.filter((r) => r.status === "fulfilled").length;
         const failed = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
-        if (succeeded === 0) throw new Error(failed[0]?.reason?.response?.data?.detail || "All machines failed");
-        const total = results.reduce((s, r) => s + (r.status === "fulfilled" ? (r.value as any).upserted : 0), 0);
-        return { upserted: total, errors: failed.map((f) => f.reason?.message ?? "error"), machines: codes.length, label: `Saved ${total} rows across ${codes.length} machines` };
+        if (succeeded === 0)
+          throw new Error(failed[0]?.reason?.response?.data?.detail || "All machines failed");
+        const total = results.reduce(
+          (s, r) => s + (r.status === "fulfilled" ? (r.value as any).upserted : 0),
+          0,
+        );
+        return {
+          upserted: total,
+          errors: failed.map((f) => f.reason?.message ?? "error"),
+          machines: codes.length,
+          label: `Saved ${total} rows across ${codes.length} machines`,
+        };
       }
     },
     onSuccess: ({ label, errors: errs }) => {
@@ -2272,7 +2966,8 @@ function ManpowerGrid() {
   const [showCatEditor, setShowCatEditor] = useState(false);
 
   const readyToFill = manpowerMode === "individual" ? !!selectedMachine : !!selectedGroupId;
-  const saveLabel = bulkMutation.isPending ? "Saving…"
+  const saveLabel = bulkMutation.isPending
+    ? "Saving…"
     : manpowerMode === "group" && selectedGroupId && mpMachines.length > 0
       ? `Save for ${mpMachines.length} machines`
       : "Save Plan";
@@ -2297,12 +2992,24 @@ function ManpowerGrid() {
           <div className="flex rounded-md border overflow-hidden text-xs">
             <button
               className={`px-3 py-1.5 font-medium transition-colors ${manpowerMode === "individual" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
-              onClick={() => { setManpowerMode("individual"); setSelectedGroupId(""); setSelectedMachine(""); }}
-            >Individual</button>
+              onClick={() => {
+                setManpowerMode("individual");
+                setSelectedGroupId("");
+                setSelectedMachine("");
+              }}
+            >
+              Individual
+            </button>
             <button
               className={`px-3 py-1.5 font-medium transition-colors border-l ${manpowerMode === "group" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
-              onClick={() => { setManpowerMode("group"); setSelectedMachine(""); setSelectedGroupId(""); }}
-            >Machine Group</button>
+              onClick={() => {
+                setManpowerMode("group");
+                setSelectedMachine("");
+                setSelectedGroupId("");
+              }}
+            >
+              Machine Group
+            </button>
           </div>
         </CardHeader>
         <CardContent className="px-4 pb-4 space-y-4">
@@ -2310,12 +3017,19 @@ function ManpowerGrid() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Date *</Label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-8 text-sm" />
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="h-8 text-sm"
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Shift *</Label>
               <Select value={shift} onValueChange={(v) => setShift(v as "A" | "B" | "C")}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="A">A — Morning</SelectItem>
                   <SelectItem value="B">B — Afternoon</SelectItem>
@@ -2325,21 +3039,39 @@ function ManpowerGrid() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Department *</Label>
-              <Select value={department} onValueChange={(v) => {
-                setDepartment(v);
-                setSelectedGroupId(""); setSelectedMachine("");
-                const d = deptOptions.find((x: any) => (typeof x === "string" ? x : x.name) === v);
-                setDepartmentId(d && typeof d !== "string" ? (d.id || null) : null);
-              }}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select dept" /></SelectTrigger>
+              <Select
+                value={department}
+                onValueChange={(v) => {
+                  setDepartment(v);
+                  setSelectedGroupId("");
+                  setSelectedMachine("");
+                  const d = deptOptions.find(
+                    (x: any) => (typeof x === "string" ? x : x.name) === v,
+                  );
+                  setDepartmentId(d && typeof d !== "string" ? d.id || null : null);
+                }}
+              >
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Select dept" />
+                </SelectTrigger>
                 <SelectContent>
-                  {deptOptions.map((d: any) => { const name = typeof d === "string" ? d : d.name; return <SelectItem key={name} value={name}>{name}</SelectItem>; })}
+                  {deptOptions.map((d: any) => {
+                    const name = typeof d === "string" ? d : d.name;
+                    return (
+                      <SelectItem key={name} value={name}>
+                        {name}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
             <div className="rounded-lg border bg-muted/30 p-3 flex flex-col justify-center">
               <div className="text-xs text-muted-foreground">Total Headcount</div>
-              <div className="text-xl font-bold mt-0.5">{totalHeadcount} <span className="text-sm font-normal text-muted-foreground">workers</span></div>
+              <div className="text-xl font-bold mt-0.5">
+                {totalHeadcount}{" "}
+                <span className="text-sm font-normal text-muted-foreground">workers</span>
+              </div>
             </div>
           </div>
 
@@ -2350,27 +3082,58 @@ function ManpowerGrid() {
                 <div className="flex items-center gap-2">
                   <Layers className="size-4 text-muted-foreground shrink-0" />
                   <div className="flex-1 space-y-1">
-                    <Label className="text-xs text-muted-foreground">Filter by Machine Group <span className="text-[10px]">(optional)</span></Label>
-                    <Select value={selectedGroupId || "_all"} onValueChange={(v) => { setSelectedGroupId(v === "_all" ? "" : v); setSelectedMachine(""); }}>
-                      <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                    <Label className="text-xs text-muted-foreground">
+                      Filter by Machine Group <span className="text-[10px]">(optional)</span>
+                    </Label>
+                    <Select
+                      value={selectedGroupId || "_all"}
+                      onValueChange={(v) => {
+                        setSelectedGroupId(v === "_all" ? "" : v);
+                        setSelectedMachine("");
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="_all">— All machines in department —</SelectItem>
-                        {machineGroups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                        {machineGroups.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
               )}
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Machine <span className="text-destructive">*</span></Label>
-                <Select value={selectedMachine} onValueChange={setSelectedMachine} disabled={!department}>
+                <Label className="text-xs font-semibold">
+                  Machine <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={selectedMachine}
+                  onValueChange={setSelectedMachine}
+                  disabled={!department}
+                >
                   <SelectTrigger className="h-9 text-sm border-primary/50 font-medium">
-                    <SelectValue placeholder={department ? "Select a machine…" : "Select department first"} />
+                    <SelectValue
+                      placeholder={department ? "Select a machine…" : "Select department first"}
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {mpMachines.length === 0
-                      ? <SelectItem value="_none" disabled>{mpMachinesQ.isLoading ? "Loading…" : "No machines found"}</SelectItem>
-                      : mpMachines.map((m: any) => <SelectItem key={m.code} value={m.code}>{m.code}{m.name ? ` — ${m.name}` : ""}</SelectItem>)}
+                    {mpMachines.length === 0 ? (
+                      <SelectItem value="_none" disabled>
+                        {mpMachinesQ.isLoading ? "Loading…" : "No machines found"}
+                      </SelectItem>
+                    ) : (
+                      mpMachines.map((m: any) => (
+                        <SelectItem key={m.code} value={m.code}>
+                          {m.code}
+                          {m.name ? ` — ${m.name}` : ""}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -2379,25 +3142,46 @@ function ManpowerGrid() {
             <div className="space-y-2">
               <Label className="text-xs font-semibold">
                 Machine Group <span className="text-destructive">*</span>
-                <span className="text-muted-foreground font-normal ml-1 text-[10px]">— headcount saved for every machine in this group</span>
+                <span className="text-muted-foreground font-normal ml-1 text-[10px]">
+                  — headcount saved for every machine in this group
+                </span>
               </Label>
               <Select value={selectedGroupId || ""} onValueChange={setSelectedGroupId}>
                 <SelectTrigger className="h-9 text-sm border-primary/50 font-medium">
                   <SelectValue placeholder="Select machine group…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {machineGroups.length === 0
-                    ? <SelectItem value="_none" disabled>No machine groups configured</SelectItem>
-                    : machineGroups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                  {machineGroups.length === 0 ? (
+                    <SelectItem value="_none" disabled>
+                      No machine groups configured
+                    </SelectItem>
+                  ) : (
+                    machineGroups.map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               {selectedGroupId && mpMachines.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  <span className="text-xs text-muted-foreground shrink-0 self-center">Will log for:</span>
+                  <span className="text-xs text-muted-foreground shrink-0 self-center">
+                    Will log for:
+                  </span>
                   {mpMachines.slice(0, 16).map((m: any) => (
-                    <span key={m.code} className="text-xs bg-amber-100 text-amber-800 border border-amber-200 rounded px-1.5 py-0.5 font-mono">{m.code}</span>
+                    <span
+                      key={m.code}
+                      className="text-xs bg-amber-100 text-amber-800 border border-amber-200 rounded px-1.5 py-0.5 font-mono"
+                    >
+                      {m.code}
+                    </span>
                   ))}
-                  {mpMachines.length > 16 && <span className="text-xs text-muted-foreground self-center">+{mpMachines.length - 16} more</span>}
+                  {mpMachines.length > 16 && (
+                    <span className="text-xs text-muted-foreground self-center">
+                      +{mpMachines.length - 16} more
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -2410,19 +3194,31 @@ function ManpowerGrid() {
         <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
           <CardTitle className="text-sm">
             {department || "—"} — Categories
-            {categoriesQ.isLoading && <span className="text-xs font-normal text-muted-foreground ml-2">(loading…)</span>}
+            {categoriesQ.isLoading && (
+              <span className="text-xs font-normal text-muted-foreground ml-2">(loading…)</span>
+            )}
             {readyToFill && (
               <span className="text-xs font-normal text-muted-foreground ml-2">
-                · {manpowerMode === "individual" ? selectedMachine : `${mpMachines.length} machines`}
+                ·{" "}
+                {manpowerMode === "individual" ? selectedMachine : `${mpMachines.length} machines`}
               </span>
             )}
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => setShowCatEditor(true)} disabled={!department}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowCatEditor(true)}
+              disabled={!department}
+            >
               <Settings2 className="size-3.5 mr-1.5" />
               Manage
             </Button>
-            <Button size="sm" onClick={() => bulkMutation.mutate()} disabled={bulkMutation.isPending || !readyToFill || totalHeadcount === 0}>
+            <Button
+              size="sm"
+              onClick={() => bulkMutation.mutate()}
+              disabled={bulkMutation.isPending || !readyToFill || totalHeadcount === 0}
+            >
               <Save className="size-3.5 mr-1.5" />
               {saveLabel}
             </Button>
@@ -2437,7 +3233,8 @@ function ManpowerGrid() {
             </div>
           ) : rows.length === 0 ? (
             <div className="p-6 text-sm text-muted-foreground text-center">
-              No categories for <strong>{department}</strong>. Add them in Masters → Manpower Categories.
+              No categories for <strong>{department}</strong>. Add them in Masters → Manpower
+              Categories.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -2451,11 +3248,17 @@ function ManpowerGrid() {
                 </TableHeader>
                 <TableBody>
                   {rows.map((row, idx) => (
-                    <TableRow key={row.category} className={Number(row.headcount) > 0 ? "bg-primary/5" : ""}>
-                      <TableCell className="pl-4 font-medium text-sm">{row.categoryLabel}</TableCell>
+                    <TableRow
+                      key={row.category}
+                      className={Number(row.headcount) > 0 ? "bg-primary/5" : ""}
+                    >
+                      <TableCell className="pl-4 font-medium text-sm">
+                        {row.categoryLabel}
+                      </TableCell>
                       <TableCell className="pr-4">
                         <Input
-                          type="number" min={0}
+                          type="number"
+                          min={0}
                           value={row.headcount}
                           onChange={(e) => updateRow(idx, "headcount", e.target.value)}
                           placeholder="0"
@@ -2475,7 +3278,9 @@ function ManpowerGrid() {
                   {/* Total row */}
                   <TableRow className="bg-muted/60 font-semibold">
                     <TableCell className="pl-4 text-sm">Total</TableCell>
-                    <TableCell className="pr-4 text-right text-sm font-bold">{totalHeadcount}</TableCell>
+                    <TableCell className="pr-4 text-right text-sm font-bold">
+                      {totalHeadcount}
+                    </TableCell>
                     <TableCell />
                   </TableRow>
                 </TableBody>
@@ -2520,78 +3325,82 @@ function ImportShiftEntriesDialog() {
 type ReportRecordType = "entries" | "wastage" | "packing" | "stoppage" | "manpower";
 
 const PROD_REPORT_TYPES: { value: ReportRecordType; label: string; icon: any }[] = [
-  { value: "entries",  label: "Shift Entries", icon: LayoutGrid },
-  { value: "wastage",  label: "Wastage",       icon: Trash2 },
-  { value: "packing",  label: "Packing",       icon: Save },
-  { value: "stoppage", label: "Stoppage",      icon: Clock },
-  { value: "manpower", label: "Manpower",      icon: Users2 },
+  { value: "entries", label: "Shift Entries", icon: LayoutGrid },
+  { value: "wastage", label: "Wastage", icon: Trash2 },
+  { value: "packing", label: "Packing", icon: Save },
+  { value: "stoppage", label: "Stoppage", icon: Clock },
+  { value: "manpower", label: "Manpower", icon: Users2 },
 ];
 
 const PROD_REPORT_COLS: Record<ReportRecordType, { key: string; label: string }[]> = {
   entries: [
-    { key: "date",         label: "Date" },
-    { key: "shift",        label: "Shift" },
-    { key: "department",   label: "Dept" },
+    { key: "date", label: "Date" },
+    { key: "shift", label: "Shift" },
+    { key: "department", label: "Dept" },
     { key: "machine_code", label: "Machine" },
-    { key: "count_ne",     label: "Count (Ne)" },
-    { key: "produced_kg",  label: "Produced (kg)" },
-    { key: "target_kg",    label: "Target (kg)" },
+    { key: "count_ne", label: "Count (Ne)" },
+    { key: "produced_kg", label: "Produced (kg)" },
+    { key: "target_kg", label: "Target (kg)" },
     { key: "efficiency_pct", label: "Eff %" },
-    { key: "status",       label: "Status" },
-    { key: "entered_by",   label: "By" },
+    { key: "status", label: "Status" },
+    { key: "entered_by", label: "By" },
   ],
   wastage: [
-    { key: "date",         label: "Date" },
-    { key: "shift",        label: "Shift" },
-    { key: "department",   label: "Dept" },
+    { key: "date", label: "Date" },
+    { key: "shift", label: "Shift" },
+    { key: "department", label: "Dept" },
     { key: "machine_code", label: "Machine" },
-    { key: "waste_type",   label: "Waste Type" },
-    { key: "waste_kg",     label: "Waste (kg)" },
-    { key: "lot_no",       label: "Lot" },
-    { key: "ratio",        label: "Ratio" },
-    { key: "remarks",      label: "Remarks" },
-    { key: "entered_by",   label: "By" },
+    { key: "waste_type", label: "Waste Type" },
+    { key: "waste_kg", label: "Waste (kg)" },
+    { key: "lot_no", label: "Lot" },
+    { key: "ratio", label: "Ratio" },
+    { key: "remarks", label: "Remarks" },
+    { key: "entered_by", label: "By" },
   ],
   packing: [
-    { key: "date",         label: "Date" },
-    { key: "shift",        label: "Shift" },
-    { key: "lot_no",       label: "Lot No" },
-    { key: "count_ne",     label: "Count Ne" },
-    { key: "count_desc",   label: "Count Desc" },
-    { key: "bag_from",     label: "Bag From" },
-    { key: "bag_to",       label: "Bag To" },
-    { key: "total_bags",   label: "Total Bags" },
-    { key: "operator",     label: "Operator" },
+    { key: "date", label: "Date" },
+    { key: "shift", label: "Shift" },
+    { key: "lot_no", label: "Lot No" },
+    { key: "count_ne", label: "Count Ne" },
+    { key: "count_desc", label: "Count Desc" },
+    { key: "bag_from", label: "Bag From" },
+    { key: "bag_to", label: "Bag To" },
+    { key: "total_bags", label: "Total Bags" },
+    { key: "operator", label: "Operator" },
   ],
   stoppage: [
-    { key: "date",               label: "Date" },
-    { key: "machine_code",       label: "Machine" },
-    { key: "datalog_code",       label: "Stop Code" },
-    { key: "reason",             label: "Reason" },
-    { key: "started_at",         label: "From" },
-    { key: "ended_at",           label: "To" },
-    { key: "duration_min",       label: "Duration (min)" },
+    { key: "date", label: "Date" },
+    { key: "machine_code", label: "Machine" },
+    { key: "datalog_code", label: "Stop Code" },
+    { key: "reason", label: "Reason" },
+    { key: "started_at", label: "From" },
+    { key: "ended_at", label: "To" },
+    { key: "duration_min", label: "Duration (min)" },
     { key: "production_loss_kg", label: "Loss (kg)" },
-    { key: "stop_type",          label: "Type" },
+    { key: "stop_type", label: "Type" },
   ],
   manpower: [
-    { key: "date",          label: "Date" },
-    { key: "shift",         label: "Shift" },
-    { key: "category",      label: "Category" },
-    { key: "mc_id_from",    label: "MC From" },
-    { key: "mc_id_to",      label: "MC To" },
+    { key: "date", label: "Date" },
+    { key: "shift", label: "Shift" },
+    { key: "category", label: "Category" },
+    { key: "mc_id_from", label: "MC From" },
+    { key: "mc_id_to", label: "MC To" },
     { key: "total_machines", label: "Machines" },
-    { key: "headcount",     label: "Headcount" },
-    { key: "supervisor",    label: "Supervisor" },
+    { key: "headcount", label: "Headcount" },
+    { key: "supervisor", label: "Supervisor" },
   ],
 };
 
 function ProductionReportsTab() {
   const { millId } = useActiveMill();
   const today = new Date();
-  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
   const sevenDaysAgo = new Date(today.getTime() - 7 * 86400_000);
-  const defaultFrom = new Date(sevenDaysAgo.getTime() - sevenDaysAgo.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+  const defaultFrom = new Date(sevenDaysAgo.getTime() - sevenDaysAgo.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
 
   const [recordType, setRecordType] = useState<ReportRecordType>("wastage");
   const [dateFrom, setDateFrom] = useState(defaultFrom);
@@ -2638,7 +3447,15 @@ function ProductionReportsTab() {
     queryKey: ["prod-report-packing", millId, dateFrom, dateTo, shift],
     queryFn: async () => {
       const { api } = await import("@/lib/api");
-      const r = await api.get("/production/packing/entries", { params: { mill_id: millId, date_from: dateFrom, date_to: dateTo, ...(shift !== "_all" ? { shift } : {}), page_size: 1000 } });
+      const r = await api.get("/production/packing/entries", {
+        params: {
+          mill_id: millId,
+          date_from: dateFrom,
+          date_to: dateTo,
+          ...(shift !== "_all" ? { shift } : {}),
+          page_size: 1000,
+        },
+      });
       return r.data;
     },
     enabled: !!millId && recordType === "packing",
@@ -2646,36 +3463,56 @@ function ProductionReportsTab() {
   });
   const stoppageQ = useQuery({
     queryKey: ["prod-report-stoppage", millId, dateFrom, dateTo, shift, department, machineCode],
-    queryFn: () => productionApi.getDowntimeLogs({ mill_id: millId, date_from: dateFrom, date_to: dateTo, ...(shift !== "_all" ? { shift } : {}), ...(machineCode ? { machine_code: machineCode } : {}), page_size: 1000 }),
+    queryFn: () =>
+      productionApi.getDowntimeLogs({
+        mill_id: millId,
+        date_from: dateFrom,
+        date_to: dateTo,
+        ...(shift !== "_all" ? { shift } : {}),
+        ...(machineCode ? { machine_code: machineCode } : {}),
+        page_size: 1000,
+      }),
     enabled: !!millId && recordType === "stoppage",
     staleTime: 30_000,
   });
   const manpowerQ = useQuery({
     queryKey: ["prod-report-manpower", millId, dateFrom, dateTo, shift],
-    queryFn: () => productionApi.getRFManpower({ mill_id: millId, date_from: dateFrom, date_to: dateTo, ...(shift !== "_all" ? { shift } : {}) }),
+    queryFn: () =>
+      productionApi.getRFManpower({
+        mill_id: millId,
+        date_from: dateFrom,
+        date_to: dateTo,
+        ...(shift !== "_all" ? { shift } : {}),
+      }),
     enabled: !!millId && recordType === "manpower",
     staleTime: 30_000,
   });
 
-  const entryRows    = (entriesQ.data?.data  ?? entriesQ.data  ?? []) as any[];
-  const wasteRows    = (wasteQ.data?.data    ?? wasteQ.data    ?? []) as any[];
-  const packingRows  = (packingQ.data?.data  ?? packingQ.data  ?? []) as any[];
-  const stoppageRows = (Array.isArray(stoppageQ.data) ? stoppageQ.data : (stoppageQ.data?.data ?? [])) as any[];
+  const entryRows = (entriesQ.data?.data ?? entriesQ.data ?? []) as any[];
+  const wasteRows = (wasteQ.data?.data ?? wasteQ.data ?? []) as any[];
+  const packingRows = (packingQ.data?.data ?? packingQ.data ?? []) as any[];
+  const stoppageRows = (
+    Array.isArray(stoppageQ.data) ? stoppageQ.data : (stoppageQ.data?.data ?? [])
+  ) as any[];
   const manpowerRows = (manpowerQ.data?.data ?? []) as any[];
 
   const activeRows =
-    recordType === "entries"  ? entryRows
-    : recordType === "wastage"  ? wasteRows
-    : recordType === "packing"  ? packingRows
-    : recordType === "stoppage" ? stoppageRows
-    : manpowerRows;
+    recordType === "entries"
+      ? entryRows
+      : recordType === "wastage"
+        ? wasteRows
+        : recordType === "packing"
+          ? packingRows
+          : recordType === "stoppage"
+            ? stoppageRows
+            : manpowerRows;
 
   const isLoading =
-    (recordType === "entries"  && entriesQ.isLoading)
-    || (recordType === "wastage"  && wasteQ.isLoading)
-    || (recordType === "packing"  && packingQ.isLoading)
-    || (recordType === "stoppage" && stoppageQ.isLoading)
-    || (recordType === "manpower" && manpowerQ.isLoading);
+    (recordType === "entries" && entriesQ.isLoading) ||
+    (recordType === "wastage" && wasteQ.isLoading) ||
+    (recordType === "packing" && packingQ.isLoading) ||
+    (recordType === "stoppage" && stoppageQ.isLoading) ||
+    (recordType === "manpower" && manpowerQ.isLoading);
 
   const cols = PROD_REPORT_COLS[recordType];
   const hasDeptFilter = ["entries", "wastage", "stoppage"].includes(recordType);
@@ -2709,16 +3546,28 @@ function ProductionReportsTab() {
           <div className="flex flex-wrap gap-3 items-end">
             <div className="space-y-1">
               <Label className="text-xs">From</Label>
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs w-36" />
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-8 text-xs w-36"
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">To</Label>
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs w-36" />
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-8 text-xs w-36"
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Shift</Label>
               <Select value={shift} onValueChange={setShift}>
-                <SelectTrigger className="h-8 text-xs w-28"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-xs w-28">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_all">All Shifts</SelectItem>
                   <SelectItem value="A">A — Morning</SelectItem>
@@ -2730,13 +3579,22 @@ function ProductionReportsTab() {
             {hasDeptFilter && (
               <div className="space-y-1">
                 <Label className="text-xs">Department</Label>
-                <Select value={department || "_all"} onValueChange={(v) => setDepartment(v === "_all" ? "" : v)}>
-                  <SelectTrigger className="h-8 text-xs w-40"><SelectValue placeholder="All depts" /></SelectTrigger>
+                <Select
+                  value={department || "_all"}
+                  onValueChange={(v) => setDepartment(v === "_all" ? "" : v)}
+                >
+                  <SelectTrigger className="h-8 text-xs w-40">
+                    <SelectValue placeholder="All depts" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_all">All Departments</SelectItem>
                     {deptOptions.map((d: any) => {
                       const name = typeof d === "string" ? d : d.name;
-                      return <SelectItem key={name} value={name}>{name}</SelectItem>;
+                      return (
+                        <SelectItem key={name} value={name}>
+                          {name}
+                        </SelectItem>
+                      );
                     })}
                   </SelectContent>
                 </Select>
@@ -2744,12 +3602,26 @@ function ProductionReportsTab() {
             )}
             {hasMachineFilter && machineGroups.length > 0 && (
               <div className="space-y-1">
-                <Label className="text-xs flex items-center gap-1"><Layers className="size-3" /> Machine Group</Label>
-                <Select value={machineGroupId || "_all"} onValueChange={(v) => { setMachineGroupId(v === "_all" ? "" : v); setMachineCode(""); }}>
-                  <SelectTrigger className="h-8 text-xs w-44"><SelectValue placeholder="All groups" /></SelectTrigger>
+                <Label className="text-xs flex items-center gap-1">
+                  <Layers className="size-3" /> Machine Group
+                </Label>
+                <Select
+                  value={machineGroupId || "_all"}
+                  onValueChange={(v) => {
+                    setMachineGroupId(v === "_all" ? "" : v);
+                    setMachineCode("");
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-xs w-44">
+                    <SelectValue placeholder="All groups" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_all">All Groups</SelectItem>
-                    {machineGroups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                    {machineGroups.map((g) => (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -2757,8 +3629,12 @@ function ProductionReportsTab() {
             {hasMachineFilter && (
               <div className="space-y-1">
                 <Label className="text-xs">Machine</Label>
-                <Input value={machineCode} onChange={(e) => setMachineCode(e.target.value)}
-                  placeholder="e.g. CD_001" className="h-8 text-xs w-28" />
+                <Input
+                  value={machineCode}
+                  onChange={(e) => setMachineCode(e.target.value)}
+                  placeholder="e.g. CD_001"
+                  className="h-8 text-xs w-28"
+                />
               </div>
             )}
           </div>
@@ -2771,7 +3647,9 @@ function ProductionReportsTab() {
           <CardTitle className="text-sm">
             {PROD_REPORT_TYPES.find((r) => r.value === recordType)?.label} Records
             {!isLoading && activeRows.length > 0 && (
-              <span className="ml-2 text-xs font-normal text-muted-foreground">({activeRows.length} rows)</span>
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                ({activeRows.length} rows)
+              </span>
             )}
           </CardTitle>
           {activeRows.length > 0 && (
@@ -2790,14 +3668,18 @@ function ProductionReportsTab() {
               <Activity className="size-4 animate-spin" /> Loading…
             </div>
           ) : activeRows.length === 0 ? (
-            <div className="p-6 text-sm text-muted-foreground text-center">No records found for the selected filters.</div>
+            <div className="p-6 text-sm text-muted-foreground text-center">
+              No records found for the selected filters.
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <Table className="text-xs min-w-max">
                 <TableHeader>
                   <TableRow className="bg-muted/40">
                     {cols.map((c) => (
-                      <TableHead key={c.key} className="px-3 py-2 whitespace-nowrap">{c.label}</TableHead>
+                      <TableHead key={c.key} className="px-3 py-2 whitespace-nowrap">
+                        {c.label}
+                      </TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
@@ -2815,7 +3697,11 @@ function ProductionReportsTab() {
                         }
                         // Format timestamps
                         if (typeof val === "string" && val.length > 10 && val.includes("T")) {
-                          try { val = val.slice(0, 16).replace("T", " "); } catch {}
+                          try {
+                            val = val.slice(0, 16).replace("T", " ");
+                          } catch {
+                            /* ignore parse errors */
+                          }
                         }
                         return (
                           <TableCell key={c.key} className="px-3 py-1.5 whitespace-nowrap">
@@ -2840,8 +3726,8 @@ function ProductionReportsTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 type PackingRow = {
-  _localId: string;          // ephemeral key for React
-  id?: string;               // set after save
+  _localId: string; // ephemeral key for React
+  id?: string; // set after save
   lot_no: string;
   count_ne: string;
   count_desc: string;
@@ -2894,7 +3780,7 @@ function PackingGrid() {
     queryKey: ["packing-entries", millId, date, shift],
     queryFn: async () => {
       const r = await api.get(
-        `/production/packing/entries?date=${date}&shift=${shift}&page_size=200`
+        `/production/packing/entries?date=${date}&shift=${shift}&page_size=200`,
       );
       return (r.data?.data ?? []) as PackingRow[];
     },
@@ -2920,7 +3806,7 @@ function PackingGrid() {
           operator: e.operator ?? "",
           remarks: e.remarks ?? "",
           status: e.status,
-        }))
+        })),
       );
       const sv = fetched.find((e: any) => e.supervisor)?.supervisor;
       if (sv) setSupervisor(sv);
@@ -2950,10 +3836,9 @@ function PackingGrid() {
 
     // 2. Fall back to DB — last saved bag for this lot+date+shift
     try {
-      const r = await api.get(
-        `/production/packing/last-bag/${encodeURIComponent(lot)}`,
-        { params: { date, shift, ...(millId ? { mill_id: millId } : {}) } }
-      );
+      const r = await api.get(`/production/packing/last-bag/${encodeURIComponent(lot)}`, {
+        params: { date, shift, ...(millId ? { mill_id: millId } : {}) },
+      });
       const last = r.data?.last_bag_to;
       if (last != null) {
         updateRow(idx, "bag_from", String(last + 1));
@@ -2980,7 +3865,13 @@ function PackingGrid() {
     setRows((prev) => [
       ...prev,
       copyFrom
-        ? { ...EMPTY_PACKING_ROW(), lot_no: copyFrom.lot_no, count_ne: copyFrom.count_ne, count_desc: copyFrom.count_desc, machine_code: copyFrom.machine_code }
+        ? {
+            ...EMPTY_PACKING_ROW(),
+            lot_no: copyFrom.lot_no,
+            count_ne: copyFrom.count_ne,
+            count_desc: copyFrom.count_desc,
+            machine_code: copyFrom.machine_code,
+          }
         : EMPTY_PACKING_ROW(),
     ]);
   }
@@ -3016,22 +3907,26 @@ function PackingGrid() {
       const existingRows = rows.filter((r) => !!r.id);
 
       if (newRows.length) {
-        await api.post("/production/packing/entries/bulk", {
-          date,
-          shift,
-          supervisor,
-          entries: newRows.map((r) => ({
-            lot_no: r.lot_no,
-            count_ne: r.count_ne ? parseFloat(r.count_ne) : null,
-            count_desc: r.count_desc || null,
-            bag_from: r.bag_from ? parseInt(r.bag_from, 10) : null,
-            bag_to: r.bag_to ? parseInt(r.bag_to, 10) : null,
-            machine_code: r.machine_code || null,
-            operator: r.operator || null,
-            supervisor: supervisor || null,
-            remarks: r.remarks || null,
-          })),
-        }, { params: { mill_id: millId } });
+        await api.post(
+          "/production/packing/entries/bulk",
+          {
+            date,
+            shift,
+            supervisor,
+            entries: newRows.map((r) => ({
+              lot_no: r.lot_no,
+              count_ne: r.count_ne ? parseFloat(r.count_ne) : null,
+              count_desc: r.count_desc || null,
+              bag_from: r.bag_from ? parseInt(r.bag_from, 10) : null,
+              bag_to: r.bag_to ? parseInt(r.bag_to, 10) : null,
+              machine_code: r.machine_code || null,
+              operator: r.operator || null,
+              supervisor: supervisor || null,
+              remarks: r.remarks || null,
+            })),
+          },
+          { params: { mill_id: millId } },
+        );
       }
 
       for (const r of existingRows) {
@@ -3097,7 +3992,12 @@ function PackingGrid() {
               value={supervisor}
               onChange={(e) => setSupervisor(e.target.value)}
             />
-            <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => setImportOpen(true)}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs gap-1"
+              onClick={() => setImportOpen(true)}
+            >
               <ArrowDown className="size-3.5" />
               Import
             </Button>
@@ -3224,9 +4124,7 @@ function PackingGrid() {
                       <Plus className="size-3" />
                     </Button>
                     {row.id ? (
-                      <ConfirmDeleteButton
-                        onConfirm={() => deleteEntry(row.id!)}
-                      />
+                      <ConfirmDeleteButton onConfirm={() => deleteEntry(row.id!)} />
                     ) : (
                       <Button
                         size="icon"
@@ -3250,12 +4148,7 @@ function PackingGrid() {
         <Button size="sm" variant="outline" className="h-8 text-xs gap-1" onClick={() => addRow()}>
           <Plus className="size-3" /> Add Row
         </Button>
-        <Button
-          size="sm"
-          className="h-8 text-xs gap-1"
-          onClick={saveAll}
-          disabled={saving}
-        >
+        <Button size="sm" className="h-8 text-xs gap-1" onClick={saveAll} disabled={saving}>
           <Save className="size-3" />
           {saving ? "Saving…" : "Save All"}
         </Button>
@@ -3308,7 +4201,13 @@ function ProductionPage() {
 
   const shiftsQ = useQuery({
     queryKey: ["shifts", millId, validDateFrom, validDateTo],
-    queryFn: () => productionApi.getEntries({ date_from: validDateFrom, date_to: validDateTo, mill_id: millId, page_size: 500 }),
+    queryFn: () =>
+      productionApi.getEntries({
+        date_from: validDateFrom,
+        date_to: validDateTo,
+        mill_id: millId,
+        page_size: 500,
+      }),
     staleTime: 30_000,
     retry: 1,
     enabled: !!millId,
@@ -3321,7 +4220,9 @@ function ProductionPage() {
     enabled: !!millId,
   });
   const { data: machineTypes } = useMillMasterCategory("machine_type");
-  const MACHINE_TYPES = (machineTypes?.length ? machineTypes : ["Blowroom", "Carding", "Drawing", "Simplex", "Ring Frame", "Autoconer", "Winding"]);
+  const MACHINE_TYPES = machineTypes?.length
+    ? machineTypes
+    : ["Blowroom", "Carding", "Drawing", "Simplex", "Ring Frame", "Autoconer", "Winding"];
 
   const qc = useQueryClient();
 
@@ -3359,12 +4260,21 @@ function ProductionPage() {
     onSuccess: () => {
       toast.success("Downtime logged");
       setDowntimeOpen(false);
-      setDtForm({ machine_id: "", start_time: "", end_time: "", reason: "", category: "", notes: "" });
+      setDtForm({
+        machine_id: "",
+        start_time: "",
+        end_time: "",
+        reason: "",
+        category: "",
+        notes: "",
+      });
       qc.invalidateQueries({ queryKey: ["downtime"] });
     },
     onError: (err: any) => {
       const detail = err?.response?.data?.detail;
-      const msg = Array.isArray(detail) ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ") : detail || err.message || "Failed to log downtime";
+      const msg = Array.isArray(detail)
+        ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ")
+        : detail || err.message || "Failed to log downtime";
       toast.error(msg);
     },
   });
@@ -3386,12 +4296,18 @@ function ProductionPage() {
   // Machine edit
   const [machineEditOpen, setMachineEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
-    code: "", name: "", type: "", make: "", model: "", capacity: "", status: "", section: "",
+    code: "",
+    name: "",
+    type: "",
+    make: "",
+    model: "",
+    capacity: "",
+    status: "",
+    section: "",
   });
   const [editMachineId, setEditMachineId] = useState<string | null>(null);
   const updateMachineMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) =>
-      productionApi.updateMachine(id, data),
+    mutationFn: ({ id, data }: { id: string; data: any }) => productionApi.updateMachine(id, data),
     onSuccess: () => {
       toast.success("Machine updated");
       setMachineEditOpen(false);
@@ -3428,7 +4344,12 @@ function ProductionPage() {
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(new Set());
   const [bulkCancelConfirm, setBulkCancelConfirm] = useState(false);
   const toggleEntrySelect = (id: string) =>
-    setSelectedEntryIds((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+    setSelectedEntryIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const bulkCancelMut = useMutation({
     mutationFn: () => productionApi.bulkCancelEntries(Array.from(selectedEntryIds)),
     onSuccess: (res: any) => {
@@ -3455,18 +4376,24 @@ function ProductionPage() {
     },
   });
 
-  const machines = (Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])) as any[];
-  const shiftsRaw = (Array.isArray(shiftsQ.data) ? shiftsQ.data : ((shiftsQ.data as any)?.data ?? [])) as any[];
-  const shifts = entriesShift === "all" ? shiftsRaw : shiftsRaw.filter((s: any) => s.shift === entriesShift);
+  const machines = (
+    Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])
+  ) as any[];
+  const shiftsRaw = (
+    Array.isArray(shiftsQ.data) ? shiftsQ.data : ((shiftsQ.data as any)?.data ?? [])
+  ) as any[];
+  const shifts =
+    entriesShift === "all" ? shiftsRaw : shiftsRaw.filter((s: any) => s.shift === entriesShift);
   const downtime = (Array.isArray(downQ.data) ? downQ.data : (downQ.data?.data ?? [])) as any[];
   const machineColConfig = useColumnConfig("production_entries");
   const downColConfig = useColumnConfig("production_downtime");
 
   const todayStr = new Date().toISOString().split("T")[0];
   // Use most recent date with any entries; fall back to today if no shifts loaded
-  const latestShiftDate = shifts.length > 0
-    ? shifts.reduce((latest: string, s: any) => (s.date > latest ? s.date : latest), "")
-    : todayStr;
+  const latestShiftDate =
+    shifts.length > 0
+      ? shifts.reduce((latest: string, s: any) => (s.date > latest ? s.date : latest), "")
+      : todayStr;
   const kpiDate = latestShiftDate || todayStr;
   const isLatestDateToday = kpiDate === todayStr;
   const totalProduced = shifts
@@ -3483,13 +4410,14 @@ function ProductionPage() {
 
   const anyError = machinesQ.isError || shiftsQ.isError || downQ.isError;
 
-  if (!user) return (
-    <div className="p-6 space-y-4">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-96 w-full" />
-    </div>
-  );
+  if (!user)
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
 
   if (machinesQ.isLoading || shiftsQ.isLoading)
     return (
@@ -3504,7 +4432,9 @@ function ProductionPage() {
         <PageHeader title="Production" subtitle="Error" />
         <div className="p-6 text-sm text-destructive space-y-2">
           <p>Failed to load production data.</p>
-          <Button size="sm" variant="outline" onClick={() => window.location.reload()}>Reload Page</Button>
+          <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
+            Reload Page
+          </Button>
         </div>
       </>
     );
@@ -3525,9 +4455,7 @@ function ProductionPage() {
                 <div className="text-xs uppercase text-muted-foreground font-medium">
                   {isLatestDateToday ? "Produced Today" : `Produced (${kpiDate})`}
                 </div>
-                <div className="text-2xl font-semibold mt-2">
-                  {fmtNumber(totalProduced)} kg
-                </div>
+                <div className="text-2xl font-semibold mt-2">{fmtNumber(totalProduced)} kg</div>
                 <Progress
                   value={totalTarget > 0 ? (totalProduced / totalTarget) * 100 : 0}
                   className="h-1.5 mt-3"
@@ -3604,137 +4532,191 @@ function ProductionPage() {
 
             <TabsContent value="entry">
               <ErrorBoundary key={`entry-${activeTab}`} inline label="Shift Grid">
-              {canEdit ? (
-                <ShiftGrid />
-              ) : (
-                <div className="p-6 text-sm text-muted-foreground">
-                  You do not have permission to create shift entries.
-                </div>
-              )}
+                {canEdit ? (
+                  <ShiftGrid />
+                ) : (
+                  <div className="p-6 text-sm text-muted-foreground">
+                    You do not have permission to create shift entries.
+                  </div>
+                )}
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="waste">
               <ErrorBoundary key={`waste-${activeTab}`} inline label="Waste">
-              {canEdit ? (
-                <WasteGrid />
-              ) : (
-                <div className="p-6 text-sm text-muted-foreground">
-                  You do not have permission to create waste entries.
-                </div>
-              )}
+                {canEdit ? (
+                  <WasteGrid />
+                ) : (
+                  <div className="p-6 text-sm text-muted-foreground">
+                    You do not have permission to create waste entries.
+                  </div>
+                )}
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="stoppage">
               <ErrorBoundary key={`stoppage-${activeTab}`} inline label="Stoppage">
-              {canEdit ? (
-                <StoppageForm />
-              ) : (
-                <div className="p-6 text-sm text-muted-foreground">
-                  You do not have permission to log stoppages.
-                </div>
-              )}
+                {canEdit ? (
+                  <StoppageForm />
+                ) : (
+                  <div className="p-6 text-sm text-muted-foreground">
+                    You do not have permission to log stoppages.
+                  </div>
+                )}
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="manpower">
               <ErrorBoundary key={`manpower-${activeTab}`} inline label="Shift Planning">
-              {canEdit ? (
-                <ManpowerGrid />
-              ) : (
-                <div className="p-6 text-sm text-muted-foreground">
-                  You do not have permission to manage manpower plans.
-                </div>
-              )}
+                {canEdit ? (
+                  <ManpowerGrid />
+                ) : (
+                  <div className="p-6 text-sm text-muted-foreground">
+                    You do not have permission to manage manpower plans.
+                  </div>
+                )}
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="packing">
               <ErrorBoundary key={`packing-${activeTab}`} inline label="Packing">
-              {canEdit ? (
-                <PackingGrid />
-              ) : (
-                <div className="p-6 text-sm text-muted-foreground">
-                  You do not have permission to create packing entries.
-                </div>
-              )}
+                {canEdit ? (
+                  <PackingGrid />
+                ) : (
+                  <div className="p-6 text-sm text-muted-foreground">
+                    You do not have permission to create packing entries.
+                  </div>
+                )}
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="machines">
               <Card>
-                <CardHeader><CardTitle className="text-base">Machine Status</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle className="text-base">Machine Status</CardTitle>
+                </CardHeader>
                 <CardContent>
                   <ErrorBoundary inline label="Machine Status">
-                  <DataTable
-                    tableId="production_machines"
-                    columns={[
-                      { key: "code", label: machineColConfig.getLabel('code'), className: "font-mono text-xs" },
-                      { key: "department", label: machineColConfig.getLabel('department'), type: "status" },
-                      { key: "target_kg", label: "Target (kg)", render: (m: any) => fmtNumber(m.target_kg ?? m.targetKg) },
-                      { key: "produced_kg", label: "Produced (kg)", render: (m: any) => fmtNumber(m.produced_kg ?? m.producedKg) },
-                      { key: "efficiency", label: "Efficiency", render: (m: any) => <span className={(m.efficiency ?? 0) >= 85 ? "text-green-600 font-medium" : (m.efficiency ?? 0) >= 70 ? "" : "text-destructive font-medium"}>{m.efficiency ?? 0}%</span> },
-                      { key: "current_status", label: machineColConfig.getLabel('machine_status'), type: "status", render: (m: any) => <StatusBadge status={m.current_status ?? m.status ?? "idle"} size="sm" /> },
-                    ] satisfies ColDef[]}
-                    data={machines}
-                    loading={machinesQ.isLoading}
-                    rowKey={(m: any) => m.id}
-                    exportFilename="machines"
-                    actions={(m: any) => (
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setEditForm({
-                              code: m.code ?? "",
-                              name: m.name ?? "",
-                              type: m.type ?? "",
-                              make: m.make ?? "",
-                              model: m.model ?? "",
-                              capacity: m.capacity ?? "",
-                              status: m.current_status ?? m.status ?? "",
-                              section: m.section ?? "",
-                            });
-                            setEditMachineId(m.id);
-                            setMachineEditOpen(true);
-                          }}
-                        >
-                          <Pencil className="size-3 mr-1" /> Edit
-                        </Button>
-                        <ConfirmDeleteButton
-                          onConfirm={async () => {
-                            await deactivateMachineMutation.mutateAsync(m.id);
-                          }}
-                          title="Deactivate this machine?"
-                          label={`Deactivate machine ${m.code}? It will be hidden from entry forms but its records are preserved.`}
-                          confirmText="Deactivate"
-                          successMessage="Machine deactivated"
-                          trigger={
-                            <Button size="sm" variant="outline" className="h-7 text-xs text-amber-700 border-amber-300 hover:bg-amber-50">
-                              <PowerOff className="size-3 mr-1" /> Deactivate
-                            </Button>
-                          }
-                        />
-                        <ConfirmDeleteButton
-                          onConfirm={async () => {
-                            await deleteMachineMutation.mutateAsync(m.id);
-                          }}
-                          title="Permanently delete this machine?"
-                          label={`Permanently DELETE machine ${m.code}? This cannot be undone. Machines with existing entries cannot be deleted — deactivate instead.`}
-                          confirmText="Delete"
-                          successMessage="Machine deleted"
-                          errorMessage="Machine has existing entries — cannot delete. Deactivate it instead."
-                          trigger={
-                            <Button size="sm" variant="outline" className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
-                              <Trash2 className="size-3 mr-1" /> Delete
-                            </Button>
-                          }
-                        />
-                      </div>
-                    )}
-                  />
+                    <DataTable
+                      tableId="production_machines"
+                      columns={
+                        [
+                          {
+                            key: "code",
+                            label: machineColConfig.getLabel("code"),
+                            className: "font-mono text-xs",
+                          },
+                          {
+                            key: "department",
+                            label: machineColConfig.getLabel("department"),
+                            type: "status",
+                          },
+                          {
+                            key: "target_kg",
+                            label: "Target (kg)",
+                            render: (m: any) => fmtNumber(m.target_kg ?? m.targetKg),
+                          },
+                          {
+                            key: "produced_kg",
+                            label: "Produced (kg)",
+                            render: (m: any) => fmtNumber(m.produced_kg ?? m.producedKg),
+                          },
+                          {
+                            key: "efficiency",
+                            label: "Efficiency",
+                            render: (m: any) => (
+                              <span
+                                className={
+                                  (m.efficiency ?? 0) >= 85
+                                    ? "text-green-600 font-medium"
+                                    : (m.efficiency ?? 0) >= 70
+                                      ? ""
+                                      : "text-destructive font-medium"
+                                }
+                              >
+                                {m.efficiency ?? 0}%
+                              </span>
+                            ),
+                          },
+                          {
+                            key: "current_status",
+                            label: machineColConfig.getLabel("machine_status"),
+                            type: "status",
+                            render: (m: any) => (
+                              <StatusBadge
+                                status={m.current_status ?? m.status ?? "idle"}
+                                size="sm"
+                              />
+                            ),
+                          },
+                        ] satisfies ColDef[]
+                      }
+                      data={machines}
+                      loading={machinesQ.isLoading}
+                      rowKey={(m: any) => m.id}
+                      exportFilename="machines"
+                      actions={(m: any) => (
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditForm({
+                                code: m.code ?? "",
+                                name: m.name ?? "",
+                                type: m.type ?? "",
+                                make: m.make ?? "",
+                                model: m.model ?? "",
+                                capacity: m.capacity ?? "",
+                                status: m.current_status ?? m.status ?? "",
+                                section: m.section ?? "",
+                              });
+                              setEditMachineId(m.id);
+                              setMachineEditOpen(true);
+                            }}
+                          >
+                            <Pencil className="size-3 mr-1" /> Edit
+                          </Button>
+                          <ConfirmDeleteButton
+                            onConfirm={async () => {
+                              await deactivateMachineMutation.mutateAsync(m.id);
+                            }}
+                            title="Deactivate this machine?"
+                            label={`Deactivate machine ${m.code}? It will be hidden from entry forms but its records are preserved.`}
+                            confirmText="Deactivate"
+                            successMessage="Machine deactivated"
+                            trigger={
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-amber-700 border-amber-300 hover:bg-amber-50"
+                              >
+                                <PowerOff className="size-3 mr-1" /> Deactivate
+                              </Button>
+                            }
+                          />
+                          <ConfirmDeleteButton
+                            onConfirm={async () => {
+                              await deleteMachineMutation.mutateAsync(m.id);
+                            }}
+                            title="Permanently delete this machine?"
+                            label={`Permanently DELETE machine ${m.code}? This cannot be undone. Machines with existing entries cannot be deleted — deactivate instead.`}
+                            confirmText="Delete"
+                            successMessage="Machine deleted"
+                            errorMessage="Machine has existing entries — cannot delete. Deactivate it instead."
+                            trigger={
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+                              >
+                                <Trash2 className="size-3 mr-1" /> Delete
+                              </Button>
+                            }
+                          />
+                        </div>
+                      )}
+                    />
                   </ErrorBoundary>
                 </CardContent>
               </Card>
@@ -3764,10 +4746,14 @@ function ProductionPage() {
                         value={editForm.type}
                         onValueChange={(v) => setEditForm((p) => ({ ...p, type: v }))}
                       >
-                        <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
                         <SelectContent>
                           {MACHINE_TYPES.map((t) => (
-                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                            <SelectItem key={t} value={t}>
+                              {t}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -3804,7 +4790,8 @@ function ProductionPage() {
                         placeholder="e.g. Carding Line 1, Ring Frame A"
                       />
                       <p className="text-[10px] text-muted-foreground">
-                        Group this machine into a line/section. Used to filter machines in Shift Entry.
+                        Group this machine into a line/section. Used to filter machines in Shift
+                        Entry.
                       </p>
                     </div>
                     <div className="space-y-2">
@@ -3813,7 +4800,9 @@ function ProductionPage() {
                         value={editForm.status}
                         onValueChange={(v) => setEditForm((p) => ({ ...p, status: v }))}
                       >
-                        <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="running">Active</SelectItem>
                           <SelectItem value="idle">Idle</SelectItem>
@@ -3851,23 +4840,39 @@ function ProductionPage() {
                     {/* Quick date buttons */}
                     <Button
                       size="sm"
-                      variant={entriesDateFrom === todayStrInit && entriesDateTo === todayStrInit ? "default" : "outline"}
+                      variant={
+                        entriesDateFrom === todayStrInit && entriesDateTo === todayStrInit
+                          ? "default"
+                          : "outline"
+                      }
                       className="h-7 text-xs"
-                      onClick={() => { setEntriesDateFrom(todayStrInit); setEntriesDateTo(todayStrInit); }}
+                      onClick={() => {
+                        setEntriesDateFrom(todayStrInit);
+                        setEntriesDateTo(todayStrInit);
+                      }}
                     >
                       Today
                     </Button>
                     <Button
                       size="sm"
-                      variant={entriesDateFrom === sevenDaysAgo && entriesDateTo === todayStrInit ? "default" : "outline"}
+                      variant={
+                        entriesDateFrom === sevenDaysAgo && entriesDateTo === todayStrInit
+                          ? "default"
+                          : "outline"
+                      }
                       className="h-7 text-xs"
-                      onClick={() => { setEntriesDateFrom(sevenDaysAgo); setEntriesDateTo(todayStrInit); }}
+                      onClick={() => {
+                        setEntriesDateFrom(sevenDaysAgo);
+                        setEntriesDateTo(todayStrInit);
+                      }}
                     >
                       Last 7 days
                     </Button>
                     {/* Custom date range */}
                     <div className="flex items-center gap-1.5">
-                      <Label className="text-xs text-muted-foreground whitespace-nowrap">From</Label>
+                      <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                        From
+                      </Label>
                       <Input
                         type="date"
                         value={entriesDateFrom}
@@ -3886,7 +4891,9 @@ function ProductionPage() {
                     </div>
                     {/* Shift filter chips */}
                     <div className="flex items-center gap-1 border-l pl-3 ml-1">
-                      <Label className="text-xs text-muted-foreground whitespace-nowrap mr-1">Shift</Label>
+                      <Label className="text-xs text-muted-foreground whitespace-nowrap mr-1">
+                        Shift
+                      </Label>
                       {(["all", "A", "B", "C"] as const).map((s) => (
                         <Button
                           key={s}
@@ -3902,7 +4909,9 @@ function ProductionPage() {
                     {/* Machine group filter (for export) */}
                     {entryGroups.length > 0 && (
                       <div className="flex items-center gap-1.5 border-l pl-3 ml-1">
-                        <Label className="text-xs text-muted-foreground whitespace-nowrap">Group</Label>
+                        <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                          Group
+                        </Label>
                         <select
                           className="h-7 text-xs border border-input rounded-md bg-background px-2 focus:outline-none focus:ring-1 focus:ring-ring"
                           value={entriesGroupId}
@@ -3917,15 +4926,20 @@ function ProductionPage() {
                         </select>
                       </div>
                     )}
-                    {shiftsQ.isFetching && <span className="text-xs text-muted-foreground animate-pulse">Loading…</span>}
-                    <span className="text-xs text-muted-foreground ml-auto">{shifts.length} entries</span>
+                    {shiftsQ.isFetching && (
+                      <span className="text-xs text-muted-foreground animate-pulse">Loading…</span>
+                    )}
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {shifts.length} entries
+                    </span>
                   </div>
 
                   {/* Bulk action toolbar */}
                   {selectedEntryIds.size > 0 && (
                     <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
                       <span className="text-sm text-red-700 font-medium flex-1">
-                        {selectedEntryIds.size} entr{selectedEntryIds.size === 1 ? "y" : "ies"} selected
+                        {selectedEntryIds.size} entr{selectedEntryIds.size === 1 ? "y" : "ies"}{" "}
+                        selected
                       </span>
                       <Button
                         size="sm"
@@ -3947,77 +4961,117 @@ function ProductionPage() {
                   )}
 
                   <ErrorBoundary inline label="Shift Entries">
-                  <DataTable
-                    tableId="production_shifts"
-                    columns={[
-                      {
-                        key: "_select",
-                        label: "",
-                        className: "w-8",
-                        render: (s: any) => (
-                          <Checkbox
-                            checked={selectedEntryIds.has(s.id)}
-                            onCheckedChange={() => toggleEntrySelect(s.id)}
-                            aria-label="Select entry"
-                          />
-                        ),
-                      },
-                      { key: "date", label: machineColConfig.getLabel('date'), type: "date" },
-                      { key: "shift", label: machineColConfig.getLabel('shift'), render: (s: any) => <Badge variant="outline">{s.shift}</Badge> },
-                      { key: "machine_code", label: machineColConfig.getLabel('machine_code'), className: "font-mono text-xs" },
-                      { key: "department", label: machineColConfig.getLabel('department'), type: "status" },
-                      { key: "operator", label: machineColConfig.getLabel('operator') },
-                      { key: "entered_by", label: "Entered by", render: (s: any) => <span className="text-xs text-muted-foreground">{s.entered_by ?? "—"}</span> },
-                      { key: "count", label: machineColConfig.getLabel('count') },
-                      { key: "produced_kg", label: machineColConfig.getLabel('produced_kg'), render: (s: any) => `${s.produced_kg ?? 0} kg` },
-                      { key: "waste_kg", label: machineColConfig.getLabel('waste_kg'), render: (s: any) => <span className="text-muted-foreground">{s.waste_kg ?? 0} kg</span> },
-                    ] satisfies ColDef[]}
-                    data={shifts}
-                    loading={shiftsQ.isLoading}
-                    rowKey={(s: any) => s.id}
-                    exportFilename="shift_entries"
-                    disableExport={true}
-                    toolbar={
-                      <ExportDateRangeButton
-                        onExportXlsx={(f, t) => exportApi.productionXlsx(f, t, undefined, entriesGroupId || undefined)}
-                        onExportPdf={(f, t) => exportApi.productionPdf(f, t, undefined, entriesGroupId || undefined)}
-                      />
-                    }
-                    actions={canEdit ? (s: any) => (
-                      <div className="flex gap-1 items-center">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          title="Edit entry"
-                          onClick={() => {
-                            setEntryEditId(s.id);
-                            setEntryEditForm({
-                              produced_kg: s.produced_kg ?? "",
-                              waste_kg: s.waste_kg ?? "",
-                              count: s.count ?? "",
-                              operator: s.operator ?? "",
-                              remarks: s.remarks ?? "",
-                              stoppage_mins: s.stoppage_mins ?? "",
-                              stoppage_reason: s.stoppage_reason ?? "",
-                            });
-                            setEntryEditOpen(true);
-                          }}
-                        >
-                          <Pencil className="size-3.5" />
-                        </Button>
-                        <ConfirmDeleteButton
-                          onConfirm={async () => {
-                            await productionApi.deleteEntry(s.id);
-                            qc.invalidateQueries({ queryKey: ["shifts"] });
-                          }}
-                          label={`Delete entry for machine ${s.machine_code} on ${s.date}?`}
-                          title="Delete Entry?"
-                          confirmText="Delete"
-                          successMessage="Entry deleted"
+                    <DataTable
+                      tableId="production_shifts"
+                      columns={
+                        [
+                          {
+                            key: "_select",
+                            label: "",
+                            className: "w-8",
+                            render: (s: any) => (
+                              <Checkbox
+                                checked={selectedEntryIds.has(s.id)}
+                                onCheckedChange={() => toggleEntrySelect(s.id)}
+                                aria-label="Select entry"
+                              />
+                            ),
+                          },
+                          { key: "date", label: machineColConfig.getLabel("date"), type: "date" },
+                          {
+                            key: "shift",
+                            label: machineColConfig.getLabel("shift"),
+                            render: (s: any) => <Badge variant="outline">{s.shift}</Badge>,
+                          },
+                          {
+                            key: "machine_code",
+                            label: machineColConfig.getLabel("machine_code"),
+                            className: "font-mono text-xs",
+                          },
+                          {
+                            key: "department",
+                            label: machineColConfig.getLabel("department"),
+                            type: "status",
+                          },
+                          { key: "operator", label: machineColConfig.getLabel("operator") },
+                          {
+                            key: "entered_by",
+                            label: "Entered by",
+                            render: (s: any) => (
+                              <span className="text-xs text-muted-foreground">
+                                {s.entered_by ?? "—"}
+                              </span>
+                            ),
+                          },
+                          { key: "count", label: machineColConfig.getLabel("count") },
+                          {
+                            key: "produced_kg",
+                            label: machineColConfig.getLabel("produced_kg"),
+                            render: (s: any) => `${s.produced_kg ?? 0} kg`,
+                          },
+                          {
+                            key: "waste_kg",
+                            label: machineColConfig.getLabel("waste_kg"),
+                            render: (s: any) => (
+                              <span className="text-muted-foreground">{s.waste_kg ?? 0} kg</span>
+                            ),
+                          },
+                        ] satisfies ColDef[]
+                      }
+                      data={shifts}
+                      loading={shiftsQ.isLoading}
+                      rowKey={(s: any) => s.id}
+                      exportFilename="shift_entries"
+                      disableExport={true}
+                      toolbar={
+                        <ExportDateRangeButton
+                          onExportXlsx={(f, t) =>
+                            exportApi.productionXlsx(f, t, undefined, entriesGroupId || undefined)
+                          }
+                          onExportPdf={(f, t) =>
+                            exportApi.productionPdf(f, t, undefined, entriesGroupId || undefined)
+                          }
                         />
-                      </div>
-                    ) : undefined}
-                  />
+                      }
+                      actions={
+                        canEdit
+                          ? (s: any) => (
+                              <div className="flex gap-1 items-center">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  title="Edit entry"
+                                  onClick={() => {
+                                    setEntryEditId(s.id);
+                                    setEntryEditForm({
+                                      produced_kg: s.produced_kg ?? "",
+                                      waste_kg: s.waste_kg ?? "",
+                                      count: s.count ?? "",
+                                      operator: s.operator ?? "",
+                                      remarks: s.remarks ?? "",
+                                      stoppage_mins: s.stoppage_mins ?? "",
+                                      stoppage_reason: s.stoppage_reason ?? "",
+                                    });
+                                    setEntryEditOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="size-3.5" />
+                                </Button>
+                                <ConfirmDeleteButton
+                                  onConfirm={async () => {
+                                    await productionApi.deleteEntry(s.id);
+                                    qc.invalidateQueries({ queryKey: ["shifts"] });
+                                  }}
+                                  label={`Delete entry for machine ${s.machine_code} on ${s.date}?`}
+                                  title="Delete Entry?"
+                                  confirmText="Delete"
+                                  successMessage="Entry deleted"
+                                />
+                              </div>
+                            )
+                          : undefined
+                      }
+                    />
                   </ErrorBoundary>
                 </CardContent>
               </Card>
@@ -4029,14 +5083,22 @@ function ProductionPage() {
                     <div className="flex items-start gap-3">
                       <Trash2 className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-semibold text-sm">Delete {selectedEntryIds.size} entr{selectedEntryIds.size === 1 ? "y" : "ies"}?</p>
+                        <p className="font-semibold text-sm">
+                          Delete {selectedEntryIds.size} entr
+                          {selectedEntryIds.size === 1 ? "y" : "ies"}?
+                        </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           This will permanently remove the selected entries. Cannot be undone.
                         </p>
                       </div>
                     </div>
                     <div className="flex gap-2 justify-end">
-                      <Button variant="outline" size="sm" onClick={() => setBulkCancelConfirm(false)} disabled={bulkCancelMut.isPending}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setBulkCancelConfirm(false)}
+                        disabled={bulkCancelMut.isPending}
+                      >
                         Back
                       </Button>
                       <Button
@@ -4072,7 +5134,9 @@ function ProductionPage() {
                         <Input
                           type={type}
                           value={entryEditForm[key] ?? ""}
-                          onChange={(e) => setEntryEditForm((p) => ({ ...p, [key]: e.target.value }))}
+                          onChange={(e) =>
+                            setEntryEditForm((p) => ({ ...p, [key]: e.target.value }))
+                          }
                           placeholder={label}
                         />
                       </div>
@@ -4080,7 +5144,10 @@ function ProductionPage() {
                   </div>
                   <SheetFooter>
                     <Button
-                      onClick={() => entryEditId && updateEntryMutation.mutate({ id: entryEditId, data: entryEditForm })}
+                      onClick={() =>
+                        entryEditId &&
+                        updateEntryMutation.mutate({ id: entryEditId, data: entryEditForm })
+                      }
                       disabled={updateEntryMutation.isPending}
                     >
                       {updateEntryMutation.isPending ? "Saving…" : "Save Changes"}
@@ -4100,59 +5167,118 @@ function ProductionPage() {
                 </CardHeader>
                 <CardContent>
                   <ErrorBoundary inline label="Downtime Logs">
-                  <DataTable
-                    tableId="production_downtime"
-                    columns={[
-                      { key: "machine_code", label: "Machine", className: "font-mono text-xs font-semibold" },
-                      { key: "reason", label: "Stop Code / Reason", render: (d: any) => (
-                        <div className="max-w-[220px]">
-                          {d.datalog_code
-                            ? <span className="text-xs"><span className="font-mono font-bold text-primary mr-1">[{d.datalog_code}]</span>{(d.reason ?? "").replace(/^\[\d+\]\s*/, "")}</span>
-                            : <span className="text-xs text-muted-foreground">{d.reason ?? "—"}</span>
-                          }
-                        </div>
-                      )},
-                      { key: "started_at", label: "Date & Time", render: (d: any) => {
-                        if (!d.started_at) return <span className="text-muted-foreground text-xs">—</span>;
-                        const dt = new Date(d.started_at);
-                        const dateStr = dt.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "2-digit" });
-                        const timeStr = d.stop_from && d.stop_to
-                          ? `${d.stop_from} → ${d.stop_to}`
-                          : dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-                        return (
-                          <div>
-                            <div className="text-xs font-medium">{dateStr}</div>
-                            <div className="text-[10px] text-muted-foreground">{timeStr}</div>
-                          </div>
-                        );
-                      }},
-                      { key: "duration_min", label: "Duration", render: (d: any) => (
-                        <span className={`text-xs font-semibold ${(d.duration_min ?? 0) > 0 ? "text-amber-600" : "text-muted-foreground"}`}>
-                          {(d.duration_min ?? 0) > 0 ? `${d.duration_min} min` : "—"}
-                        </span>
-                      )},
-                      { key: "production_loss_kg", label: "Loss", render: (d: any) => (
-                        <span className="text-xs">{(d.production_loss_kg ?? 0) > 0 ? `${d.production_loss_kg} kg` : "—"}</span>
-                      )},
-                      { key: "resolved", label: "Status", render: (d: any) => <StatusBadge status={d.resolved ? "active" : "pending"} label={d.resolved ? "Resolved" : "Open"} size="sm" /> },
-                    ] satisfies ColDef[]}
-                    data={downtime}
-                    loading={downQ.isLoading}
-                    rowKey={(d: any) => d.id}
-                    exportFilename="downtime_logs"
-                    actions={canEdit ? (d: any) => (
-                      <ConfirmDeleteButton
-                        onConfirm={async () => {
-                          await productionApi.deleteDowntime(d.id);
-                          qc.invalidateQueries({ queryKey: ["downtime"] });
-                        }}
-                        label={`Delete downtime record for ${d.machine_code}?`}
-                        title="Delete Downtime Log?"
-                        confirmText="Delete"
-                        successMessage="Record deleted"
-                      />
-                    ) : undefined}
-                  />
+                    <DataTable
+                      tableId="production_downtime"
+                      columns={
+                        [
+                          {
+                            key: "machine_code",
+                            label: "Machine",
+                            className: "font-mono text-xs font-semibold",
+                          },
+                          {
+                            key: "reason",
+                            label: "Stop Code / Reason",
+                            render: (d: any) => (
+                              <div className="max-w-[220px]">
+                                {d.datalog_code ? (
+                                  <span className="text-xs">
+                                    <span className="font-mono font-bold text-primary mr-1">
+                                      [{d.datalog_code}]
+                                    </span>
+                                    {(d.reason ?? "").replace(/^\[\d+\]\s*/, "")}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">
+                                    {d.reason ?? "—"}
+                                  </span>
+                                )}
+                              </div>
+                            ),
+                          },
+                          {
+                            key: "started_at",
+                            label: "Date & Time",
+                            render: (d: any) => {
+                              if (!d.started_at)
+                                return <span className="text-muted-foreground text-xs">—</span>;
+                              const dt = new Date(d.started_at);
+                              const dateStr = dt.toLocaleDateString("en-IN", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "2-digit",
+                              });
+                              const timeStr =
+                                d.stop_from && d.stop_to
+                                  ? `${d.stop_from} → ${d.stop_to}`
+                                  : dt.toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    });
+                              return (
+                                <div>
+                                  <div className="text-xs font-medium">{dateStr}</div>
+                                  <div className="text-[10px] text-muted-foreground">{timeStr}</div>
+                                </div>
+                              );
+                            },
+                          },
+                          {
+                            key: "duration_min",
+                            label: "Duration",
+                            render: (d: any) => (
+                              <span
+                                className={`text-xs font-semibold ${(d.duration_min ?? 0) > 0 ? "text-amber-600" : "text-muted-foreground"}`}
+                              >
+                                {(d.duration_min ?? 0) > 0 ? `${d.duration_min} min` : "—"}
+                              </span>
+                            ),
+                          },
+                          {
+                            key: "production_loss_kg",
+                            label: "Loss",
+                            render: (d: any) => (
+                              <span className="text-xs">
+                                {(d.production_loss_kg ?? 0) > 0
+                                  ? `${d.production_loss_kg} kg`
+                                  : "—"}
+                              </span>
+                            ),
+                          },
+                          {
+                            key: "resolved",
+                            label: "Status",
+                            render: (d: any) => (
+                              <StatusBadge
+                                status={d.resolved ? "active" : "pending"}
+                                label={d.resolved ? "Resolved" : "Open"}
+                                size="sm"
+                              />
+                            ),
+                          },
+                        ] satisfies ColDef[]
+                      }
+                      data={downtime}
+                      loading={downQ.isLoading}
+                      rowKey={(d: any) => d.id}
+                      exportFilename="downtime_logs"
+                      actions={
+                        canEdit
+                          ? (d: any) => (
+                              <ConfirmDeleteButton
+                                onConfirm={async () => {
+                                  await productionApi.deleteDowntime(d.id);
+                                  qc.invalidateQueries({ queryKey: ["downtime"] });
+                                }}
+                                label={`Delete downtime record for ${d.machine_code}?`}
+                                title="Delete Downtime Log?"
+                                confirmText="Delete"
+                                successMessage="Record deleted"
+                              />
+                            )
+                          : undefined
+                      }
+                    />
                   </ErrorBoundary>
                 </CardContent>
               </Card>
@@ -4166,28 +5292,42 @@ function ProductionPage() {
                       <Label>Machine</Label>
                       <Select
                         value={dtForm.machine_id}
-                        onValueChange={(v) => { setDtForm((p) => ({ ...p, machine_id: v })); setDtErrors((p) => ({ ...p, machine_id: "" })); }}
+                        onValueChange={(v) => {
+                          setDtForm((p) => ({ ...p, machine_id: v }));
+                          setDtErrors((p) => ({ ...p, machine_id: "" }));
+                        }}
                       >
-                        <SelectTrigger className={dtErrors.machine_id ? "border-destructive" : ""}><SelectValue placeholder="Select machine" /></SelectTrigger>
+                        <SelectTrigger className={dtErrors.machine_id ? "border-destructive" : ""}>
+                          <SelectValue placeholder="Select machine" />
+                        </SelectTrigger>
                         <SelectContent>
-                          {machines.filter((m: any) => m?.id).map((m: any) => (
-                            <SelectItem key={m.id} value={m.id}>
-                              {m.code} — {m.name ?? ""}
-                            </SelectItem>
-                          ))}
+                          {machines
+                            .filter((m: any) => m?.id)
+                            .map((m: any) => (
+                              <SelectItem key={m.id} value={m.id}>
+                                {m.code} — {m.name ?? ""}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
-                      {dtErrors.machine_id && <p className="text-xs text-destructive">{dtErrors.machine_id}</p>}
+                      {dtErrors.machine_id && (
+                        <p className="text-xs text-destructive">{dtErrors.machine_id}</p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>Start Time</Label>
                       <Input
                         type="datetime-local"
                         value={dtForm.start_time}
-                        onChange={(e) => { setDtForm((p) => ({ ...p, start_time: e.target.value })); setDtErrors((p) => ({ ...p, start_time: "" })); }}
+                        onChange={(e) => {
+                          setDtForm((p) => ({ ...p, start_time: e.target.value }));
+                          setDtErrors((p) => ({ ...p, start_time: "" }));
+                        }}
                         className={dtErrors.start_time ? "border-destructive" : ""}
                       />
-                      {dtErrors.start_time && <p className="text-xs text-destructive">{dtErrors.start_time}</p>}
+                      {dtErrors.start_time && (
+                        <p className="text-xs text-destructive">{dtErrors.start_time}</p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>End Time</Label>
@@ -4201,11 +5341,16 @@ function ProductionPage() {
                       <Label>Reason</Label>
                       <Input
                         value={dtForm.reason}
-                        onChange={(e) => { setDtForm((p) => ({ ...p, reason: e.target.value })); setDtErrors((p) => ({ ...p, reason: "" })); }}
+                        onChange={(e) => {
+                          setDtForm((p) => ({ ...p, reason: e.target.value }));
+                          setDtErrors((p) => ({ ...p, reason: "" }));
+                        }}
                         placeholder="Reason for downtime"
                         className={dtErrors.reason ? "border-destructive" : ""}
                       />
-                      {dtErrors.reason && <p className="text-xs text-destructive">{dtErrors.reason}</p>}
+                      {dtErrors.reason && (
+                        <p className="text-xs text-destructive">{dtErrors.reason}</p>
+                      )}
                     </div>
                     <div className="space-y-2">
                       <Label>Category</Label>
@@ -4213,7 +5358,9 @@ function ProductionPage() {
                         value={dtForm.category}
                         onValueChange={(v) => setDtForm((p) => ({ ...p, category: v }))}
                       >
-                        <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Mechanical">Mechanical</SelectItem>
                           <SelectItem value="Electrical">Electrical</SelectItem>
@@ -4232,10 +5379,7 @@ function ProductionPage() {
                     </div>
                   </div>
                   <SheetFooter>
-                    <Button
-                      onClick={handleLogDowntime}
-                      disabled={createDowntimeMutation.isPending}
-                    >
+                    <Button onClick={handleLogDowntime} disabled={createDowntimeMutation.isPending}>
                       {createDowntimeMutation.isPending ? "Saving…" : "Save"}
                     </Button>
                   </SheetFooter>
@@ -4248,7 +5392,6 @@ function ProductionPage() {
                 <ProductionReportsTab />
               </ErrorBoundary>
             </TabsContent>
-
           </Tabs>
         </div>
       </AccessGuard>

@@ -485,7 +485,7 @@ async def get_dashboard_summary(
             r = await db.execute(select(func.count()).select_from(Mill))
             _ = r.scalar()
         except Exception:
-            pass
+            logger.exception("dashboard.summary: mill count check failed")
     elif scope.get("mill_id"):
         effective_mill_id = scope["mill_id"]
     else:

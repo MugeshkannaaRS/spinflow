@@ -10,7 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -72,13 +78,14 @@ function ReportsPage() {
     }
   };
 
-  if (!user) return (
-    <div className="p-6 space-y-4">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-96 w-full" />
-    </div>
-  );
+  if (!user)
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
 
   if (query.isLoading)
     return (
@@ -130,7 +137,9 @@ function ReportsPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-lg font-semibold">Reports & Analytics</h1>
-              <p className="text-sm text-muted-foreground">Cross-module performance reports, KPIs & exportable summaries</p>
+              <p className="text-sm text-muted-foreground">
+                Cross-module performance reports, KPIs & exportable summaries
+              </p>
             </div>
           </div>
 
@@ -149,270 +158,291 @@ function ReportsPage() {
             </TabsContent>
 
             <TabsContent value="summary">
-          <div className="space-y-6">
-          <div className="flex items-center justify-end gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleExport("Production PDF", () => exportApi.productionPdf())}
-                disabled={exporting !== null}
-              >
-                {exporting === "Production PDF" ? (
-                  <Loader2 className="size-3 animate-spin mr-1" />
-                ) : (
-                  <ArrowUpFromLine className="size-3 mr-1" />
-                )}
-                Prod PDF
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleExport("Production XLSX", () => exportApi.productionXlsx())}
-                disabled={exporting !== null}
-              >
-                {exporting === "Production XLSX" ? (
-                  <Loader2 className="size-3 animate-spin mr-1" />
-                ) : (
-                  <ArrowUpFromLine className="size-3 mr-1" />
-                )}
-                Prod XLSX
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleExport("Dispatch PDF", () => exportApi.dispatchPdf())}
-                disabled={exporting !== null}
-              >
-                {exporting === "Dispatch PDF" ? (
-                  <Loader2 className="size-3 animate-spin mr-1" />
-                ) : (
-                  <ArrowUpFromLine className="size-3 mr-1" />
-                )}
-                Dispatch PDF
-              </Button>
-            </div>
-          <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">
-                  Production
+              <div className="space-y-6">
+                <div className="flex items-center justify-end gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExport("Production PDF", () => exportApi.productionPdf())}
+                    disabled={exporting !== null}
+                  >
+                    {exporting === "Production PDF" ? (
+                      <Loader2 className="size-3 animate-spin mr-1" />
+                    ) : (
+                      <ArrowUpFromLine className="size-3 mr-1" />
+                    )}
+                    Prod PDF
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      handleExport("Production XLSX", () => exportApi.productionXlsx())
+                    }
+                    disabled={exporting !== null}
+                  >
+                    {exporting === "Production XLSX" ? (
+                      <Loader2 className="size-3 animate-spin mr-1" />
+                    ) : (
+                      <ArrowUpFromLine className="size-3 mr-1" />
+                    )}
+                    Prod XLSX
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleExport("Dispatch PDF", () => exportApi.dispatchPdf())}
+                    disabled={exporting !== null}
+                  >
+                    {exporting === "Dispatch PDF" ? (
+                      <Loader2 className="size-3 animate-spin mr-1" />
+                    ) : (
+                      <ArrowUpFromLine className="size-3 mr-1" />
+                    )}
+                    Dispatch PDF
+                  </Button>
                 </div>
-                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <TrendingUp className="size-5 text-primary" />
-                  {((prod.totalProduced ?? 0) / 1000).toFixed(1)}T
+                <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+                  <Card>
+                    <CardContent className="p-5">
+                      <div className="text-xs uppercase text-muted-foreground font-medium">
+                        Production
+                      </div>
+                      <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
+                        <TrendingUp className="size-5 text-primary" />
+                        {((prod.totalProduced ?? 0) / 1000).toFixed(1)}T
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        vs {((prod.totalTarget ?? 0) / 1000).toFixed(1)}T target
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-5">
+                      <div className="text-xs uppercase text-muted-foreground font-medium">
+                        Quality
+                      </div>
+                      <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
+                        <FlaskConical className="size-5 text-success" />
+                        {qual.passRate ?? 0}% pass
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {qual.testsConducted ?? 0} tests conducted
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-5">
+                      <div className="text-xs uppercase text-muted-foreground font-medium">
+                        Dispatch
+                      </div>
+                      <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
+                        <Truck className="size-5 text-primary" />
+                        {disp.delivered ?? 0} delivered
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {disp.pending ?? 0} pending · {disp.inTransit ?? 0} in transit
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-5">
+                      <div className="text-xs uppercase text-muted-foreground font-medium">
+                        Financial
+                      </div>
+                      <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
+                        <IndianRupee className="size-5 text-primary" />₹
+                        {((fin.salesTotal ?? 0) / 10000000).toFixed(2)}Cr
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        GST: ₹{((fin.gstCollected ?? 0) / 100000).toFixed(2)}L
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  vs {((prod.totalTarget ?? 0) / 1000).toFixed(1)}T target
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">Quality</div>
-                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <FlaskConical className="size-5 text-success" />
-                  {qual.passRate ?? 0}% pass
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {qual.testsConducted ?? 0} tests conducted
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">Dispatch</div>
-                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <Truck className="size-5 text-primary" />
-                  {disp.delivered ?? 0} delivered
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {disp.pending ?? 0} pending · {disp.inTransit ?? 0} in transit
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">Financial</div>
-                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <IndianRupee className="size-5 text-primary" />₹
-                  {((fin.salesTotal ?? 0) / 10000000).toFixed(2)}Cr
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  GST: ₹{((fin.gstCollected ?? 0) / 100000).toFixed(2)}L
-                </div>
-              </CardContent>
-            </Card>
-          </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Module KPIs</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="w-full overflow-x-auto">
-                  <Table className="min-w-[640px] w-full">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Metric</TableHead>
-                        <TableHead className="text-right">Value</TableHead>
-                        <TableHead className="text-right">Target</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {summaryData.map((row) => (
-                        <TableRow key={row.name}>
-                          <TableCell className="font-medium">{row.name}</TableCell>
-                          <TableCell className="text-right">
-                            {row.value}
-                            {row.unit !== "%" ? ` ${row.unit}` : "%"}
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            {row.target}
-                            {row.unit !== "%" ? ` ${row.unit}` : "%"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={row.value >= row.target ? "default" : "destructive"}>
-                              {row.value >= row.target ? "On Track" : "Below Target"}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Module KPIs</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="w-full overflow-x-auto">
+                        <Table className="min-w-[640px] w-full">
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Metric</TableHead>
+                              <TableHead className="text-right">Value</TableHead>
+                              <TableHead className="text-right">Target</TableHead>
+                              <TableHead>Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {summaryData.map((row) => (
+                              <TableRow key={row.name}>
+                                <TableCell className="font-medium">{row.name}</TableCell>
+                                <TableCell className="text-right">
+                                  {row.value}
+                                  {row.unit !== "%" ? ` ${row.unit}` : "%"}
+                                </TableCell>
+                                <TableCell className="text-right text-muted-foreground">
+                                  {row.target}
+                                  {row.unit !== "%" ? ` ${row.unit}` : "%"}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge
+                                    variant={row.value >= row.target ? "default" : "destructive"}
+                                  >
+                                    {row.value >= row.target ? "On Track" : "Below Target"}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Key Metrics Comparison</CardTitle>
-              </CardHeader>
-              <CardContent className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={summaryData} layout="vertical" margin={{ left: 80 }}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="var(--color-border)"
-                      horizontal={false}
-                    />
-                    <XAxis type="number" stroke="var(--color-muted-foreground)" fontSize={12} />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      stroke="var(--color-muted-foreground)"
-                      fontSize={12}
-                      width={70}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        background: "var(--color-card)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 8,
-                      }}
-                    />
-                    <Bar
-                      dataKey="value"
-                      fill="var(--color-primary)"
-                      radius={[0, 4, 4, 0]}
-                      name="Actual"
-                    />
-                    <Bar
-                      dataKey="target"
-                      fill="var(--color-muted-foreground)"
-                      radius={[0, 4, 4, 0]}
-                      name="Target"
-                      opacity={0.5}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Key Metrics Comparison</CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={summaryData} layout="vertical" margin={{ left: 80 }}>
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="var(--color-border)"
+                            horizontal={false}
+                          />
+                          <XAxis
+                            type="number"
+                            stroke="var(--color-muted-foreground)"
+                            fontSize={12}
+                          />
+                          <YAxis
+                            type="category"
+                            dataKey="name"
+                            stroke="var(--color-muted-foreground)"
+                            fontSize={12}
+                            width={70}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              background: "var(--color-card)",
+                              border: "1px solid var(--color-border)",
+                              borderRadius: 8,
+                            }}
+                          />
+                          <Bar
+                            dataKey="value"
+                            fill="var(--color-primary)"
+                            radius={[0, 4, 4, 0]}
+                            name="Actual"
+                          />
+                          <Bar
+                            dataKey="target"
+                            fill="var(--color-muted-foreground)"
+                            radius={[0, 4, 4, 0]}
+                            name="Target"
+                            opacity={0.5}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Financial Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-                <div className="rounded-lg border p-4">
-                  <div className="text-xs text-muted-foreground uppercase font-medium">
-                    Sales (Total)
-                  </div>
-                  <div className="text-xl font-semibold mt-1">
-                    ₹{((fin.salesTotal ?? 0) / 100000).toFixed(2)}L
-                  </div>
-                </div>
-                <div className="rounded-lg border p-4">
-                  <div className="text-xs text-muted-foreground uppercase font-medium">
-                    Purchases
-                  </div>
-                  <div className="text-xl font-semibold mt-1">
-                    ₹{((fin.purchaseTotal ?? 0) / 100000).toFixed(2)}L
-                  </div>
-                </div>
-                <div className="rounded-lg border p-4">
-                  <div className="text-xs text-muted-foreground uppercase font-medium">
-                    Receivables
-                  </div>
-                  <div className="text-xl font-semibold mt-1 text-destructive">
-                    ₹{((fin.receivablesOutstanding ?? 0) / 100000).toFixed(2)}L
-                  </div>
-                </div>
-                <div className="rounded-lg border p-4">
-                  <div className="text-xs text-muted-foreground uppercase font-medium">
-                    GST Collected
-                  </div>
-                  <div className="text-xl font-semibold mt-1">
-                    ₹{((fin.gstCollected ?? 0) / 100000).toFixed(2)}L
-                  </div>
-                </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Financial Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
+                      <div className="rounded-lg border p-4">
+                        <div className="text-xs text-muted-foreground uppercase font-medium">
+                          Sales (Total)
+                        </div>
+                        <div className="text-xl font-semibold mt-1">
+                          ₹{((fin.salesTotal ?? 0) / 100000).toFixed(2)}L
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-4">
+                        <div className="text-xs text-muted-foreground uppercase font-medium">
+                          Purchases
+                        </div>
+                        <div className="text-xl font-semibold mt-1">
+                          ₹{((fin.purchaseTotal ?? 0) / 100000).toFixed(2)}L
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-4">
+                        <div className="text-xs text-muted-foreground uppercase font-medium">
+                          Receivables
+                        </div>
+                        <div className="text-xl font-semibold mt-1 text-destructive">
+                          ₹{((fin.receivablesOutstanding ?? 0) / 100000).toFixed(2)}L
+                        </div>
+                      </div>
+                      <div className="rounded-lg border p-4">
+                        <div className="text-xs text-muted-foreground uppercase font-medium">
+                          GST Collected
+                        </div>
+                        <div className="text-xl font-semibold mt-1">
+                          ₹{((fin.gstCollected ?? 0) / 100000).toFixed(2)}L
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">HR Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 grid-cols-3">
+                      <div className="rounded-lg border p-4 text-center">
+                        <div className="text-2xl font-semibold">{hr.total_employees}</div>
+                        <div className="text-xs text-muted-foreground mt-1">Total Employees</div>
+                      </div>
+                      <div className="rounded-lg border p-4 text-center">
+                        <div className="text-2xl font-semibold text-green-600">
+                          {hr.present_today}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">Present Today</div>
+                      </div>
+                      <div className="rounded-lg border p-4 text-center">
+                        <div className="text-2xl font-semibold text-yellow-600">
+                          {hr.pending_leaves}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">Pending Leaves</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Stock Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 grid-cols-2">
+                      <div className="rounded-lg border p-4 text-center">
+                        <div className="text-2xl font-semibold">{stock.total_lots}</div>
+                        <div className="text-xs text-muted-foreground mt-1">Total Lots</div>
+                      </div>
+                      <div className="rounded-lg border p-4 text-center">
+                        <div className="text-2xl font-semibold">
+                          {(stock.sellable_stock_kg ?? 0).toLocaleString()} kg
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">Sellable Stock</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">HR Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 grid-cols-3">
-                <div className="rounded-lg border p-4 text-center">
-                  <div className="text-2xl font-semibold">{hr.total_employees}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Total Employees</div>
-                </div>
-                <div className="rounded-lg border p-4 text-center">
-                  <div className="text-2xl font-semibold text-green-600">{hr.present_today}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Present Today</div>
-                </div>
-                <div className="rounded-lg border p-4 text-center">
-                  <div className="text-2xl font-semibold text-yellow-600">{hr.pending_leaves}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Pending Leaves</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Stock Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 grid-cols-2">
-                <div className="rounded-lg border p-4 text-center">
-                  <div className="text-2xl font-semibold">{stock.total_lots}</div>
-                  <div className="text-xs text-muted-foreground mt-1">Total Lots</div>
-                </div>
-                <div className="rounded-lg border p-4 text-center">
-                  <div className="text-2xl font-semibold">{(stock.sellable_stock_kg ?? 0).toLocaleString()} kg</div>
-                  <div className="text-xs text-muted-foreground mt-1">Sellable Stock</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          </div>{/* end summary space-y-6 */}
+              {/* end summary space-y-6 */}
             </TabsContent>
           </Tabs>
         </div>
@@ -421,7 +451,6 @@ function ReportsPage() {
   );
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // PRODUCTION RECORDS TAB
 // ─────────────────────────────────────────────────────────────────────────────
@@ -429,24 +458,28 @@ function ReportsPage() {
 type RecordType = "entries" | "wastage" | "packing" | "stoppage" | "manpower";
 
 const RECORD_TYPES: { value: RecordType; label: string; icon: React.ElementType }[] = [
-  { value: "entries",  label: "Shift Entries",  icon: TrendingUp },
-  { value: "wastage",   label: "Wastage",   icon: Trash2 },
-  { value: "packing",   label: "Packing",   icon: Boxes },
-  { value: "stoppage",  label: "Stoppage",  icon: Clock },
-  { value: "manpower",  label: "Manpower",  icon: Users2 },
+  { value: "entries", label: "Shift Entries", icon: TrendingUp },
+  { value: "wastage", label: "Wastage", icon: Trash2 },
+  { value: "packing", label: "Packing", icon: Boxes },
+  { value: "stoppage", label: "Stoppage", icon: Clock },
+  { value: "manpower", label: "Manpower", icon: Users2 },
 ];
 
 function ProductionRecordsTab() {
   const { millId } = useActiveMill();
   const today = new Date();
-  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+  const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
   const thirtyDaysAgo = new Date(today.getTime() - 30 * 86400_000);
-  const defaultFrom = new Date(thirtyDaysAgo.getTime() - thirtyDaysAgo.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+  const defaultFrom = new Date(thirtyDaysAgo.getTime() - thirtyDaysAgo.getTimezoneOffset() * 60000)
+    .toISOString()
+    .split("T")[0];
 
   const [recordType, setRecordType] = useState<RecordType>("wastage");
   const [dateFrom, setDateFrom] = useState(defaultFrom);
-  const [dateTo, setDateTo]     = useState(localDate);
-  const [shift, setShift]       = useState<string>("_all");
+  const [dateTo, setDateTo] = useState(localDate);
+  const [shift, setShift] = useState<string>("_all");
   const [department, setDepartment] = useState<string>("");
   const [machineGroupId, setMachineGroupId] = useState<string>("");
   const [machineCode, setMachineCode] = useState<string>("");
@@ -468,7 +501,7 @@ function ProductionRecordsTab() {
   const commonParams = {
     mill_id: millId,
     ...(dateFrom ? { date_from: dateFrom } : {}),
-    ...(dateTo   ? { date_to: dateTo }     : {}),
+    ...(dateTo ? { date_to: dateTo } : {}),
     ...(shift !== "_all" ? { shift } : {}),
     ...(department ? { department } : {}),
     ...(machineGroupId ? { machine_group_id: machineGroupId } : {}),
@@ -477,14 +510,32 @@ function ProductionRecordsTab() {
   };
 
   const entriesQ = useQuery({
-    queryKey: ["report-entries", millId, dateFrom, dateTo, shift, department, machineGroupId, machineCode],
+    queryKey: [
+      "report-entries",
+      millId,
+      dateFrom,
+      dateTo,
+      shift,
+      department,
+      machineGroupId,
+      machineCode,
+    ],
     queryFn: () => productionApi.getEntries(commonParams),
     enabled: !!millId && recordType === "entries",
     staleTime: 30_000,
   });
 
   const wasteQ = useQuery({
-    queryKey: ["report-waste", millId, dateFrom, dateTo, shift, department, machineGroupId, machineCode],
+    queryKey: [
+      "report-waste",
+      millId,
+      dateFrom,
+      dateTo,
+      shift,
+      department,
+      machineGroupId,
+      machineCode,
+    ],
     queryFn: () => productionApi.getWasteEntries(commonParams),
     enabled: !!millId && recordType === "wastage",
     staleTime: 30_000,
@@ -495,7 +546,13 @@ function ProductionRecordsTab() {
     queryFn: async () => {
       const { api } = await import("@/lib/api");
       const r = await api.get("/production/packing/entries", {
-        params: { mill_id: millId, date_from: dateFrom, date_to: dateTo, ...(shift !== "_all" ? { shift } : {}), page_size: 1000 },
+        params: {
+          mill_id: millId,
+          date_from: dateFrom,
+          date_to: dateTo,
+          ...(shift !== "_all" ? { shift } : {}),
+          page_size: 1000,
+        },
       });
       return r.data;
     },
@@ -504,44 +561,57 @@ function ProductionRecordsTab() {
   });
 
   const stoppageQ = useQuery({
-    queryKey: ["report-stoppage", millId, dateFrom, dateTo, shift, department, machineGroupId, machineCode],
-    queryFn: () => productionApi.getDowntimeLogs({
-      mill_id: millId,
-      date_from: dateFrom,
-      date_to: dateTo,
-      ...(shift !== "_all" ? { shift } : {}),
-      ...(department ? { department } : {}),
-      ...(machineCode ? { machine_code: machineCode } : {}),
-      page_size: 1000,
-    }),
+    queryKey: [
+      "report-stoppage",
+      millId,
+      dateFrom,
+      dateTo,
+      shift,
+      department,
+      machineGroupId,
+      machineCode,
+    ],
+    queryFn: () =>
+      productionApi.getDowntimeLogs({
+        mill_id: millId,
+        date_from: dateFrom,
+        date_to: dateTo,
+        ...(shift !== "_all" ? { shift } : {}),
+        ...(department ? { department } : {}),
+        ...(machineCode ? { machine_code: machineCode } : {}),
+        page_size: 1000,
+      }),
     enabled: !!millId && recordType === "stoppage",
     staleTime: 30_000,
   });
 
   const manpowerQ = useQuery({
     queryKey: ["report-manpower", millId, dateFrom, dateTo, shift],
-    queryFn: () => productionApi.getRFManpower({
-      mill_id: millId,
-      date_from: dateFrom,
-      date_to: dateTo,
-      ...(shift !== "_all" ? { shift } : {}),
-    }),
+    queryFn: () =>
+      productionApi.getRFManpower({
+        mill_id: millId,
+        date_from: dateFrom,
+        date_to: dateTo,
+        ...(shift !== "_all" ? { shift } : {}),
+      }),
     enabled: !!millId && recordType === "manpower",
     staleTime: 30_000,
   });
 
-  const entryRows    = (entriesQ.data?.data   ?? entriesQ.data   ?? []) as any[];
-  const wasteRows    = (wasteQ.data?.data     ?? wasteQ.data     ?? []) as any[];
-  const packingRows  = (packingQ.data?.data   ?? packingQ.data   ?? []) as any[];
-  const stoppageRows = (Array.isArray(stoppageQ.data) ? stoppageQ.data : (stoppageQ.data?.data ?? [])) as any[];
-  const manpowerRows = (manpowerQ.data?.data  ?? []) as any[];
+  const entryRows = (entriesQ.data?.data ?? entriesQ.data ?? []) as any[];
+  const wasteRows = (wasteQ.data?.data ?? wasteQ.data ?? []) as any[];
+  const packingRows = (packingQ.data?.data ?? packingQ.data ?? []) as any[];
+  const stoppageRows = (
+    Array.isArray(stoppageQ.data) ? stoppageQ.data : (stoppageQ.data?.data ?? [])
+  ) as any[];
+  const manpowerRows = (manpowerQ.data?.data ?? []) as any[];
 
   const isLoading =
-    (recordType === "entries"  && entriesQ.isLoading)
-    || (recordType === "wastage"  && wasteQ.isLoading)
-    || (recordType === "packing"  && packingQ.isLoading)
-    || (recordType === "stoppage" && stoppageQ.isLoading)
-    || (recordType === "manpower" && manpowerQ.isLoading);
+    (recordType === "entries" && entriesQ.isLoading) ||
+    (recordType === "wastage" && wasteQ.isLoading) ||
+    (recordType === "packing" && packingQ.isLoading) ||
+    (recordType === "stoppage" && stoppageQ.isLoading) ||
+    (recordType === "manpower" && manpowerQ.isLoading);
 
   // Column configs
   const colConfig: Record<RecordType, { key: string; label: string }[]> = {
@@ -604,11 +674,15 @@ function ProductionRecordsTab() {
   };
 
   const activeRows =
-    recordType === "entries"  ? entryRows
-    : recordType === "wastage"  ? wasteRows
-    : recordType === "packing"  ? packingRows
-    : recordType === "stoppage" ? stoppageRows
-    : manpowerRows;
+    recordType === "entries"
+      ? entryRows
+      : recordType === "wastage"
+        ? wasteRows
+        : recordType === "packing"
+          ? packingRows
+          : recordType === "stoppage"
+            ? stoppageRows
+            : manpowerRows;
 
   const cols = colConfig[recordType];
   const hasDeptFilter = ["entries", "wastage", "stoppage"].includes(recordType);
@@ -642,16 +716,28 @@ function ProductionRecordsTab() {
           <div className="flex flex-wrap gap-3 items-end">
             <div className="space-y-1">
               <Label className="text-xs">From</Label>
-              <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 text-xs w-36" />
+              <Input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-8 text-xs w-36"
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">To</Label>
-              <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 text-xs w-36" />
+              <Input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-8 text-xs w-36"
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Shift</Label>
               <Select value={shift} onValueChange={setShift}>
-                <SelectTrigger className="h-8 text-xs w-28"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-xs w-28">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_all">All Shifts</SelectItem>
                   <SelectItem value="A">A — Morning</SelectItem>
@@ -663,13 +749,22 @@ function ProductionRecordsTab() {
             {hasDeptFilter && (
               <div className="space-y-1">
                 <Label className="text-xs">Department</Label>
-                <Select value={department || "_all"} onValueChange={(v) => setDepartment(v === "_all" ? "" : v)}>
-                  <SelectTrigger className="h-8 text-xs w-40"><SelectValue placeholder="All depts" /></SelectTrigger>
+                <Select
+                  value={department || "_all"}
+                  onValueChange={(v) => setDepartment(v === "_all" ? "" : v)}
+                >
+                  <SelectTrigger className="h-8 text-xs w-40">
+                    <SelectValue placeholder="All depts" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_all">All Departments</SelectItem>
                     {deptOptions.map((d: any) => {
                       const name = typeof d === "string" ? d : d.name;
-                      return <SelectItem key={name} value={name}>{name}</SelectItem>;
+                      return (
+                        <SelectItem key={name} value={name}>
+                          {name}
+                        </SelectItem>
+                      );
                     })}
                   </SelectContent>
                 </Select>
@@ -677,13 +772,25 @@ function ProductionRecordsTab() {
             )}
             {hasMachineFilter && machineGroups.length > 0 && (
               <div className="space-y-1">
-                <Label className="text-xs flex items-center gap-1"><Layers className="size-3" /> Machine Group</Label>
-                <Select value={machineGroupId || "_all"} onValueChange={(v) => { setMachineGroupId(v === "_all" ? "" : v); setMachineCode(""); }}>
-                  <SelectTrigger className="h-8 text-xs w-44"><SelectValue placeholder="All groups" /></SelectTrigger>
+                <Label className="text-xs flex items-center gap-1">
+                  <Layers className="size-3" /> Machine Group
+                </Label>
+                <Select
+                  value={machineGroupId || "_all"}
+                  onValueChange={(v) => {
+                    setMachineGroupId(v === "_all" ? "" : v);
+                    setMachineCode("");
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-xs w-44">
+                    <SelectValue placeholder="All groups" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="_all">All Groups</SelectItem>
                     {machineGroups.map((g: any) => (
-                      <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -692,8 +799,12 @@ function ProductionRecordsTab() {
             {hasMachineFilter && (
               <div className="space-y-1">
                 <Label className="text-xs">Machine</Label>
-                <Input value={machineCode} onChange={(e) => setMachineCode(e.target.value)}
-                  placeholder="e.g. CD_001" className="h-8 text-xs w-28" />
+                <Input
+                  value={machineCode}
+                  onChange={(e) => setMachineCode(e.target.value)}
+                  placeholder="e.g. CD_001"
+                  className="h-8 text-xs w-28"
+                />
               </div>
             )}
           </div>
@@ -706,7 +817,9 @@ function ProductionRecordsTab() {
           <CardTitle className="text-sm">
             {RECORD_TYPES.find((r) => r.value === recordType)?.label} Records
             {!isLoading && activeRows.length > 0 && (
-              <span className="ml-2 text-xs font-normal text-muted-foreground">({activeRows.length} rows)</span>
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                ({activeRows.length} rows)
+              </span>
             )}
           </CardTitle>
           {activeRows.length > 0 && cols.length > 0 && (
@@ -734,7 +847,9 @@ function ProductionRecordsTab() {
                 <TableHeader>
                   <TableRow className="bg-muted/40">
                     {cols.map((c) => (
-                      <TableHead key={c.key} className="px-3 py-2 whitespace-nowrap">{c.label}</TableHead>
+                      <TableHead key={c.key} className="px-3 py-2 whitespace-nowrap">
+                        {c.label}
+                      </TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>

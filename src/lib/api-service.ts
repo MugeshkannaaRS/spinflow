@@ -57,11 +57,18 @@ export const authApi = {
     api.post("/auth/refresh", { refresh_token: refreshToken }).then((r) => r.data),
   me: () => api.get("/auth/me").then((r) => r.data),
   changePassword: (currentPassword: string, newPassword: string) =>
-    api.post("/auth/change-password", { current_password: currentPassword, new_password: newPassword }).then((r) => r.data),
+    api
+      .post("/auth/change-password", {
+        current_password: currentPassword,
+        new_password: newPassword,
+      })
+      .then((r) => r.data),
   forgotPassword: (email: string) =>
     api.post("/auth/forgot-password", { email }).then((r) => r.data),
   verifyOtpAndReset: (email: string, otp: string, newPassword: string) =>
-    api.post("/auth/verify-otp-reset", { email, otp, new_password: newPassword }).then((r: any) => r.data),
+    api
+      .post("/auth/verify-otp-reset", { email, otp, new_password: newPassword })
+      .then((r: any) => r.data),
 };
 
 // Production
@@ -69,7 +76,9 @@ export const productionApi = {
   getMachines: (params?: Record<string, any>) =>
     api.get("/production/machines", { params }).then((r: any) => extractList(r.data)),
   getMachineSections: (params?: Record<string, any>) =>
-    api.get("/production/machines/sections", { params }).then((r: any) => r.data as { sections: string[] }),
+    api
+      .get("/production/machines/sections", { params })
+      .then((r: any) => r.data as { sections: string[] }),
   bulkCancelEntries: (ids: string[]) =>
     api.post("/production/entries/bulk-cancel", { ids }).then((r: any) => r.data),
   getOperatorGroups: (params?: Record<string, any>) =>
@@ -89,41 +98,69 @@ export const productionApi = {
   deleteMachineGroup: (id: string) =>
     api.delete(`/production/machine-groups/${id}`).then((r: any) => r.data),
   createMachine: (data: any) => api.post("/production/machines", data).then((r) => r.data),
-  updateMachine: (id: string, data: any) => api.put(`/production/machines/${id}`, data).then((r) => r.data),
-  getEntries: (params?: Record<string, any>) => api.get("/production/entries", { params }).then((r: any) => r.data),
+  updateMachine: (id: string, data: any) =>
+    api.put(`/production/machines/${id}`, data).then((r) => r.data),
+  getEntries: (params?: Record<string, any>) =>
+    api.get("/production/entries", { params }).then((r: any) => r.data),
   createEntry: (data: any) => api.post("/production/entries", data).then((r) => r.data),
   createBulkEntries: (data: any) => api.post("/production/entries/bulk", data).then((r) => r.data),
   getDowntime: () => api.get("/production/downtime").then((r: any) => extractList(r.data)),
   createDowntime: (data: any) => api.post("/production/downtime", data).then((r) => r.data),
   approveEntry: (id: string) => api.put(`/production/entries/${id}/approve`).then((r) => r.data),
   rejectEntry: (id: string) => api.patch(`/production/entries/${id}/reject`).then((r) => r.data),
-  updateMachineStatus: (id: string, data: any) => api.patch(`/production/machines/${id}/status`, data).then((r) => r.data),
+  updateMachineStatus: (id: string, data: any) =>
+    api.patch(`/production/machines/${id}/status`, data).then((r) => r.data),
   getShifts: () => api.get("/production/shifts").then((r: any) => extractList(r.data)),
   createShift: (data: any) => api.post("/production/shifts", data).then((r) => r.data),
   deleteMachine: (id: string) => api.delete(`/production/machines/${id}`).then((r) => r.data),
   deleteEntry: (id: string) => api.delete(`/production/entries/${id}`).then((r) => r.data),
-  updateEntry: (id: string, data: any) => api.patch(`/production/entries/${id}`, data).then((r) => r.data),
+  updateEntry: (id: string, data: any) =>
+    api.patch(`/production/entries/${id}`, data).then((r) => r.data),
   // v2 additions
-  getStopCodes: (department?: string) => api.get("/production/datalog-stop-codes", { params: department ? { department } : undefined }).then((r) => r.data?.data ?? []),
+  getStopCodes: (department?: string) =>
+    api
+      .get("/production/datalog-stop-codes", { params: department ? { department } : undefined })
+      .then((r) => r.data?.data ?? []),
   getAllStopCodes: () => api.get("/production/datalog-stop-codes").then((r) => r.data?.data ?? []),
-  createStopCode: (data: { code: number; name: string; category?: string; departments?: string[] }) =>
-    api.post("/production/datalog-stop-codes", data).then((r) => r.data),
-  updateStopCode: (code: number, data: { name?: string; category?: string; departments?: string[]; is_active?: boolean }) =>
-    api.put(`/production/datalog-stop-codes/${code}`, data).then((r) => r.data),
+  createStopCode: (data: {
+    code: number;
+    name: string;
+    category?: string;
+    departments?: string[];
+  }) => api.post("/production/datalog-stop-codes", data).then((r) => r.data),
+  updateStopCode: (
+    code: number,
+    data: { name?: string; category?: string; departments?: string[]; is_active?: boolean },
+  ) => api.put(`/production/datalog-stop-codes/${code}`, data).then((r) => r.data),
   deleteStopCode: (code: number) => api.delete(`/production/datalog-stop-codes/${code}`),
-  getPageInit: (millId: string) => api.get("/production/v2/page-init", { params: { mill_id: millId } }).then((r) => r.data),
-  getWasteEntries: (params?: Record<string, any>) => api.get("/production/waste-entries", { params }).then((r) => r.data),
-  getWasteTypes: (params?: Record<string, any>) => api.get("/production/waste-entries/types", { params }).then((r) => r.data),
-  createWasteBulk: (data: any, millId?: string) => api.post("/production/waste-entries/bulk", data, { params: millId ? { mill_id: millId } : {} }).then((r) => r.data),
-  approveWasteEntry: (id: string) => api.patch(`/production/waste-entries/${id}/approve`).then((r) => r.data),
-  getManpowerCategories: (params?: Record<string, any>) => api.get("/production/manpower-categories", { params }).then((r) => r.data),
-  createManpowerCategory: (data: any, millId: string) => api.post(`/production/manpower-categories?mill_id=${millId}`, data).then((r) => r.data),
-  updateManpowerCategory: (id: string, data: any) => api.patch(`/production/manpower-categories/${id}`, data).then((r) => r.data),
-  deleteManpowerCategory: (id: string) => api.delete(`/production/manpower-categories/${id}`).then((r) => r.data),
-  logDatalogDowntime: (data: any, millId: string) => api.post(`/production/downtime/datalog?mill_id=${millId}`, data).then((r) => r.data),
-  getRFManpower: (params?: Record<string, any>) => api.get("/production/rf-manpower", { params }).then((r) => r.data),
-  upsertRFManpowerBulk: (data: any, millId: string) => api.post(`/production/rf-manpower/bulk?mill_id=${millId}`, data).then((r) => r.data),
-  getDowntimeLogs: (params?: Record<string, any>) => api.get("/production/downtime", { params }).then((r: any) => r.data),
+  getPageInit: (millId: string) =>
+    api.get("/production/v2/page-init", { params: { mill_id: millId } }).then((r) => r.data),
+  getWasteEntries: (params?: Record<string, any>) =>
+    api.get("/production/waste-entries", { params }).then((r) => r.data),
+  getWasteTypes: (params?: Record<string, any>) =>
+    api.get("/production/waste-entries/types", { params }).then((r) => r.data),
+  createWasteBulk: (data: any, millId?: string) =>
+    api
+      .post("/production/waste-entries/bulk", data, { params: millId ? { mill_id: millId } : {} })
+      .then((r) => r.data),
+  approveWasteEntry: (id: string) =>
+    api.patch(`/production/waste-entries/${id}/approve`).then((r) => r.data),
+  getManpowerCategories: (params?: Record<string, any>) =>
+    api.get("/production/manpower-categories", { params }).then((r) => r.data),
+  createManpowerCategory: (data: any, millId: string) =>
+    api.post(`/production/manpower-categories?mill_id=${millId}`, data).then((r) => r.data),
+  updateManpowerCategory: (id: string, data: any) =>
+    api.patch(`/production/manpower-categories/${id}`, data).then((r) => r.data),
+  deleteManpowerCategory: (id: string) =>
+    api.delete(`/production/manpower-categories/${id}`).then((r) => r.data),
+  logDatalogDowntime: (data: any, millId: string) =>
+    api.post(`/production/downtime/datalog?mill_id=${millId}`, data).then((r) => r.data),
+  getRFManpower: (params?: Record<string, any>) =>
+    api.get("/production/rf-manpower", { params }).then((r) => r.data),
+  upsertRFManpowerBulk: (data: any, millId: string) =>
+    api.post(`/production/rf-manpower/bulk?mill_id=${millId}`, data).then((r) => r.data),
+  getDowntimeLogs: (params?: Record<string, any>) =>
+    api.get("/production/downtime", { params }).then((r: any) => r.data),
   deleteDowntime: (id: string) => api.delete(`/production/downtime/${id}`).then((r) => r.data),
 };
 
@@ -190,7 +227,8 @@ export const storesApi = {
   createIssue: (data: any) => api.post("/stores/issues", data).then((r) => r.data),
   createSpare: (data: any) => api.post("/stores/spares", data).then((r) => r.data),
   updateSpare: (id: string, data: any) => api.put(`/stores/spares/${id}`, data).then((r) => r.data),
-  receiveStock: (id: string, data: any) => api.post(`/stores/spares/${id}/receive`, data).then((r) => r.data),
+  receiveStock: (id: string, data: any) =>
+    api.post(`/stores/spares/${id}/receive`, data).then((r) => r.data),
 };
 
 // HR
@@ -198,10 +236,11 @@ export const hrApi = {
   getEmployees: (params?: Record<string, any>) =>
     api.get("/hr/employees", { params }).then((r) => extractList(r.data)),
   createEmployee: (data: any) => api.post("/hr/employees", data).then((r) => r.data),
-  updateEmployee: (id: string, data: any) => api.put(`/hr/employees/${id}`, data).then((r) => r.data),
+  updateEmployee: (id: string, data: any) =>
+    api.put(`/hr/employees/${id}`, data).then((r) => r.data),
   deleteEmployee: (id: string) => api.delete(`/hr/employees/${id}`).then((r) => r.data),
   bulkCreateEmployees: (data: any) => api.post("/hr/employees/bulk", data).then((r) => r.data),
-  
+
   // Attendance
   getAttendance: (params?: Record<string, any>) =>
     api.get("/hr/attendance", { params }).then((r) => extractList(r.data)),
@@ -213,17 +252,14 @@ export const hrApi = {
     api.post("/hr/attendance/bulk-import", data).then((r) => r.data),
   getAttendanceSummary: (params: Record<string, any>) =>
     api.get("/hr/attendance/summary", { params }).then((r) => r.data),
-  
+
   // Monthly Payroll
   getPayroll: (params: Record<string, any>) =>
     api.get("/hr/payroll", { params }).then((r) => extractList(r.data)),
-  calculatePayroll: (data: any) =>
-    api.post("/hr/payroll/calculate", data).then((r) => r.data),
-  updatePayroll: (id: string, data: any) =>
-    api.put(`/hr/payroll/${id}`, data).then((r) => r.data),
-  finalizePayroll: (data: any) =>
-    api.post("/hr/payroll/finalize", data).then((r) => r.data),
-  
+  calculatePayroll: (data: any) => api.post("/hr/payroll/calculate", data).then((r) => r.data),
+  updatePayroll: (id: string, data: any) => api.put(`/hr/payroll/${id}`, data).then((r) => r.data),
+  finalizePayroll: (data: any) => api.post("/hr/payroll/finalize", data).then((r) => r.data),
+
   // Leaves
   getLeaves: (params?: Record<string, any>) =>
     api.get("/hr/leaves", { params }).then((r) => extractList(r.data)),
@@ -237,7 +273,8 @@ export const accountsApi = {
   getInvoices: () => api.get("/accounts/invoices").then((r: any) => extractList(r.data)),
   getReceivables: () => api.get("/accounts/receivables").then((r: any) => extractList(r.data)),
   createInvoice: (data: any) => api.post("/accounts/invoices", data).then((r) => r.data),
-  updateInvoice: (id: string, data: any) => api.put(`/accounts/invoices/${id}`, data).then((r) => r.data),
+  updateInvoice: (id: string, data: any) =>
+    api.put(`/accounts/invoices/${id}`, data).then((r) => r.data),
   deleteInvoice: (id: string) => api.delete(`/accounts/invoices/${id}`).then((r) => r.data),
 };
 
@@ -322,7 +359,10 @@ export const qrApi = {
 
 // Users
 export const usersApi = {
-  list: (params?: any) => api.get("/users", { params: params ?? { page: 1, page_size: 100 } }).then((r) => extractList(r.data)),
+  list: (params?: any) =>
+    api
+      .get("/users", { params: params ?? { page: 1, page_size: 100 } })
+      .then((r) => extractList(r.data)),
   create: (data: any) => api.post("/users", data).then((r) => r.data),
   update: (id: string, data: any) => api.put(`/users/${id}`, data).then((r) => r.data),
   deactivate: (id: string) => api.patch(`/users/${id}/deactivate`).then((r) => r.data),
@@ -332,7 +372,8 @@ export const usersApi = {
 
 // Audit
 export const auditApi = {
-  getLogs: (params?: any) => api.get("/audit/logs", { params }).then((r: any) => extractList(r.data)),
+  getLogs: (params?: any) =>
+    api.get("/audit/logs", { params }).then((r: any) => extractList(r.data)),
 };
 
 // Stock Ledger
@@ -387,7 +428,9 @@ export const loTracApi = {
 // Payroll
 export const payrollApi = {
   getMonths: (millId: string, year: number) =>
-    api.get("/payroll/months", { params: { mill_id: millId, year } }).then((r) => extractList(r.data)),
+    api
+      .get("/payroll/months", { params: { mill_id: millId, year } })
+      .then((r) => extractList(r.data)),
   process: (data: { mill_id: string; month: number; year: number }) =>
     api.post("/payroll/months/process", data).then((r) => r.data),
   approve: (id: string) => api.post(`/payroll/months/${id}/approve`).then((r) => r.data),
@@ -399,7 +442,9 @@ export const payrollApi = {
   getEmployeePayslip: (empId: string, month: number, year: number) =>
     api.get(`/payroll/employees/${empId}/payslip`, { params: { month, year } }).then((r) => r.data),
   getSummary: (millId: string, year: number) =>
-    api.get("/payroll/summary", { params: { mill_id: millId, year } }).then((r) => extractList(r.data)),
+    api
+      .get("/payroll/summary", { params: { mill_id: millId, year } })
+      .then((r) => extractList(r.data)),
 };
 
 // Finance
@@ -421,7 +466,11 @@ export const financeApi = {
 // Masters — all list calls default to page_size=1000 so full data always loads
 export const mastersApi = {
   getCompanies: (page = 1, pageSize = 1000, includeInactive?: boolean) =>
-    api.get("/masters/companies", { params: { page, page_size: pageSize, include_inactive: includeInactive } }).then((r) => extractList(r.data)),
+    api
+      .get("/masters/companies", {
+        params: { page, page_size: pageSize, include_inactive: includeInactive },
+      })
+      .then((r) => extractList(r.data)),
   getCompany: (id: string) => api.get(`/masters/companies/${id}`).then((r) => r.data),
   createCompany: (data: any) => api.post("/masters/companies", data).then((r) => r.data),
   updateCompany: (id: string, data: any) =>
@@ -429,7 +478,9 @@ export const mastersApi = {
 
   getMills: (companyId?: string, page = 1, pageSize = 1000) =>
     api
-      .get("/masters/mills", { params: { company_id: companyId, page, page_size: pageSize, include_inactive: true } })
+      .get("/masters/mills", {
+        params: { company_id: companyId, page, page_size: pageSize, include_inactive: true },
+      })
       .then((r) => extractList(r.data)),
   getMill: (id: string) => api.get(`/masters/mills/${id}`).then((r) => r.data),
   createMill: (data: any) => api.post("/masters/mills", data).then((r) => r.data),
@@ -510,7 +561,12 @@ export async function exportDownload(endpoint: string, filename: string) {
 }
 
 export const exportApi = {
-  productionPdf: (dateFrom?: string, dateTo?: string, operatorGroupId?: string, machineGroupId?: string) => {
+  productionPdf: (
+    dateFrom?: string,
+    dateTo?: string,
+    operatorGroupId?: string,
+    machineGroupId?: string,
+  ) => {
     const params = new URLSearchParams();
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
@@ -522,7 +578,12 @@ export const exportApi = {
       `production_${new Date().toISOString().slice(0, 10)}.pdf`,
     );
   },
-  productionXlsx: (dateFrom?: string, dateTo?: string, operatorGroupId?: string, machineGroupId?: string) => {
+  productionXlsx: (
+    dateFrom?: string,
+    dateTo?: string,
+    operatorGroupId?: string,
+    machineGroupId?: string,
+  ) => {
     const params = new URLSearchParams();
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
@@ -570,115 +631,125 @@ export const exportApi = {
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     const qs = params.toString();
-    return exportDownload(`/exports/quality/xlsx${qs ? `?${qs}` : ""}`, `quality_tests_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    return exportDownload(
+      `/exports/quality/xlsx${qs ? `?${qs}` : ""}`,
+      `quality_tests_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
   },
   maintenanceXlsx: (dateFrom?: string, dateTo?: string) => {
     const params = new URLSearchParams();
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     const qs = params.toString();
-    return exportDownload(`/exports/maintenance/xlsx${qs ? `?${qs}` : ""}`, `maintenance_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    return exportDownload(
+      `/exports/maintenance/xlsx${qs ? `?${qs}` : ""}`,
+      `maintenance_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
   },
   purchaseXlsx: (dateFrom?: string, dateTo?: string) => {
     const params = new URLSearchParams();
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     const qs = params.toString();
-    return exportDownload(`/exports/purchase/xlsx${qs ? `?${qs}` : ""}`, `purchase_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    return exportDownload(
+      `/exports/purchase/xlsx${qs ? `?${qs}` : ""}`,
+      `purchase_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
   },
   dispatchXlsx: (dateFrom?: string, dateTo?: string) => {
     const params = new URLSearchParams();
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     const qs = params.toString();
-    return exportDownload(`/exports/dispatch/xlsx${qs ? `?${qs}` : ""}`, `dispatch_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    return exportDownload(
+      `/exports/dispatch/xlsx${qs ? `?${qs}` : ""}`,
+      `dispatch_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
   },
   storesXlsx: (dateFrom?: string, dateTo?: string) => {
     const params = new URLSearchParams();
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     const qs = params.toString();
-    return exportDownload(`/exports/stores/xlsx${qs ? `?${qs}` : ""}`, `spare_issues_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    return exportDownload(
+      `/exports/stores/xlsx${qs ? `?${qs}` : ""}`,
+      `spare_issues_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
   },
   inventoryXlsx: (dateFrom?: string, dateTo?: string) => {
     const params = new URLSearchParams();
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     const qs = params.toString();
-    return exportDownload(`/exports/inventory/xlsx${qs ? `?${qs}` : ""}`, `inventory_lots_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    return exportDownload(
+      `/exports/inventory/xlsx${qs ? `?${qs}` : ""}`,
+      `inventory_lots_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
   },
   attendanceXlsx: (dateFrom?: string, dateTo?: string) => {
     const params = new URLSearchParams();
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     const qs = params.toString();
-    return exportDownload(`/exports/attendance/xlsx${qs ? `?${qs}` : ""}`, `attendance_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    return exportDownload(
+      `/exports/attendance/xlsx${qs ? `?${qs}` : ""}`,
+      `attendance_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    );
   },
 };
 
 export const adminApi = {
   getRoleConfig: (companyId: string) =>
-    api.get(`/admin/companies/${companyId}/role-config`).then(r => r.data),
+    api.get(`/admin/companies/${companyId}/role-config`).then((r) => r.data),
   updateRoleConfig: (companyId: string, data: any) =>
-    api.post(`/admin/companies/${companyId}/role-config`, data).then(r => r.data),
+    api.post(`/admin/companies/${companyId}/role-config`, data).then((r) => r.data),
   getRoleModules: (companyId: string) =>
-    api.get(`/admin/companies/${companyId}/role-modules`).then(r => r.data),
+    api.get(`/admin/companies/${companyId}/role-modules`).then((r) => r.data),
   updateRoleModules: (companyId: string, data: any) =>
-    api.post(`/admin/companies/${companyId}/role-modules`, data).then(r => r.data),
+    api.post(`/admin/companies/${companyId}/role-modules`, data).then((r) => r.data),
   getPermissionSets: (companyId: string) =>
-    api.get(`/admin/companies/${companyId}/permission-sets`).then(r => r.data),
+    api.get(`/admin/companies/${companyId}/permission-sets`).then((r) => r.data),
   createPermissionSet: (companyId: string, data: any) =>
-    api.post(`/admin/companies/${companyId}/permission-sets`, data).then(r => r.data),
+    api.post(`/admin/companies/${companyId}/permission-sets`, data).then((r) => r.data),
   updatePermissionSet: (companyId: string, psId: string, data: any) =>
-    api.put(`/admin/companies/${companyId}/permission-sets/${psId}`, data).then(r => r.data),
+    api.put(`/admin/companies/${companyId}/permission-sets/${psId}`, data).then((r) => r.data),
   getApprovalWorkflows: (companyId: string) =>
-    api.get(`/admin/companies/${companyId}/approval-workflows`).then(r => r.data),
+    api.get(`/admin/companies/${companyId}/approval-workflows`).then((r) => r.data),
   createApprovalWorkflow: (companyId: string, data: any) =>
-    api.post(`/admin/companies/${companyId}/approval-workflows`, data).then(r => r.data),
+    api.post(`/admin/companies/${companyId}/approval-workflows`, data).then((r) => r.data),
   getApprovalRequests: (params?: any) =>
-    api.get("/approval-requests", { params }).then(r => r.data),
-  createApprovalRequest: (data: any) =>
-    api.post("/approval-requests", data).then(r => r.data),
+    api.get("/approval-requests", { params }).then((r) => r.data),
+  createApprovalRequest: (data: any) => api.post("/approval-requests", data).then((r) => r.data),
   actionApprovalRequest: (id: string, data: any) =>
-    api.put(`/approval-requests/${id}/action`, data).then(r => r.data),
-  getPendingApprovals: () =>
-    api.get("/approval-requests/pending").then(r => r.data),
-  getHealthStatus: () =>
-    api.get("/admin/health/status").then(r => r.data),
+    api.put(`/approval-requests/${id}/action`, data).then((r) => r.data),
+  getPendingApprovals: () => api.get("/approval-requests/pending").then((r) => r.data),
+  getHealthStatus: () => api.get("/admin/health/status").then((r) => r.data),
   getHealthHistory: (days?: number) =>
-    api.get("/admin/health/history", { params: { days: days ?? 7 } }).then(r => r.data),
-  getIncidents: (params?: any) =>
-    api.get("/admin/incidents", { params }).then(r => r.data),
-  createIncident: (data: any) =>
-    api.post("/admin/incidents", data).then(r => r.data),
-  getBackups: () =>
-    api.get("/admin/backups").then(r => r.data),
-  triggerBackup: () =>
-    api.post("/admin/backup").then(r => r.data),
-  restoreBackup: (id: string) =>
-    api.post(`/admin/backup/${id}/restore`).then(r => r.data),
+    api.get("/admin/health/history", { params: { days: days ?? 7 } }).then((r) => r.data),
+  getIncidents: (params?: any) => api.get("/admin/incidents", { params }).then((r) => r.data),
+  createIncident: (data: any) => api.post("/admin/incidents", data).then((r) => r.data),
+  getBackups: () => api.get("/admin/backups").then((r) => r.data),
+  triggerBackup: () => api.post("/admin/backup").then((r) => r.data),
+  restoreBackup: (id: string) => api.post(`/admin/backup/${id}/restore`).then((r) => r.data),
   getCompanyGrowth: (params?: any) =>
-    api.get("/admin/analytics/company-growth", { params }).then(r => r.data),
-  getModuleAdoption: () =>
-    api.get("/admin/analytics/module-adoption").then(r => r.data),
+    api.get("/admin/analytics/company-growth", { params }).then((r) => r.data),
+  getModuleAdoption: () => api.get("/admin/analytics/module-adoption").then((r) => r.data),
   getRetentionCohort: (params?: any) =>
-    api.get("/admin/analytics/retention-cohort", { params }).then(r => r.data),
-  getMrrBreakdown: () =>
-    api.get("/admin/analytics/mrr-breakdown").then(r => r.data),
-  getCommandCenterKpi: () =>
-    api.get("/admin/command-center/kpi").then(r => r.data),
-  getFastestGrowing: () =>
-    api.get("/admin/command-center/fastest-growing").then(r => r.data),
-  getHealthScores: () =>
-    api.get("/admin/command-center/health-scores").then(r => r.data),
+    api.get("/admin/analytics/retention-cohort", { params }).then((r) => r.data),
+  getMrrBreakdown: () => api.get("/admin/analytics/mrr-breakdown").then((r) => r.data),
+  getCommandCenterKpi: () => api.get("/admin/command-center/kpi").then((r) => r.data),
+  getFastestGrowing: () => api.get("/admin/command-center/fastest-growing").then((r) => r.data),
+  getHealthScores: () => api.get("/admin/command-center/health-scores").then((r) => r.data),
   getCompanyModules: (companyId: string) =>
     api.get(`/admin/companies/${companyId}/modules`).then((r) => r.data),
   updateCompanyModules: (companyId: string, modules: Record<string, boolean>) =>
     api.put(`/admin/companies/${companyId}/modules`, { modules }).then((r) => r.data),
   createCompanyModules: (companyId: string, modules: string[]) =>
-    api.put(`/admin/companies/${companyId}/modules`, {
-      modules: Object.fromEntries(modules.map(m => [m, true]))
-    }).then((r) => r.data),
+    api
+      .put(`/admin/companies/${companyId}/modules`, {
+        modules: Object.fromEntries(modules.map((m) => [m, true])),
+      })
+      .then((r) => r.data),
   getMillSettings: (millId: string) =>
     api.get(`/admin/mills/${millId}/settings`).then((r) => r.data),
   updateMillSettings: (millId: string, settings: Record<string, any>) =>
@@ -693,7 +764,13 @@ export const adminApi = {
   restoreCompany: (companyId: string) =>
     api.post(`/admin/companies/${companyId}/restore`).then((r) => r.data),
   permanentDeleteCompany: (companyId: string, confirmCode: string) =>
-    api.post(`/admin/companies/${companyId}/delete`, {}, { headers: { "X-Confirm-Code": confirmCode } }).then((r) => r.data),
+    api
+      .post(
+        `/admin/companies/${companyId}/delete`,
+        {},
+        { headers: { "X-Confirm-Code": confirmCode } },
+      )
+      .then((r) => r.data),
   getCompanyDetail: (companyId: string) =>
     api.get(`/admin/companies/${companyId}/detail`).then((r) => r.data),
   getCompanyStats: () =>
@@ -708,8 +785,7 @@ export const adminApi = {
         company_stats: stats,
       };
     }),
-  getBillingSummary: () =>
-    api.get("/admin/billing/summary").then((r) => r.data),
+  getBillingSummary: () => api.get("/admin/billing/summary").then((r) => r.data),
   getSubscriptions: (params?: any) =>
     api.get("/admin/billing/subscriptions", { params }).then((r) => r.data),
   getCompanyBillingDetail: (companyId: string) =>
@@ -718,8 +794,7 @@ export const adminApi = {
     api.get("/admin/billing/invoices", { params }).then((r) => r.data),
   getBillingPayments: (params?: any) =>
     api.get("/admin/billing/payments", { params }).then((r) => r.data),
-  getBillingAnalytics: () =>
-    api.get("/admin/billing/analytics").then((r) => r.data),
+  getBillingAnalytics: () => api.get("/admin/billing/analytics").then((r) => r.data),
 };
 
 // ---------------------------------------------------------------------------
@@ -775,18 +850,22 @@ export const alertsApi = {
     description?: string;
   }) => api.post("/alerts/rules", data).then((r) => r.data),
 
-  updateRule: (id: string, data: {
-    name?: string;
-    is_active?: boolean;
-    severity?: string;
-    threshold_value?: number;
-    cooldown_minutes?: number;
-  }) => api.patch(`/alerts/rules/${id}`, data).then((r) => r.data),
+  updateRule: (
+    id: string,
+    data: {
+      name?: string;
+      is_active?: boolean;
+      severity?: string;
+      threshold_value?: number;
+      cooldown_minutes?: number;
+    },
+  ) => api.patch(`/alerts/rules/${id}`, data).then((r) => r.data),
 
   deleteRule: (id: string) => api.delete(`/alerts/rules/${id}`).then((r) => r.data),
 
   seedRules: (companyId?: string) =>
-    api.post("/alerts/seed", null, { params: companyId ? { company_id: companyId } : undefined })
+    api
+      .post("/alerts/seed", null, { params: companyId ? { company_id: companyId } : undefined })
       .then((r) => r.data),
 };
 

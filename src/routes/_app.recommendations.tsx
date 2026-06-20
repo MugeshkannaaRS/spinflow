@@ -32,23 +32,32 @@ function RecommendationsPage() {
 
   const severityIcon = (s: string) => {
     switch (s) {
-      case "warning": return AlertTriangle;
-      case "info": return Info;
-      default: return Lightbulb;
+      case "warning":
+        return AlertTriangle;
+      case "info":
+        return Info;
+      default:
+        return Lightbulb;
     }
   };
   const severityClass = (s: string) => {
     switch (s) {
-      case "warning": return "bg-amber-50 border-amber-200";
-      case "info": return "bg-blue-50 border-blue-200";
-      default: return "bg-gray-50 border-gray-200";
+      case "warning":
+        return "bg-amber-50 border-amber-200";
+      case "info":
+        return "bg-blue-50 border-blue-200";
+      default:
+        return "bg-gray-50 border-gray-200";
     }
   };
   const iconClass = (s: string) => {
     switch (s) {
-      case "warning": return "text-amber-600";
-      case "info": return "text-blue-600";
-      default: return "text-gray-600";
+      case "warning":
+        return "text-amber-600";
+      case "info":
+        return "text-blue-600";
+      default:
+        return "text-gray-600";
     }
   };
 
@@ -93,10 +102,15 @@ function RecommendationsPage() {
                 key={i}
                 className={cn(
                   "flex items-start gap-4 p-4 rounded-xl border",
-                  severityClass(rec.severity)
+                  severityClass(rec.severity),
                 )}
               >
-                <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-white", iconClass(rec.severity))}>
+                <div
+                  className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-white",
+                    iconClass(rec.severity),
+                  )}
+                >
                   <Icon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0">

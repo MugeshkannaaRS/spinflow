@@ -1,6 +1,6 @@
-from typing import Optional, List
+from typing import Optional, List, Tuple, Dict
 from datetime import datetime, timezone
-from sqlalchemy import select, func, and_, text
+from sqlalchemy import select, func, and_, or_, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 from app.services.base import BaseService
@@ -228,13 +228,52 @@ class StockLedgerService(BaseService[StockLedger]):
             return 0.0
         return balance.qty_on_hand - balance.qty_reserved
 
+    async def get_available_batch(self, keys: List[Tuple[str, str]]) -> Dict[Tuple[str, str], float]:
+        if not keys:
+            return {}
+        conditions = [
+            and_(StockBalance.lot_id == lot_id, StockBalance.warehouse_id == wh_id)
+            for lot_id, wh_id in keys
+        ]
+        stmt = select(StockBalance).where(or_(*conditions))
+        result = await self.db.execute(stmt)
+        map_by = {}
+        for balance in result.scalars().all():
+            map_by[(balance.lot_id, balance.warehouse_id)] = balance
+        output: Dict[Tuple[str, str], float] = {}
+        for lot_id, wh_id in keys:
+            balance = map_by.get((lot_id, wh_id))
+            output[(lot_id, wh_id)] = balance.qty_on_hand - balance.qty_reserved if balance else 0.0
+        return output
+
     async def stock_snapshot(
         self,
         mill_id: str,
         fg_state: Optional[str] = None,
         warehouse_id: Optional[str] = None,
         yarn_count: Optional[str] = None,
-    ) -> List[dict]:
+        page: int = 1,
+        page_size: int = 50,
+    ) -> dict:
+        base_join = (
+            select(StockBalance)
+            .join(Lot, StockBalance.lot_id == Lot.id)
+            .join(Warehouse, StockBalance.warehouse_id == Warehouse.id)
+            .outerjoin(YarnCount, and_(YarnCount.mill_id == StockBalance.mill_id, YarnCount.count == Lot.type))
+            .where(StockBalance.mill_id == mill_id)
+        )
+
+        if fg_state:
+            base_join = base_join.where(StockBalance.fg_state == fg_state)
+        if warehouse_id:
+            base_join = base_join.where(StockBalance.warehouse_id == warehouse_id)
+        if yarn_count:
+            base_join = base_join.where(YarnCount.count == yarn_count)
+
+        count_stmt = select(func.count()).select_from(base_join.subquery())
+        total_result = await self.db.execute(count_stmt)
+        total = total_result.scalar() or 0
+
         stmt = (
             select(
                 StockBalance, Lot.lot_no, Lot.quality_status, Warehouse.code.label("wh_code"),
@@ -253,6 +292,8 @@ class StockLedgerService(BaseService[StockLedger]):
         if yarn_count:
             stmt = stmt.where(YarnCount.count == yarn_count)
 
+        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+
         result = await self.db.execute(stmt)
         rows = []
         for balance, lot_no, quality_status, wh_code, yc_count in result.all():
@@ -270,7 +311,13 @@ class StockLedgerService(BaseService[StockLedger]):
                 "weight_on_hand_kg": balance.weight_on_hand_kg,
                 "last_move_at": balance.last_move_at.isoformat() if balance.last_move_at else None,
             })
-        return rows
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+            "data": rows,
+        }
 
     async def ledger_history(self, lot_id: str, limit: int = 50) -> List[dict]:
         stmt = (

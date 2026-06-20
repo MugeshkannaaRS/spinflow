@@ -52,7 +52,12 @@ export function NudgeBar() {
   const Icon = PRIORITY_ICONS[nudge.priority] ?? Lightbulb;
 
   return (
-    <div className={cn("px-4 py-2.5 border-b flex items-center gap-3", PRIORITY_STYLES[nudge.priority] ?? "bg-gray-50 border-gray-200")}>
+    <div
+      className={cn(
+        "px-4 py-2.5 border-b flex items-center gap-3",
+        PRIORITY_STYLES[nudge.priority] ?? "bg-gray-50 border-gray-200",
+      )}
+    >
       <Icon className="w-4 h-4 shrink-0 text-gray-600" />
       <div className="flex-1 min-w-0">
         <span className="text-xs font-medium text-gray-900">{nudge.title}</span>

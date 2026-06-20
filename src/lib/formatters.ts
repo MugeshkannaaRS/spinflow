@@ -2,71 +2,75 @@
 
 /** Indian-locale number, e.g. 1,23,456 */
 export const fmtNumber = (n: unknown, decimals = 0): string => {
-  const num = Number(n ?? 0)
-  if (isNaN(num)) return '0'
-  return num.toLocaleString('en-IN', {
+  const num = Number(n ?? 0);
+  if (isNaN(num)) return "0";
+  return num.toLocaleString("en-IN", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
-  })
-}
+  });
+};
 
 /** Alias used in dashboard: fmt(1234) → "1,234" */
-export const fmt = fmtNumber
+export const fmt = fmtNumber;
 
 /** Dynamic currency symbol — updated from mill subscription config */
-let _currencySymbol = "₹"
+let _currencySymbol = "₹";
 
 export function setCurrencySymbol(symbol: string): void {
-  _currencySymbol = symbol || "₹"
+  _currencySymbol = symbol || "₹";
   if (typeof window !== "undefined") {
-    (window as any).__spinflow_currency__ = _currencySymbol
+    (window as any).__spinflow_currency__ = _currencySymbol;
   }
 }
 
 export function getCurrencySymbol(): string {
   if (typeof window !== "undefined" && (window as any).__spinflow_currency__) {
-    return (window as any).__spinflow_currency__
+    return (window as any).__spinflow_currency__;
   }
-  return _currencySymbol
+  return _currencySymbol;
 }
 
 /** Currency with Cr / L abbreviation — uses dynamic currency symbol */
 export const fmtLakh = (n: unknown): string => {
-  const num = Number(n ?? 0)
-  const sym = getCurrencySymbol()
-  if (isNaN(num)) return `${sym}0`
-  if (num >= 10000000) return `${sym}${(num / 10000000).toFixed(2)} Cr`
-  if (num >= 100000)   return `${sym}${(num / 100000).toFixed(2)} L`
-  return `${sym}${num.toLocaleString('en-IN')}`
-}
+  const num = Number(n ?? 0);
+  const sym = getCurrencySymbol();
+  if (isNaN(num)) return `${sym}0`;
+  if (num >= 10000000) return `${sym}${(num / 10000000).toFixed(2)} Cr`;
+  if (num >= 100000) return `${sym}${(num / 100000).toFixed(2)} L`;
+  return `${sym}${num.toLocaleString("en-IN")}`;
+};
 
 /** Alias kept for backward compat */
-export const fmtCurrency = fmtLakh
+export const fmtCurrency = fmtLakh;
 
 /** 1 decimal percent, e.g. "4.2%" */
-export const fmtPercent = (n: unknown): string => `${fmtNumber(n, 1)}%`
+export const fmtPercent = (n: unknown): string => `${fmtNumber(n, 1)}%`;
 
 /** Alias */
-export const fmtPct = (n: unknown, decimals = 1): string =>
-  `${Number(n ?? 0).toFixed(decimals)}%`
+export const fmtPct = (n: unknown, decimals = 1): string => `${Number(n ?? 0).toFixed(decimals)}%`;
 
 /** "02 Jun 2025" */
 export const fmtDate = (d: string | Date | null | undefined): string => {
-  if (!d) return '—'
-  const dt = typeof d === 'string' ? new Date(d) : d
-  if (isNaN(dt.getTime())) return String(d)
-  return dt.toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric',
-  })
-}
+  if (!d) return "—";
+  const dt = typeof d === "string" ? new Date(d) : d;
+  if (isNaN(dt.getTime())) return String(d);
+  return dt.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
 
 /** "02 Jun 2025, 14:30" */
 export const fmtDateTime = (d: string | Date | null | undefined): string => {
-  if (!d) return '—'
-  const dt = typeof d === 'string' ? new Date(d) : d
-  if (isNaN(dt.getTime())) return String(d)
-  return dt.toLocaleString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
-}
+  if (!d) return "—";
+  const dt = typeof d === "string" ? new Date(d) : d;
+  if (isNaN(dt.getTime())) return String(d);
+  return dt.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};

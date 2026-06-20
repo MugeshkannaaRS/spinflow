@@ -44,7 +44,11 @@ function SubscriptionsPage() {
   });
 
   if (!user || user.role !== "SUPER_ADMIN") {
-    return <div className="p-6 text-destructive text-lg font-medium">Only Super Admin can access this page.</div>;
+    return (
+      <div className="p-6 text-destructive text-lg font-medium">
+        Only Super Admin can access this page.
+      </div>
+    );
   }
 
   const rows: any[] = q.data?.items ?? [];
@@ -54,22 +58,39 @@ function SubscriptionsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">Subscriptions</h1>
-          <p className="text-sm text-muted-foreground">All company subscriptions with usage and billing status.</p>
+          <p className="text-sm text-muted-foreground">
+            All company subscriptions with usage and billing status.
+          </p>
         </div>
         <div className="relative w-64">
           <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-          <Input placeholder="Search company..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
+          <Input
+            placeholder="Search company..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8"
+          />
         </div>
       </div>
 
       {q.isLoading ? (
-        <div className="rounded-lg border p-12 text-center text-sm text-muted-foreground">Loading subscriptions…</div>
+        <div className="rounded-lg border p-12 text-center text-sm text-muted-foreground">
+          Loading subscriptions…
+        </div>
       ) : q.isError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800 p-6 text-center">
           <AlertTriangle className="size-8 mx-auto mb-2 text-red-500" />
-          <p className="text-sm font-medium text-red-700 dark:text-red-400">Failed to load subscriptions.</p>
-          <p className="text-xs text-red-500 mt-1 mb-3">{(q.error as any)?.response?.data?.detail ?? (q.error as any)?.message ?? "Request failed"}</p>
-          <Button variant="outline" size="sm" onClick={() => q.refetch()}>Retry</Button>
+          <p className="text-sm font-medium text-red-700 dark:text-red-400">
+            Failed to load subscriptions.
+          </p>
+          <p className="text-xs text-red-500 mt-1 mb-3">
+            {(q.error as any)?.response?.data?.detail ??
+              (q.error as any)?.message ??
+              "Request failed"}
+          </p>
+          <Button variant="outline" size="sm" onClick={() => q.refetch()}>
+            Retry
+          </Button>
         </div>
       ) : (
         <div className="rounded-lg border overflow-hidden">
@@ -89,51 +110,82 @@ function SubscriptionsPage() {
             </thead>
             <tbody className="divide-y">
               {rows.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">No subscriptions found.</td></tr>
-              ) : rows.map((r: any) => (
-                <tr key={r.company_id} className="hover:bg-muted/30">
-                  <td className="px-4 py-3">
-                    <div className="font-medium">{r.company_name}</div>
-                    <div className="text-xs text-muted-foreground font-mono">{r.company_code}</div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={cn(
-                      "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold capitalize",
-                      PLAN_COLORS[r.plan_code] ?? PLAN_COLORS.starter,
-                    )}>
-                      {r.plan_name}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span className={r.user_count >= r.user_limit ? "text-red-600 font-semibold" : ""}>{r.user_count}</span>
-                      <span className="text-muted-foreground">/ {r.user_limit}</span>
-                      {r.user_count >= r.user_limit && <AlertTriangle className="size-3.5 text-red-500" />}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span>{r.mill_count}</span>
-                    <span className="text-muted-foreground"> / {r.mill_limit}</span>
-                  </td>
-                  <td className="px-4 py-3">{r.modules_enabled}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{r.renewal_date ?? "—"}</td>
-                  <td className="px-4 py-3 text-right font-medium">₹{(r.monthly_amount ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</td>
-                  <td className="px-4 py-3">
-                    <span className={cn(
-                      "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold",
-                      STATUS_COLORS[r.status] ?? "bg-gray-100 text-gray-600",
-                    )}>
-                      {r.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Button variant="ghost" size="sm" className="text-xs"
-                      onClick={() => navigate({ to: `/admin/billing/subscriptions/${r.company_id}` })}>
-                      View
-                    </Button>
+                <tr>
+                  <td colSpan={9} className="px-4 py-12 text-center text-muted-foreground">
+                    No subscriptions found.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                rows.map((r: any) => (
+                  <tr key={r.company_id} className="hover:bg-muted/30">
+                    <td className="px-4 py-3">
+                      <div className="font-medium">{r.company_name}</div>
+                      <div className="text-xs text-muted-foreground font-mono">
+                        {r.company_code}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={cn(
+                          "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold capitalize",
+                          PLAN_COLORS[r.plan_code] ?? PLAN_COLORS.starter,
+                        )}
+                      >
+                        {r.plan_name}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={
+                            r.user_count >= r.user_limit ? "text-red-600 font-semibold" : ""
+                          }
+                        >
+                          {r.user_count}
+                        </span>
+                        <span className="text-muted-foreground">/ {r.user_limit}</span>
+                        {r.user_count >= r.user_limit && (
+                          <AlertTriangle className="size-3.5 text-red-500" />
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span>{r.mill_count}</span>
+                      <span className="text-muted-foreground"> / {r.mill_limit}</span>
+                    </td>
+                    <td className="px-4 py-3">{r.modules_enabled}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{r.renewal_date ?? "—"}</td>
+                    <td className="px-4 py-3 text-right font-medium">
+                      ₹
+                      {(r.monthly_amount ?? 0).toLocaleString("en-IN", {
+                        maximumFractionDigits: 0,
+                      })}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={cn(
+                          "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold",
+                          STATUS_COLORS[r.status] ?? "bg-gray-100 text-gray-600",
+                        )}
+                      >
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs"
+                        onClick={() =>
+                          navigate({ to: `/admin/billing/subscriptions/${r.company_id}` })
+                        }
+                      >
+                        View
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

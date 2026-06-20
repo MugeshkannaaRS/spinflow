@@ -19,7 +19,9 @@ from typing import Optional
 # Ensure backend is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-DEFAULT_PWD_HASH = "$2b$12$LJ3m4ys3Lk0TSwHnbfOMiOXPm1Qlq5Gz0Hqz6Dz0Hqz6Dz0Hqz6Du"
+import os
+from app.core.security import hash_password
+SEED_ADMIN_PWD = os.environ.get("SEED_ADMIN_PASSWORD", "Admin@1234")
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
@@ -95,7 +97,7 @@ class StagingSeeder:
             id=uuid4_str(),
             name="Super Admin",
             email="admin@mill.spinflow",
-            password_hash=DEFAULT_PWD_HASH,
+            password_hash=hash_password(SEED_ADMIN_PWD),
             role_id=roles["SUPER_ADMIN"].id,
             is_active=True,
             must_change_password=False,
@@ -104,7 +106,7 @@ class StagingSeeder:
         await self.db.flush()
         self.timings["seed_admin"] = time.time() - t0
         self.counts["admin"] = 1
-        print(f"  Admin: created ({admin.email} / Admin@1234)")
+        print(f"  Admin: created ({admin.email} / {SEED_ADMIN_PWD})")
         return admin
 
     async def seed(self):

@@ -2,12 +2,7 @@ import React from "react";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { cn } from "@/lib/utils";
 import { HelpCircle } from "lucide-react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface FormFieldProps {
   columnKey: string;

@@ -3,7 +3,16 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiCard } from "@/components/ui/KpiCard";
-import { Users, TrendingUp, DollarSign, Activity, BarChart3, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
+import {
+  Users,
+  TrendingUp,
+  DollarSign,
+  Activity,
+  BarChart3,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_app/admin/sales")({
   head: () => ({ meta: [{ title: "Sales Command Center — SpinFlow ERP" }] }),
@@ -45,18 +54,66 @@ function SalesCommandCenter() {
 
       {/* Trial KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Active Trials" value={isLoading ? "—" : t.active ?? 0} icon={Clock} iconColor="text-blue-600" iconBg="bg-blue-50" />
-        <KpiCard label="Started (30d)" value={isLoading ? "—" : t.started_30d ?? 0} icon={TrendingUp} iconColor="text-green-600" iconBg="bg-green-50" />
-        <KpiCard label="Expired" value={isLoading ? "—" : t.expired ?? 0} icon={AlertTriangle} iconColor="text-red-600" iconBg="bg-red-50" />
-        <KpiCard label="Total Trials" value={isLoading ? "—" : t.total ?? 0} icon={Users} iconColor="text-indigo-600" iconBg="bg-indigo-50" />
+        <KpiCard
+          label="Active Trials"
+          value={isLoading ? "—" : (t.active ?? 0)}
+          icon={Clock}
+          iconColor="text-blue-600"
+          iconBg="bg-blue-50"
+        />
+        <KpiCard
+          label="Started (30d)"
+          value={isLoading ? "—" : (t.started_30d ?? 0)}
+          icon={TrendingUp}
+          iconColor="text-green-600"
+          iconBg="bg-green-50"
+        />
+        <KpiCard
+          label="Expired"
+          value={isLoading ? "—" : (t.expired ?? 0)}
+          icon={AlertTriangle}
+          iconColor="text-red-600"
+          iconBg="bg-red-50"
+        />
+        <KpiCard
+          label="Total Trials"
+          value={isLoading ? "—" : (t.total ?? 0)}
+          icon={Users}
+          iconColor="text-indigo-600"
+          iconBg="bg-indigo-50"
+        />
       </div>
 
       {/* Conversion KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Companies" value={isLoading ? "—" : c.total_companies ?? 0} icon={BarChart3} iconColor="text-gray-600" iconBg="bg-gray-50" />
-        <KpiCard label="Paying Customers" value={isLoading ? "—" : c.active_subscriptions ?? 0} icon={CheckCircle2} iconColor="text-green-600" iconBg="bg-green-50" />
-        <KpiCard label="Conversion Rate" value={isLoading ? "—" : `${c.conversion_rate ?? 0}%`} icon={TrendingUp} iconColor="text-blue-600" iconBg="bg-blue-50" />
-        <KpiCard label="MRR" value={isLoading ? "—" : `₹${(c.mrr ?? 0).toLocaleString()}`} icon={DollarSign} iconColor="text-teal-600" iconBg="bg-teal-50" />
+        <KpiCard
+          label="Companies"
+          value={isLoading ? "—" : (c.total_companies ?? 0)}
+          icon={BarChart3}
+          iconColor="text-gray-600"
+          iconBg="bg-gray-50"
+        />
+        <KpiCard
+          label="Paying Customers"
+          value={isLoading ? "—" : (c.active_subscriptions ?? 0)}
+          icon={CheckCircle2}
+          iconColor="text-green-600"
+          iconBg="bg-green-50"
+        />
+        <KpiCard
+          label="Conversion Rate"
+          value={isLoading ? "—" : `${c.conversion_rate ?? 0}%`}
+          icon={TrendingUp}
+          iconColor="text-blue-600"
+          iconBg="bg-blue-50"
+        />
+        <KpiCard
+          label="MRR"
+          value={isLoading ? "—" : `₹${(c.mrr ?? 0).toLocaleString()}`}
+          icon={DollarSign}
+          iconColor="text-teal-600"
+          iconBg="bg-teal-50"
+        />
       </div>
 
       {/* Customer Health Distribution */}
@@ -69,7 +126,7 @@ function SalesCommandCenter() {
             {[
               { label: "Healthy", count: h.healthy ?? 0, color: "bg-green-500" },
               { label: "Warning", count: h.warning ?? 0, color: "bg-amber-500" },
-              { label: "At Risk",  count: h.at_risk ?? 0, color: "bg-orange-500" },
+              { label: "At Risk", count: h.at_risk ?? 0, color: "bg-orange-500" },
               { label: "Critical", count: h.critical ?? 0, color: "bg-red-500" },
             ].map((item) => (
               <div key={item.label} className="text-center p-3 rounded-lg bg-gray-50">

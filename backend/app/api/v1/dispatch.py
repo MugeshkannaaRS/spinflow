@@ -205,6 +205,7 @@ async def create_dispatch(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("dispatch", write=True)),
 ):
+    scope = await get_mill_scope(current_user, db)
     svc = DispatchService(db, current_user)
     return await svc.create_dispatch(
         date=req.date,
@@ -215,6 +216,8 @@ async def create_dispatch(
         vehicle_no=req.vehicle_no,
         driver_name=req.driver_name,
         driver_phone=req.driver_phone,
+        mill_id=scope.get("mill_id"),
+        company_id=scope.get("company_id"),
     )
 
 

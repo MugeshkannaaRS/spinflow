@@ -11,8 +11,14 @@ import { Input } from "@/components/ui/input";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import {
-  FileText, Activity, ShieldCheck, Monitor,
-  Download, Search, Filter, X,
+  FileText,
+  Activity,
+  ShieldCheck,
+  Monitor,
+  Download,
+  Search,
+  Filter,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -24,12 +30,23 @@ export const Route = createFileRoute("/_app/audit")({
 });
 
 const ENTITY_LABELS: Record<string, string> = {
-  employee: "Employee", attendance: "Attendance", leave: "Leave",
-  payroll: "Payroll", production: "Production", dispatch: "Dispatch",
-  quality: "Quality", purchase: "Purchase", stores: "Stores",
-  accounts: "Accounts", invoice: "Invoice", user: "User",
-  company: "Company", mill: "Mill", module: "Module",
-  role: "Role", maintenance: "Maintenance",
+  employee: "Employee",
+  attendance: "Attendance",
+  leave: "Leave",
+  payroll: "Payroll",
+  production: "Production",
+  dispatch: "Dispatch",
+  quality: "Quality",
+  purchase: "Purchase",
+  stores: "Stores",
+  accounts: "Accounts",
+  invoice: "Invoice",
+  user: "User",
+  company: "Company",
+  mill: "Mill",
+  module: "Module",
+  role: "Role",
+  maintenance: "Maintenance",
 };
 
 function fmtTs(ts: string): string {
@@ -37,47 +54,57 @@ function fmtTs(ts: string): string {
   const d = new Date(ts);
   if (isNaN(d.getTime())) return ts;
   return d.toLocaleDateString("en-IN", {
-    year: "numeric", month: "short", day: "numeric",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
   });
 }
 
 function humanEntity(entity: string): string {
-  return ENTITY_LABELS[entity] || entity.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return (
+    ENTITY_LABELS[entity] || entity.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
 }
 
 const ACTION_VARIANTS: Record<string, "default" | "destructive" | "secondary" | "outline"> = {
-  login: "default", logout: "secondary",
-  create: "default", update: "secondary",
-  delete: "destructive", approve: "default", reject: "destructive",
+  login: "default",
+  logout: "secondary",
+  create: "default",
+  update: "secondary",
+  delete: "destructive",
+  approve: "default",
+  reject: "destructive",
 };
 
 const SEVERITY_BADGE: Record<string, string> = {
   EMERGENCY: "bg-red-100 text-red-700",
-  CRITICAL:  "bg-red-100 text-red-600",
-  WARNING:   "bg-amber-100 text-amber-700",
-  INFO:      "bg-blue-50 text-blue-600",
+  CRITICAL: "bg-red-100 text-red-600",
+  WARNING: "bg-amber-100 text-amber-700",
+  INFO: "bg-blue-50 text-blue-600",
 };
 
 const CATEGORY_OPTIONS = [
   { value: "", label: "All Categories" },
-  { value: "SECURITY",      label: "Security" },
+  { value: "SECURITY", label: "Security" },
   { value: "USER_ACTIVITY", label: "User Activity" },
-  { value: "PRODUCTION",    label: "Production" },
-  { value: "INVENTORY",     label: "Inventory" },
-  { value: "HR",            label: "HR" },
-  { value: "PAYROLL",       label: "Payroll" },
-  { value: "PURCHASE",      label: "Purchase" },
-  { value: "SALES",         label: "Sales" },
-  { value: "BILLING",       label: "Billing" },
-  { value: "SYSTEM",        label: "System" },
+  { value: "PRODUCTION", label: "Production" },
+  { value: "INVENTORY", label: "Inventory" },
+  { value: "HR", label: "HR" },
+  { value: "PAYROLL", label: "Payroll" },
+  { value: "PURCHASE", label: "Purchase" },
+  { value: "SALES", label: "Sales" },
+  { value: "BILLING", label: "Billing" },
+  { value: "SYSTEM", label: "System" },
 ];
 
 const SEVERITY_OPTIONS = [
   { value: "", label: "All Severity" },
-  { value: "INFO",      label: "Info" },
-  { value: "WARNING",   label: "Warning" },
-  { value: "CRITICAL",  label: "Critical" },
+  { value: "INFO", label: "Info" },
+  { value: "WARNING", label: "Warning" },
+  { value: "CRITICAL", label: "Critical" },
   { value: "EMERGENCY", label: "Emergency" },
 ];
 
@@ -109,21 +136,25 @@ const AUDIT_COLS: ColDef[] = [
   {
     key: "category",
     label: "Category",
-    render: (l: any) => l.category ? (
-      <span className="text-xs text-gray-600">{l.category.replace(/_/g, " ")}</span>
-    ) : null,
+    render: (l: any) =>
+      l.category ? (
+        <span className="text-xs text-gray-600">{l.category.replace(/_/g, " ")}</span>
+      ) : null,
   },
   {
     key: "severity",
     label: "Severity",
-    render: (l: any) => l.severity ? (
-      <span className={cn(
-        "text-[11px] font-semibold px-1.5 py-0.5 rounded uppercase",
-        SEVERITY_BADGE[l.severity] || "bg-gray-100 text-gray-600"
-      )}>
-        {l.severity}
-      </span>
-    ) : null,
+    render: (l: any) =>
+      l.severity ? (
+        <span
+          className={cn(
+            "text-[11px] font-semibold px-1.5 py-0.5 rounded uppercase",
+            SEVERITY_BADGE[l.severity] || "bg-gray-100 text-gray-600",
+          )}
+        >
+          {l.severity}
+        </span>
+      ) : null,
   },
   { key: "details", label: "Details", className: "max-w-xs truncate" },
   { key: "ip_address", label: "IP", className: "font-mono text-xs" },
@@ -140,7 +171,8 @@ function AuditPage() {
   const pageSize = 50;
 
   const params: Record<string, any> = {
-    page, page_size: pageSize,
+    page,
+    page_size: pageSize,
     search: search || undefined,
     category: category || undefined,
     severity: severity || undefined,
@@ -162,13 +194,19 @@ function AuditPage() {
 
   const totalLogs = total;
   const loginActions = logs.filter((l) => l.action === "login" || l.action === "logout").length;
-  const criticalCount = logs.filter((l) => l.severity === "CRITICAL" || l.severity === "EMERGENCY").length;
+  const criticalCount = logs.filter(
+    (l) => l.severity === "CRITICAL" || l.severity === "EMERGENCY",
+  ).length;
   const createActions = logs.filter((l) => l.action === "create").length;
 
   const hasFilters = search || category || severity || dateFrom || dateTo;
 
   const clearFilters = () => {
-    setSearch(""); setCategory(""); setSeverity(""); setDateFrom(""); setDateTo("");
+    setSearch("");
+    setCategory("");
+    setSeverity("");
+    setDateFrom("");
+    setDateTo("");
     setPage(1);
   };
 
@@ -182,10 +220,9 @@ function AuditPage() {
       if (dateFrom) p.set("date_from", dateFrom);
       if (dateTo) p.set("date_to", dateTo);
 
-      const res = await fetch(
-        `${API_BASE}/api/v1/audit/logs/export?${p.toString()}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await fetch(`${API_BASE}/api/v1/audit/logs/export?${p.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -202,12 +239,13 @@ function AuditPage() {
   return (
     <AccessGuard module="audit">
       <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-5">
-
         {/* KPI cards */}
         <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
           <Card>
             <CardContent className="p-5">
-              <div className="text-xs uppercase text-muted-foreground font-medium">Total Events</div>
+              <div className="text-xs uppercase text-muted-foreground font-medium">
+                Total Events
+              </div>
               <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
                 <FileText className="size-5 text-primary" /> {totalLogs}
               </div>
@@ -231,10 +269,15 @@ function AuditPage() {
           </Card>
           <Card>
             <CardContent className="p-5">
-              <div className="text-xs uppercase text-muted-foreground font-medium">Critical / Emergency</div>
-              <div className={cn("text-2xl font-semibold mt-2 flex items-center gap-2",
-                criticalCount > 0 ? "text-red-600" : ""
-              )}>
+              <div className="text-xs uppercase text-muted-foreground font-medium">
+                Critical / Emergency
+              </div>
+              <div
+                className={cn(
+                  "text-2xl font-semibold mt-2 flex items-center gap-2",
+                  criticalCount > 0 ? "text-red-600" : "",
+                )}
+              >
                 <Monitor className="size-5 text-amber-500" /> {criticalCount}
               </div>
             </CardContent>
@@ -276,39 +319,58 @@ function AuditPage() {
                 <Input
                   placeholder="Search user, entity, details…"
                   value={search}
-                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
                   className="pl-8 h-8 text-sm w-56"
                 />
               </div>
               <select
                 value={category}
-                onChange={(e) => { setCategory(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setCategory(e.target.value);
+                  setPage(1);
+                }}
                 className="h-8 text-sm border rounded-md px-2 bg-white text-gray-700"
               >
                 {CATEGORY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
                 ))}
               </select>
               <select
                 value={severity}
-                onChange={(e) => { setSeverity(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setSeverity(e.target.value);
+                  setPage(1);
+                }}
                 className="h-8 text-sm border rounded-md px-2 bg-white text-gray-700"
               >
                 {SEVERITY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
                 ))}
               </select>
               <input
                 type="date"
                 value={dateFrom}
-                onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setDateFrom(e.target.value);
+                  setPage(1);
+                }}
                 className="h-8 text-sm border rounded-md px-2 bg-white text-gray-700"
                 placeholder="From"
               />
               <input
                 type="date"
                 value={dateTo}
-                onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                onChange={(e) => {
+                  setDateTo(e.target.value);
+                  setPage(1);
+                }}
                 className="h-8 text-sm border rounded-md px-2 bg-white text-gray-700"
                 placeholder="To"
               />
@@ -317,15 +379,15 @@ function AuditPage() {
 
           <CardContent className="pt-0">
             <ErrorBoundary inline label="Audit Logs">
-            <DataTable
-              tableId="audit_logs"
-              columns={AUDIT_COLS}
-              data={logs}
-              loading={logsQ.isLoading}
-              rowKey={(l) => l.id ?? l.timestamp}
-              exportFilename="audit_logs"
-              emptyMessage="No audit events match your filters."
-            />
+              <DataTable
+                tableId="audit_logs"
+                columns={AUDIT_COLS}
+                data={logs}
+                loading={logsQ.isLoading}
+                rowKey={(l) => l.id ?? l.timestamp}
+                exportFilename="audit_logs"
+                emptyMessage="No audit events match your filters."
+              />
             </ErrorBoundary>
 
             {/* Pagination */}

@@ -133,13 +133,14 @@ function LotracPage() {
     window.history.replaceState({}, "", url.toString());
   };
 
-  if (!user) return (
-    <div className="p-6 space-y-4">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-96 w-full" />
-    </div>
-  );
+  if (!user)
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
 
   return (
     <>
@@ -405,7 +406,8 @@ function NewTripSheet() {
     const errs: Record<string, string> = {};
     if (!form.vehicle_id && !form.vehicle_no) errs.vehicle = "Vehicle is required";
     if (!form.customer_id) errs.customer = "Customer is required";
-    if (!form.destination_route_id && !form.destination_name) errs.destination = "Destination is required";
+    if (!form.destination_route_id && !form.destination_name)
+      errs.destination = "Destination is required";
     if ((form.planned_bags ?? 0) <= 0) errs.planned_bags = "Planned bags must be > 0";
     if ((form.planned_weight_kg ?? 0) <= 0) errs.planned_weight_kg = "Planned weight must be > 0";
     setFormErrors(errs);
@@ -460,11 +462,13 @@ function NewTripSheet() {
                 <SelectValue placeholder="Select vehicle" />
               </SelectTrigger>
               <SelectContent>
-                {vehicles.filter((v: any) => v?.id).map((v: any) => (
-                  <SelectItem key={v.id} value={v.id}>
-                    {v.vehicle_no}
-                  </SelectItem>
-                ))}
+                {vehicles
+                  .filter((v: any) => v?.id)
+                  .map((v: any) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.vehicle_no}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -494,11 +498,13 @@ function NewTripSheet() {
                 <SelectValue placeholder="Select route" />
               </SelectTrigger>
               <SelectContent>
-                {routes.filter((r: any) => r?.id).map((r: any) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.name}
-                  </SelectItem>
-                ))}
+                {routes
+                  .filter((r: any) => r?.id)
+                  .map((r: any) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -512,11 +518,13 @@ function NewTripSheet() {
                 <SelectValue placeholder="Select customer" />
               </SelectTrigger>
               <SelectContent>
-                {customers.filter((c: any) => c?.id).map((c: any) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
+                {customers
+                  .filter((c: any) => c?.id)
+                  .map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -530,11 +538,13 @@ function NewTripSheet() {
                 <SelectValue placeholder="Select order" />
               </SelectTrigger>
               <SelectContent>
-                {orders.filter((o: any) => o?.id).map((o: any) => (
-                  <SelectItem key={o.id} value={o.id}>
-                    {o.so_no}
-                  </SelectItem>
-                ))}
+                {orders
+                  .filter((o: any) => o?.id)
+                  .map((o: any) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.so_no}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -633,7 +643,10 @@ function LoaderScannerTab() {
 
   useEffect(() => {
     if (selectedTripId) {
-      loTracApi.getTrip(selectedTripId).then(setTripDetail).catch(() => null);
+      loTracApi
+        .getTrip(selectedTripId)
+        .then(setTripDetail)
+        .catch(() => null);
     }
   }, [selectedTripId]);
 
@@ -697,11 +710,13 @@ function LoaderScannerTab() {
             <SelectValue placeholder="Choose trip..." />
           </SelectTrigger>
           <SelectContent>
-            {loadingTrips.filter((t) => t?.id).map((t) => (
-              <SelectItem key={t.id} value={t.id}>
-                {t.trip_no} — {t.loaded_bags}/{t.planned_bags} bags
-              </SelectItem>
-            ))}
+            {loadingTrips
+              .filter((t) => t?.id)
+              .map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.trip_no} — {t.loaded_bags}/{t.planned_bags} bags
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
       </div>
@@ -886,7 +901,10 @@ function ReceiverScannerTab() {
 
   useEffect(() => {
     if (selectedTripId) {
-      loTracApi.getTrip(selectedTripId).then(setTripDetail).catch(() => null);
+      loTracApi
+        .getTrip(selectedTripId)
+        .then(setTripDetail)
+        .catch(() => null);
     }
   }, [selectedTripId]);
 
@@ -997,11 +1015,13 @@ function ReceiverScannerTab() {
             <SelectValue placeholder="Choose trip..." />
           </SelectTrigger>
           <SelectContent>
-            {rxTrips.filter((t) => t?.id).map((t) => (
-              <SelectItem key={t.id} value={t.id}>
-                {t.trip_no} — {t.delivered_bags}/{t.planned_bags} bags
-              </SelectItem>
-            ))}
+            {rxTrips
+              .filter((t) => t?.id)
+              .map((t) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.trip_no} — {t.delivered_bags}/{t.planned_bags} bags
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
       </div>
@@ -1015,11 +1035,13 @@ function ReceiverScannerTab() {
                 <SelectValue placeholder="Select your location..." />
               </SelectTrigger>
               <SelectContent>
-                {routes.filter((r: any) => r?.id).map((r: any) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.name}
-                  </SelectItem>
-                ))}
+                {routes
+                  .filter((r: any) => r?.id)
+                  .map((r: any) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>

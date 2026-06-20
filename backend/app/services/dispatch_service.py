@@ -62,6 +62,8 @@ class DispatchService(BaseService):
         vehicle_no: Optional[str] = None,
         driver_name: Optional[str] = None,
         driver_phone: Optional[str] = None,
+        mill_id: Optional[str] = None,
+        company_id: Optional[str] = None,
     ) -> Dispatch:
         if vehicle_no:
             vehicle_result = await self.db.execute(
@@ -80,6 +82,8 @@ class DispatchService(BaseService):
             vehicle_no=vehicle_no,
             driver_name=driver_name,
             driver_phone=driver_phone,
+            mill_id=mill_id,
+            company_id=company_id,
             status="pending",
         )
         self.db.add(dispatch)

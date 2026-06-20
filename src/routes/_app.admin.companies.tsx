@@ -101,10 +101,30 @@ const CORE_MODULES = [
 ];
 
 const ADDON_MODULES = [
-  { key: "lotrac", label: "LoTrac", desc: "QR-based sack tracking & delivery confirmation", price: "\u20B91,999/mo" },
-  { key: "whatsapp", label: "WhatsApp Alerts", desc: "Machine down, low stock, daily MIS report at 6 PM", price: "\u20B92,999/mo" },
-  { key: "lc_tracking", label: "LC Tracking", desc: "Letter of Credit management with expiry alerts", price: "\u20B9999/mo" },
-  { key: "analytics", label: "Advanced Analytics", desc: "Lot traceability, P&L dashboard, efficiency benchmarks", price: "\u20B91,499/mo" },
+  {
+    key: "lotrac",
+    label: "LoTrac",
+    desc: "QR-based sack tracking & delivery confirmation",
+    price: "\u20B91,999/mo",
+  },
+  {
+    key: "whatsapp",
+    label: "WhatsApp Alerts",
+    desc: "Machine down, low stock, daily MIS report at 6 PM",
+    price: "\u20B92,999/mo",
+  },
+  {
+    key: "lc_tracking",
+    label: "LC Tracking",
+    desc: "Letter of Credit management with expiry alerts",
+    price: "\u20B9999/mo",
+  },
+  {
+    key: "analytics",
+    label: "Advanced Analytics",
+    desc: "Lot traceability, P&L dashboard, efficiency benchmarks",
+    price: "\u20B91,499/mo",
+  },
 ];
 
 function generateTempPassword() {
@@ -119,7 +139,7 @@ function generateTempPassword() {
   ];
   const all = upper + lower + digits + special;
   for (let i = 0; i < 7; i++) base.push(all[Math.floor(Math.random() * all.length)]);
-  return base.sort(() => Math.random() - 0.5).join('');
+  return base.sort(() => Math.random() - 0.5).join("");
 }
 
 function CompaniesPage() {
@@ -188,13 +208,13 @@ function CompaniesPage() {
     try {
       if (Array.isArray(companyStats)) {
         for (const s of companyStats) {
-          if (s && typeof s === 'object' && 'company_id' in s) {
-            counts[s.company_id] = (s.user_count ?? 0);
+          if (s && typeof s === "object" && "company_id" in s) {
+            counts[s.company_id] = s.user_count ?? 0;
           }
         }
       }
     } catch (e) {
-      console.error('Error computing companyUserCounts:', e);
+      console.error("Error computing companyUserCounts:", e);
     }
     return counts;
   }, [companyStats]);
@@ -204,13 +224,13 @@ function CompaniesPage() {
     try {
       if (Array.isArray(companyStats)) {
         for (const s of companyStats) {
-          if (s && typeof s === 'object' && 'company_id' in s) {
-            counts[s.company_id] = (s.mill_count ?? 0);
+          if (s && typeof s === "object" && "company_id" in s) {
+            counts[s.company_id] = s.mill_count ?? 0;
           }
         }
       }
     } catch (e) {
-      console.error('Error computing companyMillCounts:', e);
+      console.error("Error computing companyMillCounts:", e);
     }
     return counts;
   }, [companyStats]);
@@ -233,7 +253,14 @@ function CompaniesPage() {
             <AlertTriangle className="size-4 text-red-500 shrink-0" />
             <p className="text-xs text-red-700 dark:text-red-400">Failed to load companies.</p>
           </div>
-          <Button variant="outline" size="sm" className="text-xs h-7" onClick={() => companiesQ.refetch()}>Retry</Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs h-7"
+            onClick={() => companiesQ.refetch()}
+          >
+            Retry
+          </Button>
         </div>
       )}
       <Card>
@@ -250,77 +277,120 @@ function CompaniesPage() {
         </CardHeader>
         <CardContent>
           <ErrorBoundary inline label="Companies">
-          <DataTable
-            tableId="admin_companies"
-            columns={[
-              { key: "name", label: "Company Name", render: (c: any) => <span className="font-medium">{c.name}</span> },
-              { key: "code", label: "Code" },
-              { key: "gstin", label: "GSTIN" },
-              { key: "max_users", label: "Max Users", render: (c: any) => c.max_users ?? 50 },
-              { key: "_active_users", label: "Active Users", render: (c: any) => companyUserCounts[c.id] ?? 0 },
-              { key: "_mills", label: "Mills", render: (c: any) => companyMillCounts[c.id] ?? 0 },
-              {
-                key: "plan",
-                label: "Plan",
-                render: (c: any) => {
-                  const PLAN_COLORS: Record<string, string> = {
-                    starter: "bg-gray-100 text-gray-600",
-                    growth: "bg-blue-100 text-blue-700",
-                    business: "bg-indigo-100 text-indigo-700",
-                    enterprise: "bg-purple-100 text-purple-700",
-                    unlimited: "bg-amber-100 text-amber-700",
-                  };
-                  const plan = c.plan ?? c.subscription_plan ?? "starter";
-                  const color = PLAN_COLORS[plan] ?? PLAN_COLORS.starter;
-                  return (
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${color}`}>
-                      {plan}
-                    </span>
-                  );
-                },
-              },
-              {
-                key: "is_active",
-                label: "Status",
-                render: (c: any) => (
-                  <span className={c.is_active
-                    ? "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                    : "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                  }>
-                    {c.is_active ? "Active" : "Suspended"}
-                  </span>
-                ),
-              },
-            ] satisfies ColDef[]}
-            data={activeCompanies}
-            rowKey={(c: any) => c.id}
-            onRowClick={(c: any) => navigate({ to: "/admin/companies/$companyId", params: { companyId: c.id } })}
-            exportFilename="admin_companies"
-            actions={(item: any) => (
-              <div className="flex gap-1">
-                <Button size="sm" variant="outline" onClick={() => setEditCompany(item)}>
-                  <Pencil className="size-3.5 mr-1" /> Edit
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setModulesCompany(item)}>
-                  <Blocks className="size-3.5 mr-1" /> Modules
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-red-600 hover:bg-red-50 border-red-200"
-                  onClick={() => setSuspendCompany(item)}
-                >
-                  {item.is_active ? <Ban className="size-3.5 mr-1" /> : <CheckCircle className="size-3.5 mr-1" />}
-                  {item.is_active ? "Suspend" : "Activate"}
-                </Button>
-              </div>
-            )}
-          />
+            <DataTable
+              tableId="admin_companies"
+              columns={
+                [
+                  {
+                    key: "name",
+                    label: "Company Name",
+                    render: (c: any) => <span className="font-medium">{c.name}</span>,
+                  },
+                  { key: "code", label: "Code" },
+                  { key: "gstin", label: "GSTIN" },
+                  { key: "max_users", label: "Max Users", render: (c: any) => c.max_users ?? 50 },
+                  {
+                    key: "_active_users",
+                    label: "Active Users",
+                    render: (c: any) => companyUserCounts[c.id] ?? 0,
+                  },
+                  {
+                    key: "_mills",
+                    label: "Mills",
+                    render: (c: any) => companyMillCounts[c.id] ?? 0,
+                  },
+                  {
+                    key: "plan",
+                    label: "Plan",
+                    render: (c: any) => {
+                      const PLAN_COLORS: Record<string, string> = {
+                        starter: "bg-gray-100 text-gray-600",
+                        growth: "bg-blue-100 text-blue-700",
+                        business: "bg-indigo-100 text-indigo-700",
+                        enterprise: "bg-purple-100 text-purple-700",
+                        unlimited: "bg-amber-100 text-amber-700",
+                      };
+                      const plan = c.plan ?? c.subscription_plan ?? "starter";
+                      const color = PLAN_COLORS[plan] ?? PLAN_COLORS.starter;
+                      return (
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${color}`}
+                        >
+                          {plan}
+                        </span>
+                      );
+                    },
+                  },
+                  {
+                    key: "is_active",
+                    label: "Status",
+                    render: (c: any) => (
+                      <span
+                        className={
+                          c.is_active
+                            ? "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                            : "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                        }
+                      >
+                        {c.is_active ? "Active" : "Suspended"}
+                      </span>
+                    ),
+                  },
+                ] satisfies ColDef[]
+              }
+              data={activeCompanies}
+              rowKey={(c: any) => c.id}
+              onRowClick={(c: any) =>
+                navigate({ to: "/admin/companies/$companyId", params: { companyId: c.id } })
+              }
+              exportFilename="admin_companies"
+              actions={(item: any) => (
+                <div className="flex gap-1">
+                  <Button size="sm" variant="outline" onClick={() => setEditCompany(item)}>
+                    <Pencil className="size-3.5 mr-1" /> Edit
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setModulesCompany(item)}>
+                    <Blocks className="size-3.5 mr-1" /> Modules
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600 hover:bg-red-50 border-red-200"
+                    onClick={() => setSuspendCompany(item)}
+                  >
+                    {item.is_active ? (
+                      <Ban className="size-3.5 mr-1" />
+                    ) : (
+                      <CheckCircle className="size-3.5 mr-1" />
+                    )}
+                    {item.is_active ? "Suspend" : "Activate"}
+                  </Button>
+                </div>
+              )}
+            />
           </ErrorBoundary>
         </CardContent>
 
-        <EditCompanyDialog company={editCompany} onClose={() => setEditCompany(null)} onDone={() => { qc.invalidateQueries({ queryKey: ["masters"] }); qc.invalidateQueries({ queryKey: ["admin-summary"] }); setEditCompany(null); }} />
-        <ModulesDialog company={modulesCompany} onClose={() => setModulesCompany(null)} onDone={() => { qc.invalidateQueries({ queryKey: ["masters"] }); qc.invalidateQueries({ queryKey: ["admin-summary"] }); if (modulesCompany?.id) qc.invalidateQueries({ queryKey: ["company-modules", modulesCompany.id] }); setModulesCompany(null); }} />
+        <EditCompanyDialog
+          company={editCompany}
+          onClose={() => setEditCompany(null)}
+          onDone={() => {
+            qc.invalidateQueries({ queryKey: ["masters"] });
+            qc.invalidateQueries({ queryKey: ["admin-summary"] });
+            setEditCompany(null);
+          }}
+        />
+        <ModulesDialog
+          company={modulesCompany}
+          onClose={() => setModulesCompany(null)}
+          onDone={() => {
+            qc.invalidateQueries({ queryKey: ["masters"] });
+            qc.invalidateQueries({ queryKey: ["admin-summary"] });
+            if (modulesCompany?.id)
+              qc.invalidateQueries({ queryKey: ["company-modules", modulesCompany.id] });
+            setModulesCompany(null);
+          }}
+        />
         <AlertDialog open={!!suspendCompany} onOpenChange={() => setSuspendCompany(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -330,8 +400,7 @@ function CompaniesPage() {
               <AlertDialogDescription>
                 {suspendCompany?.is_active
                   ? "All users of this company will be unable to login until reactivated."
-                  : "This will restore access for all users of this company."
-                }
+                  : "This will restore access for all users of this company."}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -350,8 +419,23 @@ function CompaniesPage() {
   );
 }
 
-function EditCompanyDialog({ company, onClose, onDone }: { company: Company | null; onClose: () => void; onDone: () => void }) {
-  const [form, setForm] = useState({ name: "", gstin: "", phone: "", email: "", plan: "starter", max_employees: 100 });
+function EditCompanyDialog({
+  company,
+  onClose,
+  onDone,
+}: {
+  company: Company | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: "",
+    gstin: "",
+    phone: "",
+    email: "",
+    plan: "starter",
+    max_employees: 100,
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -371,9 +455,15 @@ function EditCompanyDialog({ company, onClose, onDone }: { company: Company | nu
 
   const handleSave = async () => {
     if (!company) return;
-    if (!form.name.trim()) { setError("Name is required"); return; }
+    if (!form.name.trim()) {
+      setError("Name is required");
+      return;
+    }
     const gstin = form.gstin.trim();
-    if (gstin && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin.toUpperCase())) {
+    if (
+      gstin &&
+      !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin.toUpperCase())
+    ) {
       setError("Invalid GSTIN format");
       return;
     }
@@ -407,21 +497,33 @@ function EditCompanyDialog({ company, onClose, onDone }: { company: Company | nu
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label>Name <span className="text-destructive">*</span></Label>
+            <Label>
+              Name <span className="text-destructive">*</span>
+            </Label>
             <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
           <div className="space-y-1.5">
             <Label>GSTIN</Label>
-            <Input value={form.gstin} onChange={(e) => setForm({ ...form, gstin: e.target.value })} />
+            <Input
+              value={form.gstin}
+              onChange={(e) => setForm({ ...form, gstin: e.target.value })}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Phone</Label>
-              <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+              <Input
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Email</Label>
-              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
             </div>
           </div>
           <div className="space-y-1.5">
@@ -432,7 +534,9 @@ function EditCompanyDialog({ company, onClose, onDone }: { company: Company | nu
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white dark:bg-slate-800"
             >
               {PLAN_OPTIONS.map((p) => (
-                <option key={p.value} value={p.value}>{p.label}</option>
+                <option key={p.value} value={p.value}>
+                  {p.label}
+                </option>
               ))}
             </select>
           </div>
@@ -447,7 +551,9 @@ function EditCompanyDialog({ company, onClose, onDone }: { company: Company | nu
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
             <Button onClick={handleSave} disabled={loading}>
               {loading ? "Saving\u2026" : "Save"}
             </Button>
@@ -458,7 +564,15 @@ function EditCompanyDialog({ company, onClose, onDone }: { company: Company | nu
   );
 }
 
-function ModulesDialog({ company, onClose, onDone }: { company: Company | null; onClose: () => void; onDone: () => void }) {
+function ModulesDialog({
+  company,
+  onClose,
+  onDone,
+}: {
+  company: Company | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
   const [modules, setModules] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
 
@@ -506,17 +620,19 @@ function ModulesDialog({ company, onClose, onDone }: { company: Company | null; 
             <span className="text-xs text-gray-400">\u2014 included in licence</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            {CORE_MODULES.map(mod => (
-              <div key={mod.key}
+            {CORE_MODULES.map((mod) => (
+              <div
+                key={mod.key}
                 className="flex items-center justify-between p-2.5 rounded-lg
                   border border-gray-100 dark:border-slate-700 hover:bg-gray-50
-                  dark:hover:bg-slate-700/50">
+                  dark:hover:bg-slate-700/50"
+              >
                 <span className="text-sm text-gray-700 dark:text-slate-300">
                   {mod.icon} {mod.label}
                 </span>
                 <Switch
                   checked={modules[mod.key] ?? false}
-                  onCheckedChange={v => setModules(p => ({...p, [mod.key]: v}))}
+                  onCheckedChange={(v) => setModules((p) => ({ ...p, [mod.key]: v }))}
                 />
               </div>
             ))}
@@ -531,18 +647,22 @@ function ModulesDialog({ company, onClose, onDone }: { company: Company | null; 
             <span className="text-xs text-blue-500">\u2014 monthly billing</span>
           </div>
           <div className="space-y-2">
-            {ADDON_MODULES.map(mod => (
-              <div key={mod.key}
+            {ADDON_MODULES.map((mod) => (
+              <div
+                key={mod.key}
                 className="flex items-center justify-between p-3 rounded-xl
                   border border-dashed border-blue-200 dark:border-blue-800
-                  bg-blue-50/40 dark:bg-blue-900/10">
+                  bg-blue-50/40 dark:bg-blue-900/10"
+              >
                 <div className="flex-1 min-w-0 mr-3">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-gray-800 dark:text-slate-200">
                       {mod.label}
                     </span>
-                    <span className="text-xs font-bold text-blue-600 bg-blue-100
-                      dark:bg-blue-900/40 dark:text-blue-400 px-2 py-0.5 rounded-full">
+                    <span
+                      className="text-xs font-bold text-blue-600 bg-blue-100
+                      dark:bg-blue-900/40 dark:text-blue-400 px-2 py-0.5 rounded-full"
+                    >
                       {mod.price}
                     </span>
                   </div>
@@ -552,7 +672,7 @@ function ModulesDialog({ company, onClose, onDone }: { company: Company | null; 
                 </div>
                 <Switch
                   checked={modules[mod.key] ?? false}
-                  onCheckedChange={v => setModules(p => ({...p, [mod.key]: v}))}
+                  onCheckedChange={(v) => setModules((p) => ({ ...p, [mod.key]: v }))}
                 />
               </div>
             ))}
@@ -560,7 +680,9 @@ function ModulesDialog({ company, onClose, onDone }: { company: Company | null; 
         </div>
 
         <DialogFooter className="mt-5">
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? "Saving..." : "Save Module Access"}
           </Button>

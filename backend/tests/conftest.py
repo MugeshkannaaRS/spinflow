@@ -1,4 +1,5 @@
 import asyncio
+import json
 import uuid
 from typing import AsyncGenerator
 
@@ -7,8 +8,51 @@ import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import event
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.types import TypeDecorator, TEXT
 
 from app.db.base import Base
+
+
+# ---------------------------------------------------------------------------
+# SQLite JSONB compatibility shim
+# SQLite has no native JSONB type.  We register a TypeDecorator that stores
+# JSON as TEXT so every model that uses postgresql.JSONB still works in the
+# in-memory test database.
+# ---------------------------------------------------------------------------
+class JSONBAsText(TypeDecorator):
+    """Stores JSONB values as plain TEXT in SQLite."""
+    impl = TEXT
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return json.dumps(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return json.loads(value)
+
+
+# Monkey-patch the PostgreSQL JSONB type so SQLAlchemy uses our shim when
+# creating tables against an SQLite engine.
+JSONB.__init_subclass__ = lambda cls, **kw: None  # noqa: E731 – suppress subclass warning
+
+_original_jsonb_visit = getattr(JSONB, "visit_JSONB", None)
+
+
+def _sqlite_jsonb_impl(self, **kw):
+    """Return a JSON-as-TEXT column for SQLite."""
+    return TEXT()
+
+
+# Register a compile-time override: when SQLite encounters JSONB, use TEXT.
+from sqlalchemy.dialects.sqlite import base as sqlite_base  # noqa: E402
+
+if not hasattr(sqlite_base.SQLiteTypeCompiler, "visit_JSONB"):
+    sqlite_base.SQLiteTypeCompiler.visit_JSONB = lambda self, type_, **kw: "TEXT"
 from app.models.user import User, Role
 from app.models.production import Machine, Shift, MachineStatus
 from app.models.inventory import Lot, Warehouse, InventoryBag

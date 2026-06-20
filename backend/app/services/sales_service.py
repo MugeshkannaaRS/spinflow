@@ -152,8 +152,28 @@ class SalesOrderService(BaseService[SalesOrder]):
             so.incoterms = incoterms
 
         if lines is not None:
-            for old_line in so.lines:
+            # Build new lines first, THEN delete old ones.
+            # This avoids data loss if flush fails between delete and insert.
+            new_line_objs = []
+            for l in lines:
+                new_line_objs.append(SalesOrderLine(
+                    so_id=so.id,
+                    lot_id=l["lot_id"],
+                    warehouse_id=l["warehouse_id"],
+                    bags_ordered=l["bags_ordered"],
+                    weight_kg=l["weight_kg"],
+                    rate_per_kg=l.get("rate_per_kg"),
+                    line_amount=(l.get("rate_per_kg") or 0) * l["weight_kg"] if l.get("rate_per_kg") else None,
+                ))
+
+            # Delete existing lines only after new objects are ready
+            for old_line in list(so.lines):
                 await self.db.delete(old_line)
+            await self.db.flush()  # commit deletes before inserting to avoid PK conflicts
+
+            for new_line in new_line_objs:
+                self.db.add(new_line)
+
             total_bags = sum(l["bags_ordered"] for l in lines)
             total_weight = sum(l["weight_kg"] for l in lines)
             so.total_bags = total_bags
@@ -164,17 +184,6 @@ class SalesOrderService(BaseService[SalesOrder]):
             else:
                 so.rate_per_kg = None
                 so.total_value = None
-            for l in lines:
-                line = SalesOrderLine(
-                    so_id=so.id,
-                    lot_id=l["lot_id"],
-                    warehouse_id=l["warehouse_id"],
-                    bags_ordered=l["bags_ordered"],
-                    weight_kg=l["weight_kg"],
-                    rate_per_kg=l.get("rate_per_kg"),
-                    line_amount=(l.get("rate_per_kg") or 0) * l["weight_kg"] if l.get("rate_per_kg") else None,
-                )
-                self.db.add(line)
 
         await self.db.flush()
         return await self._load_order(so.id)
@@ -208,8 +217,11 @@ class SalesOrderService(BaseService[SalesOrder]):
 
         stock_service = StockLedgerService(self.db, self.current_user)
 
+        avail_keys = [(line.lot_id, line.warehouse_id) for line in so.lines]
+        avail_map = await stock_service.get_available_batch(avail_keys)
+
         for line in so.lines:
-            available = await stock_service.get_available(line.lot_id, line.warehouse_id)
+            available = avail_map.get((line.lot_id, line.warehouse_id), 0.0)
             if available < line.bags_ordered:
                 lot_result = await self.db.execute(select(Lot).where(Lot.id == line.lot_id))
                 lot = lot_result.scalar_one_or_none()
@@ -317,9 +329,11 @@ class SalesOrderService(BaseService[SalesOrder]):
             raise SpinFlowException.not_found("SalesOrder")
 
         stock_service = StockLedgerService(self.db, self.current_user)
+        avail_keys = [(line.lot_id, line.warehouse_id) for line in so.lines]
+        avail_map = await stock_service.get_available_batch(avail_keys)
         lines_out = []
         for line in so.lines:
-            available = await stock_service.get_available(line.lot_id, line.warehouse_id)
+            available = avail_map.get((line.lot_id, line.warehouse_id), 0.0)
             lines_out.append({
                 "id": line.id,
                 "so_id": line.so_id,

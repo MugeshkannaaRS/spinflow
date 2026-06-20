@@ -13,39 +13,93 @@ function resolveStatus(raw: string): StatusConfig {
 
   // Green — active / good states
   if (
-    ["active", "present", "paid", "delivered", "running", "pass", "passed",
-     "approved", "processed", "finalized", "completed", "done", "success",
-     "in_stock", "available", "open"].includes(s)
-  ) return { variant: "green" };
+    [
+      "active",
+      "present",
+      "paid",
+      "delivered",
+      "running",
+      "pass",
+      "passed",
+      "approved",
+      "processed",
+      "finalized",
+      "completed",
+      "done",
+      "success",
+      "in_stock",
+      "available",
+      "open",
+    ].includes(s)
+  )
+    return { variant: "green" };
 
   // Yellow — in-progress / pending states
   if (
-    ["pending", "in_transit", "in_progress", "processing", "loaded",
-     "loading", "partial", "review", "draft", "scheduled",
-     "dispatched", "sent"].includes(s)
-  ) return { variant: "yellow" };
+    [
+      "pending",
+      "in_transit",
+      "in_progress",
+      "processing",
+      "loaded",
+      "loading",
+      "partial",
+      "review",
+      "draft",
+      "scheduled",
+      "dispatched",
+      "sent",
+    ].includes(s)
+  )
+    return { variant: "yellow" };
 
   // Red — bad / failure states
   if (
-    ["inactive", "absent", "overdue", "failed", "fail", "rejected",
-     "down", "breakdown", "maintenance", "suspended", "cancelled",
-     "canceled", "late", "error", "unpaid", "deactivated"].includes(s)
-  ) return { variant: "red" };
+    [
+      "inactive",
+      "absent",
+      "overdue",
+      "failed",
+      "fail",
+      "rejected",
+      "down",
+      "breakdown",
+      "maintenance",
+      "suspended",
+      "cancelled",
+      "canceled",
+      "late",
+      "error",
+      "unpaid",
+      "deactivated",
+    ].includes(s)
+  )
+    return { variant: "red" };
 
   // Slate — neutral
   if (
-    ["idle", "draft", "on_leave", "transferred", "archived",
-     "closed", "unknown", "n_a", "na"].includes(s)
-  ) return { variant: "slate" };
+    [
+      "idle",
+      "draft",
+      "on_leave",
+      "transferred",
+      "archived",
+      "closed",
+      "unknown",
+      "n_a",
+      "na",
+    ].includes(s)
+  )
+    return { variant: "slate" };
 
   return { variant: "slate" };
 }
 
 const VARIANT_STYLES: Record<StatusVariant, { badge: string; dot: string }> = {
-  green:  { badge: "bg-green-100 text-green-700 border-green-200",  dot: "bg-green-500" },
+  green: { badge: "bg-green-100 text-green-700 border-green-200", dot: "bg-green-500" },
   yellow: { badge: "bg-yellow-100 text-yellow-700 border-yellow-200", dot: "bg-yellow-500" },
-  red:    { badge: "bg-red-100 text-red-700 border-red-200",         dot: "bg-red-500" },
-  slate:  { badge: "bg-slate-100 text-slate-600 border-slate-200",   dot: "bg-slate-400" },
+  red: { badge: "bg-red-100 text-red-700 border-red-200", dot: "bg-red-500" },
+  slate: { badge: "bg-slate-100 text-slate-600 border-slate-200", dot: "bg-slate-400" },
 };
 
 interface StatusBadgeProps {
@@ -79,7 +133,13 @@ export function StatusBadge({ status, label, size = "md", className }: StatusBad
         className,
       )}
     >
-      <span className={cn("rounded-full shrink-0", size === "sm" ? "w-1.5 h-1.5" : "w-[6px] h-[6px]", dot)} />
+      <span
+        className={cn(
+          "rounded-full shrink-0",
+          size === "sm" ? "w-1.5 h-1.5" : "w-[6px] h-[6px]",
+          dot,
+        )}
+      />
       {displayLabel}
     </span>
   );

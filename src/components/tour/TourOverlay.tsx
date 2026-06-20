@@ -39,7 +39,8 @@ export function TourOverlay() {
 
   const { data: tours } = useQuery({
     queryKey: ["tours", path],
-    queryFn: () => api.get(`/tours?page=${encodeURIComponent(path)}`).then((r) => r.data.data ?? []),
+    queryFn: () =>
+      api.get(`/tours?page=${encodeURIComponent(path)}`).then((r) => r.data.data ?? []),
     staleTime: 300_000,
     enabled: !!user && !dismissed.has(path),
   });
@@ -121,16 +122,21 @@ export function TourOverlay() {
       <div
         className={cn(
           "fixed z-50 w-80 bg-white rounded-xl shadow-2xl border p-4 space-y-3 transition-all",
-          targetEl ? "opacity-100" : "opacity-0"
+          targetEl ? "opacity-100" : "opacity-0",
         )}
         style={
           targetEl
             ? {
                 top: targetEl.getBoundingClientRect().bottom + 12,
-                left: Math.max(16, Math.min(
-                  targetEl.getBoundingClientRect().left + targetEl.getBoundingClientRect().width / 2 - 160,
-                  window.innerWidth - 336
-                )),
+                left: Math.max(
+                  16,
+                  Math.min(
+                    targetEl.getBoundingClientRect().left +
+                      targetEl.getBoundingClientRect().width / 2 -
+                      160,
+                    window.innerWidth - 336,
+                  ),
+                ),
               }
             : { top: "50%", left: "50%", transform: "translate(-50%, -50%)" }
         }
@@ -181,9 +187,13 @@ export function TourOverlay() {
               className="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
             >
               {isLast ? (
-                <>Done <Check className="w-3 h-3" /></>
+                <>
+                  Done <Check className="w-3 h-3" />
+                </>
               ) : (
-                <>Next <ChevronRight className="w-3 h-3" /></>
+                <>
+                  Next <ChevronRight className="w-3 h-3" />
+                </>
               )}
             </button>
           </div>

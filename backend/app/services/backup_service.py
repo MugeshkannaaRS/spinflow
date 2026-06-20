@@ -64,15 +64,14 @@ class BackupService:
             )
             mill_ids = [r[0] for r in mills_q.fetchall()]
 
-        mill_expr = ",".join(f"'{m}'" for m in mill_ids) if mill_ids else "''"
-
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             for table, col, scope in BACKUP_TABLES:
                 try:
                     if col and scope == "mill" and mill_ids:
                         rows = (
                             await self.db.execute(
-                                text(f"SELECT * FROM {table} WHERE {col} IN ({mill_expr})")
+                                text(f"SELECT * FROM {table} WHERE {col} = ANY(:mill_ids)"),
+                                {"mill_ids": mill_ids},
                             )
                         ).fetchall()
                     elif col and company_id:

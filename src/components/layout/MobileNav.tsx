@@ -63,12 +63,12 @@ export function MobileNav() {
 
   const isActive = (to: string) => pathname === to || pathname.startsWith(to + "/");
 
-  const visibleModules = ALL_MODULE_ITEMS.filter(item => {
+  const visibleModules = ALL_MODULE_ITEMS.filter((item) => {
     if (item.to === "/admin" && user?.role !== "SUPER_ADMIN") return false;
     return canAccess(item.module);
   });
 
-  const middleTabs = CANDIDATE_TABS.filter(t => canAccess(t.module)).slice(0, 3);
+  const middleTabs = CANDIDATE_TABS.filter((t) => canAccess(t.module)).slice(0, 3);
 
   const bottomTabs: Array<{ to: string | null; label: string; icon: any; isAlert?: boolean }> = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -78,7 +78,8 @@ export function MobileNav() {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--bg-primary)] border-t border-[var(--border)] lg:hidden"
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--bg-primary)] border-t border-[var(--border)] lg:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="flex items-center justify-around h-14">
@@ -86,10 +87,12 @@ export function MobileNav() {
             const Icon = item.icon;
             const active = item.to ? isActive(item.to) : false;
             const content = (
-              <div className={cn(
-                "flex flex-col items-center justify-center min-w-[56px] h-full px-3 transition-colors relative",
-                active ? "text-brand-500" : "text-[var(--text-muted)]",
-              )}>
+              <div
+                className={cn(
+                  "flex flex-col items-center justify-center min-w-[56px] h-full px-3 transition-colors relative",
+                  active ? "text-brand-500" : "text-[var(--text-muted)]",
+                )}
+              >
                 {item.isAlert ? (
                   <div className="relative mb-0.5">
                     <Icon className="size-5" />
@@ -106,7 +109,11 @@ export function MobileNav() {
               </div>
             );
             if (!item.to) {
-              return <div key={item.label} className="flex items-center justify-center">{content}</div>;
+              return (
+                <div key={item.label} className="flex items-center justify-center">
+                  {content}
+                </div>
+              );
             }
             return (
               <Link key={item.to} to={item.to} className="flex items-center justify-center">
@@ -135,7 +142,10 @@ export function MobileNav() {
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-slate-700 flex-shrink-0">
               <h3 className="text-sm font-semibold text-[var(--text-primary)]">All Modules</h3>
-              <button onClick={() => setMoreOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-slate-700">
+              <button
+                onClick={() => setMoreOpen(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-slate-700"
+              >
                 <X className="size-5 text-gray-500" />
               </button>
             </div>

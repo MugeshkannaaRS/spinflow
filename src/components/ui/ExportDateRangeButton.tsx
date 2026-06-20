@@ -29,10 +29,7 @@ interface ExportDateRangeButtonProps {
   onExportPdf?: (dateFrom: string, dateTo: string) => Promise<void>;
 }
 
-export function ExportDateRangeButton({
-  onExportXlsx,
-  onExportPdf,
-}: ExportDateRangeButtonProps) {
+export function ExportDateRangeButton({ onExportXlsx, onExportPdf }: ExportDateRangeButtonProps) {
   const today = new Date().toISOString().slice(0, 10);
   const firstOfMonth = today.slice(0, 8) + "01";
 
@@ -75,7 +72,9 @@ export function ExportDateRangeButton({
         <div className="space-y-4 py-1">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="export-from" className="text-xs">From</Label>
+              <Label htmlFor="export-from" className="text-xs">
+                From
+              </Label>
               <Input
                 id="export-from"
                 type="date"
@@ -85,7 +84,9 @@ export function ExportDateRangeButton({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="export-to" className="text-xs">To</Label>
+              <Label htmlFor="export-to" className="text-xs">
+                To
+              </Label>
               <Input
                 id="export-to"
                 type="date"
@@ -120,7 +121,7 @@ export function ExportDateRangeButton({
                     format === "pdf"
                       ? "border-primary bg-primary/5 text-primary font-medium"
                       : "border-border text-muted-foreground hover:border-primary/50"
-                    }`}
+                  }`}
                 >
                   <FileDown className="size-4" />
                   PDF
@@ -135,10 +136,17 @@ export function ExportDateRangeButton({
             Cancel
           </Button>
           <Button size="sm" onClick={handleExport} disabled={loading}>
-            {loading
-              ? <><Loader2 className="size-3.5 animate-spin mr-1" />Exporting…</>
-              : <><Download className="size-3.5 mr-1" />Download</>
-            }
+            {loading ? (
+              <>
+                <Loader2 className="size-3.5 animate-spin mr-1" />
+                Exporting…
+              </>
+            ) : (
+              <>
+                <Download className="size-3.5 mr-1" />
+                Download
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

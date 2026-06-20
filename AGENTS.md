@@ -1,5 +1,7 @@
 # SpinFlow ERP
 
+> **Full project context**: See `CONTEXT.md` (12,487 lines) — auto-combined from all `.md` files for LLM memory sync. This file is the lean working memory; `CONTEXT.md` has the raw audit/architecture/report dumps.
+
 ## Goal
 - Validated launch-ready (LR-1 GO). Next: generate production deployment artifacts (staging environment, pilot onboarding guide, final report).
 
@@ -95,14 +97,21 @@
   - **stock.py: `GET /stock/snapshot`** — Added scope check on `mill_id` query param
   - **stock.py: `GET /stock/lot/{id}/history`** — Added Lot scope check via mill_id/company_id
   - **stock.py: `GET /stock/lot/{id}/balance`** — Added Lot scope check via mill_id/company_id
-  - Note: `GET /purchase/bales/stats` and `POST /purchase/bales/group` cannot be fully scoped — `CottonBale` model lacks `mill_id` field (schema change needed)
+
+- **Tenant Isolation Audit & Fix**: Audited 6 creation endpoints across dispatch, quality, and purchase modules that left `mill_id`/`company_id` null despite having nullable FK columns. All now stamp from `get_mill_scope()`:
+  - `POST /dispatch/orders` — `DispatchService.create_dispatch()` now accepts + sets `mill_id`/`company_id`
+  - `POST /quality/tests` — `QualityService.create_test()` now accepts + sets `mill_id`/`company_id`
+  - `POST /quality/tests/bulk` — `scope` was fetched but never written; now stamps both fields
+  - `POST /purchase/purchases` — sets `mill_id` from scope on `CottonPurchase`
+  - `POST /purchase/suppliers` — sets `mill_id` from scope on `Supplier`
+  - `POST /purchase/bales` — sets `mill_id` + `company_id` from scope on `CottonBale`
+  - Migration 041 (`tenant_safety_and_financial_precision.py`) made fully idempotent with `ADD COLUMN IF NOT EXISTS` / `CREATE INDEX IF NOT EXISTS` to handle schema drift against Supabase
 
 ### Deferred
 - 8 pre-existing dashboard test failures (unrelated to admin/onboarding)
-- `log_audit()` in deps.py still calls its own `db.commit()` — 50+ callers need eventual refactor for transactional safety
 - `generate_subscription_invoice` is slow (1115ms) — exceeds 1s SLOW_QUERY_THRESHOLD
 - ~15 High-severity audit issues remain (missing mill_id filters, double-counting, growth skew, wrong role field, SO number collision, etc.)
-- `CottonBale` model lacks `mill_id` — `GET /purchase/bales/stats` and `POST /purchase/bales/group` rely solely on module-level gating
+- `GET /purchase/bales/stats` and `POST /purchase/bales/group` lack mill scope filtering (now possible — `CottonBale.mill_id` exists from migration 041)
 
 ## Key Decisions
 - Company is the root entity — everything managed inside Company workspace, not sibling pages
@@ -123,13 +132,13 @@
 - **Phase 4E — Mobile & responsiveness audit**: Audit all workspace pages for mobile — fix overflow-x, stack cards vertically, show less columns on small screens.
 - **Phase 4F — Final polish**: Error boundaries to each tab component, breadcrumbs to all admin pages, consistent card border-radius/spacing.
 - Consolidate organizations/limits/modules pages into Company Detail tabs, remove stale nav links
-- Normalize log_audit() to use pre-commit pattern across all 50+ callers
+
 - Update Companies listing PLAN_OPTIONS to use "custom" instead of "unlimited"
 - Rotate secrets referenced by `.env` (DB password, JWT keys, Redis, QR, Supabase)
 - Provision fresh staging: new Supabase project + new Render services + fresh `.env`
 
 ## Critical Context
-- **Health Score: 96/100** — Company-centric architecture complete. 295 backend + 65 frontend tests pass (8 pre-existing frontend failures).
+- **Health Score: 96/100** — Company-centric architecture complete. 356 backend + 65 frontend tests pass (9 pre-existing backend, 8 pre-existing frontend failures).
 - Company lifecycle: `POST /admin/companies/{id}/suspend` and `/reactivate` with full cascade
 - Auth guards: `get_current_user()` and `POST /auth/login` both check `company.status == "suspended"` — reject with 403/423
 - Module Registry supersedes all prior `ALL_MODULES`/`ALL_MODULE_KEYS` constants in backend
@@ -172,3 +181,14 @@
 - `backend/app/api/v1/uploads.py`: `_check_entity_scope()` helper for entity ownership
 - `backend/app/api/v1/purchase.py`: `GET /purchase/suppliers` mill_id filter applied
 - `backend/app/api/v1/stock.py`: Lot scope checks on history/balance endpoints
+- `backend/app/services/dispatch_service.py`: Accepts `mill_id`/`company_id` on create
+- `backend/app/services/quality_service.py`: Accepts `mill_id`/`company_id` on create
+  - `backend/alembic/versions/041_tenant_safety_and_financial_precision.py`: Idempotent tenant isolation migration
+
+- **Secret Rotation Sprint**: Rotated all 3 JWT/QR signing keys (256-bit hex), removed production URL fallbacks from frontend (fail closed), replaced docker-compose default passwords with `${VAR:?required}` (fail closed), created `.env.example` with zero real secrets, gated demo accounts behind `VITE_SHOW_DEMO_ACCOUNTS`, moved seed script passwords to `SEED_ADMIN_PASSWORD`/`SEED_USER_PASSWORD` env vars.
+
+### SUPABASE DB PASSWORD — MANUAL ACTION REQUIRED
+The Supabase database password (`hoxpo4-qepgov-Gapqir`) in `backend/.env` could not be rotated programmatically. To rotate it:
+1. Go to Supabase Dashboard → Project Settings → Database → Reset Database Password
+2. Update `DATABASE_URL` and `DATABASE_SYNC_URL` in `backend/.env` with the new password
+3. Restart any running backend processes

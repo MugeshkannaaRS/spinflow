@@ -36,7 +36,19 @@ import {
 import { useState, useEffect, useMemo } from "react";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { toast } from "sonner";
-import { Plus, Search, Settings, Blocks, ArrowDown, Pencil, Factory, Trash2, Users, X, Check } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Settings,
+  Blocks,
+  ArrowDown,
+  Pencil,
+  Factory,
+  Trash2,
+  Users,
+  X,
+  Check,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useMillMasterCategory, useMillMasters } from "@/hooks/useMillConfig";
@@ -104,32 +116,52 @@ function MastersPage() {
   }
 
   function deactivateDepartment(id: string) {
-    mastersApi.deleteDepartment(id)
-      .then(() => { toast.success("Department deactivated"); qcMasters.invalidateQueries({ queryKey: ["masters", "departments"] }); })
+    mastersApi
+      .deleteDepartment(id)
+      .then(() => {
+        toast.success("Department deactivated");
+        qcMasters.invalidateQueries({ queryKey: ["masters", "departments"] });
+      })
       .catch(() => toast.error("Failed to deactivate department"));
   }
 
   function deactivateYarnCount(id: string) {
-    mastersApi.deleteYarnCount(id)
-      .then(() => { toast.success("Yarn count deactivated"); qcMasters.invalidateQueries({ queryKey: ["masters", "yarn-counts"] }); })
+    mastersApi
+      .deleteYarnCount(id)
+      .then(() => {
+        toast.success("Yarn count deactivated");
+        qcMasters.invalidateQueries({ queryKey: ["masters", "yarn-counts"] });
+      })
       .catch(() => toast.error("Failed to deactivate yarn count"));
   }
 
   function deactivateVehicle(id: string) {
-    mastersApi.deleteVehicle(id)
-      .then(() => { toast.success("Vehicle deactivated"); qcMasters.invalidateQueries({ queryKey: ["masters", "vehicles"] }); })
+    mastersApi
+      .deleteVehicle(id)
+      .then(() => {
+        toast.success("Vehicle deactivated");
+        qcMasters.invalidateQueries({ queryKey: ["masters", "vehicles"] });
+      })
       .catch(() => toast.error("Failed to deactivate vehicle"));
   }
 
   function deactivateRoute(id: string) {
-    mastersApi.deleteRoute(id)
-      .then(() => { toast.success("Route deactivated"); qcMasters.invalidateQueries({ queryKey: ["masters", "routes"] }); })
+    mastersApi
+      .deleteRoute(id)
+      .then(() => {
+        toast.success("Route deactivated");
+        qcMasters.invalidateQueries({ queryKey: ["masters", "routes"] });
+      })
       .catch(() => toast.error("Failed to deactivate route"));
   }
 
   function deactivateWarehouse(id: string) {
-    inventoryApi.deleteWarehouse(id)
-      .then(() => { toast.success("Warehouse deactivated"); qcMasters.invalidateQueries({ queryKey: ["masters", "warehouses"] }); })
+    inventoryApi
+      .deleteWarehouse(id)
+      .then(() => {
+        toast.success("Warehouse deactivated");
+        qcMasters.invalidateQueries({ queryKey: ["masters", "warehouses"] });
+      })
       .catch(() => toast.error("Failed to deactivate warehouse"));
   }
 
@@ -198,7 +230,7 @@ function MastersPage() {
   const companiesData = (companiesQ.data ?? []) as Company[];
   const activeCompaniesData = useMemo(
     () => companiesData.filter((c: any) => c?.id && c.is_active !== false),
-    [companiesData]
+    [companiesData],
   );
   const millsData = (millsQ.data ?? []) as Mill[];
   const deptsData = (deptsQ.data ?? []) as Department[];
@@ -210,13 +242,14 @@ function MastersPage() {
   const warehousesData = (warehousesQ.data ?? []) as any[];
   const machinesData = (Array.isArray(machinesQ.data) ? machinesQ.data : []) as any[];
 
-  if (!user) return (
-    <div className="p-6 space-y-4">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-96 w-full" />
-    </div>
-  );
+  if (!user)
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
 
   // SUPER_ADMIN should not land on Masters — redirect to Admin
   if (user.role === "SUPER_ADMIN") {
@@ -246,256 +279,275 @@ function MastersPage() {
             <TabsList className="flex-wrap h-auto">
               {(() => {
                 const allTabs = [
-                  { key: "companies",       label: "Companies" },
-                  { key: "mills",           label: "Mills" },
-                  { key: "machines",        label: "Machines" },
+                  { key: "companies", label: "Companies" },
+                  { key: "mills", label: "Mills" },
+                  { key: "machines", label: "Machines" },
                   { key: "machine-groups", label: "Machine Groups" },
-                  { key: "departments",     label: "Departments" },
-                  { key: "yarn-counts",     label: "Yarn Counts" },
-                  { key: "customers",       label: "Customers" },
-                  { key: "vehicles",        label: "Vehicles" },
-                  { key: "routes",          label: "Routes" },
-                  { key: "shifts",          label: "Shifts" },
-                  { key: "warehouses",      label: "Warehouses" },
-                  { key: "stop-codes",      label: "Stop Codes" },
+                  { key: "departments", label: "Departments" },
+                  { key: "yarn-counts", label: "Yarn Counts" },
+                  { key: "customers", label: "Customers" },
+                  { key: "vehicles", label: "Vehicles" },
+                  { key: "routes", label: "Routes" },
+                  { key: "shifts", label: "Shifts" },
+                  { key: "warehouses", label: "Warehouses" },
+                  { key: "stop-codes", label: "Stop Codes" },
                 ];
                 const isSuperAdmin = false;
-                return allTabs.filter(t =>
-                  isSuperAdmin ? ["companies", "mills"].includes(t.key) : t.key !== "companies"
-                ).map(t => (
-                  <TabsTrigger key={t.key} value={t.key}>{t.label}</TabsTrigger>
-                ));
+                return allTabs
+                  .filter((t) =>
+                    isSuperAdmin ? ["companies", "mills"].includes(t.key) : t.key !== "companies",
+                  )
+                  .map((t) => (
+                    <TabsTrigger key={t.key} value={t.key}>
+                      {t.label}
+                    </TabsTrigger>
+                  ));
               })()}
             </TabsList>
 
             <TabsContent value="companies">
               <ErrorBoundary inline label="Companies">
-              <MasterTable
-                title="Companies"
-                data={companiesData.filter((x) => matchesSearch(x, search))}
-                columns={[
-                  { key: "code", label: "Code" },
-                  { key: "name", label: "Name" },
-                  { key: "gstin", label: "GSTIN" },
-                  { key: "phone", label: "Phone" },
-                  { key: "email", label: "Email" },
-                ]}
-                activeKey="is_active"
-                canEdit={canEdit}
-                onAdd={<CompanyForm />}
-                onEdit={(item) => <CompanyForm item={item} />}
-                extraActions={(item) => (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setModulesCompany(item as Company)}
-                  >
-                    <Blocks className="size-3.5 mr-1" /> Modules
-                  </Button>
-                )}
-              />
+                <MasterTable
+                  title="Companies"
+                  data={companiesData.filter((x) => matchesSearch(x, search))}
+                  columns={[
+                    { key: "code", label: "Code" },
+                    { key: "name", label: "Name" },
+                    { key: "gstin", label: "GSTIN" },
+                    { key: "phone", label: "Phone" },
+                    { key: "email", label: "Email" },
+                  ]}
+                  activeKey="is_active"
+                  canEdit={canEdit}
+                  onAdd={<CompanyForm />}
+                  onEdit={(item) => <CompanyForm item={item} />}
+                  extraActions={(item) => (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setModulesCompany(item as Company)}
+                    >
+                      <Blocks className="size-3.5 mr-1" /> Modules
+                    </Button>
+                  )}
+                />
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="mills">
               <ErrorBoundary inline label="Mills">
-              <MasterTable
-                title="Mills"
-                data={millsData.filter((x) => matchesSearch(x, search))}
-                columns={[
-                  { key: "code", label: "Code" },
-                  { key: "name", label: "Name" },
-                  { key: "city", label: "City" },
-                  { key: "state", label: "State" },
-                  { key: "phone", label: "Phone" },
-                ]}
-                activeKey="is_active"
-                canEdit={canEdit && user?.role !== "MILL_OWNER"}
-                onAdd={user?.role !== "MILL_OWNER" ? <MillForm companies={activeCompaniesData} /> : (<></>)}
-                onEdit={(item) => <MillForm item={item} companies={activeCompaniesData} />}
-                headerExtra={user?.role === "MILL_OWNER" ? (
-                  <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
-                    <span>Need another mill?</span>
-                    <Link to="/company/billing" className="font-semibold text-amber-800 hover:text-amber-900 underline">Upgrade plan</Link>
-                  </div>
-                ) : undefined}
-                extraActions={(item) => (
-                  <Button size="sm" variant="outline" onClick={() => setSettingsMill(item as Mill)}>
-                    <Settings className="size-3.5 mr-1" /> Settings
-                  </Button>
-                )}
-              />
+                <MasterTable
+                  title="Mills"
+                  data={millsData.filter((x) => matchesSearch(x, search))}
+                  columns={[
+                    { key: "code", label: "Code" },
+                    { key: "name", label: "Name" },
+                    { key: "city", label: "City" },
+                    { key: "state", label: "State" },
+                    { key: "phone", label: "Phone" },
+                  ]}
+                  activeKey="is_active"
+                  canEdit={canEdit && user?.role !== "MILL_OWNER"}
+                  onAdd={
+                    user?.role !== "MILL_OWNER" ? (
+                      <MillForm companies={activeCompaniesData} />
+                    ) : (
+                      <></>
+                    )
+                  }
+                  onEdit={(item) => <MillForm item={item} companies={activeCompaniesData} />}
+                  headerExtra={
+                    user?.role === "MILL_OWNER" ? (
+                      <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+                        <span>Need another mill?</span>
+                        <Link
+                          to="/company/billing"
+                          className="font-semibold text-amber-800 hover:text-amber-900 underline"
+                        >
+                          Upgrade plan
+                        </Link>
+                      </div>
+                    ) : undefined
+                  }
+                  extraActions={(item) => (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setSettingsMill(item as Mill)}
+                    >
+                      <Settings className="size-3.5 mr-1" /> Settings
+                    </Button>
+                  )}
+                />
               </ErrorBoundary>
             </TabsContent>
 
             {/* ── Machines ─────────────────────────────────────────────────── */}
             <TabsContent value="machines">
               <ErrorBoundary inline label="Machines">
-              <MachinesTab
-                machines={machinesData.filter((x: any) => matchesSearch(x, search))}
-                isLoading={machinesQ.isLoading}
-                colConfig={machineColConfig}
-                canEdit={canEdit}
-                onImportSuccess={() => qcMasters.invalidateQueries({ queryKey: ["masters", "machines"] })}
-              />
+                <MachinesTab
+                  machines={machinesData.filter((x: any) => matchesSearch(x, search))}
+                  isLoading={machinesQ.isLoading}
+                  colConfig={machineColConfig}
+                  canEdit={canEdit}
+                  onImportSuccess={() =>
+                    qcMasters.invalidateQueries({ queryKey: ["masters", "machines"] })
+                  }
+                />
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="machine-groups">
               <ErrorBoundary inline label="Machine Groups">
-              <MachineGroupsTab
-                allMachines={machinesData}
-                canEdit={canEdit}
-                search={search}
-              />
+                <MachineGroupsTab allMachines={machinesData} canEdit={canEdit} search={search} />
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="departments">
               <ErrorBoundary inline label="Departments">
-              <MasterTable
-                title="Departments"
-                data={deptsData.filter((x) => matchesSearch(x, search))}
-                columns={[
-                  { key: "code", label: deptColConfig.getLabel("code") },
-                  { key: "name", label: deptColConfig.getLabel("name") },
-                  { key: "department_type", label: deptColConfig.getLabel("department_type") },
-                ]}
-                activeKey="is_active"
-                canEdit={canEdit}
-                onAdd={<DepartmentForm mills={millsData} />}
-                onEdit={(item) => <DepartmentForm item={item} mills={millsData} />}
-                onDeactivate={canEdit ? deactivateDepartment : undefined}
-              />
+                <MasterTable
+                  title="Departments"
+                  data={deptsData.filter((x) => matchesSearch(x, search))}
+                  columns={[
+                    { key: "code", label: deptColConfig.getLabel("code") },
+                    { key: "name", label: deptColConfig.getLabel("name") },
+                    { key: "department_type", label: deptColConfig.getLabel("department_type") },
+                  ]}
+                  activeKey="is_active"
+                  canEdit={canEdit}
+                  onAdd={<DepartmentForm mills={millsData} />}
+                  onEdit={(item) => <DepartmentForm item={item} mills={millsData} />}
+                  onDeactivate={canEdit ? deactivateDepartment : undefined}
+                />
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="yarn-counts">
               <ErrorBoundary inline label="Yarn Counts">
-              <MasterTable
-                title="Yarn Counts"
-                data={yarnData.filter((x) => matchesSearch(x, search))}
-                columns={[
-                  { key: "count", label: yarnColConfig.getLabel("count") },
-                  { key: "count_value", label: yarnColConfig.getLabel("count_value") },
-                  { key: "blend", label: yarnColConfig.getLabel("blend") },
-                  { key: "standard_csp", label: yarnColConfig.getLabel("standard_csp") },
-                ]}
-                activeKey="is_active"
-                canEdit={canEdit}
-                onAdd={<YarnCountForm mills={millsData} />}
-                onEdit={(item) => <YarnCountForm item={item} mills={millsData} />}
-                onDeactivate={canEdit ? deactivateYarnCount : undefined}
-              />
+                <MasterTable
+                  title="Yarn Counts"
+                  data={yarnData.filter((x) => matchesSearch(x, search))}
+                  columns={[
+                    { key: "count", label: yarnColConfig.getLabel("count") },
+                    { key: "count_value", label: yarnColConfig.getLabel("count_value") },
+                    { key: "blend", label: yarnColConfig.getLabel("blend") },
+                    { key: "standard_csp", label: yarnColConfig.getLabel("standard_csp") },
+                  ]}
+                  activeKey="is_active"
+                  canEdit={canEdit}
+                  onAdd={<YarnCountForm mills={millsData} />}
+                  onEdit={(item) => <YarnCountForm item={item} mills={millsData} />}
+                  onDeactivate={canEdit ? deactivateYarnCount : undefined}
+                />
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="customers">
               <ErrorBoundary inline label="Customers">
-              <MasterTable
-                title="Customers"
-                data={custData.filter((x) => matchesSearch(x, search))}
-                columns={[
-                  { key: "code", label: custColConfig.getLabel("code") },
-                  { key: "name", label: custColConfig.getLabel("name") },
-                  { key: "city", label: custColConfig.getLabel("city") },
-                  { key: "phone", label: custColConfig.getLabel("phone") },
-                  { key: "credit_limit", label: custColConfig.getLabel("credit_limit") },
-                ]}
-                activeKey="is_active"
-                canEdit={canEdit}
-                onAdd={<CustomerForm mills={millsData} />}
-                onEdit={(item) => <CustomerForm item={item} mills={millsData} />}
-                onDeactivate={canEdit ? deactivateCustomer : undefined}
-                headerExtra={canEdit ? <ImportCustomersDialog /> : undefined}
-              />
+                <MasterTable
+                  title="Customers"
+                  data={custData.filter((x) => matchesSearch(x, search))}
+                  columns={[
+                    { key: "code", label: custColConfig.getLabel("code") },
+                    { key: "name", label: custColConfig.getLabel("name") },
+                    { key: "city", label: custColConfig.getLabel("city") },
+                    { key: "phone", label: custColConfig.getLabel("phone") },
+                    { key: "credit_limit", label: custColConfig.getLabel("credit_limit") },
+                  ]}
+                  activeKey="is_active"
+                  canEdit={canEdit}
+                  onAdd={<CustomerForm mills={millsData} />}
+                  onEdit={(item) => <CustomerForm item={item} mills={millsData} />}
+                  onDeactivate={canEdit ? deactivateCustomer : undefined}
+                  headerExtra={canEdit ? <ImportCustomersDialog /> : undefined}
+                />
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="vehicles">
               <ErrorBoundary inline label="Vehicles">
-              <MasterTable
-                title="Vehicles"
-                data={vehData.filter((x) => matchesSearch(x, search))}
-                columns={[
-                  { key: "vehicle_no", label: vehColConfig.getLabel("vehicle_no") },
-                  { key: "vehicle_type", label: vehColConfig.getLabel("vehicle_type") },
-                  { key: "capacity_kg", label: vehColConfig.getLabel("capacity_kg") },
-                  { key: "driver_name", label: vehColConfig.getLabel("driver_name") },
-                  { key: "driver_phone", label: vehColConfig.getLabel("driver_phone") },
-                ]}
-                activeKey="is_active"
-                canEdit={canEdit}
-                onAdd={<VehicleForm mills={millsData} />}
-                onEdit={(item) => <VehicleForm item={item} mills={millsData} />}
-                onDeactivate={canEdit ? deactivateVehicle : undefined}
-              />
+                <MasterTable
+                  title="Vehicles"
+                  data={vehData.filter((x) => matchesSearch(x, search))}
+                  columns={[
+                    { key: "vehicle_no", label: vehColConfig.getLabel("vehicle_no") },
+                    { key: "vehicle_type", label: vehColConfig.getLabel("vehicle_type") },
+                    { key: "capacity_kg", label: vehColConfig.getLabel("capacity_kg") },
+                    { key: "driver_name", label: vehColConfig.getLabel("driver_name") },
+                    { key: "driver_phone", label: vehColConfig.getLabel("driver_phone") },
+                  ]}
+                  activeKey="is_active"
+                  canEdit={canEdit}
+                  onAdd={<VehicleForm mills={millsData} />}
+                  onEdit={(item) => <VehicleForm item={item} mills={millsData} />}
+                  onDeactivate={canEdit ? deactivateVehicle : undefined}
+                />
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="routes">
               <ErrorBoundary inline label="Routes">
-              <MasterTable
-                title="Routes"
-                data={routeData.filter((x) => matchesSearch(x, search))}
-                columns={[
-                  { key: "code", label: "Code" },
-                  { key: "name", label: "Name" },
-                  { key: "origin", label: "Origin" },
-                  { key: "destination", label: "Destination" },
-                  { key: "distance_km", label: "Distance (km)" },
-                ]}
-                activeKey="is_active"
-                canEdit={canEdit}
-                onAdd={<RouteForm mills={millsData} />}
-                onEdit={(item) => <RouteForm item={item} mills={millsData} />}
-                onDeactivate={canEdit ? deactivateRoute : undefined}
-              />
+                <MasterTable
+                  title="Routes"
+                  data={routeData.filter((x) => matchesSearch(x, search))}
+                  columns={[
+                    { key: "code", label: "Code" },
+                    { key: "name", label: "Name" },
+                    { key: "origin", label: "Origin" },
+                    { key: "destination", label: "Destination" },
+                    { key: "distance_km", label: "Distance (km)" },
+                  ]}
+                  activeKey="is_active"
+                  canEdit={canEdit}
+                  onAdd={<RouteForm mills={millsData} />}
+                  onEdit={(item) => <RouteForm item={item} mills={millsData} />}
+                  onDeactivate={canEdit ? deactivateRoute : undefined}
+                />
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="shifts">
               <ErrorBoundary inline label="Shifts">
-              <MasterTable
-                title="Shifts"
-                data={shiftsData.filter((x) => matchesSearch(x, search))}
-                columns={[
-                  { key: "code", label: shiftColConfig.getLabel("code") },
-                  { key: "name", label: shiftColConfig.getLabel("name") },
-                  { key: "start_time", label: shiftColConfig.getLabel("start_time") },
-                  { key: "end_time", label: shiftColConfig.getLabel("end_time") },
-                ]}
-                noStatus
-                canEdit={canEdit}
-                onAdd={<ShiftForm />}
-                onEdit={(item) => <ShiftForm item={item} />}
-              />
+                <MasterTable
+                  title="Shifts"
+                  data={shiftsData.filter((x) => matchesSearch(x, search))}
+                  columns={[
+                    { key: "code", label: shiftColConfig.getLabel("code") },
+                    { key: "name", label: shiftColConfig.getLabel("name") },
+                    { key: "start_time", label: shiftColConfig.getLabel("start_time") },
+                    { key: "end_time", label: shiftColConfig.getLabel("end_time") },
+                  ]}
+                  noStatus
+                  canEdit={canEdit}
+                  onAdd={<ShiftForm />}
+                  onEdit={(item) => <ShiftForm item={item} />}
+                />
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="warehouses">
               <ErrorBoundary inline label="Warehouses">
-              <MasterTable
-                title="Warehouses"
-                data={warehousesData.filter((x) => matchesSearch(x, search))}
-                columns={[
-                  { key: "code", label: "Code" },
-                  { key: "name", label: "Name" },
-                  { key: "location", label: "Location" },
-                  { key: "capacity_bags", label: "Capacity (bags)" },
-                ]}
-                activeKey="is_active"
-                canEdit={canEdit}
-                onAdd={<WarehouseForm />}
-                onEdit={(item) => <WarehouseForm item={item} />}
-                onDeactivate={canEdit ? deactivateWarehouse : undefined}
-              />
+                <MasterTable
+                  title="Warehouses"
+                  data={warehousesData.filter((x) => matchesSearch(x, search))}
+                  columns={[
+                    { key: "code", label: "Code" },
+                    { key: "name", label: "Name" },
+                    { key: "location", label: "Location" },
+                    { key: "capacity_bags", label: "Capacity (bags)" },
+                  ]}
+                  activeKey="is_active"
+                  canEdit={canEdit}
+                  onAdd={<WarehouseForm />}
+                  onEdit={(item) => <WarehouseForm item={item} />}
+                  onDeactivate={canEdit ? deactivateWarehouse : undefined}
+                />
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="stop-codes">
               <ErrorBoundary inline label="Stop Codes">
-              <StopCodesTab canEdit={canEdit} search={search} />
+                <StopCodesTab canEdit={canEdit} search={search} />
               </ErrorBoundary>
             </TabsContent>
           </Tabs>
@@ -596,33 +648,46 @@ function MasterTable<T = any>({
   const tableId = `masters_${title.toLowerCase().replace(/\s+/g, "_")}`;
 
   const colDefs: ColDef<T>[] = [
-    ...columns.map((col) => ({
-      key: col.key,
-      label: col.label,
-      render: (item: T) => <span>{formatValue((item as any)[col.key])}</span>,
-    } as ColDef<T>)),
+    ...columns.map(
+      (col) =>
+        ({
+          key: col.key,
+          label: col.label,
+          render: (item: T) => <span>{formatValue((item as any)[col.key])}</span>,
+        }) as ColDef<T>,
+    ),
     ...(!noStatus
-      ? [{
-          key: "_status",
-          label: "Status",
-          filterable: false,
-          render: (item: T) => {
-            const row = item as any;
-            if (activeKey === "current_status")
-              return (
-                <Badge variant={row[activeKey] === "running" ? "default" : row[activeKey] === "idle" ? "secondary" : "outline"}>
-                  {String(row[activeKey] ?? "unknown")}
-                </Badge>
-              );
-            if (activeKey)
-              return (
-                <Badge variant={row[activeKey] ? "default" : "secondary"}>
-                  {row[activeKey] ? "Active" : "Inactive"}
-                </Badge>
-              );
-            return <span className="text-muted-foreground">-</span>;
-          },
-        } as ColDef<T>]
+      ? [
+          {
+            key: "_status",
+            label: "Status",
+            filterable: false,
+            render: (item: T) => {
+              const row = item as any;
+              if (activeKey === "current_status")
+                return (
+                  <Badge
+                    variant={
+                      row[activeKey] === "running"
+                        ? "default"
+                        : row[activeKey] === "idle"
+                          ? "secondary"
+                          : "outline"
+                    }
+                  >
+                    {String(row[activeKey] ?? "unknown")}
+                  </Badge>
+                );
+              if (activeKey)
+                return (
+                  <Badge variant={row[activeKey] ? "default" : "secondary"}>
+                    {row[activeKey] ? "Active" : "Inactive"}
+                  </Badge>
+                );
+              return <span className="text-muted-foreground">-</span>;
+            },
+          } as ColDef<T>,
+        ]
       : []),
   ];
 
@@ -630,7 +695,9 @@ function MasterTable<T = any>({
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">{title} ({data.length})</CardTitle>
+          <CardTitle className="text-base">
+            {title} ({data.length})
+          </CardTitle>
           <div className="flex items-center gap-2">
             {canEdit && (
               <Button size="sm" onClick={() => setAdding(true)}>
@@ -648,52 +715,72 @@ function MasterTable<T = any>({
             loading={false}
             rowKey={(item: any) => String(item.id ?? "")}
             exportFilename={title.toLowerCase().replace(/\s+/g, "_")}
-            actions={(canEdit || extraActions) ? (item: T) => {
-              const row = item as any;
-              const id = String(row.id ?? "");
-              return (
-                <div className="flex items-center gap-1">
-                  {/* Edit — compact icon button, opens sheet */}
-                  {canEdit && (
-                    <button
-                      title="Edit"
-                      onClick={() => setEditItem(item)}
-                      className="p-1.5 rounded hover:bg-blue-50 text-blue-600 hover:text-blue-700 transition-colors"
-                    >
-                      <Pencil className="size-3.5" />
-                    </button>
-                  )}
-                  {extraActions?.(item)}
-                  {/* Deactivate — confirm then call */}
-                  {canEdit && onDeactivate && (
-                    <button
-                      title={row[activeKey ?? "is_active"] ? "Deactivate" : "Already inactive"}
-                      disabled={!row[activeKey ?? "is_active"]}
-                      onClick={() => setDeactivateConfirm(id)}
-                      className="p-1.5 rounded hover:bg-red-50 text-red-500 hover:text-red-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  )}
-                </div>
-              );
-            } : undefined}
+            actions={
+              canEdit || extraActions
+                ? (item: T) => {
+                    const row = item as any;
+                    const id = String(row.id ?? "");
+                    return (
+                      <div className="flex items-center gap-1">
+                        {/* Edit — compact icon button, opens sheet */}
+                        {canEdit && (
+                          <button
+                            title="Edit"
+                            onClick={() => setEditItem(item)}
+                            className="p-1.5 rounded hover:bg-blue-50 text-blue-600 hover:text-blue-700 transition-colors"
+                          >
+                            <Pencil className="size-3.5" />
+                          </button>
+                        )}
+                        {extraActions?.(item)}
+                        {/* Deactivate — confirm then call */}
+                        {canEdit && onDeactivate && (
+                          <button
+                            title={
+                              row[activeKey ?? "is_active"] ? "Deactivate" : "Already inactive"
+                            }
+                            disabled={!row[activeKey ?? "is_active"]}
+                            onClick={() => setDeactivateConfirm(id)}
+                            className="p-1.5 rounded hover:bg-red-50 text-red-500 hover:text-red-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
+                : undefined
+            }
           />
         </CardContent>
       </Card>
 
       {/* Edit Sheet */}
-      <Sheet open={!!editItem} onOpenChange={(o) => { if (!o) setEditItem(null); }}>
+      <Sheet
+        open={!!editItem}
+        onOpenChange={(o) => {
+          if (!o) setEditItem(null);
+        }}
+      >
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader><SheetTitle>Edit {singularize(title)}</SheetTitle></SheetHeader>
+          <SheetHeader>
+            <SheetTitle>Edit {singularize(title)}</SheetTitle>
+          </SheetHeader>
           <div className="mt-4">{editItem ? onEdit(editItem) : null}</div>
         </SheetContent>
       </Sheet>
 
       {/* Add Sheet */}
-      <Sheet open={adding} onOpenChange={(o) => { if (!o) setAdding(false); }}>
+      <Sheet
+        open={adding}
+        onOpenChange={(o) => {
+          if (!o) setAdding(false);
+        }}
+      >
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader><SheetTitle>Add {singularize(title)}</SheetTitle></SheetHeader>
+          <SheetHeader>
+            <SheetTitle>Add {singularize(title)}</SheetTitle>
+          </SheetHeader>
           <div className="mt-4">{onAdd}</div>
         </SheetContent>
       </Sheet>
@@ -708,15 +795,23 @@ function MasterTable<T = any>({
               </div>
               <div>
                 <p className="font-semibold text-sm">Deactivate {singularize(title)}?</p>
-                <p className="text-xs text-muted-foreground mt-0.5">This marks it as inactive. It won't appear in active lists but data is preserved.</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  This marks it as inactive. It won't appear in active lists but data is preserved.
+                </p>
               </div>
             </div>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" size="sm" onClick={() => setDeactivateConfirm(null)}>Cancel</Button>
-              <Button size="sm" variant="destructive" onClick={() => {
-                onDeactivate!(deactivateConfirm);
-                setDeactivateConfirm(null);
-              }}>
+              <Button variant="outline" size="sm" onClick={() => setDeactivateConfirm(null)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  onDeactivate!(deactivateConfirm);
+                  setDeactivateConfirm(null);
+                }}
+              >
                 Deactivate
               </Button>
             </div>
@@ -1066,11 +1161,13 @@ function MillForm({ item, companies }: { item?: Mill; companies: Company[] }) {
             <SelectValue placeholder="Select company" />
           </SelectTrigger>
           <SelectContent>
-            {companies.filter((c) => c?.id).map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
+            {companies
+              .filter((c) => c?.id)
+              .map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
           </SelectContent>
         </Select>
         {err("company_id") && <p className="text-xs text-destructive">{err("company_id")}</p>}
@@ -2067,36 +2164,86 @@ function MachinesTab({
   const visibleKeys: string[] = colConfig?.columns
     ?.filter((c: any) => c.is_visible !== false)
     .map((c: any) => c.key) ?? [
-    "code", "name", "machine_type", "department", "spindles",
-    "current_status", "make", "installation_date", "is_active",
+    "code",
+    "name",
+    "machine_type",
+    "department",
+    "spindles",
+    "current_status",
+    "make",
+    "installation_date",
+    "is_active",
   ];
 
   const allColDefs: ColDef<any>[] = [
-    { key: "code",              label: "Code",           render: (m) => <span className="font-mono text-xs font-semibold">{m.code}</span> },
-    { key: "name",              label: "Name",           render: (m) => <span className="font-medium">{m.name}</span> },
-    { key: "machine_type",      label: "Type/Model",     render: (m) => <span className="text-xs">{m.machine_type ?? m.model ?? "—"}</span> },
-    { key: "department",        label: "Department",     render: (m) => <span className="text-xs">{m.department ?? "—"}</span> },
-    { key: "spindles",          label: "Spindles/Heads", render: (m) => <span className="text-xs">{m.spindles ?? "—"}</span> },
-    { key: "make",              label: "Make",           render: (m) => <span className="text-xs text-muted-foreground">{m.make ?? "—"}</span> },
-    { key: "installation_date", label: "Comm. Date",     render: (m) => <span className="text-xs">{m.installation_date ? String(m.installation_date).slice(0, 10) : "—"}</span> },
+    {
+      key: "code",
+      label: "Code",
+      render: (m) => <span className="font-mono text-xs font-semibold">{m.code}</span>,
+    },
+    { key: "name", label: "Name", render: (m) => <span className="font-medium">{m.name}</span> },
+    {
+      key: "machine_type",
+      label: "Type/Model",
+      render: (m) => <span className="text-xs">{m.machine_type ?? m.model ?? "—"}</span>,
+    },
+    {
+      key: "department",
+      label: "Department",
+      render: (m) => <span className="text-xs">{m.department ?? "—"}</span>,
+    },
+    {
+      key: "spindles",
+      label: "Spindles/Heads",
+      render: (m) => <span className="text-xs">{m.spindles ?? "—"}</span>,
+    },
+    {
+      key: "make",
+      label: "Make",
+      render: (m) => <span className="text-xs text-muted-foreground">{m.make ?? "—"}</span>,
+    },
+    {
+      key: "installation_date",
+      label: "Comm. Date",
+      render: (m) => (
+        <span className="text-xs">
+          {m.installation_date ? String(m.installation_date).slice(0, 10) : "—"}
+        </span>
+      ),
+    },
     {
       key: "current_status",
       label: "Status",
       render: (m) => {
         const s = m.current_status ?? "running";
         const cls =
-          s === "running"     ? "bg-green-100 text-green-700" :
-          s === "breakdown"   ? "bg-red-100 text-red-700" :
-          s === "maintenance" ? "bg-amber-100 text-amber-700" :
-                                "bg-gray-100 text-gray-600";
-        return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${cls}`}>{s}</span>;
+          s === "running"
+            ? "bg-green-100 text-green-700"
+            : s === "breakdown"
+              ? "bg-red-100 text-red-700"
+              : s === "maintenance"
+                ? "bg-amber-100 text-amber-700"
+                : "bg-gray-100 text-gray-600";
+        return (
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${cls}`}
+          >
+            {s}
+          </span>
+        );
       },
     },
-    { key: "is_active", label: "Active", render: (m) => (
-      <span className={`text-xs font-medium ${m.is_active !== false ? "text-emerald-600" : "text-red-500"}`}>
-        {m.is_active !== false ? "Yes" : "No"}
-      </span>
-    )},
+    {
+      key: "is_active",
+      label: "Active",
+      render: (m) => (
+        <span
+          className={`text-xs font-medium ${m.is_active !== false ? "text-emerald-600" : "text-red-500"}`}
+        >
+          {m.is_active !== false ? "Yes" : "No"}
+        </span>
+      ),
+    },
   ];
 
   // Auto-append custom field columns from first machine's custom_fields dict
@@ -2109,30 +2256,32 @@ function MachinesTab({
   const apiCustomKeys = new Set<string>();
   for (const m of machines.slice(0, 5)) {
     if (m.custom_fields && typeof m.custom_fields === "object") {
-      Object.keys(m.custom_fields).forEach(k => apiCustomKeys.add(k));
+      Object.keys(m.custom_fields).forEach((k) => apiCustomKeys.add(k));
     }
   }
 
   const allCustomKeys = [
     ...customColKeys,
     ...[...apiCustomKeys]
-      .filter(k => !customColKeys.find((c: any) => c.key === k))
-      .map(k => ({ key: k, label: k.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()) })),
+      .filter((k) => !customColKeys.find((c: any) => c.key === k))
+      .map((k) => ({
+        key: k,
+        label: k.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()),
+      })),
   ];
 
-  const customColDefs: ColDef<any>[] = allCustomKeys.map(({ key, label }: { key: string; label: string }) => ({
-    key,
-    label,
-    render: (m: any) => {
-      const val = m.custom_fields?.[key] ?? m[key] ?? "—";
-      return <span className="text-xs text-blue-700">{String(val)}</span>;
-    },
-  }));
+  const customColDefs: ColDef<any>[] = allCustomKeys.map(
+    ({ key, label }: { key: string; label: string }) => ({
+      key,
+      label,
+      render: (m: any) => {
+        const val = m.custom_fields?.[key] ?? m[key] ?? "—";
+        return <span className="text-xs text-blue-700">{String(val)}</span>;
+      },
+    }),
+  );
 
-  const colDefs = [
-    ...allColDefs.filter(c => visibleKeys.includes(c.key)),
-    ...customColDefs,
-  ];
+  const colDefs = [...allColDefs.filter((c) => visibleKeys.includes(c.key)), ...customColDefs];
 
   return (
     <div className="space-y-4 mt-4">
@@ -2142,7 +2291,9 @@ function MachinesTab({
           <Factory className="size-4 text-muted-foreground" />
           <h2 className="text-sm font-semibold">Machines</h2>
           {!isLoading && (
-            <span className="text-xs text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded-full">{machines.length}</span>
+            <span className="text-xs text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded-full">
+              {machines.length}
+            </span>
           )}
         </div>
         {canEdit && (
@@ -2161,9 +2312,17 @@ function MachinesTab({
       {!isLoading && machines.length === 0 && (
         <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-xs text-blue-700">
           <p className="font-semibold mb-1">How to import machines</p>
-          <p>Use <strong>Import Excel</strong> with your machine register file. Supported columns:</p>
-          <p className="mt-1 font-mono text-[11px]">Mc_code · Department · Name of item · Type No · Manufacturing Year · No of delivery Head · Comm. Date · Remarks</p>
-          <p className="mt-1">Machines without a code get auto-generated codes. Brand/Country from Remarks is captured automatically.</p>
+          <p>
+            Use <strong>Import Excel</strong> with your machine register file. Supported columns:
+          </p>
+          <p className="mt-1 font-mono text-[11px]">
+            Mc_code · Department · Name of item · Type No · Manufacturing Year · No of delivery Head
+            · Comm. Date · Remarks
+          </p>
+          <p className="mt-1">
+            Machines without a code get auto-generated codes. Brand/Country from Remarks is captured
+            automatically.
+          </p>
         </div>
       )}
 
@@ -2177,19 +2336,23 @@ function MachinesTab({
         exportFilename="machines"
         rowKey={(m) => m.id ?? m.code}
         onRowClick={canEdit ? (m) => setEditItem(m) : undefined}
-        actions={canEdit ? (m: any) => (
-          <ConfirmDeleteButton
-            onConfirm={async () => {
-              await productionApi.deleteMachine(m.id);
-              qc.invalidateQueries({ queryKey: ["masters", "machines"] });
-              qc.invalidateQueries({ queryKey: ["machines"] });
-            }}
-            label={`Delete machine ${m.code}?`}
-            title="Delete Machine?"
-            confirmText="Delete"
-            successMessage={`Machine ${m.code} deleted`}
-          />
-        ) : undefined}
+        actions={
+          canEdit
+            ? (m: any) => (
+                <ConfirmDeleteButton
+                  onConfirm={async () => {
+                    await productionApi.deleteMachine(m.id);
+                    qc.invalidateQueries({ queryKey: ["masters", "machines"] });
+                    qc.invalidateQueries({ queryKey: ["machines"] });
+                  }}
+                  label={`Delete machine ${m.code}?`}
+                  title="Delete Machine?"
+                  confirmText="Delete"
+                  successMessage={`Machine ${m.code} deleted`}
+                />
+              )
+            : undefined
+        }
       />
 
       {/* Import Modal */}
@@ -2210,7 +2373,12 @@ function MachinesTab({
       <MachineForm
         item={editItem ?? undefined}
         open={addOpen || !!editItem}
-        onOpenChange={(v) => { if (!v) { setAddOpen(false); setEditItem(null); } }}
+        onOpenChange={(v) => {
+          if (!v) {
+            setAddOpen(false);
+            setEditItem(null);
+          }
+        }}
         onSaved={() => {
           setAddOpen(false);
           setEditItem(null);
@@ -2236,19 +2404,17 @@ function MachineForm({
 }) {
   const { millId } = useActiveMill();
   const [form, setForm] = useState({
-    code:              item?.code              ?? "",
-    name:              item?.name              ?? "",
-    machine_type:      item?.machine_type      ?? "",
-    department:        item?.department        ?? "",
-    spindles:          item?.spindles ? String(item.spindles) : "",
-    make:              item?.make              ?? "",
+    code: item?.code ?? "",
+    name: item?.name ?? "",
+    machine_type: item?.machine_type ?? "",
+    department: item?.department ?? "",
+    spindles: item?.spindles ? String(item.spindles) : "",
+    make: item?.make ?? "",
     installation_date: item?.installation_date ? String(item.installation_date).slice(0, 10) : "",
-    current_status:    item?.current_status    ?? "running",
+    current_status: item?.current_status ?? "running",
   });
   // Custom fields from MillCustomField definitions
-  const [customVals, setCustomVals] = useState<Record<string, string>>(
-    item?.custom_fields ?? {}
-  );
+  const [customVals, setCustomVals] = useState<Record<string, string>>(item?.custom_fields ?? {});
   const [saving, setSaving] = useState(false);
   const isEdit = !!item;
 
@@ -2262,9 +2428,12 @@ function MachineForm({
   // Fetch custom field definitions for this mill's machines
   const { data: customFieldDefs } = useQuery({
     queryKey: ["custom-field-defs", millId, "machines"],
-    queryFn: () => api.get("/ui-config/custom-fields", {
-      params: { mill_id: millId, module: "machines" },
-    }).then(r => r.data?.fields ?? []),
+    queryFn: () =>
+      api
+        .get("/ui-config/custom-fields", {
+          params: { mill_id: millId, module: "machines" },
+        })
+        .then((r) => r.data?.fields ?? []),
     staleTime: 60_000,
     enabled: !!millId,
   });
@@ -2311,18 +2480,25 @@ function MachineForm({
         <form onSubmit={handleSubmit} className="space-y-3 mt-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Code <span className="text-destructive">*</span></Label>
+              <Label>
+                Code <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.code}
-                onChange={e => setForm({ ...form, code: e.target.value })}
+                onChange={(e) => setForm({ ...form, code: e.target.value })}
                 placeholder="e.g. CD_001"
                 disabled={isEdit}
               />
             </div>
             <div className="space-y-1.5">
               <Label>Status</Label>
-              <Select value={form.current_status} onValueChange={v => setForm({ ...form, current_status: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={form.current_status}
+                onValueChange={(v) => setForm({ ...form, current_status: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="running">Running</SelectItem>
                   <SelectItem value="idle">Idle</SelectItem>
@@ -2333,20 +2509,29 @@ function MachineForm({
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>Name / Model <span className="text-destructive">*</span></Label>
+            <Label>
+              Name / Model <span className="text-destructive">*</span>
+            </Label>
             <Input
               value={form.name}
-              onChange={e => setForm({ ...form, name: e.target.value })}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="e.g. Trutzschler DK-740"
             />
           </div>
           <div className="space-y-1.5">
             <Label>Department</Label>
-            <Select value={form.department} onValueChange={v => setForm({ ...form, department: v })}>
-              <SelectTrigger><SelectValue placeholder="Select department…" /></SelectTrigger>
+            <Select
+              value={form.department}
+              onValueChange={(v) => setForm({ ...form, department: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select department…" />
+              </SelectTrigger>
               <SelectContent>
                 {depts.map((d: any) => (
-                  <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                  <SelectItem key={d.id} value={d.name}>
+                    {d.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -2356,7 +2541,7 @@ function MachineForm({
               <Label>Type / Model No</Label>
               <Input
                 value={form.machine_type}
-                onChange={e => setForm({ ...form, machine_type: e.target.value })}
+                onChange={(e) => setForm({ ...form, machine_type: e.target.value })}
                 placeholder="e.g. 168757 L"
               />
             </div>
@@ -2365,7 +2550,7 @@ function MachineForm({
               <Input
                 type="number"
                 value={form.spindles}
-                onChange={e => setForm({ ...form, spindles: e.target.value })}
+                onChange={(e) => setForm({ ...form, spindles: e.target.value })}
                 placeholder="e.g. 120"
               />
             </div>
@@ -2374,7 +2559,7 @@ function MachineForm({
             <Label>Make (Brand / Country)</Label>
             <Input
               value={form.make}
-              onChange={e => setForm({ ...form, make: e.target.value })}
+              onChange={(e) => setForm({ ...form, make: e.target.value })}
               placeholder="e.g. Trutzschler (Germany)"
             />
           </div>
@@ -2383,7 +2568,7 @@ function MachineForm({
             <Input
               type="date"
               value={form.installation_date}
-              onChange={e => setForm({ ...form, installation_date: e.target.value })}
+              onChange={(e) => setForm({ ...form, installation_date: e.target.value })}
             />
           </div>
 
@@ -2397,12 +2582,22 @@ function MachineForm({
                 <div key={def.field_key} className="space-y-1.5">
                   <Label className="flex items-center gap-1.5">
                     {def.field_label}
-                    <span className="text-[10px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-sans">custom</span>
+                    <span className="text-[10px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-sans">
+                      custom
+                    </span>
                   </Label>
                   <Input
-                    type={def.field_type === "number" ? "number" : def.field_type === "date" ? "date" : "text"}
+                    type={
+                      def.field_type === "number"
+                        ? "number"
+                        : def.field_type === "date"
+                          ? "date"
+                          : "text"
+                    }
                     value={customVals[def.field_key] ?? ""}
-                    onChange={e => setCustomVals(prev => ({ ...prev, [def.field_key]: e.target.value }))}
+                    onChange={(e) =>
+                      setCustomVals((prev) => ({ ...prev, [def.field_key]: e.target.value }))
+                    }
                     placeholder={`Enter ${def.field_label.toLowerCase()}…`}
                   />
                 </div>
@@ -2451,14 +2646,21 @@ function MachineGroupsTab({
   });
   const groups: MachineGroup[] = (groupsQ.data ?? []) as MachineGroup[];
   const filtered = groups.filter(
-    (g) => !search || g.name.toLowerCase().includes(search.toLowerCase()) || (g.description ?? "").toLowerCase().includes(search.toLowerCase())
+    (g) =>
+      !search ||
+      g.name.toLowerCase().includes(search.toLowerCase()) ||
+      (g.description ?? "").toLowerCase().includes(search.toLowerCase()),
   );
 
   const saveMut = useMutation({
     mutationFn: () =>
       editing
         ? productionApi.updateMachineGroup(editing.id, form)
-        : productionApi.createMachineGroup({ ...form, is_active: true, mill_id: millId ?? undefined }),
+        : productionApi.createMachineGroup({
+            ...form,
+            is_active: true,
+            mill_id: millId ?? undefined,
+          }),
     onSuccess: () => {
       toast.success(editing ? "Machine group updated" : "Machine group created");
       qc.invalidateQueries({ queryKey: ["machine-groups"] });
@@ -2485,7 +2687,11 @@ function MachineGroupsTab({
 
   function openEdit(g: MachineGroup) {
     setEditing(g);
-    setForm({ name: g.name, description: g.description ?? "", machine_codes: g.machine_codes ?? [] });
+    setForm({
+      name: g.name,
+      description: g.description ?? "",
+      machine_codes: g.machine_codes ?? [],
+    });
     setMachineSearch("");
     setSheetOpen(true);
   }
@@ -2504,7 +2710,7 @@ function MachineGroupsTab({
       !machineSearch ||
       m.code?.toLowerCase().includes(machineSearch.toLowerCase()) ||
       m.name?.toLowerCase().includes(machineSearch.toLowerCase()) ||
-      m.department?.toLowerCase().includes(machineSearch.toLowerCase())
+      m.department?.toLowerCase().includes(machineSearch.toLowerCase()),
   );
 
   // Group machines by department for the picker
@@ -2523,7 +2729,8 @@ function MachineGroupsTab({
             <Blocks className="size-4" /> Machine Groups
           </CardTitle>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Name and group your machines (e.g. "Carding Line 1", "Ring Frame Section A"). In Shift Entry, the worker selects a group to log entries.
+            Name and group your machines (e.g. "Carding Line 1", "Ring Frame Section A"). In Shift
+            Entry, the worker selects a group to log entries.
           </p>
         </div>
         {canEdit && (
@@ -2539,7 +2746,9 @@ function MachineGroupsTab({
           <div className="text-center py-10 text-muted-foreground space-y-2">
             <Blocks className="size-8 mx-auto opacity-30" />
             <p className="text-sm">No machine groups yet.</p>
-            <p className="text-xs">Create groups like "Carding Line 1" or "Ring Frame Section A".</p>
+            <p className="text-xs">
+              Create groups like "Carding Line 1" or "Ring Frame Section A".
+            </p>
             {canEdit && (
               <Button size="sm" variant="outline" onClick={openNew}>
                 <Plus className="size-3.5 mr-1" /> Create first group
@@ -2553,9 +2762,13 @@ function MachineGroupsTab({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-sm">{g.name}</span>
-                    <Badge variant="outline" className="text-xs">{(g.machine_codes ?? []).length} machines</Badge>
+                    <Badge variant="outline" className="text-xs">
+                      {(g.machine_codes ?? []).length} machines
+                    </Badge>
                     {!g.is_active && (
-                      <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        Inactive
+                      </Badge>
                     )}
                   </div>
                   {g.description && (
@@ -2563,14 +2776,20 @@ function MachineGroupsTab({
                   )}
                   <div className="flex flex-wrap gap-1 mt-1.5">
                     {(g.machine_codes ?? []).length === 0 ? (
-                      <span className="text-xs text-muted-foreground italic">No machines assigned</span>
+                      <span className="text-xs text-muted-foreground italic">
+                        No machines assigned
+                      </span>
                     ) : (
                       (g.machine_codes ?? []).slice(0, 12).map((code) => (
-                        <Badge key={code} variant="secondary" className="text-xs font-mono">{code}</Badge>
+                        <Badge key={code} variant="secondary" className="text-xs font-mono">
+                          {code}
+                        </Badge>
                       ))
                     )}
                     {(g.machine_codes ?? []).length > 12 && (
-                      <Badge variant="secondary" className="text-xs">+{(g.machine_codes ?? []).length - 12} more</Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        +{(g.machine_codes ?? []).length - 12} more
+                      </Badge>
                     )}
                   </div>
                 </div>
@@ -2608,7 +2827,9 @@ function MachineGroupsTab({
           </SheetHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-1.5">
-              <Label>Group Name <span className="text-destructive">*</span></Label>
+              <Label>
+                Group Name <span className="text-destructive">*</span>
+              </Label>
               <Input
                 value={form.name}
                 onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
@@ -2616,7 +2837,9 @@ function MachineGroupsTab({
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Description <span className="text-xs text-muted-foreground">(optional)</span></Label>
+              <Label>
+                Description <span className="text-xs text-muted-foreground">(optional)</span>
+              </Label>
               <Input
                 value={form.description}
                 onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
@@ -2650,12 +2873,16 @@ function MachineGroupsTab({
               </div>
               <div className="border rounded-lg max-h-72 overflow-y-auto divide-y">
                 {Object.keys(machinesByDept).length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-4">No machines found</p>
+                  <p className="text-xs text-muted-foreground text-center py-4">
+                    No machines found
+                  </p>
                 ) : (
                   Object.entries(machinesByDept).map(([dept, machines]) => (
                     <div key={dept}>
                       <div className="px-3 py-1.5 bg-muted/50 sticky top-0">
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{dept}</span>
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          {dept}
+                        </span>
                       </div>
                       {(machines as any[]).map((m: any) => {
                         const selected = form.machine_codes.includes(m.code);
@@ -2666,12 +2893,22 @@ function MachineGroupsTab({
                             onClick={() => toggleMachine(m.code)}
                             className={`w-full flex items-center gap-2.5 px-3 py-2 text-left hover:bg-muted/40 transition-colors ${selected ? "bg-primary/5" : ""}`}
                           >
-                            <div className={`size-4 rounded flex items-center justify-center border ${selected ? "bg-primary border-primary" : "border-input"}`}>
+                            <div
+                              className={`size-4 rounded flex items-center justify-center border ${selected ? "bg-primary border-primary" : "border-input"}`}
+                            >
                               {selected && <Check className="size-2.5 text-white" />}
                             </div>
                             <span className="font-mono text-xs font-medium">{m.code}</span>
-                            {m.name && <span className="text-xs text-muted-foreground truncate">{m.name}</span>}
-                            {m.department && <span className="ml-auto text-xs text-muted-foreground/60">{m.department}</span>}
+                            {m.name && (
+                              <span className="text-xs text-muted-foreground truncate">
+                                {m.name}
+                              </span>
+                            )}
+                            {m.department && (
+                              <span className="ml-auto text-xs text-muted-foreground/60">
+                                {m.department}
+                              </span>
+                            )}
                           </button>
                         );
                       })}
@@ -2699,21 +2936,26 @@ function MachineGroupsTab({
 // ── Stop Codes Tab ────────────────────────────────────────────────────────────
 
 const STOP_CODE_CATEGORIES = [
-  { value: "normal",                label: "Normal" },
-  { value: "planned",               label: "Planned" },
-  { value: "breakdown_mechanical",  label: "Breakdown — Mechanical" },
-  { value: "breakdown_electrical",  label: "Breakdown — Electrical" },
-  { value: "production_change",     label: "Production Change" },
-  { value: "quality",               label: "Quality" },
-  { value: "utility",               label: "Utility" },
-  { value: "misc",                  label: "Misc" },
+  { value: "normal", label: "Normal" },
+  { value: "planned", label: "Planned" },
+  { value: "breakdown_mechanical", label: "Breakdown — Mechanical" },
+  { value: "breakdown_electrical", label: "Breakdown — Electrical" },
+  { value: "production_change", label: "Production Change" },
+  { value: "quality", label: "Quality" },
+  { value: "utility", label: "Utility" },
+  { value: "misc", label: "Misc" },
 ];
 
 function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string }) {
   const qc = useQueryClient();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
-  const [form, setForm] = useState({ code: "", name: "", category: "", departments: [] as string[] });
+  const [form, setForm] = useState({
+    code: "",
+    name: "",
+    category: "",
+    departments: [] as string[],
+  });
 
   // Mill departments for checkbox list
   const { data: millMasters } = useMillMasters();
@@ -2727,7 +2969,12 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
   const allCodes = (codesQ.data ?? []) as any[];
   const filtered = allCodes.filter((c) => {
     const q = search.toLowerCase();
-    return !q || String(c.code).includes(q) || (c.name ?? "").toLowerCase().includes(q) || (c.category ?? "").toLowerCase().includes(q);
+    return (
+      !q ||
+      String(c.code).includes(q) ||
+      (c.name ?? "").toLowerCase().includes(q) ||
+      (c.category ?? "").toLowerCase().includes(q)
+    );
   });
 
   const toggleDept = (name: string) => {
@@ -2771,10 +3018,19 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
     },
   });
 
-  const openAdd = () => { setEditing(null); setForm({ code: "", name: "", category: "", departments: [] }); setSheetOpen(true); };
+  const openAdd = () => {
+    setEditing(null);
+    setForm({ code: "", name: "", category: "", departments: [] });
+    setSheetOpen(true);
+  };
   const openEdit = (c: any) => {
     setEditing(c);
-    setForm({ code: String(c.code), name: c.name, category: c.category ?? "", departments: Array.isArray(c.departments) ? c.departments : [] });
+    setForm({
+      code: String(c.code),
+      name: c.name,
+      category: c.category ?? "",
+      departments: Array.isArray(c.departments) ? c.departments : [],
+    });
     setSheetOpen(true);
   };
 
@@ -2783,10 +3039,16 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold flex items-center gap-2">
           DATALOG Stop Codes
-          {!codesQ.isLoading && <span className="text-xs text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded-full">{allCodes.length}</span>}
+          {!codesQ.isLoading && (
+            <span className="text-xs text-muted-foreground bg-gray-100 px-1.5 py-0.5 rounded-full">
+              {allCodes.length}
+            </span>
+          )}
         </h2>
         {canEdit && (
-          <Button size="sm" onClick={openAdd}><Plus className="size-4 mr-1" /> Add Stop Code</Button>
+          <Button size="sm" onClick={openAdd}>
+            <Plus className="size-4 mr-1" /> Add Stop Code
+          </Button>
         )}
       </div>
 
@@ -2799,54 +3061,82 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
                   <th className="text-left pl-4 py-2 w-14">Code</th>
                   <th className="text-left py-2 w-48">Name / Reason</th>
                   <th className="text-left py-2 w-36">Category</th>
-                  <th className="text-left py-2">Departments <span className="font-normal opacity-70">(blank = all)</span></th>
+                  <th className="text-left py-2">
+                    Departments <span className="font-normal opacity-70">(blank = all)</span>
+                  </th>
                   <th className="text-left py-2 w-14">Active</th>
                   <th className="py-2 w-20" />
                 </tr>
               </thead>
               <tbody>
                 {codesQ.isLoading ? (
-                  <tr><td colSpan={6} className="text-center py-6 text-muted-foreground text-xs">Loading…</td></tr>
-                ) : filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-6 text-muted-foreground text-xs">No stop codes found. Add one above.</td></tr>
-                ) : filtered.map((c: any, idx: number) => (
-                  <tr key={c.code} className={["border-b last:border-0", idx % 2 === 0 ? "" : "bg-muted/20"].join(" ")}>
-                    <td className="pl-4 py-2 font-mono font-bold text-primary">{c.code}</td>
-                    <td className="py-2 font-medium">{c.name}</td>
-                    <td className="py-2 text-xs text-muted-foreground">
-                      {STOP_CODE_CATEGORIES.find(x => x.value === c.category)?.label ?? c.category ?? "—"}
-                    </td>
-                    <td className="py-2 text-xs text-muted-foreground">
-                      {Array.isArray(c.departments) && c.departments.length > 0
-                        ? c.departments.join(", ")
-                        : <span className="italic opacity-60">All departments</span>}
-                    </td>
-                    <td className="py-2">
-                      <span className={`text-xs font-medium ${c.is_active !== false ? "text-emerald-600" : "text-red-500"}`}>
-                        {c.is_active !== false ? "Yes" : "No"}
-                      </span>
-                    </td>
-                    <td className="py-2 pr-3">
-                      {canEdit && (
-                        <div className="flex items-center gap-1 justify-end">
-                          <button onClick={() => openEdit(c)} className="p-1.5 rounded hover:bg-blue-50 text-blue-600" title="Edit">
-                            <Pencil className="size-3.5" />
-                          </button>
-                          <ConfirmDeleteButton
-                            onConfirm={async () => {
-                              await productionApi.deleteStopCode(c.code);
-                              qc.invalidateQueries({ queryKey: ["stop-codes"] });
-                            }}
-                            label={`Deactivate code ${c.code} — ${c.name}?`}
-                            title="Deactivate Stop Code?"
-                            confirmText="Deactivate"
-                            successMessage="Stop code deactivated"
-                          />
-                        </div>
-                      )}
+                  <tr>
+                    <td colSpan={6} className="text-center py-6 text-muted-foreground text-xs">
+                      Loading…
                     </td>
                   </tr>
-                ))}
+                ) : filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="text-center py-6 text-muted-foreground text-xs">
+                      No stop codes found. Add one above.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map((c: any, idx: number) => (
+                    <tr
+                      key={c.code}
+                      className={[
+                        "border-b last:border-0",
+                        idx % 2 === 0 ? "" : "bg-muted/20",
+                      ].join(" ")}
+                    >
+                      <td className="pl-4 py-2 font-mono font-bold text-primary">{c.code}</td>
+                      <td className="py-2 font-medium">{c.name}</td>
+                      <td className="py-2 text-xs text-muted-foreground">
+                        {STOP_CODE_CATEGORIES.find((x) => x.value === c.category)?.label ??
+                          c.category ??
+                          "—"}
+                      </td>
+                      <td className="py-2 text-xs text-muted-foreground">
+                        {Array.isArray(c.departments) && c.departments.length > 0 ? (
+                          c.departments.join(", ")
+                        ) : (
+                          <span className="italic opacity-60">All departments</span>
+                        )}
+                      </td>
+                      <td className="py-2">
+                        <span
+                          className={`text-xs font-medium ${c.is_active !== false ? "text-emerald-600" : "text-red-500"}`}
+                        >
+                          {c.is_active !== false ? "Yes" : "No"}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-3">
+                        {canEdit && (
+                          <div className="flex items-center gap-1 justify-end">
+                            <button
+                              onClick={() => openEdit(c)}
+                              className="p-1.5 rounded hover:bg-blue-50 text-blue-600"
+                              title="Edit"
+                            >
+                              <Pencil className="size-3.5" />
+                            </button>
+                            <ConfirmDeleteButton
+                              onConfirm={async () => {
+                                await productionApi.deleteStopCode(c.code);
+                                qc.invalidateQueries({ queryKey: ["stop-codes"] });
+                              }}
+                              label={`Deactivate code ${c.code} — ${c.name}?`}
+                              title="Deactivate Stop Code?"
+                              confirmText="Deactivate"
+                              successMessage="Stop code deactivated"
+                            />
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -2854,7 +3144,15 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
       </Card>
 
       {/* Add / Edit Sheet */}
-      <Sheet open={sheetOpen} onOpenChange={(o) => { if (!o) { setSheetOpen(false); setEditing(null); } }}>
+      <Sheet
+        open={sheetOpen}
+        onOpenChange={(o) => {
+          if (!o) {
+            setSheetOpen(false);
+            setEditing(null);
+          }
+        }}
+      >
         <SheetContent className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>{editing ? `Edit Code ${editing.code}` : "Add Stop Code"}</SheetTitle>
@@ -2864,13 +3162,17 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
               <div className="space-y-1.5">
                 <Label className="text-xs">Code Number *</Label>
                 <Input
-                  type="number" min={1} max={9999}
+                  type="number"
+                  min={1}
+                  max={9999}
                   value={form.code}
                   onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))}
                   placeholder="e.g. 1"
                   className="h-8 text-sm"
                 />
-                <p className="text-xs text-muted-foreground">Numeric code used in DATALOG system (1–9999)</p>
+                <p className="text-xs text-muted-foreground">
+                  Numeric code used in DATALOG system (1–9999)
+                </p>
               </div>
             )}
             <div className="space-y-1.5">
@@ -2884,11 +3186,18 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Category</Label>
-              <Select value={form.category} onValueChange={(v) => setForm((p) => ({ ...p, category: v }))}>
-                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select category" /></SelectTrigger>
+              <Select
+                value={form.category}
+                onValueChange={(v) => setForm((p) => ({ ...p, category: v }))}
+              >
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
                 <SelectContent>
                   {STOP_CODE_CATEGORIES.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    <SelectItem key={c.value} value={c.value}>
+                      {c.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -2898,10 +3207,14 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
             <div className="space-y-2">
               <div>
                 <Label className="text-xs font-semibold">Applicable Departments</Label>
-                <p className="text-xs text-muted-foreground mt-0.5">Leave all unchecked = applies to every department</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Leave all unchecked = applies to every department
+                </p>
               </div>
               {deptOptions.length === 0 ? (
-                <p className="text-xs text-muted-foreground italic">No departments set up in Masters yet</p>
+                <p className="text-xs text-muted-foreground italic">
+                  No departments set up in Masters yet
+                </p>
               ) : (
                 <div className="grid grid-cols-2 gap-y-1.5 gap-x-3 border rounded-md p-3 bg-muted/20">
                   {deptOptions.map((d: any) => {

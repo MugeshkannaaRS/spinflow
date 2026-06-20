@@ -36,9 +36,7 @@ export function PageHeader({
       {/* Left: title + subtitle */}
       <div>
         <h1 className="text-[22px] font-bold text-[#0f172a] leading-tight">{title}</h1>
-        {subtitle && (
-          <p className="text-[13px] text-[#64748b] mt-0.5">{subtitle}</p>
-        )}
+        {subtitle && <p className="text-[13px] text-[#64748b] mt-0.5">{subtitle}</p>}
       </div>
 
       {/* Right: actions + refresh */}

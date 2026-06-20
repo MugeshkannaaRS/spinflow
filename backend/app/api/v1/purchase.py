@@ -89,22 +89,18 @@ async def get_purchases(
         stmt = stmt.where(CottonPurchase.mill_id == effective_mill_id)
     elif scope["company_id"]:
         stmt = stmt.join(Mill, CottonPurchase.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
-    try:
-        count_stmt = select(func.count()).select_from(stmt.subquery())
-        total = (await db.execute(count_stmt)).scalar() or 0
-        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-        result = await db.execute(stmt)
-        items = result.scalars().all()
-        return {
-            "total": total,
-            "page": page,
-            "page_size": page_size,
-            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-            "data": [CottonPurchaseOut.model_validate(item).model_dump() for item in items],
-        }
-    except Exception as e:
-        logger.error(f"purchase.purchases list error: {e}")
-        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(stmt)
+    items = result.scalars().all()
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+        "data": [CottonPurchaseOut.model_validate(item).model_dump() for item in items],
+    }
 
 
 @router.post("/purchase/purchases", response_model=CottonPurchaseOut)
@@ -113,6 +109,7 @@ async def create_purchase(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase", write=True)),
 ):
+    scope = await get_mill_scope(current_user, db)
     purchase = CottonPurchase(
         date=req.purchase_date.isoformat(),
         invoice_no=req.invoice_no or "",
@@ -122,6 +119,7 @@ async def create_purchase(
         net_kg=req.weight_kg * req.bale_count,
         rate_per_kg=req.rate_per_quintal / 100,
         moisture=req.moisture_pct or 0,
+        mill_id=scope.get("mill_id"),
         status="pending",
     )
     db.add(purchase)
@@ -157,27 +155,23 @@ async def get_suppliers(
             if mill_check.scalar_one_or_none():
                 effective_mill_id = mill_id
 
-    try:
-        stmt = select(Supplier)
-        if effective_mill_id:
-            stmt = stmt.where(Supplier.mill_id == effective_mill_id)
-        elif scope.get("company_id"):
-            stmt = stmt.join(Mill, Supplier.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
-        count_stmt = select(func.count()).select_from(stmt.subquery())
-        total = (await db.execute(count_stmt)).scalar() or 0
-        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-        result = await db.execute(stmt)
-        items = result.scalars().all()
-        return {
-            "total": total,
-            "page": page,
-            "page_size": page_size,
-            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-            "data": [SupplierOut.model_validate(item).model_dump() for item in items],
-        }
-    except Exception as e:
-        logger.error(f"purchase.suppliers list error: {e}")
-        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
+    stmt = select(Supplier)
+    if effective_mill_id:
+        stmt = stmt.where(Supplier.mill_id == effective_mill_id)
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, Supplier.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(stmt)
+    items = result.scalars().all()
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+        "data": [SupplierOut.model_validate(item).model_dump() for item in items],
+    }
 
 
 @router.post("/purchase/suppliers", response_model=SupplierOut)
@@ -186,6 +180,7 @@ async def create_supplier(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase", write=True)),
 ):
+    scope = await get_mill_scope(current_user, db)
     supplier_code = req.code or req.name[:50].upper().replace(" ", "-")
     supplier = Supplier(
         code=supplier_code,
@@ -195,6 +190,7 @@ async def create_supplier(
         email=str(req.email) if req.email else None,
         address=req.address,
         gstin=req.gstin,
+        mill_id=scope.get("mill_id"),
         status=True,
     )
     db.add(supplier)
@@ -329,16 +325,12 @@ async def get_bales(
         stmt = stmt.where(CottonBale.category == category)
     if status:
         stmt = stmt.where(CottonBale.status == status)
-    try:
-        count_stmt = select(func.count()).select_from(stmt.subquery())
-        total = (await db.execute(count_stmt)).scalar() or 0
-        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-        result = await db.execute(stmt)
-        items = result.scalars().all()
-        return {"total": total, "page": page, "page_size": page_size, "data": [BaleOut.model_validate(item).model_dump() for item in items]}
-    except Exception as e:
-        logger.error(f"purchase.bales list error: {e}")
-        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(stmt)
+    items = result.scalars().all()
+    return {"total": total, "page": page, "page_size": page_size, "data": [BaleOut.model_validate(item).model_dump() for item in items]}
 
 
 @router.post("/purchase/bales", response_model=BaleOut)
@@ -347,6 +339,7 @@ async def create_bale(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase", write=True)),
 ):
+    scope = await get_mill_scope(current_user, db)
     qi = _compute_quality_index(req.strength, req.uniformity, req.micronaire, req.trash_area)
     category = _assign_category(req.micronaire)
     bale = CottonBale(
@@ -370,6 +363,8 @@ async def create_bale(
         sci=req.sci,
         quality_index=qi,
         category=category,
+        mill_id=scope.get("mill_id"),
+        company_id=scope.get("company_id"),
         status="in-stock" if category != "Reject" else "rejected",
     )
     db.add(bale)
@@ -454,27 +449,23 @@ async def get_grns(
             if mill_check.scalar_one_or_none():
                 effective_mill_id = mill_id
 
-    try:
-        stmt = select(GRNEntry).order_by(GRNEntry.created_at.desc())
-        if effective_mill_id:
-            stmt = stmt.join(CottonPurchase, GRNEntry.purchase_id == CottonPurchase.id).where(CottonPurchase.mill_id == effective_mill_id)
-        elif scope["company_id"]:
-            stmt = stmt.join(CottonPurchase, GRNEntry.purchase_id == CottonPurchase.id).join(Mill, CottonPurchase.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
-        count_stmt = select(func.count()).select_from(stmt.subquery())
-        total = (await db.execute(count_stmt)).scalar() or 0
-        stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-        result = await db.execute(stmt)
-        items = result.scalars().all()
-        return {
-            "total": total,
-            "page": page,
-            "page_size": page_size,
-            "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-            "data": [GRNOut.model_validate(item).model_dump() for item in items],
-        }
-    except Exception as e:
-        logger.error(f"purchase.grns list error: {e}")
-        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
+    stmt = select(GRNEntry).order_by(GRNEntry.created_at.desc())
+    if effective_mill_id:
+        stmt = stmt.join(CottonPurchase, GRNEntry.purchase_id == CottonPurchase.id).where(CottonPurchase.mill_id == effective_mill_id)
+    elif scope["company_id"]:
+        stmt = stmt.join(CottonPurchase, GRNEntry.purchase_id == CottonPurchase.id).join(Mill, CottonPurchase.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(stmt)
+    items = result.scalars().all()
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+        "data": [GRNOut.model_validate(item).model_dump() for item in items],
+    }
 
 
 @router.post("/purchase/grn", response_model=GRNOut)

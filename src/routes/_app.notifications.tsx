@@ -58,9 +58,16 @@ function NotificationsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["notifications-full", page, unreadOnly, category],
     queryFn: () =>
-      api.get("/notifications", {
-        params: { page, page_size: 20, unread_only: unreadOnly || undefined, category: category || undefined },
-      }).then((r: any) => r.data),
+      api
+        .get("/notifications", {
+          params: {
+            page,
+            page_size: 20,
+            unread_only: unreadOnly || undefined,
+            category: category || undefined,
+          },
+        })
+        .then((r: any) => r.data),
     staleTime: 30_000,
   });
 
@@ -95,7 +102,9 @@ function NotificationsPage() {
         <div className="flex items-center gap-3">
           <h2 className="text-lg font-bold text-gray-900">All Notifications</h2>
           {total > 0 && (
-            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{total} total</span>
+            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+              {total} total
+            </span>
           )}
         </div>
         {unreadTotal > 0 && (
@@ -113,12 +122,15 @@ function NotificationsPage() {
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <button
-          onClick={() => { setUnreadOnly((v) => !v); setPage(1); }}
+          onClick={() => {
+            setUnreadOnly((v) => !v);
+            setPage(1);
+          }}
           className={cn(
             "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors",
             unreadOnly
               ? "bg-blue-50 border-blue-300 text-blue-700 font-medium"
-              : "border-gray-200 text-gray-600 hover:bg-gray-50"
+              : "border-gray-200 text-gray-600 hover:bg-gray-50",
           )}
         >
           <Bell className="w-3.5 h-3.5" />
@@ -127,12 +139,15 @@ function NotificationsPage() {
         {Object.entries(CATEGORY_LABELS).map(([code, label]) => (
           <button
             key={code}
-            onClick={() => { setCategory((v) => v === code ? "" : code); setPage(1); }}
+            onClick={() => {
+              setCategory((v) => (v === code ? "" : code));
+              setPage(1);
+            }}
             className={cn(
               "px-3 py-1.5 rounded-lg text-sm border transition-colors",
               category === code
                 ? "bg-gray-900 border-gray-900 text-white font-medium"
-                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                : "border-gray-200 text-gray-600 hover:bg-gray-50",
             )}
           >
             {label}
@@ -148,7 +163,9 @@ function NotificationsPage() {
           ) : notifications.length === 0 ? (
             <div className="flex flex-col items-center gap-3 py-14 text-gray-400">
               <BellOff className="w-10 h-10" />
-              <p className="text-sm">No notifications{unreadOnly ? " — you're all caught up!" : ""}</p>
+              <p className="text-sm">
+                No notifications{unreadOnly ? " — you're all caught up!" : ""}
+              </p>
             </div>
           ) : (
             <div className="divide-y divide-gray-100">
@@ -157,24 +174,26 @@ function NotificationsPage() {
                   key={n.id}
                   className={cn(
                     "flex items-start gap-4 px-5 py-4 hover:bg-gray-50 transition-colors group",
-                    !n.is_read && "bg-blue-50/30"
+                    !n.is_read && "bg-blue-50/30",
                   )}
                 >
                   {/* Severity dot */}
                   <span
                     className={cn(
                       "mt-1.5 w-2.5 h-2.5 shrink-0 rounded-full",
-                      SEVERITY_COLORS[n.severity] || "bg-gray-300"
+                      SEVERITY_COLORS[n.severity] || "bg-gray-300",
                     )}
                   />
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
-                      <p className={cn(
-                        "text-[14px] leading-snug",
-                        n.is_read ? "text-gray-700" : "font-semibold text-gray-900"
-                      )}>
+                      <p
+                        className={cn(
+                          "text-[14px] leading-snug",
+                          n.is_read ? "text-gray-700" : "font-semibold text-gray-900",
+                        )}
+                      >
                         {n.title}
                       </p>
                       <span className="shrink-0 text-xs text-gray-400 whitespace-nowrap mt-0.5">
@@ -185,10 +204,12 @@ function NotificationsPage() {
                       <p className="text-sm text-gray-500 mt-0.5 leading-snug">{n.message}</p>
                     )}
                     <div className="flex items-center gap-2 mt-1.5">
-                      <span className={cn(
-                        "text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded",
-                        SEVERITY_BADGE[n.severity] || "bg-gray-100 text-gray-600"
-                      )}>
+                      <span
+                        className={cn(
+                          "text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded",
+                          SEVERITY_BADGE[n.severity] || "bg-gray-100 text-gray-600",
+                        )}
+                      >
                         {n.severity}
                       </span>
                       <span className="text-[11px] text-gray-400">

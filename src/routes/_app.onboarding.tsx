@@ -10,15 +10,35 @@ export const Route = createFileRoute("/_app/onboarding")({
 });
 
 const STEPS = [
-  { key: "company_info", label: "Company Setup", desc: "Your company profile is ready", link: "/masters" },
-  { key: "mill_setup",   label: "Mill Setup",    desc: "Create at least one mill",     link: "/masters" },
-  { key: "departments",  label: "Departments",   desc: "Add production departments",    link: "/masters" },
-  { key: "employees",    label: "Employees",     desc: "Import your workforce",         link: "/import-hub" },
-  { key: "machines",     label: "Machines",      desc: "Register your machines",        link: "/masters" },
-  { key: "shifts",       label: "Shifts",        desc: "Configure production shifts",   link: "/masters" },
-  { key: "roles",        label: "Roles",         desc: "Assign user roles",             link: "/users" },
-  { key: "billing",      label: "Billing",       desc: "Activate your subscription",    link: "/company/billing" },
-  { key: "go_live",      label: "Go Live",       desc: "All systems ready — start operations", link: "/dashboard" },
+  {
+    key: "company_info",
+    label: "Company Setup",
+    desc: "Your company profile is ready",
+    link: "/masters",
+  },
+  { key: "mill_setup", label: "Mill Setup", desc: "Create at least one mill", link: "/masters" },
+  {
+    key: "departments",
+    label: "Departments",
+    desc: "Add production departments",
+    link: "/masters",
+  },
+  { key: "employees", label: "Employees", desc: "Import your workforce", link: "/import-hub" },
+  { key: "machines", label: "Machines", desc: "Register your machines", link: "/masters" },
+  { key: "shifts", label: "Shifts", desc: "Configure production shifts", link: "/masters" },
+  { key: "roles", label: "Roles", desc: "Assign user roles", link: "/users" },
+  {
+    key: "billing",
+    label: "Billing",
+    desc: "Activate your subscription",
+    link: "/company/billing",
+  },
+  {
+    key: "go_live",
+    label: "Go Live",
+    desc: "All systems ready — start operations",
+    link: "/dashboard",
+  },
 ];
 
 const STEP_LINKS: Record<string, string> = {
@@ -102,7 +122,7 @@ function OnboardingPage() {
               href={STEP_LINKS[step.key]}
               className={cn(
                 "flex items-center gap-4 p-4 rounded-xl border bg-white hover:bg-gray-50 transition-colors",
-                done && "border-green-200 bg-green-50/30"
+                done && "border-green-200 bg-green-50/30",
               )}
             >
               {done ? (
@@ -111,7 +131,9 @@ function OnboardingPage() {
                 <Circle className="w-6 h-6 text-gray-300 shrink-0" />
               )}
               <div className="flex-1 min-w-0">
-                <p className={cn("text-sm font-semibold", done ? "text-green-800" : "text-gray-900")}>
+                <p
+                  className={cn("text-sm font-semibold", done ? "text-green-800" : "text-gray-900")}
+                >
                   {step.label}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">

@@ -153,10 +153,7 @@ function exportToCSV<T>(rows: T[], columns: ColDef<T>[], filename: string) {
 }
 
 async function exportToPDF<T>(rows: T[], columns: ColDef<T>[], title: string) {
-  const [{ jsPDF }, autoTable] = await Promise.all([
-    import("jspdf"),
-    import("jspdf-autotable"),
-  ]);
+  const [{ jsPDF }, autoTable] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   doc.setFontSize(10);
   doc.text(title, 14, 10);
@@ -179,7 +176,10 @@ function SkeletonRow({ cols }: { cols: number }) {
     <TableRow>
       {Array.from({ length: cols }).map((_, i) => (
         <TableCell key={i}>
-          <div className="h-4 bg-muted rounded animate-pulse" style={{ width: `${40 + Math.random() * 40}%` }} />
+          <div
+            className="h-4 bg-muted rounded animate-pulse"
+            style={{ width: `${40 + Math.random() * 40}%` }}
+          />
         </TableCell>
       ))}
     </TableRow>
@@ -248,7 +248,9 @@ export function DataTable<T = any>({
     try {
       const stored = localStorage.getItem(STORAGE_KEY(effectiveKey));
       if (stored) return new Set(JSON.parse(stored));
-    } catch {}
+    } catch {
+      /* localStorage unavailable */
+    }
     return new Set(allColumns.filter((c) => c.defaultHidden).map((c) => c.key));
   });
 
@@ -256,7 +258,9 @@ export function DataTable<T = any>({
     setHiddenKeys(next);
     try {
       localStorage.setItem(STORAGE_KEY(effectiveKey), JSON.stringify([...next]));
-    } catch {}
+    } catch {
+      /* localStorage unavailable */
+    }
   };
 
   const visibleCols = useMemo(
@@ -269,20 +273,20 @@ export function DataTable<T = any>({
 
   const handleHeaderClick = (colKey: string) => {
     if (isServer && onSortChange) {
-      const nextDir: SortDir =
-        sortColumn === colKey && sortDirection === "asc" ? "desc" : "asc";
+      const nextDir: SortDir = sortColumn === colKey && sortDirection === "asc" ? "desc" : "asc";
       onSortChange(colKey, nextDir);
     } else {
       setClientSort((prev) => {
-        const nextDir: SortDir =
-          prev?.key === colKey && prev.dir === "asc" ? "desc" : "asc";
+        const nextDir: SortDir = prev?.key === colKey && prev.dir === "asc" ? "desc" : "asc";
         return { key: colKey, dir: nextDir };
       });
     }
   };
 
   const activeSort = isServer
-    ? sortColumn ? { key: sortColumn, dir: sortDirection ?? "asc" as SortDir } as SortState : null
+    ? sortColumn
+      ? ({ key: sortColumn, dir: sortDirection ?? ("asc" as SortDir) } as SortState)
+      : null
     : clientSort;
 
   // ── Client-side search ───────────────────────────────────────────────────
@@ -322,7 +326,9 @@ export function DataTable<T = any>({
   const total = isServer ? (totalProp ?? safeData.length) : processed.length;
   const totalPages = Math.max(1, Math.ceil(total / currentPageSize));
   const safePage = Math.min(currentPage, totalPages);
-  const pageRows = isServer ? data : processed.slice((safePage - 1) * currentPageSize, safePage * currentPageSize);
+  const pageRows = isServer
+    ? data
+    : processed.slice((safePage - 1) * currentPageSize, safePage * currentPageSize);
   const startIdx = total === 0 ? 0 : (safePage - 1) * currentPageSize + 1;
   const endIdx = Math.min(safePage * currentPageSize, total);
 
@@ -394,40 +400,42 @@ export function DataTable<T = any>({
           {toolbar}
 
           {/* Export */}
-          {!disableExport && <DropdownMenu open={exportOpen} onOpenChange={setExportOpen}>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
-                <ArrowUpFromLine className="size-3.5" />
-                Export
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuCheckboxItem
-                checked={false}
-                onCheckedChange={() => handleExport("excel")}
-                className="text-xs cursor-pointer"
-              >
-                <FileSpreadsheet className="size-3.5 mr-2" />
-                Export Excel
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={false}
-                onCheckedChange={() => handleExport("csv")}
-                className="text-xs cursor-pointer"
-              >
-                <FileDown className="size-3.5 mr-2" />
-                Export CSV
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem
-                checked={false}
-                onCheckedChange={() => handleExport("pdf")}
-                className="text-xs cursor-pointer"
-              >
-                <FileDown className="size-3.5 mr-2" />
-                Export PDF
-              </DropdownMenuCheckboxItem>
-            </DropdownMenuContent>
-          </DropdownMenu>}
+          {!disableExport && (
+            <DropdownMenu open={exportOpen} onOpenChange={setExportOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-8 text-xs gap-1">
+                  <ArrowUpFromLine className="size-3.5" />
+                  Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuCheckboxItem
+                  checked={false}
+                  onCheckedChange={() => handleExport("excel")}
+                  className="text-xs cursor-pointer"
+                >
+                  <FileSpreadsheet className="size-3.5 mr-2" />
+                  Export Excel
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={false}
+                  onCheckedChange={() => handleExport("csv")}
+                  className="text-xs cursor-pointer"
+                >
+                  <FileDown className="size-3.5 mr-2" />
+                  Export CSV
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem
+                  checked={false}
+                  onCheckedChange={() => handleExport("pdf")}
+                  className="text-xs cursor-pointer"
+                >
+                  <FileDown className="size-3.5 mr-2" />
+                  Export PDF
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {/* Column visibility */}
           <DropdownMenu>
@@ -535,14 +543,13 @@ export function DataTable<T = any>({
                 pageRows.map((row: T, idx: number) => (
                   <TableRow
                     key={rowKeyFn(row) ?? idx}
-                    className={cn(
-                      "hover:bg-muted/30",
-                      onRowClick && "cursor-pointer",
-                    )}
+                    className={cn("hover:bg-muted/30", onRowClick && "cursor-pointer")}
                     onClick={() => onRowClick?.(row)}
                   >
                     {visibleCols.map((col) => {
-                      const cellContent = col.render ? col.render(row) : getCellValue(row, col.key) || "—";
+                      const cellContent = col.render
+                        ? col.render(row)
+                        : getCellValue(row, col.key) || "—";
                       return (
                         <TableCell
                           key={col.key}
@@ -578,7 +585,10 @@ export function DataTable<T = any>({
             onValueChange={(v) => {
               const size = Number(v);
               if (isServer) onPageSizeChange?.(size);
-              else { setClientPageSize(size); setClientPage(1); }
+              else {
+                setClientPageSize(size);
+                setClientPage(1);
+              }
             }}
           >
             <SelectTrigger className="h-7 w-16 text-xs">
@@ -595,9 +605,7 @@ export function DataTable<T = any>({
         </div>
 
         <span>
-          {total === 0
-            ? "No records"
-            : `Showing ${startIdx}–${endIdx} of ${total} records`}
+          {total === 0 ? "No records" : `Showing ${startIdx}–${endIdx} of ${total} records`}
         </span>
 
         <div className="flex items-center gap-1">

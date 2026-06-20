@@ -53,20 +53,47 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 const ENTITIES = [
-  "employee", "attendance", "leave", "payroll", "production",
-  "dispatch", "quality", "purchase", "stores", "accounts",
-  "invoice", "user", "company", "mill", "module",
-  "role", "maintenance", "report", "settings",
+  "employee",
+  "attendance",
+  "leave",
+  "payroll",
+  "production",
+  "dispatch",
+  "quality",
+  "purchase",
+  "stores",
+  "accounts",
+  "invoice",
+  "user",
+  "company",
+  "mill",
+  "module",
+  "role",
+  "maintenance",
+  "report",
+  "settings",
 ];
 
 function humanEntity(entity: string): string {
   const labels: Record<string, string> = {
-    employee: "Employee", attendance: "Attendance", leave: "Leave",
-    payroll: "Payroll", production: "Production", dispatch: "Dispatch",
-    quality: "Quality", purchase: "Purchase", stores: "Stores",
-    accounts: "Accounts", invoice: "Invoice", user: "User",
-    company: "Company", mill: "Mill", module: "Module",
-    role: "Role", maintenance: "Maintenance", report: "Report",
+    employee: "Employee",
+    attendance: "Attendance",
+    leave: "Leave",
+    payroll: "Payroll",
+    production: "Production",
+    dispatch: "Dispatch",
+    quality: "Quality",
+    purchase: "Purchase",
+    stores: "Stores",
+    accounts: "Accounts",
+    invoice: "Invoice",
+    user: "User",
+    company: "Company",
+    mill: "Mill",
+    module: "Module",
+    role: "Role",
+    maintenance: "Maintenance",
+    report: "Report",
     settings: "Settings",
   };
   return labels[entity] || entity.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -77,8 +104,12 @@ function fmtTimestamp(ts: string): string {
   const d = new Date(ts);
   if (isNaN(d.getTime())) return ts;
   return d.toLocaleDateString("en-IN", {
-    year: "numeric", month: "short", day: "numeric",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
   });
 }
 
@@ -97,16 +128,20 @@ function AuditPage() {
   });
 
   const logsQ = useQuery({
-    queryKey: ["admin-audit-logs", { search, action: actionFilter, entity: entityFilter, date_from: dateFrom, date_to: dateTo }],
-    queryFn: () => auditApi.getLogs({
-      page: 1,
-      page_size: 500,
-      search: search || undefined,
-      action: actionFilter || undefined,
-      entity: entityFilter || undefined,
-      date_from: dateFrom || undefined,
-      date_to: dateTo || undefined,
-    }),
+    queryKey: [
+      "admin-audit-logs",
+      { search, action: actionFilter, entity: entityFilter, date_from: dateFrom, date_to: dateTo },
+    ],
+    queryFn: () =>
+      auditApi.getLogs({
+        page: 1,
+        page_size: 500,
+        search: search || undefined,
+        action: actionFilter || undefined,
+        entity: entityFilter || undefined,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+      }),
     staleTime: 30_000,
     retry: 1,
   });
@@ -128,7 +163,9 @@ function AuditPage() {
     {
       key: "timestamp",
       label: "Date",
-      render: (l: any) => <span className="text-xs whitespace-nowrap">{fmtTimestamp(l.timestamp)}</span>,
+      render: (l: any) => (
+        <span className="text-xs whitespace-nowrap">{fmtTimestamp(l.timestamp)}</span>
+      ),
     },
     { key: "user_name", label: "User" },
     {
@@ -142,7 +179,9 @@ function AuditPage() {
           try {
             const parsed = typeof l.details === "string" ? JSON.parse(l.details) : l.details;
             if (parsed?.company_id) return companyMap.get(parsed.company_id) ?? parsed.company_id;
-          } catch {}
+          } catch {
+            /* ignore parse errors */
+          }
         }
         return <span className="text-muted-foreground">—</span>;
       },
@@ -151,7 +190,9 @@ function AuditPage() {
       key: "action",
       label: "Action",
       render: (l: any) => (
-        <Badge className={cn("font-medium", ACTION_COLORS[l.action] ?? "bg-gray-100 text-gray-600")}>
+        <Badge
+          className={cn("font-medium", ACTION_COLORS[l.action] ?? "bg-gray-100 text-gray-600")}
+        >
           {ACTION_LABELS[l.action] ?? l.action}
         </Badge>
       ),
@@ -166,7 +207,9 @@ function AuditPage() {
 
   const hasAnyFilter = search || actionFilter || entityFilter || dateFrom || dateTo;
   const totalLogs = logs.length;
-  const loginActions = logs.filter((l) => l.action === "login" || l.action === "logout" || l.action === "failed_login").length;
+  const loginActions = logs.filter(
+    (l) => l.action === "login" || l.action === "logout" || l.action === "failed_login",
+  ).length;
   const createActions = logs.filter((l) => l.action === "create").length;
   const approveActions = logs.filter((l) => l.action === "approve" || l.action === "reject").length;
 
@@ -180,7 +223,17 @@ function AuditPage() {
           </p>
         </div>
         {hasAnyFilter && (
-          <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setActionFilter(""); setEntityFilter(""); setDateFrom(""); setDateTo(""); }}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSearch("");
+              setActionFilter("");
+              setEntityFilter("");
+              setDateFrom("");
+              setDateTo("");
+            }}
+          >
             <X className="size-3.5 mr-1" /> Clear Filters
           </Button>
         )}
@@ -189,35 +242,62 @@ function AuditPage() {
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1 flex-1 min-w-[200px]">
           <Label className="text-xs text-muted-foreground">Search</Label>
-          <Input placeholder="Search details, user, entity…" value={search} onChange={(e) => setSearch(e.target.value)} className="h-9" />
+          <Input
+            placeholder="Search details, user, entity…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-9"
+          />
         </div>
         <div className="space-y-1 w-44">
           <Label className="text-xs text-muted-foreground">Action</Label>
           <Select value={actionFilter} onValueChange={(v) => setActionFilter(v === "all" ? "" : v)}>
-            <SelectTrigger className="h-9"><SelectValue placeholder="All actions" /></SelectTrigger>
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="All actions" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All actions</SelectItem>
-              {Object.entries(ACTION_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+              {Object.entries(ACTION_LABELS).map(([k, v]) => (
+                <SelectItem key={k} value={k}>
+                  {v}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1 w-44">
           <Label className="text-xs text-muted-foreground">Module</Label>
           <Select value={entityFilter} onValueChange={(v) => setEntityFilter(v === "all" ? "" : v)}>
-            <SelectTrigger className="h-9"><SelectValue placeholder="All modules" /></SelectTrigger>
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="All modules" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All modules</SelectItem>
-              {ENTITIES.map((e) => <SelectItem key={e} value={e}>{humanEntity(e)}</SelectItem>)}
+              {ENTITIES.map((e) => (
+                <SelectItem key={e} value={e}>
+                  {humanEntity(e)}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1 w-40">
           <Label className="text-xs text-muted-foreground">From</Label>
-          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9" />
+          <Input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="h-9"
+          />
         </div>
         <div className="space-y-1 w-40">
           <Label className="text-xs text-muted-foreground">To</Label>
-          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9" />
+          <Input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="h-9"
+          />
         </div>
       </div>
 
@@ -242,7 +322,9 @@ function AuditPage() {
         </Card>
         <Card>
           <CardContent className="p-5">
-            <div className="text-xs uppercase text-muted-foreground font-medium">Create Actions</div>
+            <div className="text-xs uppercase text-muted-foreground font-medium">
+              Create Actions
+            </div>
             <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
               <Activity className="size-5 text-primary" />
               {createActions}
@@ -262,29 +344,43 @@ function AuditPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Audit Trail {!logsQ.isLoading && `(${totalLogs})`}</CardTitle>
+          <CardTitle className="text-base">
+            Audit Trail {!logsQ.isLoading && `(${totalLogs})`}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {logsQ.isLoading ? (
-            <div className="text-sm text-muted-foreground py-8 text-center">Loading audit logs…</div>
+            <div className="text-sm text-muted-foreground py-8 text-center">
+              Loading audit logs…
+            </div>
           ) : logsQ.isError ? (
             <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800 p-6 text-center">
               <AlertTriangle className="size-8 mx-auto mb-2 text-red-500" />
-              <p className="text-sm font-medium text-red-700 dark:text-red-400">Failed to load audit logs.</p>
-              <p className="text-xs text-red-500 mt-1 mb-3">{(logsQ.error as any)?.response?.data?.detail ?? (logsQ.error as any)?.message ?? "Request failed"}</p>
-              <Button variant="outline" size="sm" onClick={() => logsQ.refetch()}>Retry</Button>
+              <p className="text-sm font-medium text-red-700 dark:text-red-400">
+                Failed to load audit logs.
+              </p>
+              <p className="text-xs text-red-500 mt-1 mb-3">
+                {(logsQ.error as any)?.response?.data?.detail ??
+                  (logsQ.error as any)?.message ??
+                  "Request failed"}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => logsQ.refetch()}>
+                Retry
+              </Button>
             </div>
           ) : (
             <ErrorBoundary inline label="Admin Audit Logs">
-            <DataTable
-              tableId="admin_audit_logs"
-              columns={columns}
-              data={logs}
-              loading={false}
-              rowKey={(l) => l.id ?? l.timestamp}
-              exportFilename="admin_audit_logs"
-              emptyMessage={hasAnyFilter ? "No audit events match your filters." : "No audit events yet."}
-            />
+              <DataTable
+                tableId="admin_audit_logs"
+                columns={columns}
+                data={logs}
+                loading={false}
+                rowKey={(l) => l.id ?? l.timestamp}
+                exportFilename="admin_audit_logs"
+                emptyMessage={
+                  hasAnyFilter ? "No audit events match your filters." : "No audit events yet."
+                }
+              />
             </ErrorBoundary>
           )}
         </CardContent>

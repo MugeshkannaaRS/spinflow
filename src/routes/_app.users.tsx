@@ -122,7 +122,7 @@ function UsersPage() {
   const currentUser = useAuth((s) => s.user);
   const isSuperAdmin = currentUser?.role === "SUPER_ADMIN";
   const { data: sub } = useMillSubscription();
-  const atUserLimit = !isSuperAdmin && sub ? (sub.is_over_limit || sub.remaining_users === 0) : false;
+  const atUserLimit = !isSuperAdmin && sub ? sub.is_over_limit || sub.remaining_users === 0 : false;
   const userColConfig = useColumnConfig("hr_employees");
 
   const usersQ = useQuery({
@@ -147,7 +147,7 @@ function UsersPage() {
   const companies: any[] = companiesQ.data ?? [];
   const activeCompanies = useMemo(
     () => companies.filter((c: any) => c?.id && c.is_active !== false),
-    [companies]
+    [companies],
   );
   const mills: any[] = millsQ.data ?? [];
 
@@ -272,18 +272,28 @@ function UsersPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-lg font-semibold">Users & Roles</h1>
-              <p className="text-sm text-muted-foreground">User management, role assignment, permissions & activity tracking</p>
+              <p className="text-sm text-muted-foreground">
+                User management, role assignment, permissions & activity tracking
+              </p>
             </div>
             {atUserLimit && (
               <div className="flex items-center gap-2 px-4 py-2.5 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                 <AlertTriangle className="size-4 shrink-0" />
-                <span>User limit reached ({sub?.current_users ?? 0}/{sub?.max_users ?? 10}). </span>
-                <Link to="/company/billing" className="font-semibold underline hover:text-red-800">Upgrade plan</Link>
+                <span>
+                  User limit reached ({sub?.current_users ?? 0}/{sub?.max_users ?? 10}).{" "}
+                </span>
+                <Link to="/company/billing" className="font-semibold underline hover:text-red-800">
+                  Upgrade plan
+                </Link>
               </div>
             )}
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
-                <Button onClick={openNewUser} disabled={atUserLimit} title={atUserLimit ? "User limit reached. Upgrade plan." : ""}>
+                <Button
+                  onClick={openNewUser}
+                  disabled={atUserLimit}
+                  title={atUserLimit ? "User limit reached. Upgrade plan." : ""}
+                >
                   <Plus className="size-4 mr-2" />
                   New User
                 </Button>
@@ -370,18 +380,15 @@ function UsersPage() {
                         <SelectValue placeholder="Select role" />
                       </SelectTrigger>
                       <SelectContent>
-                        {ROLES
-                          .filter(role => {
-                            // MILL_OWNER can only create roles below them in hierarchy
-                            if (currentUser?.role === "SUPER_ADMIN") return true;
-                            return !["SUPER_ADMIN", "MILL_OWNER"].includes(role);
-                          })
-                          .map((role) => (
-                            <SelectItem key={role} value={role}>
-                              {ROLE_LABELS[role]}
-                            </SelectItem>
-                          ))
-                        }
+                        {ROLES.filter((role) => {
+                          // MILL_OWNER can only create roles below them in hierarchy
+                          if (currentUser?.role === "SUPER_ADMIN") return true;
+                          return !["SUPER_ADMIN", "MILL_OWNER"].includes(role);
+                        }).map((role) => (
+                          <SelectItem key={role} value={role}>
+                            {ROLE_LABELS[role]}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -404,11 +411,13 @@ function UsersPage() {
                         <SelectValue placeholder="Select company" />
                       </SelectTrigger>
                       <SelectContent>
-                        {activeCompanies.filter((c: any) => c?.id).map((c: any) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
+                        {activeCompanies
+                          .filter((c: any) => c?.id)
+                          .map((c: any) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -432,11 +441,13 @@ function UsersPage() {
                         />
                       </SelectTrigger>
                       <SelectContent>
-                        {filteredMills.filter((m: any) => m?.id).map((m: any) => (
-                          <SelectItem key={m.id} value={m.id}>
-                            {m.name}
-                          </SelectItem>
-                        ))}
+                        {filteredMills
+                          .filter((m: any) => m?.id)
+                          .map((m: any) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -476,72 +487,90 @@ function UsersPage() {
           <Card>
             <CardContent className="pt-6">
               <ErrorBoundary inline label="Users">
-              <DataTable
-                tableId="users_list"
-                columns={[
-                  { key: "full_name", label: "Name", render: (u: any) => <span className="font-medium">{u.full_name}</span> },
-                  { key: "email", label: "Email" },
-                  {
-                    key: "role",
-                    label: "Role",
-                    type: "status",
-                    render: (u: any) => (
-                      <Badge className={cn("font-medium", ROLE_BADGE_COLORS[u.role] ?? "")}>
-                        {ROLE_LABELS[u.role as Role] ?? u.role}
-                      </Badge>
-                    ),
-                  },
-                  { key: "department", label: "Department" },
-                  {
-                    key: "last_login",
-                    label: "Last Login",
-                    render: (u: any) =>
-                      u.last_login ? (
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(u.last_login).toLocaleDateString()}
-                        </span>
-                      ) : "—",
-                  },
-                  {
-                    key: "is_active",
-                    label: "Status",
-                    type: "status",
-                    render: (u: any) => (
-                      <Badge variant={u.is_active ? "default" : "secondary"}>
-                        {u.is_active ? "Active" : "Inactive"}
-                      </Badge>
-                    ),
-                  },
-                ] satisfies ColDef[]}
-                data={users}
-                rowKey={(u) => u.id}
-                exportFilename="users"
-                emptyMessage="No users found. Create your first user."
-                actions={(user) => (
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(user)} title="Edit">
-                      <Pencil className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => deactivateMutation.mutate(user.id)}
-                      title={user.is_active ? "Deactivate" : "Reactivate"}
-                    >
-                      {user.is_active ? (
-                        <ToggleRight className="size-4 text-destructive" />
-                      ) : (
-                        <ToggleLeft className="size-4 text-green-600" />
-                      )}
-                    </Button>
-                    {user.is_active && (
-                      <Button variant="ghost" size="icon" onClick={() => handleResetPwd(user)} title="Reset Password">
-                        <KeyRound className="size-4" />
+                <DataTable
+                  tableId="users_list"
+                  columns={
+                    [
+                      {
+                        key: "full_name",
+                        label: "Name",
+                        render: (u: any) => <span className="font-medium">{u.full_name}</span>,
+                      },
+                      { key: "email", label: "Email" },
+                      {
+                        key: "role",
+                        label: "Role",
+                        type: "status",
+                        render: (u: any) => (
+                          <Badge className={cn("font-medium", ROLE_BADGE_COLORS[u.role] ?? "")}>
+                            {ROLE_LABELS[u.role as Role] ?? u.role}
+                          </Badge>
+                        ),
+                      },
+                      { key: "department", label: "Department" },
+                      {
+                        key: "last_login",
+                        label: "Last Login",
+                        render: (u: any) =>
+                          u.last_login ? (
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(u.last_login).toLocaleDateString()}
+                            </span>
+                          ) : (
+                            "—"
+                          ),
+                      },
+                      {
+                        key: "is_active",
+                        label: "Status",
+                        type: "status",
+                        render: (u: any) => (
+                          <Badge variant={u.is_active ? "default" : "secondary"}>
+                            {u.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        ),
+                      },
+                    ] satisfies ColDef[]
+                  }
+                  data={users}
+                  rowKey={(u) => u.id}
+                  exportFilename="users"
+                  emptyMessage="No users found. Create your first user."
+                  actions={(user) => (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(user)}
+                        title="Edit"
+                      >
+                        <Pencil className="size-4" />
                       </Button>
-                    )}
-                  </div>
-                )}
-              />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => deactivateMutation.mutate(user.id)}
+                        title={user.is_active ? "Deactivate" : "Reactivate"}
+                      >
+                        {user.is_active ? (
+                          <ToggleRight className="size-4 text-destructive" />
+                        ) : (
+                          <ToggleLeft className="size-4 text-green-600" />
+                        )}
+                      </Button>
+                      {user.is_active && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleResetPwd(user)}
+                          title="Reset Password"
+                        >
+                          <KeyRound className="size-4" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                />
               </ErrorBoundary>
             </CardContent>
           </Card>
@@ -567,7 +596,9 @@ function UsersPage() {
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => successDialog.user?.email && copyToClipboard(successDialog.user.email)}
+                      onClick={() =>
+                        successDialog.user?.email && copyToClipboard(successDialog.user.email)
+                      }
                     >
                       <Copy className="size-4" />
                     </Button>
@@ -637,10 +668,7 @@ function UsersPage() {
             )}
           </DialogContent>
         </Dialog>
-
       </AccessGuard>
     </>
   );
 }
-
-

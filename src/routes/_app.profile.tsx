@@ -28,9 +28,18 @@ function ProfilePage() {
   };
 
   const handleChangePw = async () => {
-    if (!pwForm.current) { toast.error("Enter current password"); return; }
-    if (pwForm.next.length < 6) { toast.error("New password min 6 chars"); return; }
-    if (pwForm.next !== pwForm.confirm) { toast.error("Passwords don't match"); return; }
+    if (!pwForm.current) {
+      toast.error("Enter current password");
+      return;
+    }
+    if (pwForm.next.length < 6) {
+      toast.error("New password min 6 chars");
+      return;
+    }
+    if (pwForm.next !== pwForm.confirm) {
+      toast.error("Passwords don't match");
+      return;
+    }
     setPwLoading(true);
     try {
       await api.post("/auth/change-password", {
@@ -47,19 +56,18 @@ function ProfilePage() {
     }
   };
 
-  if (!user) return (
-    <div className="p-6 space-y-4">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-96 w-full" />
-    </div>
-  );
+  if (!user)
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
 
   return (
     <div className="max-w-lg mx-auto space-y-4 p-4">
-      <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
-        Profile
-      </h1>
+      <h1 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">Profile</h1>
 
       <div className="bg-white dark:bg-slate-800 rounded-2xl p-5 border border-gray-100 dark:border-slate-700 shadow-sm">
         <div className="flex items-center gap-4">
@@ -85,16 +93,28 @@ function ProfilePage() {
       <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50 dark:border-slate-700/50">
           <div className="flex items-center gap-3">
-            {theme === "dark" ? <Moon className="w-4 h-4 text-gray-500" /> : <Sun className="w-4 h-4 text-gray-500" />}
+            {theme === "dark" ? (
+              <Moon className="w-4 h-4 text-gray-500" />
+            ) : (
+              <Sun className="w-4 h-4 text-gray-500" />
+            )}
             <span className="text-sm font-medium text-gray-700 dark:text-slate-300">
               {theme === "dark" ? "Dark Mode" : "Light Mode"}
             </span>
           </div>
           <button
             onClick={toggleTheme}
-            className={cn("relative w-11 h-6 rounded-full transition-colors", theme === "dark" ? "bg-blue-600" : "bg-gray-200")}
+            className={cn(
+              "relative w-11 h-6 rounded-full transition-colors",
+              theme === "dark" ? "bg-blue-600" : "bg-gray-200",
+            )}
           >
-            <div className={cn("absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform", theme === "dark" ? "translate-x-5" : "translate-x-0.5")} />
+            <div
+              className={cn(
+                "absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform",
+                theme === "dark" ? "translate-x-5" : "translate-x-0.5",
+              )}
+            />
           </button>
         </div>
 
@@ -103,7 +123,9 @@ function ProfilePage() {
           className="w-full flex items-center gap-3 px-5 py-4 hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors border-b border-gray-50 dark:border-slate-700/50"
         >
           <Key className="w-4 h-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700 dark:text-slate-300">Change Password</span>
+          <span className="text-sm font-medium text-gray-700 dark:text-slate-300">
+            Change Password
+          </span>
         </button>
 
         {changingPw && (
@@ -112,9 +134,11 @@ function ProfilePage() {
               <input
                 key={field}
                 type="password"
-                placeholder={["Current password", "New password (min 6 chars)", "Confirm new password"][i]}
+                placeholder={
+                  ["Current password", "New password (min 6 chars)", "Confirm new password"][i]
+                }
                 value={pwForm[field as keyof typeof pwForm]}
-                onChange={e => setPwForm(p => ({ ...p, [field]: e.target.value }))}
+                onChange={(e) => setPwForm((p) => ({ ...p, [field]: e.target.value }))}
                 className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             ))}

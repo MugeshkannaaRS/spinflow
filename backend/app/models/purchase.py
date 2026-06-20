@@ -1,15 +1,19 @@
-from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, UniqueConstraint, Numeric
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
+from typing import Optional
 from app.db.base import Base, TimestampMixin, generate_uuid
 
 
 class Supplier(TimestampMixin, Base):
     __tablename__ = "suppliers"
+    __table_args__ = (
+        UniqueConstraint("mill_id", "code", name="uq_suppliers_mill_code"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
-    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     contact_person: Mapped[str] = mapped_column(String(200), nullable=True)
     phone: Mapped[str] = mapped_column(String(20), nullable=True)
@@ -24,6 +28,9 @@ class Supplier(TimestampMixin, Base):
 
 class CottonPurchase(TimestampMixin, Base):
     __tablename__ = "cotton_purchases"
+    __table_args__ = (
+        UniqueConstraint("mill_id", "invoice_no", name="uq_cotton_purchases_mill_invoice"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
@@ -34,7 +41,7 @@ class CottonPurchase(TimestampMixin, Base):
     bales: Mapped[int] = mapped_column(Integer, nullable=False)
     gross_kg: Mapped[float] = mapped_column(Float, nullable=False)
     net_kg: Mapped[float] = mapped_column(Float, nullable=False)
-    rate_per_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    rate_per_kg: Mapped[float] = mapped_column(Numeric(12, 4), nullable=False)
     moisture: Mapped[float] = mapped_column(Float, default=0)
     grade: Mapped[str] = mapped_column(String(10), nullable=True)
     gst_amount: Mapped[float] = mapped_column(Float, default=0.0)
@@ -44,6 +51,9 @@ class CottonPurchase(TimestampMixin, Base):
 
 class BaleStock(Base):
     __tablename__ = "bale_stock"
+    __table_args__ = (
+        UniqueConstraint("purchase_id", "bale_no", name="uq_bale_stock_purchase_bale"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     purchase_id: Mapped[str] = mapped_column(String(36), ForeignKey("cotton_purchases.id"), nullable=False)
@@ -58,6 +68,8 @@ class CottonBale(TimestampMixin, Base):
     __tablename__ = "cotton_bales"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
+    company_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("companies.id"), nullable=True, index=True)
     bale_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     supplier: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     lot_number: Mapped[str] = mapped_column(String(100), nullable=True, index=True)

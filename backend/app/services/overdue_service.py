@@ -70,6 +70,8 @@ class OverdueService:
                     f"for company {invoice.company_id}: {e}"
                 )
 
+        await self.db.commit()
+
         return {
             "processed": processed,
             "reminders": reminders,

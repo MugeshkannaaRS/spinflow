@@ -1,5 +1,6 @@
 from typing import Optional, List, Dict
 from datetime import datetime, timezone, date
+from sqlalchemy import select, func, and_
 from app.services.base import BaseService
 from app.models.accounts import Invoice, Payment, GSTEntry
 from app.models.payroll import PayrollMonth
@@ -120,7 +121,8 @@ class AccountsService(BaseService[Invoice]):
         today = date.today()
         result = await self.db.execute(
             select(Invoice).where(
-                Invoice.status.in_(["posted", "overdue"])
+                Invoice.status.in_(["posted", "overdue"]),
+                Invoice.mill_id == mill_id,
             )
         )
         invoices = result.scalars().all()
@@ -170,7 +172,8 @@ class AccountsService(BaseService[Invoice]):
     ) -> dict:
         result = await self.db.execute(
             select(CottonPurchase).where(
-                CottonPurchase.status.in_(["completed", "grn_pending", "pending"])
+                CottonPurchase.status.in_(["completed", "grn_pending", "pending"]),
+                CottonPurchase.mill_id == mill_id,
             )
         )
         purchases = result.scalars().all()

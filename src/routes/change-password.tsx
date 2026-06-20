@@ -51,7 +51,11 @@ function ChangePasswordPage() {
       navigate({ to: "/dashboard" as any });
     },
     onError: (e: any) => {
-      const msg = e?.response?.data?.detail ?? e?.response?.data?.message ?? e?.message ?? "Failed to change password";
+      const msg =
+        e?.response?.data?.detail ??
+        e?.response?.data?.message ??
+        e?.message ??
+        "Failed to change password";
       if (typeof msg === "object" && msg?.message) {
         setErrorMsg(msg.message);
       } else {
@@ -62,7 +66,8 @@ function ChangePasswordPage() {
 
   const allReqsMet = requirements.every((r) => r.test(newPassword));
   const passwordsMatch = newPassword === confirmPassword;
-  const canSubmit = currentPassword && newPassword && confirmPassword && allReqsMet && passwordsMatch;
+  const canSubmit =
+    currentPassword && newPassword && confirmPassword && allReqsMet && passwordsMatch;
 
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
@@ -98,9 +103,18 @@ function ChangePasswordPage() {
             onSubmit={(e) => {
               e.preventDefault();
               setErrorMsg("");
-              if (!currentPassword) { setErrorMsg("Current password is required"); return; }
-              if (!newPassword || newPassword.length < 6) { setErrorMsg("New password must be at least 6 characters"); return; }
-              if (newPassword !== confirmPassword) { setErrorMsg("Passwords do not match"); return; }
+              if (!currentPassword) {
+                setErrorMsg("Current password is required");
+                return;
+              }
+              if (!newPassword || newPassword.length < 6) {
+                setErrorMsg("New password must be at least 6 characters");
+                return;
+              }
+              if (newPassword !== confirmPassword) {
+                setErrorMsg("Passwords do not match");
+                return;
+              }
               if (m.isPending) return;
               m.mutate();
             }}
@@ -153,7 +167,9 @@ function ChangePasswordPage() {
                         style={{ width: `${(strength.score / 4) * 100}%` }}
                       />
                     </div>
-                    <span className="text-xs font-medium text-muted-foreground">{strength.label}</span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {strength.label}
+                    </span>
                   </div>
                   <ul className="space-y-0.5">
                     {requirements.map((req) => {

@@ -75,13 +75,14 @@ function PayrollPage() {
     retry: 1,
   });
 
-  if (!user) return (
-    <div className="p-6 space-y-4">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-96 w-full" />
-    </div>
-  );
+  if (!user)
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
 
   const summaryData = summaryQ.data ?? [];
 
@@ -438,25 +439,62 @@ function PayslipsTab({ millId, year }: { millId: string; year: number }) {
           <p className="text-sm text-muted-foreground">Payroll not yet processed for this month</p>
         ) : (
           <ErrorBoundary inline label="Payroll">
-          <DataTable
-            tableId="payroll_payslips"
-            columns={[
-              { key: "employee_code", label: payslipColConfig.getLabel('employee_code'), className: "font-mono text-xs" },
-              { key: "employee_name", label: payslipColConfig.getLabel('employee_name'), render: (p: any) => <span className="font-medium">{p.employee_name}</span> },
-              { key: "department", label: payslipColConfig.getLabel('department'), type: "status" },
-              { key: "present_days", label: payslipColConfig.getLabel('present_days') },
-              { key: "overtime_hours", label: payslipColConfig.getLabel('overtime_hours') },
-              { key: "gross_wage", label: payslipColConfig.getLabel('gross_wage'), render: (p: any) => `₹${fmtNumber(p.gross_wage)}` },
-              { key: "pf_employee", label: payslipColConfig.getLabel('pf_employee'), render: (p: any) => `₹${fmtNumber(p.pf_employee)}` },
-              { key: "esic_employee", label: payslipColConfig.getLabel('esic_employee'), render: (p: any) => `₹${fmtNumber(p.esic_employee)}` },
-              { key: "net_wage", label: payslipColConfig.getLabel('net_wage'), render: (p: any) => <span className="font-medium">₹{fmtNumber(p.net_wage)}</span> },
-              { key: "status", label: payslipColConfig.getLabel('status'), type: "status", render: (p: any) => <StatusBadge status={p.status} size="sm" /> },
-            ] satisfies ColDef[]}
-            data={payslips}
-            loading={payslipsQ.isLoading}
-            rowKey={(p: any) => p.id}
-            exportFilename={`payslips_${month}_${MONTHS[Number(month) - 1]}`}
-          />
+            <DataTable
+              tableId="payroll_payslips"
+              columns={
+                [
+                  {
+                    key: "employee_code",
+                    label: payslipColConfig.getLabel("employee_code"),
+                    className: "font-mono text-xs",
+                  },
+                  {
+                    key: "employee_name",
+                    label: payslipColConfig.getLabel("employee_name"),
+                    render: (p: any) => <span className="font-medium">{p.employee_name}</span>,
+                  },
+                  {
+                    key: "department",
+                    label: payslipColConfig.getLabel("department"),
+                    type: "status",
+                  },
+                  { key: "present_days", label: payslipColConfig.getLabel("present_days") },
+                  { key: "overtime_hours", label: payslipColConfig.getLabel("overtime_hours") },
+                  {
+                    key: "gross_wage",
+                    label: payslipColConfig.getLabel("gross_wage"),
+                    render: (p: any) => `₹${fmtNumber(p.gross_wage)}`,
+                  },
+                  {
+                    key: "pf_employee",
+                    label: payslipColConfig.getLabel("pf_employee"),
+                    render: (p: any) => `₹${fmtNumber(p.pf_employee)}`,
+                  },
+                  {
+                    key: "esic_employee",
+                    label: payslipColConfig.getLabel("esic_employee"),
+                    render: (p: any) => `₹${fmtNumber(p.esic_employee)}`,
+                  },
+                  {
+                    key: "net_wage",
+                    label: payslipColConfig.getLabel("net_wage"),
+                    render: (p: any) => (
+                      <span className="font-medium">₹{fmtNumber(p.net_wage)}</span>
+                    ),
+                  },
+                  {
+                    key: "status",
+                    label: payslipColConfig.getLabel("status"),
+                    type: "status",
+                    render: (p: any) => <StatusBadge status={p.status} size="sm" />,
+                  },
+                ] satisfies ColDef[]
+              }
+              data={payslips}
+              loading={payslipsQ.isLoading}
+              rowKey={(p: any) => p.id}
+              exportFilename={`payslips_${month}_${MONTHS[Number(month) - 1]}`}
+            />
           </ErrorBoundary>
         )}
       </CardContent>

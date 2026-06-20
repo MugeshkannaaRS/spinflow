@@ -33,7 +33,10 @@ export function ColumnConfigurator({ module, tableKey }: ColumnConfiguratorProps
 
   const handleOpen = (o: boolean) => {
     setOpen(o);
-    if (o) setLocalCols(columns.map((c, i) => ({ key: c.key, label: c.label, visible: c.isVisible, order: i + 1 })));
+    if (o)
+      setLocalCols(
+        columns.map((c, i) => ({ key: c.key, label: c.label, visible: c.isVisible, order: i + 1 })),
+      );
   };
 
   const toggleVisible = (key: string) => {
@@ -59,7 +62,9 @@ export function ColumnConfigurator({ module, tableKey }: ColumnConfiguratorProps
   };
 
   const resetDefaults = () => {
-    setLocalCols(columns.map((c, i) => ({ key: c.key, label: c.label, visible: c.isVisible, order: i + 1 })));
+    setLocalCols(
+      columns.map((c, i) => ({ key: c.key, label: c.label, visible: c.isVisible, order: i + 1 })),
+    );
   };
 
   const handleSave = async () => {
@@ -70,9 +75,13 @@ export function ColumnConfigurator({ module, tableKey }: ColumnConfiguratorProps
         is_visible: c.visible,
         display_order: i + 1,
       }));
-      await api.put("/ui-config/columns", { columns: updated }, {
-        params: { table: tableKey, mill_id: "default" },
-      });
+      await api.put(
+        "/ui-config/columns",
+        { columns: updated },
+        {
+          params: { table: tableKey, mill_id: "default" },
+        },
+      );
       setOpen(false);
     } catch {
       // silent

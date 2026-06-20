@@ -106,6 +106,7 @@ async def create_test(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("quality", write=True)),
 ):
+    scope = await get_mill_scope(current_user, db)
     svc = QualityService(db, current_user)
     return await svc.create_test(
         date=req.date,
@@ -118,6 +119,8 @@ async def create_test(
         sample_ref=req.sample_ref,
         unit=req.unit,
         tested_by=req.tested_by,
+        mill_id=scope.get("mill_id"),
+        company_id=scope.get("company_id"),
     )
 
 
@@ -175,6 +178,8 @@ async def bulk_create_tests(
                 machine_code=str(row.get("machine_code") or "").strip() or None,
                 sample_ref=str(row.get("sample_ref") or "").strip() or None,
                 tested_by=str(row.get("tested_by") or "").strip() or None,
+                mill_id=scope.get("mill_id"),
+                company_id=scope.get("company_id"),
                 status="pending",
             )
             db.add(test)

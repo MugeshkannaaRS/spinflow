@@ -1,5 +1,5 @@
 from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Numeric, Date, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 from datetime import datetime, date
 from typing import Optional
 from app.db.base import Base, TimestampMixin, generate_uuid
@@ -17,7 +17,7 @@ class Employee(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
     sl_no: Mapped[int] = mapped_column(Integer, nullable=True)
     employee_id: Mapped[str] = mapped_column(String(50), nullable=True)
-    joining_date: Mapped[date] = mapped_column(Date, nullable=True)
+    joining_date: Mapped[date] = mapped_column(Date, nullable=True)  # canonical; use this
     gen: Mapped[str] = mapped_column(String(10), nullable=True)
     dob: Mapped[date] = mapped_column(Date, nullable=True)
     age: Mapped[int] = mapped_column(Integer, nullable=True)
@@ -25,7 +25,7 @@ class Employee(TimestampMixin, Base):
     grade: Mapped[str] = mapped_column(String(20), nullable=True)
     designation: Mapped[str] = mapped_column(String(100), nullable=True)
     section: Mapped[str] = mapped_column(String(100), nullable=True)
-    department_name: Mapped[str] = mapped_column(String(100), nullable=True)
+    department_name: Mapped[str] = mapped_column(String(100), nullable=True)  # DEPRECATED: use `department` instead
     bank_account_no: Mapped[str] = mapped_column(String(50), nullable=True)
     basic: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     house_rent: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
@@ -34,7 +34,7 @@ class Employee(TimestampMixin, Base):
     food_allowance: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     wages: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     increment: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
-    total_salary: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    total_salary: Mapped[float] = mapped_column(Numeric(10, 2), default=0)  # canonical; use this
     mobile_bill: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     shift_benefit: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     wages_of_month: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
@@ -45,10 +45,10 @@ class Employee(TimestampMixin, Base):
     email: Mapped[str] = mapped_column(String(200), nullable=True)
     aadhar: Mapped[str] = mapped_column(String(20), nullable=True)
     address: Mapped[str] = mapped_column(Text, nullable=True)
-    doj: Mapped[str] = mapped_column(String(10), nullable=True)
-    salary: Mapped[float] = mapped_column(Float, default=0)
+    doj: Mapped[str] = mapped_column(String(10), nullable=True)  # DEPRECATED: use `joining_date` instead (auto-synced via validates)
+    salary: Mapped[float] = mapped_column(Numeric(10, 2), default=0)  # DEPRECATED: use `total_salary` instead (auto-synced via validates)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    daily_wage: Mapped[float] = mapped_column(Float, default=0.0)
+    daily_wage: Mapped[float] = mapped_column(Numeric(10, 2), default=0.0)
     shift: Mapped[str] = mapped_column(String(10), nullable=True)
     pf_no: Mapped[str] = mapped_column(String(50), nullable=True)
     esic_no: Mapped[str] = mapped_column(String(50), nullable=True)
@@ -56,6 +56,29 @@ class Employee(TimestampMixin, Base):
     bank_ifsc: Mapped[str] = mapped_column(String(20), nullable=True)
     pf_enrolled: Mapped[bool] = mapped_column(Boolean, default=False)
     esic_enrolled: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    @validates("joining_date")
+    def _sync_joining_date(self, key, value):
+        if isinstance(value, date):
+            self.doj = value.isoformat()
+        elif value is not None:
+            self.doj = str(value)
+        else:
+            self.doj = None
+        return value
+
+    @validates("total_salary")
+    def _sync_total_salary(self, key, value):
+        if value is not None:
+            self.salary = float(value)
+        else:
+            self.salary = None
+        return value
+
+    @validates("department")
+    def _sync_department(self, key, value):
+        self.department_name = value
+        return value
 
 
 class MonthlyPayroll(TimestampMixin, Base):
@@ -100,6 +123,9 @@ class MonthlyPayroll(TimestampMixin, Base):
 
 class Attendance(Base):
     __tablename__ = "attendance"
+    __table_args__ = (
+        UniqueConstraint("date", "employee_id", name="uq_attendance_date_employee"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
@@ -115,6 +141,9 @@ class Attendance(Base):
 
 class Leave(TimestampMixin, Base):
     __tablename__ = "leaves"
+    __table_args__ = (
+        UniqueConstraint("employee_id", "from_date", name="uq_leave_employee_fromdate"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     employee_id: Mapped[str] = mapped_column(String(36), ForeignKey("employees.id"), nullable=False, index=True)
@@ -141,6 +170,9 @@ class EmployeeShift(Base):
 
 class EmployeeCustomField(TimestampMixin, Base):
     __tablename__ = "employee_custom_fields"
+    __table_args__ = (
+        UniqueConstraint("company_id", "field_name", name="uq_employee_custom_fields_company_name"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     company_id: Mapped[str] = mapped_column(String(36), ForeignKey("companies.id"), nullable=False, index=True)
@@ -150,6 +182,9 @@ class EmployeeCustomField(TimestampMixin, Base):
 
 class EmployeeCustomValue(TimestampMixin, Base):
     __tablename__ = "employee_custom_values"
+    __table_args__ = (
+        UniqueConstraint("employee_id", "field_id", name="uq_employee_custom_values_employee_field"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     employee_id: Mapped[str] = mapped_column(String(36), ForeignKey("employees.id"), nullable=False, index=True)

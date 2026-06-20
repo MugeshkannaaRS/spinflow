@@ -3,7 +3,18 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { KpiCard } from "@/components/ui/KpiCard";
-import { Factory, AlertTriangle, CheckCircle2, DollarSign, Users, TrendingUp, Package, BadgeCheck, Clock, Activity } from "lucide-react";
+import {
+  Factory,
+  AlertTriangle,
+  CheckCircle2,
+  DollarSign,
+  Users,
+  TrendingUp,
+  Package,
+  BadgeCheck,
+  Clock,
+  Activity,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_app/executive-dashboard")({
   head: () => ({ meta: [{ title: "Executive Dashboard — SpinFlow ERP" }] }),
@@ -47,18 +58,65 @@ function ExecutiveDashboard() {
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Activity className="w-3.5 h-3.5" />
-          Health Score: <span className={healthScore >= 70 ? "text-green-600 font-bold" : healthScore >= 50 ? "text-amber-600 font-bold" : "text-red-600 font-bold"}>{healthScore}/100</span>
+          Health Score:{" "}
+          <span
+            className={
+              healthScore >= 70
+                ? "text-green-600 font-bold"
+                : healthScore >= 50
+                  ? "text-amber-600 font-bold"
+                  : "text-red-600 font-bold"
+            }
+          >
+            {healthScore}/100
+          </span>
         </div>
       </div>
 
       {/* KPI row — 3 cols mobile, 6 cols desktop */}
       <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 lg:gap-4">
-        <KpiCard label="Today Production" value={isLoading ? "—" : `${todayProd} kg`} icon={Factory} iconColor="text-blue-600" iconBg="bg-blue-50" />
-        <KpiCard label="Efficiency" value={isLoading ? "—" : `${efficiency}%`} icon={TrendingUp} iconColor="text-green-600" iconBg="bg-green-50" />
-        <KpiCard label="Waste %" value={isLoading ? "—" : `${waste}%`} icon={AlertTriangle} iconColor="text-amber-600" iconBg="bg-amber-50" />
-        <KpiCard label="Active Machines" value={isLoading ? "—" : activeMachines} icon={Activity} iconColor="text-indigo-600" iconBg="bg-indigo-50" />
-        <KpiCard label="Quality Pass" value={isLoading ? "—" : `${qualityPass}%`} icon={BadgeCheck} iconColor="text-teal-600" iconBg="bg-teal-50" />
-        <KpiCard label="Open Alerts" value={isLoading ? "—" : openAlerts} icon={AlertTriangle} iconColor="text-red-600" iconBg="bg-red-50" />
+        <KpiCard
+          label="Today Production"
+          value={isLoading ? "—" : `${todayProd} kg`}
+          icon={Factory}
+          iconColor="text-blue-600"
+          iconBg="bg-blue-50"
+        />
+        <KpiCard
+          label="Efficiency"
+          value={isLoading ? "—" : `${efficiency}%`}
+          icon={TrendingUp}
+          iconColor="text-green-600"
+          iconBg="bg-green-50"
+        />
+        <KpiCard
+          label="Waste %"
+          value={isLoading ? "—" : `${waste}%`}
+          icon={AlertTriangle}
+          iconColor="text-amber-600"
+          iconBg="bg-amber-50"
+        />
+        <KpiCard
+          label="Active Machines"
+          value={isLoading ? "—" : activeMachines}
+          icon={Activity}
+          iconColor="text-indigo-600"
+          iconBg="bg-indigo-50"
+        />
+        <KpiCard
+          label="Quality Pass"
+          value={isLoading ? "—" : `${qualityPass}%`}
+          icon={BadgeCheck}
+          iconColor="text-teal-600"
+          iconBg="bg-teal-50"
+        />
+        <KpiCard
+          label="Open Alerts"
+          value={isLoading ? "—" : openAlerts}
+          icon={AlertTriangle}
+          iconColor="text-red-600"
+          iconBg="bg-red-50"
+        />
       </div>
 
       {/* Quick action cards */}
@@ -127,9 +185,14 @@ function ExecutiveDashboard() {
             </p>
             <div className="flex items-center gap-3">
               <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-600 rounded-full" style={{ width: `${eng?.components?.setup_completion?.score ?? 0}%` }} />
+                <div
+                  className="h-full bg-blue-600 rounded-full"
+                  style={{ width: `${eng?.components?.setup_completion?.score ?? 0}%` }}
+                />
               </div>
-              <span className="text-xs font-bold text-blue-600">{Math.round(eng?.components?.setup_completion?.score ?? 0)}%</span>
+              <span className="text-xs font-bold text-blue-600">
+                {Math.round(eng?.components?.setup_completion?.score ?? 0)}%
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -141,9 +204,14 @@ function ExecutiveDashboard() {
             </p>
             <div className="flex items-center gap-3">
               <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-green-600 rounded-full" style={{ width: `${eng?.components?.feature_adoption?.score ?? 0}%` }} />
+                <div
+                  className="h-full bg-green-600 rounded-full"
+                  style={{ width: `${eng?.components?.feature_adoption?.score ?? 0}%` }}
+                />
               </div>
-              <span className="text-xs font-bold text-green-600">{Math.round(eng?.components?.feature_adoption?.score ?? 0)}%</span>
+              <span className="text-xs font-bold text-green-600">
+                {Math.round(eng?.components?.feature_adoption?.score ?? 0)}%
+              </span>
             </div>
           </CardContent>
         </Card>

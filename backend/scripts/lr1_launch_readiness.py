@@ -32,10 +32,10 @@ from app.models.billing import (
 )
 from app.models.hr import Employee
 from app.models.audit import AuditLog
-from app.core.config import settings
-
-# Use a fixed known hash to avoid bcrypt/passlib version issues
-DEFAULT_PWD_HASH = "$2b$12$LJ3m4ys3Lk0TSwHnbfOMiOXPm1Qlq5Gz0Hqz6Dz0Hqz6Dz0Hqz6Du"
+import os
+from app.core.security import hash_password
+DEFAULT_PWD = os.environ.get("SEED_USER_PASSWORD", "Pilot@1234")
+DEFAULT_PWD_HASH = hash_password(DEFAULT_PWD)
 
 DATABASE_URL = settings.DATABASE_URL or "sqlite+aiosqlite:///:memory:"
 

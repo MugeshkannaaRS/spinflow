@@ -31,7 +31,8 @@ export function useNotifications(opts?: { limit?: number }) {
   // Unread count (fast, badge)
   const countQ = useQuery<number>({
     queryKey: ["notifications-unread-count"],
-    queryFn: () => api.get("/notifications/unread-count").then((r: any) => r.data.unread_count ?? 0),
+    queryFn: () =>
+      api.get("/notifications/unread-count").then((r: any) => r.data.unread_count ?? 0),
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
@@ -41,7 +42,8 @@ export function useNotifications(opts?: { limit?: number }) {
   const listQ = useQuery<DbNotification[]>({
     queryKey: ["notifications-list", limit],
     queryFn: () =>
-      api.get("/notifications", { params: { page_size: limit } })
+      api
+        .get("/notifications", { params: { page_size: limit } })
         .then((r: any) => r.data?.data ?? []),
     staleTime: 30_000,
     refetchOnWindowFocus: true,

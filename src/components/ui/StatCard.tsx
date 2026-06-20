@@ -17,11 +17,31 @@ interface StatCardProps {
 }
 
 const colorMap: Record<string, { iconBg: string; iconColor: string; progressBar: string }> = {
-  blue:    { iconBg: "bg-blue-50 dark:bg-blue-900/30",    iconColor: "text-blue-500",    progressBar: "bg-blue-500" },
-  green:   { iconBg: "bg-emerald-50 dark:bg-emerald-900/30", iconColor: "text-emerald-500", progressBar: "bg-emerald-500" },
-  orange:  { iconBg: "bg-orange-50 dark:bg-orange-900/30",  iconColor: "text-orange-500",  progressBar: "bg-orange-500" },
-  emerald: { iconBg: "bg-teal-50 dark:bg-teal-900/30",      iconColor: "text-teal-500",    progressBar: "bg-teal-500" },
-  red:     { iconBg: "bg-red-50 dark:bg-red-900/30",        iconColor: "text-red-500",     progressBar: "bg-red-500" },
+  blue: {
+    iconBg: "bg-blue-50 dark:bg-blue-900/30",
+    iconColor: "text-blue-500",
+    progressBar: "bg-blue-500",
+  },
+  green: {
+    iconBg: "bg-emerald-50 dark:bg-emerald-900/30",
+    iconColor: "text-emerald-500",
+    progressBar: "bg-emerald-500",
+  },
+  orange: {
+    iconBg: "bg-orange-50 dark:bg-orange-900/30",
+    iconColor: "text-orange-500",
+    progressBar: "bg-orange-500",
+  },
+  emerald: {
+    iconBg: "bg-teal-50 dark:bg-teal-900/30",
+    iconColor: "text-teal-500",
+    progressBar: "bg-teal-500",
+  },
+  red: {
+    iconBg: "bg-red-50 dark:bg-red-900/30",
+    iconColor: "text-red-500",
+    progressBar: "bg-red-500",
+  },
 };
 
 export function StatCard({
@@ -46,17 +66,19 @@ export function StatCard({
         "border border-gray-100 dark:border-slate-700",
         "shadow-sm hover:shadow-md transition-all duration-200",
         alert && "border-l-4 lg:border-l-4 border-l-red-500",
-        onClick && "cursor-pointer hover:-translate-y-0.5"
+        onClick && "cursor-pointer hover:-translate-y-0.5",
       )}
     >
       <div className="flex items-start justify-between mb-2 lg:mb-3">
         <p className="text-[10px] lg:text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-slate-500">
           {title}
         </p>
-        <div className={cn(
-          "w-8 h-8 lg:w-10 lg:h-10 rounded-lg lg:rounded-xl flex items-center justify-center flex-shrink-0",
-          c.iconBg
-        )}>
+        <div
+          className={cn(
+            "w-8 h-8 lg:w-10 lg:h-10 rounded-lg lg:rounded-xl flex items-center justify-center flex-shrink-0",
+            c.iconBg,
+          )}
+        >
           <Icon className={cn("w-4 h-4 lg:w-5 lg:h-5", c.iconColor)} />
         </div>
       </div>
@@ -68,14 +90,18 @@ export function StatCard({
       </div>
 
       {subtitle && (
-        <p className="text-[11px] lg:text-sm text-gray-500 dark:text-slate-400 mb-1 lg:mb-2">{subtitle}</p>
+        <p className="text-[11px] lg:text-sm text-gray-500 dark:text-slate-400 mb-1 lg:mb-2">
+          {subtitle}
+        </p>
       )}
 
       {trend && (
-        <div className={cn(
-          "flex items-center gap-1 text-[10px] lg:text-xs font-medium mt-0.5 lg:mt-1",
-          trendUp ? "text-emerald-600" : "text-red-500"
-        )}>
+        <div
+          className={cn(
+            "flex items-center gap-1 text-[10px] lg:text-xs font-medium mt-0.5 lg:mt-1",
+            trendUp ? "text-emerald-600" : "text-red-500",
+          )}
+        >
           {trendUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
           {trend}
         </div>

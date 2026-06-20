@@ -33,7 +33,6 @@ interface WrongDestinationPayload {
   timestamp: string;
 }
 
-
 export function useWebSocket() {
   const token = useAuth((s) => s.token);
   const [isConnected, setIsConnected] = useState(false);
@@ -70,8 +69,11 @@ export function useWebSocket() {
     let intentionalClose = false;
     let retryCount = 0;
 
-    const API_BASE =
-      import.meta.env.VITE_API_BASE_URL || "https://spinflow.onrender.com";
+    const API_BASE = import.meta.env.VITE_API_BASE_URL;
+    if (!API_BASE) {
+      console.error("[SpinFlow] VITE_API_BASE_URL is not set — cannot connect WebSocket");
+      return;
+    }
     const WS_BASE = API_BASE.replace("https://", "wss://").replace("http://", "ws://");
     const wsUrl = `${WS_BASE}/ws/notifications?token=${token}`;
     // SECURITY: token in URL is logged by proxies/servers and exposed via document.referrer.

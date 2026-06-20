@@ -41,7 +41,16 @@ import {
 } from "@/components/ui/sheet";
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
-import { Plus, CheckCircle2, XCircle, FlaskConical, AlertTriangle, ArrowDown, Trash2, Pencil } from "lucide-react";
+import {
+  Plus,
+  CheckCircle2,
+  XCircle,
+  FlaskConical,
+  AlertTriangle,
+  ArrowDown,
+  Trash2,
+  Pencil,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import type { QualityTest } from "@/lib/types";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
@@ -96,13 +105,14 @@ function QualityPage() {
   const pendingLots = lots.filter((l) => l.status === "pending").length;
   const totalRejectedKg = rejections.reduce((s, r) => s + (r.quantity_kg ?? 0), 0);
 
-  if (!user) return (
-    <div className="p-6 space-y-4">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-96 w-full" />
-    </div>
-  );
+  if (!user)
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
 
   if (testsQ.isLoading)
     return (
@@ -189,41 +199,76 @@ function QualityPage() {
                 </CardHeader>
                 <CardContent>
                   <ErrorBoundary inline label="Quality Tests">
-                  <DataTable
-                    tableId="quality_tests"
-                    columns={[
-                      { key: "date", label: testColConfig.getLabel('date'), type: "date" },
-                      { key: "type", label: testColConfig.getLabel('type'), type: "status", render: (t: any) => <Badge variant="outline">{t.type}</Badge> },
-                      { key: "lot_id", label: testColConfig.getLabel('lot_id'), className: "font-mono text-xs" },
-                      { key: "machine_code", label: testColConfig.getLabel('machine_code'), className: "font-mono text-xs" },
-                      { key: "sample_ref", label: testColConfig.getLabel('sample_ref') },
-                      { key: "result", label: testColConfig.getLabel('result'), render: (t: any) => `${t.result} ${t.unit}` },
-                      { key: "standard", label: testColConfig.getLabel('standard'), render: (t: any) => `${t.standard} ${t.unit}` },
-                      { key: "status", label: testColConfig.getLabel('status'), type: "status", render: (t: any) => <StatusBadge status={t.status} size="sm" /> },
-                      { key: "tested_by", label: testColConfig.getLabel('tested_by') },
-                    ] satisfies ColDef[]}
-                    data={tests}
-                    loading={testsQ.isLoading}
-                    rowKey={(t) => t.id}
-                    exportFilename="quality_tests"
-                    disableExport={true}
-                    toolbar={
-                      <div className="flex gap-1">
-                        <ExportDateRangeButton onExportXlsx={(f, t) => exportApi.qualityXlsx(f, t)} />
-                        {canEdit && <ImportTestsDialog />}
-                      </div>
-                    }
-                    actions={canEdit ? (t: any) => t.status === "pending" ? (
-                      <ConfirmDeleteButton
-                        onConfirm={async () => {
-                          await qualityApi.deleteTest(t.id);
-                          qc.invalidateQueries({ queryKey: ["quality-tests"] });
-                        }}
-                        label={`Cancel quality test for lot ${t.lot_id || "—"}?`}
-                        successMessage="Quality test cancelled"
-                      />
-                    ) : null : undefined}
-                  />
+                    <DataTable
+                      tableId="quality_tests"
+                      columns={
+                        [
+                          { key: "date", label: testColConfig.getLabel("date"), type: "date" },
+                          {
+                            key: "type",
+                            label: testColConfig.getLabel("type"),
+                            type: "status",
+                            render: (t: any) => <Badge variant="outline">{t.type}</Badge>,
+                          },
+                          {
+                            key: "lot_id",
+                            label: testColConfig.getLabel("lot_id"),
+                            className: "font-mono text-xs",
+                          },
+                          {
+                            key: "machine_code",
+                            label: testColConfig.getLabel("machine_code"),
+                            className: "font-mono text-xs",
+                          },
+                          { key: "sample_ref", label: testColConfig.getLabel("sample_ref") },
+                          {
+                            key: "result",
+                            label: testColConfig.getLabel("result"),
+                            render: (t: any) => `${t.result} ${t.unit}`,
+                          },
+                          {
+                            key: "standard",
+                            label: testColConfig.getLabel("standard"),
+                            render: (t: any) => `${t.standard} ${t.unit}`,
+                          },
+                          {
+                            key: "status",
+                            label: testColConfig.getLabel("status"),
+                            type: "status",
+                            render: (t: any) => <StatusBadge status={t.status} size="sm" />,
+                          },
+                          { key: "tested_by", label: testColConfig.getLabel("tested_by") },
+                        ] satisfies ColDef[]
+                      }
+                      data={tests}
+                      loading={testsQ.isLoading}
+                      rowKey={(t) => t.id}
+                      exportFilename="quality_tests"
+                      disableExport={true}
+                      toolbar={
+                        <div className="flex gap-1">
+                          <ExportDateRangeButton
+                            onExportXlsx={(f, t) => exportApi.qualityXlsx(f, t)}
+                          />
+                          {canEdit && <ImportTestsDialog />}
+                        </div>
+                      }
+                      actions={
+                        canEdit
+                          ? (t: any) =>
+                              t.status === "pending" ? (
+                                <ConfirmDeleteButton
+                                  onConfirm={async () => {
+                                    await qualityApi.deleteTest(t.id);
+                                    qc.invalidateQueries({ queryKey: ["quality-tests"] });
+                                  }}
+                                  label={`Cancel quality test for lot ${t.lot_id || "—"}?`}
+                                  successMessage="Quality test cancelled"
+                                />
+                              ) : null
+                          : undefined
+                      }
+                    />
                   </ErrorBoundary>
                 </CardContent>
               </Card>
@@ -231,29 +276,59 @@ function QualityPage() {
 
             <TabsContent value="lots">
               <Card>
-                <CardHeader><CardTitle className="text-base">Lot Approval Workflow</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle className="text-base">Lot Approval Workflow</CardTitle>
+                </CardHeader>
                 <CardContent>
                   <ErrorBoundary inline label="Lot Approvals">
-                  <DataTable
-                    tableId="quality_lots"
-                    columns={[
-                      { key: "lot_no", label: lotColConfig.getLabel('lot_no'), className: "font-mono text-xs" },
-                      { key: "department", label: lotColConfig.getLabel('department'), type: "status" },
-                      { key: "produced_kg", label: lotColConfig.getLabel('produced_kg') },
-                      { key: "csp_result", label: lotColConfig.getLabel('csp_result') },
-                      { key: "count_result", label: lotColConfig.getLabel('count_result') },
-                      { key: "moisture_result", label: lotColConfig.getLabel('moisture_result'), render: (l: any) => l.moisture_result != null ? `${l.moisture_result}%` : "—" },
-                      { key: "strength_result", label: lotColConfig.getLabel('strength_result') },
-                      { key: "status", label: lotColConfig.getLabel('status'), type: "status", render: (l: any) => <StatusBadge status={l.status} size="sm" /> },
-                    ] satisfies ColDef[]}
-                    data={lots}
-                    loading={lotsQ.isLoading}
-                    rowKey={(l) => l.id}
-                    exportFilename="lot_approvals"
-                    actions={(l) => l.status === "pending" && canEdit ? (
-                      <div className="flex gap-1"><LotApproveAction lotId={l.id} /><LotRejectAction lotId={l.id} /></div>
-                    ) : null}
-                  />
+                    <DataTable
+                      tableId="quality_lots"
+                      columns={
+                        [
+                          {
+                            key: "lot_no",
+                            label: lotColConfig.getLabel("lot_no"),
+                            className: "font-mono text-xs",
+                          },
+                          {
+                            key: "department",
+                            label: lotColConfig.getLabel("department"),
+                            type: "status",
+                          },
+                          { key: "produced_kg", label: lotColConfig.getLabel("produced_kg") },
+                          { key: "csp_result", label: lotColConfig.getLabel("csp_result") },
+                          { key: "count_result", label: lotColConfig.getLabel("count_result") },
+                          {
+                            key: "moisture_result",
+                            label: lotColConfig.getLabel("moisture_result"),
+                            render: (l: any) =>
+                              l.moisture_result != null ? `${l.moisture_result}%` : "—",
+                          },
+                          {
+                            key: "strength_result",
+                            label: lotColConfig.getLabel("strength_result"),
+                          },
+                          {
+                            key: "status",
+                            label: lotColConfig.getLabel("status"),
+                            type: "status",
+                            render: (l: any) => <StatusBadge status={l.status} size="sm" />,
+                          },
+                        ] satisfies ColDef[]
+                      }
+                      data={lots}
+                      loading={lotsQ.isLoading}
+                      rowKey={(l) => l.id}
+                      exportFilename="lot_approvals"
+                      actions={(l) =>
+                        l.status === "pending" && canEdit ? (
+                          <div className="flex gap-1">
+                            <LotApproveAction lotId={l.id} />
+                            <LotRejectAction lotId={l.id} />
+                          </div>
+                        ) : null
+                      }
+                    />
                   </ErrorBoundary>
                 </CardContent>
               </Card>
@@ -261,25 +336,47 @@ function QualityPage() {
 
             <TabsContent value="rejections">
               <Card>
-                <CardHeader><CardTitle className="text-base">Rejection Analysis</CardTitle></CardHeader>
+                <CardHeader>
+                  <CardTitle className="text-base">Rejection Analysis</CardTitle>
+                </CardHeader>
                 <CardContent>
                   <ErrorBoundary inline label="Rejection Analysis">
-                  <DataTable
-                    tableId="quality_rejections"
-                    columns={[
-                      { key: "date", label: rejColConfig.getLabel('date'), type: "date" },
-                      { key: "lot_id", label: rejColConfig.getLabel('lot_id'), className: "font-mono text-xs" },
-                      { key: "category", label: rejColConfig.getLabel('category'), type: "status", render: (r: any) => <Badge variant="destructive">{r.category}</Badge> },
-                      { key: "quantity_kg", label: rejColConfig.getLabel('quantity_kg') },
-                      { key: "reason", label: rejColConfig.getLabel('reason'), className: "max-w-xs truncate" },
-                      { key: "disposition", label: rejColConfig.getLabel('disposition'), type: "status", render: (r: any) => <Badge variant="outline">{r.disposition}</Badge> },
-                      { key: "noted_by", label: rejColConfig.getLabel('noted_by') },
-                    ] satisfies ColDef[]}
-                    data={rejections}
-                    loading={rejQ.isLoading}
-                    rowKey={(r) => r.id}
-                    exportFilename="rejections"
-                  />
+                    <DataTable
+                      tableId="quality_rejections"
+                      columns={
+                        [
+                          { key: "date", label: rejColConfig.getLabel("date"), type: "date" },
+                          {
+                            key: "lot_id",
+                            label: rejColConfig.getLabel("lot_id"),
+                            className: "font-mono text-xs",
+                          },
+                          {
+                            key: "category",
+                            label: rejColConfig.getLabel("category"),
+                            type: "status",
+                            render: (r: any) => <Badge variant="destructive">{r.category}</Badge>,
+                          },
+                          { key: "quantity_kg", label: rejColConfig.getLabel("quantity_kg") },
+                          {
+                            key: "reason",
+                            label: rejColConfig.getLabel("reason"),
+                            className: "max-w-xs truncate",
+                          },
+                          {
+                            key: "disposition",
+                            label: rejColConfig.getLabel("disposition"),
+                            type: "status",
+                            render: (r: any) => <Badge variant="outline">{r.disposition}</Badge>,
+                          },
+                          { key: "noted_by", label: rejColConfig.getLabel("noted_by") },
+                        ] satisfies ColDef[]
+                      }
+                      data={rejections}
+                      loading={rejQ.isLoading}
+                      rowKey={(r) => r.id}
+                      exportFilename="rejections"
+                    />
                   </ErrorBoundary>
                 </CardContent>
               </Card>
@@ -298,8 +395,23 @@ function QualityPage() {
                     { key: "cv_1m", label: "CV 1m" },
                     { key: "cv_2m", label: "CV 2m" },
                     { key: "cv_5m", label: "CV 5m" },
-                    { key: "within_spec", label: "OK?", render: (r: any) => r.within_spec ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="destructive">No</Badge> },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "within_spec",
+                      label: "OK?",
+                      render: (r: any) =>
+                        r.within_spec ? (
+                          <Badge variant="outline" className="text-green-600">
+                            Yes
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">No</Badge>
+                        ),
+                    },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -313,7 +425,11 @@ function QualityPage() {
                     { key: "lot_no", label: "Lot No" },
                     { key: "total_production_kg", label: "Production (kg)" },
                     { key: "total_wastage_pct", label: "Wastage %" },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -328,7 +444,11 @@ function QualityPage() {
                     { key: "std_hank", label: "Std Hank" },
                     { key: "actual_hank", label: "Actual Hank" },
                     { key: "cv_pct", label: "CV%" },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -349,7 +469,11 @@ function QualityPage() {
                     { key: "lot_no", label: "Lot No" },
                     { key: "a_pct", label: "A%" },
                     { key: "cv_pct", label: "CV%" },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -364,8 +488,23 @@ function QualityPage() {
                     { key: "process", label: "Process" },
                     { key: "a_pct_n_plus", label: "A% N+" },
                     { key: "a_pct_n_minus", label: "A% N-" },
-                    { key: "within_spec", label: "OK?", render: (r: any) => r.within_spec ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="destructive">No</Badge> },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "within_spec",
+                      label: "OK?",
+                      render: (r: any) =>
+                        r.within_spec ? (
+                          <Badge variant="outline" className="text-green-600">
+                            Yes
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">No</Badge>
+                        ),
+                    },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -380,7 +519,11 @@ function QualityPage() {
                     { key: "process", label: "Process" },
                     { key: "actual_hank", label: "Actual Hank" },
                     { key: "hank_cv_pct", label: "CV%" },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -401,8 +544,23 @@ function QualityPage() {
                     { key: "nominal_hank", label: "Nominal Hank" },
                     { key: "actual_hank", label: "Actual Hank" },
                     { key: "cv_pct", label: "CV%" },
-                    { key: "within_spec", label: "OK?", render: (r: any) => r.within_spec ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="destructive">No</Badge> },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "within_spec",
+                      label: "OK?",
+                      render: (r: any) =>
+                        r.within_spec ? (
+                          <Badge variant="outline" className="text-green-600">
+                            Yes
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">No</Badge>
+                        ),
+                    },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -417,7 +575,11 @@ function QualityPage() {
                     { key: "total_breaks", label: "Total Breaks" },
                     { key: "active_spindles", label: "Active Spindles" },
                     { key: "breaks_per_100spl_hrs", label: "Breaks/100 Spl-Hr" },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -430,8 +592,23 @@ function QualityPage() {
                     { key: "machine_no", label: "Machine" },
                     { key: "shift_code", label: "Shift" },
                     { key: "avg_stretch_pct", label: "Avg Stretch %" },
-                    { key: "within_spec", label: "OK?", render: (r: any) => r.within_spec ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="destructive">No</Badge> },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "within_spec",
+                      label: "OK?",
+                      render: (r: any) =>
+                        r.within_spec ? (
+                          <Badge variant="outline" className="text-green-600">
+                            Yes
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">No</Badge>
+                        ),
+                    },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -453,8 +630,23 @@ function QualityPage() {
                     { key: "tpi", label: "TPI" },
                     { key: "avg_csp", label: "Avg CSP" },
                     { key: "cv_pct", label: "CV%" },
-                    { key: "within_spec", label: "OK?", render: (r: any) => r.within_spec ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="destructive">No</Badge> },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "within_spec",
+                      label: "OK?",
+                      render: (r: any) =>
+                        r.within_spec ? (
+                          <Badge variant="outline" className="text-green-600">
+                            Yes
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">No</Badge>
+                        ),
+                    },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -468,7 +660,11 @@ function QualityPage() {
                     { key: "count_ne", label: "Count Ne" },
                     { key: "total_breaks", label: "Total Breaks" },
                     { key: "breaks_per_1000spl_hr", label: "Breaks/1000 Spl-Hr" },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -483,7 +679,11 @@ function QualityPage() {
                     { key: "lot_no", label: "Lot No" },
                     { key: "snap_total", label: "Total Snaps" },
                     { key: "idle_spindles_total", label: "Idle Spindles" },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -505,7 +705,11 @@ function QualityPage() {
                     { key: "kms", label: "km Tested" },
                     { key: "yf", label: "YF" },
                     { key: "n_neps", label: "N(Neps)" },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -520,8 +724,23 @@ function QualityPage() {
                     { key: "lot_no", label: "Lot No" },
                     { key: "count_ne", label: "Count Ne" },
                     { key: "splice_pct", label: "Splice %" },
-                    { key: "within_spec", label: "≥85%?", render: (r: any) => r.within_spec ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="destructive">No</Badge> },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "within_spec",
+                      label: "≥85%?",
+                      render: (r: any) =>
+                        r.within_spec ? (
+                          <Badge variant="outline" className="text-green-600">
+                            Yes
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">No</Badge>
+                        ),
+                    },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -536,7 +755,11 @@ function QualityPage() {
                     { key: "lot_no", label: "Lot No" },
                     { key: "count_ne", label: "Count Ne" },
                     { key: "overall_wax_pickup_pct", label: "Wax Pickup %" },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -550,7 +773,11 @@ function QualityPage() {
                     { key: "lot_no", label: "Lot No" },
                     { key: "count_ne", label: "Count Ne" },
                     { key: "avg_cone_wt", label: "Avg Cone Wt (g)" },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -569,8 +796,23 @@ function QualityPage() {
                     { key: "nominal_ratio", label: "Nominal Ratio" },
                     { key: "cotton_pct", label: "Cotton %" },
                     { key: "polyester_pct", label: "Polyester %" },
-                    { key: "within_spec", label: "OK?", render: (r: any) => r.within_spec ? <Badge variant="outline" className="text-green-600">Yes</Badge> : <Badge variant="destructive">No</Badge> },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "within_spec",
+                      label: "OK?",
+                      render: (r: any) =>
+                        r.within_spec ? (
+                          <Badge variant="outline" className="text-green-600">
+                            Yes
+                          </Badge>
+                        ) : (
+                          <Badge variant="destructive">No</Badge>
+                        ),
+                    },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -581,7 +823,11 @@ function QualityPage() {
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "shift_code", label: "Shift" },
-                    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} size="sm" /> },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
                   ]}
                   millId={millId}
                   canEdit={canEdit}
@@ -715,7 +961,9 @@ function NewTestSlideOver() {
       },
       onError: (err: any) => {
         const detail = err?.response?.data?.detail;
-        const msg = Array.isArray(detail) ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ") : detail || "Failed to record test";
+        const msg = Array.isArray(detail)
+          ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ")
+          : detail || "Failed to record test";
         toast.error(msg);
       },
     });
@@ -736,10 +984,15 @@ function NewTestSlideOver() {
         <form onSubmit={handleSubmit} className="space-y-4 mt-6">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label>Lot <span className="text-destructive">*</span></Label>
+              <Label>
+                Lot <span className="text-destructive">*</span>
+              </Label>
               <Select
                 value={form.lot_id}
-                onValueChange={(v) => { setForm({ ...form, lot_id: v }); setFormErrors((p) => ({ ...p, lot_id: "" })); }}
+                onValueChange={(v) => {
+                  setForm({ ...form, lot_id: v });
+                  setFormErrors((p) => ({ ...p, lot_id: "" }));
+                }}
               >
                 <SelectTrigger className={formErrors.lot_id ? "border-destructive" : ""}>
                   <SelectValue placeholder="Select lot" />
@@ -755,35 +1008,49 @@ function NewTestSlideOver() {
               {formErrors.lot_id && <p className="text-xs text-destructive">{formErrors.lot_id}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Date <span className="text-destructive">*</span></Label>
+              <Label>
+                Date <span className="text-destructive">*</span>
+              </Label>
               <Input
                 type="date"
                 value={form.date}
-                onChange={(e) => { setForm({ ...form, date: e.target.value }); setFormErrors((p) => ({ ...p, date: "" })); }}
+                onChange={(e) => {
+                  setForm({ ...form, date: e.target.value });
+                  setFormErrors((p) => ({ ...p, date: "" }));
+                }}
                 className={formErrors.date ? "border-destructive" : ""}
               />
               {formErrors.date && <p className="text-xs text-destructive">{formErrors.date}</p>}
             </div>
             <div className="space-y-1.5">
-              <Label>Type <span className="text-destructive">*</span></Label>
+              <Label>
+                Type <span className="text-destructive">*</span>
+              </Label>
               <Select value={form.type} onValueChange={handleTypeChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Test type" />
                 </SelectTrigger>
                 <SelectContent>
                   {testTypes.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Result <span className="text-destructive">*</span></Label>
+              <Label>
+                Result <span className="text-destructive">*</span>
+              </Label>
               <Input
                 type="number"
                 step="0.01"
                 value={form.result}
-                onChange={(e) => { setForm({ ...form, result: e.target.value }); setFormErrors((p) => ({ ...p, result: "" })); }}
+                onChange={(e) => {
+                  setForm({ ...form, result: e.target.value });
+                  setFormErrors((p) => ({ ...p, result: "" }));
+                }}
                 placeholder="Measured value"
                 className={formErrors.result ? "border-destructive" : ""}
               />
@@ -878,8 +1145,10 @@ function colToQmField(key: string, label: string): QmFieldDef {
   if (key === "status") return { key, label, type: "status" };
   if (key === "within_spec") return { key, label, type: "yn" };
   if (key === "lot_no") return { key, label, type: "text", required: true };
-  if (key === "machine_no" || key === "machine") return { key, label, type: "text", required: true };
-  const numericRe = /(_pct|_kg|_ne|_csp|kms|_min|_max|_total|_count|_breaks|_weight|_hank|_speed|_tm|_tpi|_wt|_grams|_hrs|_psi|_bar|_rpm|_1m|_2m|_5m|_10m|_20m|_50m|_100m|_pct$|_yf$)$|^(cv_|avg_|total_|max_|min_|n_)/;
+  if (key === "machine_no" || key === "machine")
+    return { key, label, type: "text", required: true };
+  const numericRe =
+    /(_pct|_kg|_ne|_csp|kms|_min|_max|_total|_count|_breaks|_weight|_hank|_speed|_tm|_tpi|_wt|_grams|_hrs|_psi|_bar|_rpm|_1m|_2m|_5m|_10m|_20m|_50m|_100m|_pct$|_yf$)$|^(cv_|avg_|total_|max_|min_|n_)/;
   if (numericRe.test(key)) return { key, label, type: "number", step: "0.01" };
   return { key, label, type: "text" };
 }
@@ -926,10 +1195,16 @@ function QmFormsTab({ title, endpoint, columns, millId, canEdit }: QmFormsTabPro
 
   const [form, setForm] = useState<Record<string, any>>(defaultForm);
 
-  const openNew = () => { setForm(defaultForm); setEditRecord(null); setSheetOpen(true); };
+  const openNew = () => {
+    setForm(defaultForm);
+    setEditRecord(null);
+    setSheetOpen(true);
+  };
   const openEdit = (record: any) => {
     const f: Record<string, any> = {};
-    formFields.forEach((field) => { f[field.key] = record[field.key] ?? ""; });
+    formFields.forEach((field) => {
+      f[field.key] = record[field.key] ?? "";
+    });
     setForm(f);
     setEditRecord(record);
     setSheetOpen(true);
@@ -1028,7 +1303,11 @@ function QmFormsTab({ title, endpoint, columns, millId, canEdit }: QmFormsTabPro
                   size="sm"
                   variant="ghost"
                   className="h-8 text-xs"
-                  onClick={() => { setDate(""); setLotNo(""); setMachineNo(""); }}
+                  onClick={() => {
+                    setDate("");
+                    setLotNo("");
+                    setMachineNo("");
+                  }}
                 >
                   Clear
                 </Button>
@@ -1049,21 +1328,25 @@ function QmFormsTab({ title, endpoint, columns, millId, canEdit }: QmFormsTabPro
             loading={isLoading}
             rowKey={(r: any) => r.id}
             exportFilename={title.toLowerCase().replace(/\s+/g, "_")}
-            actions={canEdit ? (r: any) => (
-              <div className="flex gap-1">
-                <Button size="sm" variant="outline" onClick={() => openEdit(r)}>
-                  <Pencil className="size-3 mr-1" /> Edit
-                </Button>
-                <ConfirmDeleteButton
-                  onConfirm={async () => {
-                    await api.delete(`${endpoint}/${r.id}`);
-                    qc.invalidateQueries({ queryKey: ["qm-forms", endpoint] });
-                  }}
-                  label={`Delete this ${title} record? This cannot be undone.`}
-                  successMessage="Record deleted"
-                />
-              </div>
-            ) : undefined}
+            actions={
+              canEdit
+                ? (r: any) => (
+                    <div className="flex gap-1">
+                      <Button size="sm" variant="outline" onClick={() => openEdit(r)}>
+                        <Pencil className="size-3 mr-1" /> Edit
+                      </Button>
+                      <ConfirmDeleteButton
+                        onConfirm={async () => {
+                          await api.delete(`${endpoint}/${r.id}`);
+                          qc.invalidateQueries({ queryKey: ["qm-forms", endpoint] });
+                        }}
+                        label={`Delete this ${title} record? This cannot be undone.`}
+                        successMessage="Record deleted"
+                      />
+                    </div>
+                  )
+                : undefined
+            }
           />
         </CardContent>
       </Card>
@@ -1092,9 +1375,15 @@ function QmFormsTab({ title, endpoint, columns, millId, canEdit }: QmFormsTabPro
                     value={form[f.key] ?? "A"}
                     onValueChange={(v) => setForm((p) => ({ ...p, [f.key]: v }))}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
-                      {SHIFT_OPTIONS.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                      {SHIFT_OPTIONS.map((o) => (
+                        <SelectItem key={o} value={o}>
+                          {o}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 )}
@@ -1103,7 +1392,9 @@ function QmFormsTab({ title, endpoint, columns, millId, canEdit }: QmFormsTabPro
                     value={form[f.key] ?? "draft"}
                     onValueChange={(v) => setForm((p) => ({ ...p, [f.key]: v }))}
                   >
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       {STATUS_OPTIONS.map((o) => (
                         <SelectItem key={o} value={o}>
@@ -1119,12 +1410,14 @@ function QmFormsTab({ title, endpoint, columns, millId, canEdit }: QmFormsTabPro
                       form[f.key] === true || form[f.key] === "true"
                         ? "true"
                         : form[f.key] === false || form[f.key] === "false"
-                        ? "false"
-                        : ""
+                          ? "false"
+                          : ""
                     }
                     onValueChange={(v) => setForm((p) => ({ ...p, [f.key]: v }))}
                   >
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="true">Yes</SelectItem>
                       <SelectItem value="false">No</SelectItem>
@@ -1203,7 +1496,9 @@ function LotRejectAction({ lotId }: { lotId: string }) {
             <DialogTitle>Reject Lot</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <Label>Rejection Reason <span className="text-destructive">*</span></Label>
+            <Label>
+              Rejection Reason <span className="text-destructive">*</span>
+            </Label>
             <textarea
               className="flex min-h-[100px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               value={reason}

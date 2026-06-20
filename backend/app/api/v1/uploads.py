@@ -1,6 +1,7 @@
 import os
 import shutil
 import uuid
+import struct
 from pathlib import Path
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +30,37 @@ ALLOWED_TYPES = {
     "image/jpeg": "jpg",
     "image/png": "png",
 }
+
+def _detect_mime_type(data: bytes) -> str:
+    """Detect MIME type from file content using magic bytes."""
+    if len(data) < 8:
+        return "application/octet-stream"
+    # PDF: %PDF
+    if data[:4] == b"%PDF":
+        return "application/pdf"
+    # PNG: 89 50 4E 47
+    if data[:4] == b"\x89PNG":
+        return "image/png"
+    # JPEG: FF D8 FF
+    if data[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    # ZIP (includes XLSX/DOCX): PK\x03\x04
+    if data[:4] == b"PK\x03\x04":
+        # Check for [Content_Types].xml to distinguish xlsx from generic zip
+        if b"[Content_Types].xml" in data[:4096]:
+            return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        return "application/octet-stream"
+    # CSV or plain text
+    if data[:2] == b"\xff\xfe" or data[:2] == b"\xfe\xff":
+        return "text/csv"
+    try:
+        text = data[:4096].decode("utf-8", errors="ignore")
+        if "," in text[:200] or "\t" in text[:200]:
+            return "text/csv"
+    except Exception:
+        pass
+    return "application/octet-stream"
+
 
 ALLOWED_ENTITY_TYPES = {
     "employee", "dispatch", "purchase", "quality", "maintenance",
@@ -100,6 +132,18 @@ async def upload_file(
             status_code=400,
             detail=f"File type '{file.content_type}' not allowed. Allowed: PDF, CSV, Excel, images",
         )
+
+    # Validate file content via magic bytes (MIME header is client-controlled and untrustworthy)
+    content_type = _detect_mime_type(content)
+    if content_type != file.content_type:
+        logger = __import__("logging").getLogger("spinflow")
+        logger.warning(f"MIME type mismatch: header={file.content_type}, magic={content_type}")
+    if content_type not in ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File content does not match allowed types. Detected: {content_type}",
+        )
+    file.content_type = content_type  # Use detected type
 
     if entity_type not in ALLOWED_ENTITY_TYPES:
         raise HTTPException(

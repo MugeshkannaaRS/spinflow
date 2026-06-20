@@ -1,4 +1,4 @@
-from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, JSON, Numeric, func
+from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, JSON, Numeric, func, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from typing import Optional, List
@@ -28,6 +28,9 @@ class SubscriptionPlan(TimestampMixin, Base):
 
 class ModulePricing(TimestampMixin, Base):
     __tablename__ = "module_pricing"
+    __table_args__ = (
+        UniqueConstraint("plan_id", "module_name", name="uq_module_pricing_plan_module"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     plan_id: Mapped[str] = mapped_column(String(36), ForeignKey("subscription_plans.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -127,6 +130,9 @@ class AddonPricing(TimestampMixin, Base):
 
 class OveragePricing(TimestampMixin, Base):
     __tablename__ = "overage_pricing"
+    __table_args__ = (
+        UniqueConstraint("company_id", "resource_type", name="uq_overage_pricing_company_resource"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     company_id: Mapped[str] = mapped_column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)

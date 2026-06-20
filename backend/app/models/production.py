@@ -71,6 +71,9 @@ class Machine(Base):
 
 class ProductionEntry(TimestampMixin, Base):
     __tablename__ = "production_entries"
+    __table_args__ = (
+        UniqueConstraint("date", "shift", "machine_code", "department", name="uq_production_entry_shift_machine"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
@@ -111,6 +114,9 @@ class ProductionEntry(TimestampMixin, Base):
 class OperatorGroup(Base):
     """Named operator assigned to a fixed set of machines per mill."""
     __tablename__ = "operator_groups"
+    __table_args__ = (
+        UniqueConstraint("mill_id", "name", name="uq_operator_groups_mill_name"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
@@ -127,6 +133,9 @@ class MachineGroup(Base):
     Groups are defined by the machine set, not by operator.
     A machine can appear in multiple groups."""
     __tablename__ = "machine_groups"
+    __table_args__ = (
+        UniqueConstraint("mill_id", "name", name="uq_machine_groups_mill_name"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)

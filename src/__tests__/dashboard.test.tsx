@@ -142,9 +142,7 @@ describe("Dashboard", () => {
   it("renders dismissal button on alert banner", async () => {
     mockApiGet.mockResolvedValueOnce({
       data: {
-        alerts: [
-          { type: "critical", message: "Machine 4 down", time: "2m ago" },
-        ],
+        alerts: [{ type: "critical", message: "Machine 4 down", time: "2m ago" }],
       },
     });
     renderWithQuery(<Dashboard />);

@@ -34,9 +34,9 @@ export interface MillMasters {
 }
 
 const DEFAULT_SHIFTS: ShiftOption[] = [
-  { id: "A", name: "A — Morning",   start: "06:00", end: "14:00" },
+  { id: "A", name: "A — Morning", start: "06:00", end: "14:00" },
   { id: "B", name: "B — Afternoon", start: "14:00", end: "22:00" },
-  { id: "C", name: "C — Night",     start: "22:00", end: "06:00" },
+  { id: "C", name: "C — Night", start: "22:00", end: "06:00" },
 ];
 
 const EMPTY_MASTERS: MillMasters = {
@@ -51,38 +51,39 @@ const EMPTY_MASTERS: MillMasters = {
 
 /** Returns all dynamic master lists for the current mill (departments, grades, machines, etc.) */
 export function useMillMasters() {
-  const user = useAuth(s => s.user);
-  const activeMill = useAuth(s => s.activeMill);
+  const user = useAuth((s) => s.user);
+  const activeMill = useAuth((s) => s.activeMill);
   const millId = activeMill?.id ?? user?.millId;
 
   return useQuery<MillMasters>({
     queryKey: ["mill-masters", millId],
     queryFn: () =>
-      api.get("/mill-config/masters/all")
-        .then(r => {
+      api
+        .get("/mill-config/masters/all")
+        .then((r) => {
           const d = r.data;
           // Ensure shift always has fallback
           if (!d.shift || d.shift.length === 0) d.shift = DEFAULT_SHIFTS;
           return d;
         })
         .catch(() => EMPTY_MASTERS),
-    staleTime:            10 * 60 * 1000,
-    gcTime:               20 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 20 * 60 * 1000,
     refetchOnWindowFocus: false,
-    enabled:              !!millId,
-    placeholderData:      EMPTY_MASTERS,
+    enabled: !!millId,
+    placeholderData: EMPTY_MASTERS,
   });
 }
 
 /** Returns masters for a specific category */
 export function useMillMasterCategory(category: string) {
-  const user = useAuth(s => s.user);
-  const activeMill = useAuth(s => s.activeMill);
+  const user = useAuth((s) => s.user);
+  const activeMill = useAuth((s) => s.activeMill);
   const millId = activeMill?.id ?? user?.millId;
 
   return useQuery<string[]>({
     queryKey: ["mill-masters-cat", millId, category],
-    queryFn: () => api.get("/mill-config/masters", { params: { category } }).then(r => r.data),
+    queryFn: () => api.get("/mill-config/masters", { params: { category } }).then((r) => r.data),
     staleTime: 10 * 60 * 1000,
     enabled: !!millId && !!category,
     placeholderData: [],
@@ -91,15 +92,15 @@ export function useMillMasterCategory(category: string) {
 
 /** Returns subscription info: user limits, currency symbol */
 export function useMillSubscription() {
-  const user = useAuth(s => s.user);
+  const user = useAuth((s) => s.user);
 
   return useQuery({
     queryKey: ["mill-subscription", user?.companyId],
-    queryFn: () => api.get("/mill-config/subscription").then(r => r.data),
-    staleTime:            5 * 60 * 1000,
-    gcTime:               10 * 60 * 1000,
+    queryFn: () => api.get("/mill-config/subscription").then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
-    enabled:              !!user?.companyId,
+    enabled: !!user?.companyId,
     placeholderData: {
       plan: "starter",
       max_users: 10,
@@ -118,7 +119,7 @@ export function useUpdateCurrency() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (symbol: string) =>
-      api.patch("/mill-config/subscription/currency", { symbol }).then(r => r.data),
+      api.patch("/mill-config/subscription/currency", { symbol }).then((r) => r.data),
     onSuccess: (data: { symbol: string }) => {
       qc.invalidateQueries({ queryKey: ["mill-subscription"] });
       if (typeof window !== "undefined" && data?.symbol) {

@@ -33,7 +33,22 @@ class CompanyDeletionService:
         self.company_code = None
         self.affected_counts: Dict[str, int] = {}
 
+    ALLOWED_TABLES = frozenset({
+        "companies", "mills", "master_departments", "employees", "machines",
+        "lots", "warehouses", "customers", "suppliers", "sales_orders",
+        "invoices", "company_modules", "user_modules", "billing_invoices",
+        "company_subscriptions", "production_entries", "dispatch",
+        "dispatch_items", "inventory_bags", "stock_ledger", "stock_balance",
+        "stock_transfers", "attendance", "leaves", "payslip_entries",
+        "payroll_months", "spares", "spare_issues", "maintenance_logs",
+        "quality_tests", "grn_entries", "bale_stock", "cotton_bales",
+        "cotton_purchases", "suppliers", "mixing_recipes", "mixing_layers",
+        "bale_consumption_logs", "user_sessions",
+    })
+
     async def _table_count(self, table: str, where: str, param: Any) -> int:
+        if table not in self.ALLOWED_TABLES:
+            raise ValueError(f"Table '{table}' is not in the allowlist")
         result = await self.db.execute(text(f"SELECT COUNT(*) FROM {table} WHERE {where}"), {"p": param})
         return result.scalar() or 0
 
@@ -45,39 +60,42 @@ class CompanyDeletionService:
         transaction fail with 'current transaction is aborted'. SAVEPOINT lets us
         roll back only the failed statement and continue.
         """
+        if table not in self.ALLOWED_TABLES:
+            raise ValueError(f"Table '{table}' is not in the allowlist")
         params = {}
         if param is not None and ":p" in where:
             params["p"] = param
         if extra_params:
             params.update(extra_params)
-        sp = f"sp_{table[:20].replace('-', '_')}"
+        sp_id = len(table) % 10000
         try:
-            await self.db.execute(text(f"SAVEPOINT {sp}"))
+            await self.db.execute(text(f"SAVEPOINT sp_del_{sp_id}"))
             result = await self.db.execute(text(f"DELETE FROM {table} WHERE {where}"), params)
-            await self.db.execute(text(f"RELEASE SAVEPOINT {sp}"))
+            await self.db.execute(text(f"RELEASE SAVEPOINT sp_del_{sp_id}"))
             return result.rowcount
         except Exception as e:
-            # Roll back to savepoint so the transaction stays valid
             try:
-                await self.db.execute(text(f"ROLLBACK TO SAVEPOINT {sp}"))
+                await self.db.execute(text(f"ROLLBACK TO SAVEPOINT sp_del_{sp_id}"))
             except Exception:
                 pass
             err = str(e).lower()
             if "does not exist" in err or "undefined" in err or "no such" in err:
                 logger.warning(f"Skipping non-existent table '{table}': {e}")
                 return 0
-            raise  # Re-raise real errors (FK violations, etc.)
+            raise
 
     async def _delete_from_two(self, table: str, where: str, p1: Any, p2: Any) -> int:
-        sp = f"sp2_{table[:18].replace('-', '_')}"
+        if table not in self.ALLOWED_TABLES:
+            raise ValueError(f"Table '{table}' is not in the allowlist")
+        sp_id = len(table) % 10000 + 10000
         try:
-            await self.db.execute(text(f"SAVEPOINT {sp}"))
+            await self.db.execute(text(f"SAVEPOINT sp_del2_{sp_id}"))
             result = await self.db.execute(text(f"DELETE FROM {table} WHERE {where}"), {"p1": p1, "p2": p2})
-            await self.db.execute(text(f"RELEASE SAVEPOINT {sp}"))
+            await self.db.execute(text(f"RELEASE SAVEPOINT sp_del2_{sp_id}"))
             return result.rowcount
         except Exception as e:
             try:
-                await self.db.execute(text(f"ROLLBACK TO SAVEPOINT {sp}"))
+                await self.db.execute(text(f"ROLLBACK TO SAVEPOINT sp_del2_{sp_id}"))
             except Exception:
                 pass
             err = str(e).lower()

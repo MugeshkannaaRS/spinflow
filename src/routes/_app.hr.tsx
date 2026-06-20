@@ -48,11 +48,7 @@ import {
   DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -190,8 +186,13 @@ interface PayrollRow {
 
 // Fallback departments — replaced at runtime by mill-specific data
 const DEPARTMENTS_FALLBACK = [
-  "Spinning", "Weaving", "Processing", "Packaging",
-  "Maintenance", "Stores", "Admin",
+  "Spinning",
+  "Weaving",
+  "Processing",
+  "Packaging",
+  "Maintenance",
+  "Stores",
+  "Admin",
 ];
 // Module-level alias used by subcomponents (overridden inside HRPage via dynamic data)
 let DEPARTMENTS: string[] = DEPARTMENTS_FALLBACK;
@@ -204,7 +205,20 @@ function formatDate(d: string | Date): string {
   if (!d) return "";
   const date = typeof d === "string" ? new Date(d) : d;
   if (isNaN(date.getTime())) return String(d);
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   const day = String(date.getDate()).padStart(2, "0");
   return `${day} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
@@ -229,8 +243,18 @@ function daysInMonth(month: number, year: number): number {
 }
 
 const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 // ─── Main Page ──────────────────────────────────────────────────────────────────
@@ -244,8 +268,8 @@ function HRPage() {
   if (millMasters?.department_names?.length) {
     DEPARTMENTS = millMasters.department_names;
   }
-  const GRADES_DYN = (millMasters?.grade?.length ? millMasters.grade : GRADES);
-  const SHIFTS_DYN = (millMasters?.shift?.length ? millMasters.shift : SHIFTS);
+  const GRADES_DYN = millMasters?.grade?.length ? millMasters.grade : GRADES;
+  const SHIFTS_DYN = millMasters?.shift?.length ? millMasters.shift : SHIFTS;
   const qc = useQueryClient();
 
   const [tab, setTab] = useState("employees");
@@ -273,32 +297,38 @@ function HRPage() {
   });
   const empResponse = (empQ.data ?? {}) as any;
   const empCustomFieldDefs = empResponse.custom_field_definitions ?? [];
-  const employees: EmployeeRow[] = (Array.isArray(empQ.data) ? empQ.data : (empResponse.data ?? []))
-    .map((e: any) => {
-      const flat = { ...e };
-      if (e.custom_fields) {
-        for (const [key, val] of Object.entries(e.custom_fields)) {
-          flat[key] = val;
-        }
+  const employees: EmployeeRow[] = (
+    Array.isArray(empQ.data) ? empQ.data : (empResponse.data ?? [])
+  ).map((e: any) => {
+    const flat = { ...e };
+    if (e.custom_fields) {
+      for (const [key, val] of Object.entries(e.custom_fields)) {
+        flat[key] = val;
       }
-      return flat as EmployeeRow;
-    });
-  const attendance: AttendanceRow[] = Array.isArray(attQ.data) ? attQ.data : (attQ.data?.data ?? []);
+    }
+    return flat as EmployeeRow;
+  });
+  const attendance: AttendanceRow[] = Array.isArray(attQ.data)
+    ? attQ.data
+    : (attQ.data?.data ?? []);
   const leaves: LeaveRow[] = Array.isArray(leaveQ.data) ? leaveQ.data : (leaveQ.data?.data ?? []);
 
   const activeEmployees = employees.filter((e) => e.is_active).length;
   const todayStr = new Date().toISOString().slice(0, 10);
-  const todayPresent = attendance.filter((a) => a.date === todayStr && a.status === "present").length;
+  const todayPresent = attendance.filter(
+    (a) => a.date === todayStr && a.status === "present",
+  ).length;
   const pendingLeaves = leaves.filter((l) => l.status === "pending").length;
   const todayAbsent = attendance.filter((a) => a.date === todayStr && a.status === "absent").length;
 
-  if (!user) return (
-    <div className="p-6 space-y-4">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-96 w-full" />
-    </div>
-  );
+  if (!user)
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
 
   if (empQ.isLoading)
     return (
@@ -328,7 +358,9 @@ function HRPage() {
           <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
             <Card>
               <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">Active Employees</div>
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Active Employees
+                </div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
                   <Users className="size-5 text-primary" />
                   {activeEmployees}
@@ -337,7 +369,9 @@ function HRPage() {
             </Card>
             <Card>
               <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">Present Today</div>
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Present Today
+                </div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
                   <UserCheck className="size-5 text-success" />
                   {todayPresent}
@@ -346,7 +380,9 @@ function HRPage() {
             </Card>
             <Card>
               <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">Pending Leaves</div>
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Pending Leaves
+                </div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
                   <CalendarCheck className="size-5 text-warning" />
                   {pendingLeaves}
@@ -355,7 +391,9 @@ function HRPage() {
             </Card>
             <Card>
               <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">Absent Today</div>
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Absent Today
+                </div>
                 <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
                   <Clock className="size-5 text-destructive" />
                   {todayAbsent}
@@ -374,25 +412,34 @@ function HRPage() {
 
             <TabsContent value="employees">
               <ErrorBoundary inline label="Employees">
-              <EmployeesTab employees={employees} canEdit={canEdit} customFieldDefs={empCustomFieldDefs} />
+                <EmployeesTab
+                  employees={employees}
+                  canEdit={canEdit}
+                  customFieldDefs={empCustomFieldDefs}
+                />
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="attendance">
               <ErrorBoundary inline label="Attendance">
-              <AttendanceTab employees={employees} canEdit={canEdit} />
+                <AttendanceTab employees={employees} canEdit={canEdit} />
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="payroll">
               <ErrorBoundary inline label="Payroll">
-              <PayrollTab employees={employees} canEdit={canEdit} millId={millId!} userRole={user.role} />
+                <PayrollTab
+                  employees={employees}
+                  canEdit={canEdit}
+                  millId={millId!}
+                  userRole={user.role}
+                />
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="leaves">
               <ErrorBoundary inline label="Leaves">
-              <LeavesTab employees={employees} leaves={leaves} canEdit={canEdit} user={user} />
+                <LeavesTab employees={employees} leaves={leaves} canEdit={canEdit} user={user} />
               </ErrorBoundary>
             </TabsContent>
           </Tabs>
@@ -406,11 +453,21 @@ function HRPage() {
 // TAB 1 — EMPLOYEES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function EmployeesTab({ employees, canEdit, customFieldDefs = [] }: { employees: EmployeeRow[]; canEdit: boolean; customFieldDefs?: { field_key: string; field_label: string; field_type: string }[] }) {
+function EmployeesTab({
+  employees,
+  canEdit,
+  customFieldDefs = [],
+}: {
+  employees: EmployeeRow[];
+  canEdit: boolean;
+  customFieldDefs?: { field_key: string; field_label: string; field_type: string }[];
+}) {
   const empColConfig = useColumnConfig("hr_employees");
   const qc = useQueryClient();
   const { data: millMasters } = useMillMasters();
-  const DEPT_LIST = (millMasters?.department_names?.length ? millMasters.department_names : DEPARTMENTS_FALLBACK);
+  const DEPT_LIST = millMasters?.department_names?.length
+    ? millMasters.department_names
+    : DEPARTMENTS_FALLBACK;
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState("all");
   const [gradeFilter, setGradeFilter] = useState("all");
@@ -421,15 +478,37 @@ function EmployeesTab({ employees, canEdit, customFieldDefs = [] }: { employees:
   const [detailOpen, setDetailOpen] = useState(false);
 
   const COLUMN_GROUPS: { key: string; label: string; columns: string[] }[] = [
-    { key: "personal", label: "Personal", columns: ["sl_no", "code", "name", "dob", "age", "gender"] },
+    {
+      key: "personal",
+      label: "Personal",
+      columns: ["sl_no", "code", "name", "dob", "age", "gender"],
+    },
     { key: "job", label: "Job", columns: ["department", "designation", "section", "grade"] },
     { key: "salary", label: "Salary", columns: ["basic", "wages", "total_salary"] },
-    { key: "allowances", label: "Allowances", columns: ["house_rent", "medical", "conveyance", "food_allowance", "mobile_bill", "increment", "shift_benefit"] },
-    { key: "monthly", label: "Monthly", columns: ["joining_date", "bank_account_no", "days_of_month"] },
+    {
+      key: "allowances",
+      label: "Allowances",
+      columns: [
+        "house_rent",
+        "medical",
+        "conveyance",
+        "food_allowance",
+        "mobile_bill",
+        "increment",
+        "shift_benefit",
+      ],
+    },
+    {
+      key: "monthly",
+      label: "Monthly",
+      columns: ["joining_date", "bank_account_no", "days_of_month"],
+    },
   ];
 
   const stored = typeof window !== "undefined" ? localStorage.getItem("hr-column-groups") : null;
-  const [visibleGroups, setVisibleGroups] = useState<Set<string>>(new Set(stored ? JSON.parse(stored) : ["personal", "job", "salary"]));
+  const [visibleGroups, setVisibleGroups] = useState<Set<string>>(
+    new Set(stored ? JSON.parse(stored) : ["personal", "job", "salary"]),
+  );
 
   useEffect(() => {
     localStorage.setItem("hr-column-groups", JSON.stringify([...visibleGroups]));
@@ -477,42 +556,139 @@ function EmployeesTab({ employees, canEdit, customFieldDefs = [] }: { employees:
   };
 
   const currencyRender = (v: number | undefined | null) =>
-    v != null ? `₹${Number(v).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}` : "—";
+    v != null
+      ? `₹${Number(v).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+      : "—";
 
-  const dateRender = (d: string | undefined | null) => d ? formatDate(d) : "—";
+  const dateRender = (d: string | undefined | null) => (d ? formatDate(d) : "—");
 
   const alwaysCols: ColDef<EmployeeRow>[] = [
-    { key: "sl_no", label: empColConfig.getLabel('sl_no'), className: "w-14", render: (e) => <span className="text-xs text-muted-foreground">{e.sl_no ?? e.employee_id ?? ""}</span> },
-    { key: "code", label: empColConfig.getLabel('code'), className: "font-mono text-xs", render: (e) => <span className="font-mono text-xs">{e.code || ""}</span> },
-    { key: "name", label: empColConfig.getLabel('name'), render: (e) => <span className="font-medium">{e.name || ""}</span> },
-    { key: "department", label: empColConfig.getLabel('department') },
-    { key: "designation", label: empColConfig.getLabel('designation'), render: (e) => e.designation ?? e.role ?? "—" },
-    { key: "grade", label: empColConfig.getLabel('grade'), render: (e) => e.grade ?? "—" },
-    { key: "gen", label: empColConfig.getLabel('gen'), render: (e) => e.gen ?? "—" },
-    { key: "basic", label: empColConfig.getLabel('basic'), type: "number", render: (e) => currencyRender(e.basic) },
-    { key: "wages", label: empColConfig.getLabel('wages'), type: "number", render: (e) => currencyRender(e.wages) },
-    { key: "total_salary", label: empColConfig.getLabel('total_salary'), type: "number", render: (e) => currencyRender(e.total_salary) },
-    { key: "is_active", label: empColConfig.getLabel('is_active') || "Status", type: "status", render: (e) => <StatusBadge status={e.is_active ? "active" : "inactive"} /> },
+    {
+      key: "sl_no",
+      label: empColConfig.getLabel("sl_no"),
+      className: "w-14",
+      render: (e) => (
+        <span className="text-xs text-muted-foreground">{e.sl_no ?? e.employee_id ?? ""}</span>
+      ),
+    },
+    {
+      key: "code",
+      label: empColConfig.getLabel("code"),
+      className: "font-mono text-xs",
+      render: (e) => <span className="font-mono text-xs">{e.code || ""}</span>,
+    },
+    {
+      key: "name",
+      label: empColConfig.getLabel("name"),
+      render: (e) => <span className="font-medium">{e.name || ""}</span>,
+    },
+    { key: "department", label: empColConfig.getLabel("department") },
+    {
+      key: "designation",
+      label: empColConfig.getLabel("designation"),
+      render: (e) => e.designation ?? e.role ?? "—",
+    },
+    { key: "grade", label: empColConfig.getLabel("grade"), render: (e) => e.grade ?? "—" },
+    { key: "gen", label: empColConfig.getLabel("gen"), render: (e) => e.gen ?? "—" },
+    {
+      key: "basic",
+      label: empColConfig.getLabel("basic"),
+      type: "number",
+      render: (e) => currencyRender(e.basic),
+    },
+    {
+      key: "wages",
+      label: empColConfig.getLabel("wages"),
+      type: "number",
+      render: (e) => currencyRender(e.wages),
+    },
+    {
+      key: "total_salary",
+      label: empColConfig.getLabel("total_salary"),
+      type: "number",
+      render: (e) => currencyRender(e.total_salary),
+    },
+    {
+      key: "is_active",
+      label: empColConfig.getLabel("is_active") || "Status",
+      type: "status",
+      render: (e) => <StatusBadge status={e.is_active ? "active" : "inactive"} />,
+    },
   ];
 
   const groupColMap: Record<string, ColDef<EmployeeRow>[]> = {
     allowances: [
-      { key: "house_rent", label: empColConfig.getLabel('house_rent'), type: "number", render: (e) => currencyRender(e.house_rent) },
-      { key: "medical", label: empColConfig.getLabel('medical'), type: "number", render: (e) => currencyRender(e.medical) },
-      { key: "conveyance", label: empColConfig.getLabel('conveyance'), type: "number", render: (e) => currencyRender(e.conveyance) },
-      { key: "food_allowance", label: empColConfig.getLabel('food_allowance'), type: "number", render: (e) => currencyRender(e.food_allowance) },
-      { key: "mobile_bill", label: empColConfig.getLabel('mobile_bill'), type: "number", render: (e) => currencyRender(e.mobile_bill) },
-      { key: "increment", label: empColConfig.getLabel('increment'), type: "number", render: (e) => currencyRender(e.increment) },
-      { key: "shift_benefit", label: empColConfig.getLabel('shift_benefit'), type: "number", render: (e) => currencyRender(e.shift_benefit) },
+      {
+        key: "house_rent",
+        label: empColConfig.getLabel("house_rent"),
+        type: "number",
+        render: (e) => currencyRender(e.house_rent),
+      },
+      {
+        key: "medical",
+        label: empColConfig.getLabel("medical"),
+        type: "number",
+        render: (e) => currencyRender(e.medical),
+      },
+      {
+        key: "conveyance",
+        label: empColConfig.getLabel("conveyance"),
+        type: "number",
+        render: (e) => currencyRender(e.conveyance),
+      },
+      {
+        key: "food_allowance",
+        label: empColConfig.getLabel("food_allowance"),
+        type: "number",
+        render: (e) => currencyRender(e.food_allowance),
+      },
+      {
+        key: "mobile_bill",
+        label: empColConfig.getLabel("mobile_bill"),
+        type: "number",
+        render: (e) => currencyRender(e.mobile_bill),
+      },
+      {
+        key: "increment",
+        label: empColConfig.getLabel("increment"),
+        type: "number",
+        render: (e) => currencyRender(e.increment),
+      },
+      {
+        key: "shift_benefit",
+        label: empColConfig.getLabel("shift_benefit"),
+        type: "number",
+        render: (e) => currencyRender(e.shift_benefit),
+      },
     ],
     monthly: [
-      { key: "joining_date", label: empColConfig.getLabel('joining_date'), type: "date", render: (e) => dateRender(e.date_of_joining) },
-      { key: "dob", label: empColConfig.getLabel('dob'), type: "date", render: (e) => dateRender(e.dob) },
-      { key: "age", label: empColConfig.getLabel('age'), type: "number", render: (e) => e.age ?? (e.date_of_birth ? calcAge(e.date_of_birth) : "—") },
-      { key: "gender", label: empColConfig.getLabel('gender') },
-      { key: "section", label: empColConfig.getLabel('section') },
-      { key: "bank_account_no", label: empColConfig.getLabel('bank_account_no') },
-      { key: "days_of_month", label: empColConfig.getLabel('days_of_month'), type: "number", render: (e) => e.days_of_month ?? 26 },
+      {
+        key: "joining_date",
+        label: empColConfig.getLabel("joining_date"),
+        type: "date",
+        render: (e) => dateRender(e.date_of_joining),
+      },
+      {
+        key: "dob",
+        label: empColConfig.getLabel("dob"),
+        type: "date",
+        render: (e) => dateRender(e.dob),
+      },
+      {
+        key: "age",
+        label: empColConfig.getLabel("age"),
+        type: "number",
+        render: (e) => e.age ?? (e.date_of_birth ? calcAge(e.date_of_birth) : "—"),
+      },
+      { key: "gender", label: empColConfig.getLabel("gender") },
+      { key: "section", label: empColConfig.getLabel("section") },
+      { key: "bank_account_no", label: empColConfig.getLabel("bank_account_no") },
+      {
+        key: "days_of_month",
+        label: empColConfig.getLabel("days_of_month"),
+        type: "number",
+        render: (e) => e.days_of_month ?? 26,
+      },
     ],
   };
 
@@ -526,17 +702,31 @@ function EmployeesTab({ employees, canEdit, customFieldDefs = [] }: { employees:
     return cols;
   }, [visibleGroups]);
 
-  const customCols: ColDef<EmployeeRow>[] = useMemo(() =>
-    customFieldDefs.map((cf) => ({
-      key: cf.field_key,
-      label: cf.field_label + " *",
-      render: (e: any) => <span className="text-[#64748b] text-sm">{e[cf.field_key] || "—"}</span>,
-    })), [customFieldDefs]);
+  const customCols: ColDef<EmployeeRow>[] = useMemo(
+    () =>
+      customFieldDefs.map((cf) => ({
+        key: cf.field_key,
+        label: cf.field_label + " *",
+        render: (e: any) => (
+          <span className="text-[#64748b] text-sm">{e[cf.field_key] || "—"}</span>
+        ),
+      })),
+    [customFieldDefs],
+  );
 
-  const dataTableColumns = useMemo(() => [...alwaysCols, ...groupColumns, ...customCols], [groupColumns, customCols]);
+  const dataTableColumns = useMemo(
+    () => [...alwaysCols, ...groupColumns, ...customCols],
+    [groupColumns, customCols],
+  );
 
-  const depts = useMemo(() => [...new Set(employees.map((e) => e.department).filter((d): d is string => !!d))].sort(), [employees]);
-  const grades = useMemo(() => [...new Set(employees.map((e) => e.grade).filter((g): g is string => !!g))].sort(), [employees]);
+  const depts = useMemo(
+    () => [...new Set(employees.map((e) => e.department).filter((d): d is string => !!d))].sort(),
+    [employees],
+  );
+  const grades = useMemo(
+    () => [...new Set(employees.map((e) => e.grade).filter((g): g is string => !!g))].sort(),
+    [employees],
+  );
 
   return (
     <div className="space-y-4">
@@ -547,7 +737,11 @@ function EmployeesTab({ employees, canEdit, customFieldDefs = [] }: { employees:
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Departments</SelectItem>
-            {depts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+            {depts.map((d) => (
+              <SelectItem key={d} value={d}>
+                {d}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={gradeFilter} onValueChange={setGradeFilter}>
@@ -556,7 +750,11 @@ function EmployeesTab({ employees, canEdit, customFieldDefs = [] }: { employees:
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Grades</SelectItem>
-            {grades.map((g) => (<SelectItem key={g} value={g}>Grade {g}</SelectItem>))}
+            {grades.map((g) => (
+              <SelectItem key={g} value={g}>
+                Grade {g}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -604,7 +802,8 @@ function EmployeesTab({ employees, canEdit, customFieldDefs = [] }: { employees:
                     checked={visibleGroups.has(g.key)}
                     onCheckedChange={() => {
                       const next = new Set(visibleGroups);
-                      if (next.has(g.key)) next.delete(g.key); else next.add(g.key);
+                      if (next.has(g.key)) next.delete(g.key);
+                      else next.add(g.key);
                       setVisibleGroups(next);
                     }}
                   />
@@ -627,15 +826,33 @@ function EmployeesTab({ employees, canEdit, customFieldDefs = [] }: { employees:
         actions={(e) => (
           <div className="flex gap-1">
             {canEdit && (
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleEdit(e)} title="Edit">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0"
+                onClick={() => handleEdit(e)}
+                title="Edit"
+              >
                 <Pencil className="size-3.5" />
               </Button>
             )}
-            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => handleView(e)} title="View">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 p-0"
+              onClick={() => handleView(e)}
+              title="View"
+            >
               <Eye className="size-3.5" />
             </Button>
             {canEdit && e.is_active && (
-              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive" onClick={() => handleDeactivate(e)} title="Deactivate">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 text-destructive"
+                onClick={() => handleDeactivate(e)}
+                title="Deactivate"
+              >
                 <Trash2 className="size-3.5" />
               </Button>
             )}
@@ -661,7 +878,15 @@ interface CustomValueItem {
   value: string | null;
 }
 
-function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; onOpenChange: (v: boolean) => void; employee: EmployeeRow }) {
+function EmployeeDetailSheet({
+  open,
+  onOpenChange,
+  employee,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  employee: EmployeeRow;
+}) {
   const { millId } = useActiveMill();
   const empColConfig = useColumnConfig("hr_employees");
   const [payrollTab, setPayrollTab] = useState("personal");
@@ -671,7 +896,10 @@ function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; 
   const curYear = now.getFullYear();
   const { data: payrollData } = useQuery({
     queryKey: ["hr-payroll-employee", employee.id, curMonth, curYear, millId],
-    queryFn: () => hrApi.getPayroll({ employee_id: employee.id, month: curMonth, year: curYear, mill_id: millId }).then((r: any) => r.data?.[0]),
+    queryFn: () =>
+      hrApi
+        .getPayroll({ employee_id: employee.id, month: curMonth, year: curYear, mill_id: millId })
+        .then((r: any) => r.data?.[0]),
     enabled: open,
     staleTime: 30_000,
   });
@@ -685,7 +913,13 @@ function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; 
 
   const customValues: CustomValueItem[] = empDetail?.custom_values ?? [];
 
-  const Field = ({ label, value }: { label: string; value: string | number | undefined | null }) => (
+  const Field = ({
+    label,
+    value,
+  }: {
+    label: string;
+    value: string | number | undefined | null;
+  }) => (
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="text-sm font-medium">{value ?? "-"}</p>
@@ -703,51 +937,127 @@ function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; 
       <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>{employee.name}</SheetTitle>
-          <p className="text-xs text-muted-foreground">{employee.code} · {employee.department}</p>
+          <p className="text-xs text-muted-foreground">
+            {employee.code} · {employee.department}
+          </p>
         </SheetHeader>
         <div className="flex gap-2 border-b pb-2 mt-4">
-          <button type="button" onClick={() => setPayrollTab("personal")} className={cn("px-3 py-1 text-sm rounded", payrollTab === "personal" ? "bg-primary text-primary-foreground" : "bg-muted")}>Personal Info</button>
-          <button type="button" onClick={() => setPayrollTab("salary")} className={cn("px-3 py-1 text-sm rounded", payrollTab === "salary" ? "bg-primary text-primary-foreground" : "bg-muted")}>Salary Structure</button>
-          <button type="button" onClick={() => setPayrollTab("monthly")} className={cn("px-3 py-1 text-sm rounded", payrollTab === "monthly" ? "bg-primary text-primary-foreground" : "bg-muted")}>Monthly Data</button>
+          <button
+            type="button"
+            onClick={() => setPayrollTab("personal")}
+            className={cn(
+              "px-3 py-1 text-sm rounded",
+              payrollTab === "personal" ? "bg-primary text-primary-foreground" : "bg-muted",
+            )}
+          >
+            Personal Info
+          </button>
+          <button
+            type="button"
+            onClick={() => setPayrollTab("salary")}
+            className={cn(
+              "px-3 py-1 text-sm rounded",
+              payrollTab === "salary" ? "bg-primary text-primary-foreground" : "bg-muted",
+            )}
+          >
+            Salary Structure
+          </button>
+          <button
+            type="button"
+            onClick={() => setPayrollTab("monthly")}
+            className={cn(
+              "px-3 py-1 text-sm rounded",
+              payrollTab === "monthly" ? "bg-primary text-primary-foreground" : "bg-muted",
+            )}
+          >
+            Monthly Data
+          </button>
           {customValues.length > 0 && (
-            <button type="button" onClick={() => setPayrollTab("custom")} className={cn("px-3 py-1 text-sm rounded", payrollTab === "custom" ? "bg-primary text-primary-foreground" : "bg-muted")}>Additional Info</button>
+            <button
+              type="button"
+              onClick={() => setPayrollTab("custom")}
+              className={cn(
+                "px-3 py-1 text-sm rounded",
+                payrollTab === "custom" ? "bg-primary text-primary-foreground" : "bg-muted",
+              )}
+            >
+              Additional Info
+            </button>
           )}
         </div>
 
         {payrollTab === "personal" && (
           <div className="grid grid-cols-2 gap-4 py-4">
-            <Field label={empColConfig.getLabel('sl_no')} value={employee.sl_no} />
-            <Field label={empColConfig.getLabel('employee_id')} value={employee.employee_id ?? employee.code} />
-            <Field label={empColConfig.getLabel('name')} value={employee.name} />
-            <Field label={empColConfig.getLabel('dob')} value={employee.dob ? formatDate(employee.dob) : employee.date_of_birth ? formatDate(employee.date_of_birth) : "-"} />
-            <Field label={empColConfig.getLabel('age')} value={employee.age ?? (employee.date_of_birth ? calcAge(employee.date_of_birth) : "-")} />
-            <Field label={empColConfig.getLabel('gender')} value={employee.gender ?? "-"} />
-            <Field label={empColConfig.getLabel('grade')} value={employee.grade ?? "-"} />
-            <Field label={empColConfig.getLabel('gen')} value={employee.gen ?? "-"} />
-            <Field label={empColConfig.getLabel('joining_date')} value={employee.date_of_joining ? formatDate(employee.date_of_joining) : "-"} />
-            <Field label={empColConfig.getLabel('section')} value={employee.section ?? "-"} />
-            <Field label={empColConfig.getLabel('department')} value={employee.department ?? "-"} />
-            <Field label={empColConfig.getLabel('designation')} value={employee.designation ?? employee.role ?? "-"} />
-            <Field label={empColConfig.getLabel('phone')} value={employee.phone ?? "-"} />
-            <Field label={empColConfig.getLabel('bank_account_no')} value={employee.bank_account_no ?? employee.bank_account ?? "-"} />
-            <Field label={empColConfig.getLabel('shift')} value={employee.shift ?? "General"} />
+            <Field label={empColConfig.getLabel("sl_no")} value={employee.sl_no} />
+            <Field
+              label={empColConfig.getLabel("employee_id")}
+              value={employee.employee_id ?? employee.code}
+            />
+            <Field label={empColConfig.getLabel("name")} value={employee.name} />
+            <Field
+              label={empColConfig.getLabel("dob")}
+              value={
+                employee.dob
+                  ? formatDate(employee.dob)
+                  : employee.date_of_birth
+                    ? formatDate(employee.date_of_birth)
+                    : "-"
+              }
+            />
+            <Field
+              label={empColConfig.getLabel("age")}
+              value={
+                employee.age ?? (employee.date_of_birth ? calcAge(employee.date_of_birth) : "-")
+              }
+            />
+            <Field label={empColConfig.getLabel("gender")} value={employee.gender ?? "-"} />
+            <Field label={empColConfig.getLabel("grade")} value={employee.grade ?? "-"} />
+            <Field label={empColConfig.getLabel("gen")} value={employee.gen ?? "-"} />
+            <Field
+              label={empColConfig.getLabel("joining_date")}
+              value={employee.date_of_joining ? formatDate(employee.date_of_joining) : "-"}
+            />
+            <Field label={empColConfig.getLabel("section")} value={employee.section ?? "-"} />
+            <Field label={empColConfig.getLabel("department")} value={employee.department ?? "-"} />
+            <Field
+              label={empColConfig.getLabel("designation")}
+              value={employee.designation ?? employee.role ?? "-"}
+            />
+            <Field label={empColConfig.getLabel("phone")} value={employee.phone ?? "-"} />
+            <Field
+              label={empColConfig.getLabel("bank_account_no")}
+              value={employee.bank_account_no ?? employee.bank_account ?? "-"}
+            />
+            <Field label={empColConfig.getLabel("shift")} value={employee.shift ?? "General"} />
           </div>
         )}
 
         {payrollTab === "salary" && (
           <div className="grid grid-cols-2 gap-4 py-4">
-            <Currency label={empColConfig.getLabel('basic')} value={employee.basic} />
-            <Currency label={empColConfig.getLabel('house_rent')} value={employee.house_rent} />
-            <Currency label={empColConfig.getLabel('medical')} value={employee.medical} />
-            <Currency label={empColConfig.getLabel('conveyance')} value={employee.conveyance} />
-            <Currency label={empColConfig.getLabel('food_allowance')} value={employee.food_allowance} />
-            <Currency label={empColConfig.getLabel('wages')} value={employee.wages} />
-            <Currency label={empColConfig.getLabel('increment')} value={employee.increment} />
-            <Currency label={empColConfig.getLabel('total_salary')} value={employee.total_salary} />
-            <Currency label={empColConfig.getLabel('mobile_bill')} value={employee.mobile_bill} />
-            <Currency label={empColConfig.getLabel('shift_benefit')} value={employee.shift_benefit} />
-            <Field label={empColConfig.getLabel('days_of_month')} value={employee.days_of_month ?? 26} />
-            <Currency label={empColConfig.getLabel('wages_of_month')} value={employee.wages_of_month} />
+            <Currency label={empColConfig.getLabel("basic")} value={employee.basic} />
+            <Currency label={empColConfig.getLabel("house_rent")} value={employee.house_rent} />
+            <Currency label={empColConfig.getLabel("medical")} value={employee.medical} />
+            <Currency label={empColConfig.getLabel("conveyance")} value={employee.conveyance} />
+            <Currency
+              label={empColConfig.getLabel("food_allowance")}
+              value={employee.food_allowance}
+            />
+            <Currency label={empColConfig.getLabel("wages")} value={employee.wages} />
+            <Currency label={empColConfig.getLabel("increment")} value={employee.increment} />
+            <Currency label={empColConfig.getLabel("total_salary")} value={employee.total_salary} />
+            <Currency label={empColConfig.getLabel("mobile_bill")} value={employee.mobile_bill} />
+            <Currency
+              label={empColConfig.getLabel("shift_benefit")}
+              value={employee.shift_benefit}
+            />
+            <Field
+              label={empColConfig.getLabel("days_of_month")}
+              value={employee.days_of_month ?? 26}
+            />
+            <Currency
+              label={empColConfig.getLabel("wages_of_month")}
+              value={employee.wages_of_month}
+            />
           </div>
         )}
 
@@ -756,7 +1066,11 @@ function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; 
             <p className="text-sm font-medium text-muted-foreground">Additional Information</p>
             <div className="grid grid-cols-2 gap-4">
               {customValues.map((cv) => (
-                <Field key={cv.field_name} label={cv.field_name.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())} value={cv.value} />
+                <Field
+                  key={cv.field_name}
+                  label={cv.field_name.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                  value={cv.value}
+                />
               ))}
             </div>
           </div>
@@ -767,46 +1081,105 @@ function EmployeeDetailSheet({ open, onOpenChange, employee }: { open: boolean; 
             {p ? (
               <>
                 <div className="grid grid-cols-3 gap-3">
-                  <Field label={empColConfig.getLabel('days_of_month')} value={p.days_of_month} />
-                  <Field label={empColConfig.getLabel('calculate_days')} value={p.calculate_days} />
-                  <Field label={empColConfig.getLabel('actual_attendance')} value={p.actual_attendance} />
-                  <Field label={empColConfig.getLabel('day_off')} value={p.day_off} />
-                  <Field label={empColConfig.getLabel('cl')} value={p.cl} />
-                  <Field label={empColConfig.getLabel('sl')} value={p.sl} />
-                  <Field label={empColConfig.getLabel('el')} value={p.el} />
-                  <Field label={empColConfig.getLabel('comp_leave')} value={p.comp_leave} />
-                  <Field label={empColConfig.getLabel('festival_holiday')} value={p.festival_holiday} />
-                  <Field label={empColConfig.getLabel('absent_days')} value={p.absent_days} />
-                  <Field label={empColConfig.getLabel('payable_days')} value={p.payable_days} />
-                  <Field label={empColConfig.getLabel('payable_salary')} value={p.payable_salary != null ? formatCurrency(p.payable_salary) : "-"} />
+                  <Field label={empColConfig.getLabel("days_of_month")} value={p.days_of_month} />
+                  <Field label={empColConfig.getLabel("calculate_days")} value={p.calculate_days} />
+                  <Field
+                    label={empColConfig.getLabel("actual_attendance")}
+                    value={p.actual_attendance}
+                  />
+                  <Field label={empColConfig.getLabel("day_off")} value={p.day_off} />
+                  <Field label={empColConfig.getLabel("cl")} value={p.cl} />
+                  <Field label={empColConfig.getLabel("sl")} value={p.sl} />
+                  <Field label={empColConfig.getLabel("el")} value={p.el} />
+                  <Field label={empColConfig.getLabel("comp_leave")} value={p.comp_leave} />
+                  <Field
+                    label={empColConfig.getLabel("festival_holiday")}
+                    value={p.festival_holiday}
+                  />
+                  <Field label={empColConfig.getLabel("absent_days")} value={p.absent_days} />
+                  <Field label={empColConfig.getLabel("payable_days")} value={p.payable_days} />
+                  <Field
+                    label={empColConfig.getLabel("payable_salary")}
+                    value={p.payable_salary != null ? formatCurrency(p.payable_salary) : "-"}
+                  />
                 </div>
                 <Separator />
                 <div className="grid grid-cols-3 gap-3">
-                  <Field label={empColConfig.getLabel('ot_hours')} value={p.ot_hours} />
-                  <Field label={empColConfig.getLabel('ot_amount')} value={p.ot_amount != null ? formatCurrency(p.ot_amount) : "-"} />
-                  <Field label={empColConfig.getLabel('attendance_bonus')} value={p.attendance_bonus != null ? formatCurrency(p.attendance_bonus) : "-"} />
-                  <Field label={empColConfig.getLabel('festival_duty_benefit')} value={p.festival_duty_benefit != null ? formatCurrency(p.festival_duty_benefit) : "-"} />
-                  <Field label={empColConfig.getLabel('festival_holiday_allowance')} value={p.festival_holiday_allowance != null ? formatCurrency(p.festival_holiday_allowance) : "-"} />
-                  <Field label={empColConfig.getLabel('ifter_days')} value={p.ifter_days} />
-                  <Field label={empColConfig.getLabel('ifter_allowance')} value={p.ifter_allowance != null ? formatCurrency(p.ifter_allowance) : "-"} />
-                  <Field label={empColConfig.getLabel('special_food')} value={p.special_food != null ? formatCurrency(p.special_food) : "-"} />
-                  <Field label={empColConfig.getLabel('arrear_others')} value={p.arrear_others != null ? formatCurrency(p.arrear_others) : "-"} />
-                  <Field label={empColConfig.getLabel('shift_qty')} value={p.shift_qty} />
-                  <Field label={empColConfig.getLabel('shift_amount')} value={p.shift_amount != null ? formatCurrency(p.shift_amount) : "-"} />
-                  <Field label={empColConfig.getLabel('roster_qty')} value={p.roster_qty} />
-                  <Field label={empColConfig.getLabel('roster_amount')} value={p.roster_amount != null ? formatCurrency(p.roster_amount) : "-"} />
-                  <Field label={empColConfig.getLabel('absent_deduction')} value={p.absent_deduction != null ? formatCurrency(p.absent_deduction) : "-"} />
-                  <Field label={empColConfig.getLabel('advance_deduction')} value={p.advance_deduction != null ? formatCurrency(p.advance_deduction) : "-"} />
-                  <Field label={empColConfig.getLabel('tax_deduction')} value={p.tax_deduction != null ? formatCurrency(p.tax_deduction) : "-"} />
+                  <Field label={empColConfig.getLabel("ot_hours")} value={p.ot_hours} />
+                  <Field
+                    label={empColConfig.getLabel("ot_amount")}
+                    value={p.ot_amount != null ? formatCurrency(p.ot_amount) : "-"}
+                  />
+                  <Field
+                    label={empColConfig.getLabel("attendance_bonus")}
+                    value={p.attendance_bonus != null ? formatCurrency(p.attendance_bonus) : "-"}
+                  />
+                  <Field
+                    label={empColConfig.getLabel("festival_duty_benefit")}
+                    value={
+                      p.festival_duty_benefit != null
+                        ? formatCurrency(p.festival_duty_benefit)
+                        : "-"
+                    }
+                  />
+                  <Field
+                    label={empColConfig.getLabel("festival_holiday_allowance")}
+                    value={
+                      p.festival_holiday_allowance != null
+                        ? formatCurrency(p.festival_holiday_allowance)
+                        : "-"
+                    }
+                  />
+                  <Field label={empColConfig.getLabel("ifter_days")} value={p.ifter_days} />
+                  <Field
+                    label={empColConfig.getLabel("ifter_allowance")}
+                    value={p.ifter_allowance != null ? formatCurrency(p.ifter_allowance) : "-"}
+                  />
+                  <Field
+                    label={empColConfig.getLabel("special_food")}
+                    value={p.special_food != null ? formatCurrency(p.special_food) : "-"}
+                  />
+                  <Field
+                    label={empColConfig.getLabel("arrear_others")}
+                    value={p.arrear_others != null ? formatCurrency(p.arrear_others) : "-"}
+                  />
+                  <Field label={empColConfig.getLabel("shift_qty")} value={p.shift_qty} />
+                  <Field
+                    label={empColConfig.getLabel("shift_amount")}
+                    value={p.shift_amount != null ? formatCurrency(p.shift_amount) : "-"}
+                  />
+                  <Field label={empColConfig.getLabel("roster_qty")} value={p.roster_qty} />
+                  <Field
+                    label={empColConfig.getLabel("roster_amount")}
+                    value={p.roster_amount != null ? formatCurrency(p.roster_amount) : "-"}
+                  />
+                  <Field
+                    label={empColConfig.getLabel("absent_deduction")}
+                    value={p.absent_deduction != null ? formatCurrency(p.absent_deduction) : "-"}
+                  />
+                  <Field
+                    label={empColConfig.getLabel("advance_deduction")}
+                    value={p.advance_deduction != null ? formatCurrency(p.advance_deduction) : "-"}
+                  />
+                  <Field
+                    label={empColConfig.getLabel("tax_deduction")}
+                    value={p.tax_deduction != null ? formatCurrency(p.tax_deduction) : "-"}
+                  />
                 </div>
                 <Separator />
                 <div className="flex justify-between items-center p-3 bg-muted rounded-md">
-                  <span className="text-sm font-semibold">{empColConfig.getLabel('net_payable')}</span>
-                  <span className="text-lg font-bold text-primary">{p.net_payable != null ? formatCurrency(p.net_payable) : "-"}</span>
+                  <span className="text-sm font-semibold">
+                    {empColConfig.getLabel("net_payable")}
+                  </span>
+                  <span className="text-lg font-bold text-primary">
+                    {p.net_payable != null ? formatCurrency(p.net_payable) : "-"}
+                  </span>
                 </div>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-8">No payroll data for current month. Calculate payroll in the Payroll tab.</p>
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No payroll data for current month. Calculate payroll in the Payroll tab.
+              </p>
             )}
           </div>
         )}
@@ -858,8 +1231,14 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
 
   const nextSlNo = employees.length > 0 ? Math.max(...employees.map((e) => e.sl_no ?? 0)) + 1 : 1;
 
-  const totalSalary = form.basic + form.house_rent + form.medical + form.conveyance +
-    form.food_allowance + form.mobile_bill + form.shift_benefit;
+  const totalSalary =
+    form.basic +
+    form.house_rent +
+    form.medical +
+    form.conveyance +
+    form.food_allowance +
+    form.mobile_bill +
+    form.shift_benefit;
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -973,65 +1352,136 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
         </SheetHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="flex gap-2 border-b pb-2">
-            <button type="button" onClick={() => setSection("personal")} className={cn("px-3 py-1 text-sm rounded", section === "personal" ? "bg-primary text-primary-foreground" : "bg-muted")}>Personal Info</button>
-            <button type="button" onClick={() => setSection("job")} className={cn("px-3 py-1 text-sm rounded", section === "job" ? "bg-primary text-primary-foreground" : "bg-muted")}>Job Info</button>
-            <button type="button" onClick={() => setSection("salary")} className={cn("px-3 py-1 text-sm rounded", section === "salary" ? "bg-primary text-primary-foreground" : "bg-muted")}>Salary</button>
+            <button
+              type="button"
+              onClick={() => setSection("personal")}
+              className={cn(
+                "px-3 py-1 text-sm rounded",
+                section === "personal" ? "bg-primary text-primary-foreground" : "bg-muted",
+              )}
+            >
+              Personal Info
+            </button>
+            <button
+              type="button"
+              onClick={() => setSection("job")}
+              className={cn(
+                "px-3 py-1 text-sm rounded",
+                section === "job" ? "bg-primary text-primary-foreground" : "bg-muted",
+              )}
+            >
+              Job Info
+            </button>
+            <button
+              type="button"
+              onClick={() => setSection("salary")}
+              className={cn(
+                "px-3 py-1 text-sm rounded",
+                section === "salary" ? "bg-primary text-primary-foreground" : "bg-muted",
+              )}
+            >
+              Salary
+            </button>
           </div>
 
           {section === "personal" && (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('sl_no')}</Label>
-                  <Input value={form.sl_no} onChange={(e) => setForm({ ...form, sl_no: Number(e.target.value) })} type="number" />
+                  <Label>{empColConfig.getLabel("sl_no")}</Label>
+                  <Input
+                    value={form.sl_no}
+                    onChange={(e) => setForm({ ...form, sl_no: Number(e.target.value) })}
+                    type="number"
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('employee_id')}</Label>
-                  <Input value={form.employee_code} onChange={(e) => setForm({ ...form, employee_code: e.target.value })} />
+                  <Label>{empColConfig.getLabel("employee_id")}</Label>
+                  <Input
+                    value={form.employee_code}
+                    onChange={(e) => setForm({ ...form, employee_code: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>{empColConfig.getLabel('name')}{empColConfig.isRequired('name') && <span className="text-destructive">*</span>}</Label>
-                <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className={errors.full_name ? "border-destructive" : ""} />
+                <Label>
+                  {empColConfig.getLabel("name")}
+                  {empColConfig.isRequired("name") && <span className="text-destructive">*</span>}
+                </Label>
+                <Input
+                  value={form.full_name}
+                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                  className={errors.full_name ? "border-destructive" : ""}
+                />
                 {errors.full_name && <p className="text-xs text-destructive">{errors.full_name}</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('dob')}</Label>
-                  <Input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />
+                  <Label>{empColConfig.getLabel("dob")}</Label>
+                  <Input
+                    type="date"
+                    value={form.date_of_birth}
+                    onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('age')}</Label>
+                  <Label>{empColConfig.getLabel("age")}</Label>
                   <Input value={form.age} readOnly className="bg-muted" />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('gender')}</Label>
-                  <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <Label>{empColConfig.getLabel("gender")}</Label>
+                  <Select
+                    value={form.gender}
+                    onValueChange={(v) => setForm({ ...form, gender: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
                     <SelectContent>
-                      {GENDERS.map((g) => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
+                      {GENDERS.map((g) => (
+                        <SelectItem key={g} value={g}>
+                          {g}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('grade')}</Label>
-                  <Input type="number" min={0} max={99} value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} placeholder="0" />
+                  <Label>{empColConfig.getLabel("grade")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={99}
+                    value={form.grade}
+                    onChange={(e) => setForm({ ...form, grade: e.target.value })}
+                    placeholder="0"
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('gen')}</Label>
+                  <Label>{empColConfig.getLabel("gen")}</Label>
                   <Select value={form.gen} onValueChange={(v) => setForm({ ...form, gen: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
                     <SelectContent>
-                      {GENDERS.map((g) => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
+                      {GENDERS.map((g) => (
+                        <SelectItem key={g} value={g}>
+                          {g}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>{empColConfig.getLabel('joining_date')}</Label>
-                <Input type="date" value={form.date_of_joining} onChange={(e) => setForm({ ...form, date_of_joining: e.target.value })} />
+                <Label>{empColConfig.getLabel("joining_date")}</Label>
+                <Input
+                  type="date"
+                  value={form.date_of_joining}
+                  onChange={(e) => setForm({ ...form, date_of_joining: e.target.value })}
+                />
               </div>
             </div>
           )}
@@ -1040,44 +1490,76 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('designation')}</Label>
-                  <Input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} />
+                  <Label>{empColConfig.getLabel("designation")}</Label>
+                  <Input
+                    value={form.designation}
+                    onChange={(e) => setForm({ ...form, designation: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('section')}</Label>
-                  <Input value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} />
+                  <Label>{empColConfig.getLabel("section")}</Label>
+                  <Input
+                    value={form.section}
+                    onChange={(e) => setForm({ ...form, section: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>{empColConfig.getLabel('department')}{empColConfig.isRequired('department') && <span className="text-destructive">*</span>}</Label>
-                <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
+                <Label>
+                  {empColConfig.getLabel("department")}
+                  {empColConfig.isRequired("department") && (
+                    <span className="text-destructive">*</span>
+                  )}
+                </Label>
+                <Select
+                  value={form.department}
+                  onValueChange={(v) => setForm({ ...form, department: v })}
+                >
                   <SelectTrigger className={errors.department ? "border-destructive" : ""}>
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    {DEPARTMENTS.map((d: string) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+                    {DEPARTMENTS.map((d: string) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                {errors.department && <p className="text-xs text-destructive">{errors.department}</p>}
+                {errors.department && (
+                  <p className="text-xs text-destructive">{errors.department}</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('shift')}</Label>
+                  <Label>{empColConfig.getLabel("shift")}</Label>
                   <Select value={form.shift} onValueChange={(v) => setForm({ ...form, shift: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
-                      {SHIFTS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+                      {SHIFTS.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('phone')}</Label>
-                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                  <Label>{empColConfig.getLabel("phone")}</Label>
+                  <Input
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>{empColConfig.getLabel('bank_account_no')}</Label>
-                <Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} />
+                <Label>{empColConfig.getLabel("bank_account_no")}</Label>
+                <Input
+                  value={form.bank_account}
+                  onChange={(e) => setForm({ ...form, bank_account: e.target.value })}
+                />
               </div>
             </div>
           )}
@@ -1086,58 +1568,121 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('basic')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.basic} onChange={(e) => setForm({ ...form, basic: Number(e.target.value) })} />
+                  <Label>{empColConfig.getLabel("basic")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.basic}
+                    onChange={(e) => setForm({ ...form, basic: Number(e.target.value) })}
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('house_rent')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.house_rent} onChange={(e) => setForm({ ...form, house_rent: Number(e.target.value) })} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('medical')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.medical} onChange={(e) => setForm({ ...form, medical: Number(e.target.value) })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('conveyance')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.conveyance} onChange={(e) => setForm({ ...form, conveyance: Number(e.target.value) })} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('food_allowance')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.food_allowance} onChange={(e) => setForm({ ...form, food_allowance: Number(e.target.value) })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('wages')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.wages} onChange={(e) => setForm({ ...form, wages: Number(e.target.value) })} />
+                  <Label>{empColConfig.getLabel("house_rent")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.house_rent}
+                    onChange={(e) => setForm({ ...form, house_rent: Number(e.target.value) })}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('increment')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.increment} onChange={(e) => setForm({ ...form, increment: Number(e.target.value) })} />
+                  <Label>{empColConfig.getLabel("medical")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.medical}
+                    onChange={(e) => setForm({ ...form, medical: Number(e.target.value) })}
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('mobile_bill')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.mobile_bill} onChange={(e) => setForm({ ...form, mobile_bill: Number(e.target.value) })} />
+                  <Label>{empColConfig.getLabel("conveyance")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.conveyance}
+                    onChange={(e) => setForm({ ...form, conveyance: Number(e.target.value) })}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('shift_benefit')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.shift_benefit} onChange={(e) => setForm({ ...form, shift_benefit: Number(e.target.value) })} />
+                  <Label>{empColConfig.getLabel("food_allowance")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.food_allowance}
+                    onChange={(e) => setForm({ ...form, food_allowance: Number(e.target.value) })}
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('days_of_month')}</Label>
-                  <Input type="number" min={1} max={31} value={form.days_of_month} onChange={(e) => setForm({ ...form, days_of_month: Number(e.target.value) })} />
+                  <Label>{empColConfig.getLabel("wages")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.wages}
+                    onChange={(e) => setForm({ ...form, wages: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>{empColConfig.getLabel("increment")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.increment}
+                    onChange={(e) => setForm({ ...form, increment: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>{empColConfig.getLabel("mobile_bill")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.mobile_bill}
+                    onChange={(e) => setForm({ ...form, mobile_bill: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>{empColConfig.getLabel("shift_benefit")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.shift_benefit}
+                    onChange={(e) => setForm({ ...form, shift_benefit: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>{empColConfig.getLabel("days_of_month")}</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={form.days_of_month}
+                    onChange={(e) => setForm({ ...form, days_of_month: Number(e.target.value) })}
+                  />
                 </div>
               </div>
               <div className="bg-muted p-3 rounded-md">
-                <Label>{empColConfig.getLabel('total_salary')} (auto-calculated)</Label>
+                <Label>{empColConfig.getLabel("total_salary")} (auto-calculated)</Label>
                 <p className="text-lg font-bold text-primary mt-1">{formatCurrency(totalSalary)}</p>
-                <p className="text-xs text-muted-foreground mt-1">Basic + House Rent + Medical + Conveyance + Food Allowance + Mobile Bill + Shift Benefit</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Basic + House Rent + Medical + Conveyance + Food Allowance + Mobile Bill + Shift
+                  Benefit
+                </p>
               </div>
             </div>
           )}
@@ -1173,7 +1718,7 @@ function EditEmployeeSheet({
     employee_code: employee.code ?? "",
     full_name: employee.name ?? "",
     date_of_birth: employee.date_of_birth ?? "",
-    age: employee.date_of_birth ? calcAge(employee.date_of_birth) : employee.age ?? 0,
+    age: employee.date_of_birth ? calcAge(employee.date_of_birth) : (employee.age ?? 0),
     gender: employee.gender ?? "",
     grade: employee.grade ?? "",
     gen: employee.gen ?? "",
@@ -1196,8 +1741,14 @@ function EditEmployeeSheet({
     days_of_month: employee.days_of_month ?? 30,
   });
 
-  const totalSalary = form.basic + form.house_rent + form.medical + form.conveyance +
-    form.food_allowance + form.mobile_bill + form.shift_benefit;
+  const totalSalary =
+    form.basic +
+    form.house_rent +
+    form.medical +
+    form.conveyance +
+    form.food_allowance +
+    form.mobile_bill +
+    form.shift_benefit;
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -1273,65 +1824,136 @@ function EditEmployeeSheet({
         </SheetHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="flex gap-2 border-b pb-2">
-            <button type="button" onClick={() => setSection("personal")} className={cn("px-3 py-1 text-sm rounded", section === "personal" ? "bg-primary text-primary-foreground" : "bg-muted")}>Personal Info</button>
-            <button type="button" onClick={() => setSection("job")} className={cn("px-3 py-1 text-sm rounded", section === "job" ? "bg-primary text-primary-foreground" : "bg-muted")}>Job Info</button>
-            <button type="button" onClick={() => setSection("salary")} className={cn("px-3 py-1 text-sm rounded", section === "salary" ? "bg-primary text-primary-foreground" : "bg-muted")}>Salary</button>
+            <button
+              type="button"
+              onClick={() => setSection("personal")}
+              className={cn(
+                "px-3 py-1 text-sm rounded",
+                section === "personal" ? "bg-primary text-primary-foreground" : "bg-muted",
+              )}
+            >
+              Personal Info
+            </button>
+            <button
+              type="button"
+              onClick={() => setSection("job")}
+              className={cn(
+                "px-3 py-1 text-sm rounded",
+                section === "job" ? "bg-primary text-primary-foreground" : "bg-muted",
+              )}
+            >
+              Job Info
+            </button>
+            <button
+              type="button"
+              onClick={() => setSection("salary")}
+              className={cn(
+                "px-3 py-1 text-sm rounded",
+                section === "salary" ? "bg-primary text-primary-foreground" : "bg-muted",
+              )}
+            >
+              Salary
+            </button>
           </div>
 
           {section === "personal" && (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('sl_no')}</Label>
-                  <Input value={form.sl_no} onChange={(e) => setForm({ ...form, sl_no: Number(e.target.value) })} type="number" />
+                  <Label>{empColConfig.getLabel("sl_no")}</Label>
+                  <Input
+                    value={form.sl_no}
+                    onChange={(e) => setForm({ ...form, sl_no: Number(e.target.value) })}
+                    type="number"
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('employee_id')}</Label>
-                  <Input value={form.employee_code} onChange={(e) => setForm({ ...form, employee_code: e.target.value })} />
+                  <Label>{empColConfig.getLabel("employee_id")}</Label>
+                  <Input
+                    value={form.employee_code}
+                    onChange={(e) => setForm({ ...form, employee_code: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>{empColConfig.getLabel('name')}{empColConfig.isRequired('name') && <span className="text-destructive">*</span>}</Label>
-                <Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className={errors.full_name ? "border-destructive" : ""} />
+                <Label>
+                  {empColConfig.getLabel("name")}
+                  {empColConfig.isRequired("name") && <span className="text-destructive">*</span>}
+                </Label>
+                <Input
+                  value={form.full_name}
+                  onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                  className={errors.full_name ? "border-destructive" : ""}
+                />
                 {errors.full_name && <p className="text-xs text-destructive">{errors.full_name}</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('dob')}</Label>
-                  <Input type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />
+                  <Label>{empColConfig.getLabel("dob")}</Label>
+                  <Input
+                    type="date"
+                    value={form.date_of_birth}
+                    onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('age')}</Label>
+                  <Label>{empColConfig.getLabel("age")}</Label>
                   <Input value={form.age} readOnly className="bg-muted" />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('gender')}</Label>
-                  <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <Label>{empColConfig.getLabel("gender")}</Label>
+                  <Select
+                    value={form.gender}
+                    onValueChange={(v) => setForm({ ...form, gender: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
                     <SelectContent>
-                      {GENDERS.map((g) => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
+                      {GENDERS.map((g) => (
+                        <SelectItem key={g} value={g}>
+                          {g}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('grade')}</Label>
-                  <Input type="number" min={0} max={99} value={form.grade} onChange={(e) => setForm({ ...form, grade: e.target.value })} placeholder="0" />
+                  <Label>{empColConfig.getLabel("grade")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={99}
+                    value={form.grade}
+                    onChange={(e) => setForm({ ...form, grade: e.target.value })}
+                    placeholder="0"
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('gen')}</Label>
+                  <Label>{empColConfig.getLabel("gen")}</Label>
                   <Select value={form.gen} onValueChange={(v) => setForm({ ...form, gen: v })}>
-                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
                     <SelectContent>
-                      {GENDERS.map((g) => (<SelectItem key={g} value={g}>{g}</SelectItem>))}
+                      {GENDERS.map((g) => (
+                        <SelectItem key={g} value={g}>
+                          {g}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>{empColConfig.getLabel('joining_date')}</Label>
-                <Input type="date" value={form.date_of_joining} onChange={(e) => setForm({ ...form, date_of_joining: e.target.value })} />
+                <Label>{empColConfig.getLabel("joining_date")}</Label>
+                <Input
+                  type="date"
+                  value={form.date_of_joining}
+                  onChange={(e) => setForm({ ...form, date_of_joining: e.target.value })}
+                />
               </div>
             </div>
           )}
@@ -1340,44 +1962,76 @@ function EditEmployeeSheet({
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('designation')}</Label>
-                  <Input value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} />
+                  <Label>{empColConfig.getLabel("designation")}</Label>
+                  <Input
+                    value={form.designation}
+                    onChange={(e) => setForm({ ...form, designation: e.target.value })}
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('section')}</Label>
-                  <Input value={form.section} onChange={(e) => setForm({ ...form, section: e.target.value })} />
+                  <Label>{empColConfig.getLabel("section")}</Label>
+                  <Input
+                    value={form.section}
+                    onChange={(e) => setForm({ ...form, section: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>{empColConfig.getLabel('department')}{empColConfig.isRequired('department') && <span className="text-destructive">*</span>}</Label>
-                <Select value={form.department} onValueChange={(v) => setForm({ ...form, department: v })}>
+                <Label>
+                  {empColConfig.getLabel("department")}
+                  {empColConfig.isRequired("department") && (
+                    <span className="text-destructive">*</span>
+                  )}
+                </Label>
+                <Select
+                  value={form.department}
+                  onValueChange={(v) => setForm({ ...form, department: v })}
+                >
                   <SelectTrigger className={errors.department ? "border-destructive" : ""}>
                     <SelectValue placeholder="Select department" />
                   </SelectTrigger>
                   <SelectContent>
-                    {DEPARTMENTS.map((d: string) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+                    {DEPARTMENTS.map((d: string) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-                {errors.department && <p className="text-xs text-destructive">{errors.department}</p>}
+                {errors.department && (
+                  <p className="text-xs text-destructive">{errors.department}</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('shift')}</Label>
+                  <Label>{empColConfig.getLabel("shift")}</Label>
                   <Select value={form.shift} onValueChange={(v) => setForm({ ...form, shift: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
-                      {SHIFTS.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+                      {SHIFTS.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('phone')}</Label>
-                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                  <Label>{empColConfig.getLabel("phone")}</Label>
+                  <Input
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>{empColConfig.getLabel('bank_account_no')}</Label>
-                <Input value={form.bank_account} onChange={(e) => setForm({ ...form, bank_account: e.target.value })} />
+                <Label>{empColConfig.getLabel("bank_account_no")}</Label>
+                <Input
+                  value={form.bank_account}
+                  onChange={(e) => setForm({ ...form, bank_account: e.target.value })}
+                />
               </div>
             </div>
           )}
@@ -1386,58 +2040,121 @@ function EditEmployeeSheet({
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('basic')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.basic} onChange={(e) => setForm({ ...form, basic: Number(e.target.value) })} />
+                  <Label>{empColConfig.getLabel("basic")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.basic}
+                    onChange={(e) => setForm({ ...form, basic: Number(e.target.value) })}
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('house_rent')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.house_rent} onChange={(e) => setForm({ ...form, house_rent: Number(e.target.value) })} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('medical')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.medical} onChange={(e) => setForm({ ...form, medical: Number(e.target.value) })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('conveyance')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.conveyance} onChange={(e) => setForm({ ...form, conveyance: Number(e.target.value) })} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('food_allowance')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.food_allowance} onChange={(e) => setForm({ ...form, food_allowance: Number(e.target.value) })} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('wages')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.wages} onChange={(e) => setForm({ ...form, wages: Number(e.target.value) })} />
+                  <Label>{empColConfig.getLabel("house_rent")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.house_rent}
+                    onChange={(e) => setForm({ ...form, house_rent: Number(e.target.value) })}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('increment')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.increment} onChange={(e) => setForm({ ...form, increment: Number(e.target.value) })} />
+                  <Label>{empColConfig.getLabel("medical")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.medical}
+                    onChange={(e) => setForm({ ...form, medical: Number(e.target.value) })}
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('mobile_bill')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.mobile_bill} onChange={(e) => setForm({ ...form, mobile_bill: Number(e.target.value) })} />
+                  <Label>{empColConfig.getLabel("conveyance")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.conveyance}
+                    onChange={(e) => setForm({ ...form, conveyance: Number(e.target.value) })}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('shift_benefit')}</Label>
-                  <Input type="number" min={0} step={0.01} value={form.shift_benefit} onChange={(e) => setForm({ ...form, shift_benefit: Number(e.target.value) })} />
+                  <Label>{empColConfig.getLabel("food_allowance")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.food_allowance}
+                    onChange={(e) => setForm({ ...form, food_allowance: Number(e.target.value) })}
+                  />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel('days_of_month')}</Label>
-                  <Input type="number" min={1} max={31} value={form.days_of_month} onChange={(e) => setForm({ ...form, days_of_month: Number(e.target.value) })} />
+                  <Label>{empColConfig.getLabel("wages")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.wages}
+                    onChange={(e) => setForm({ ...form, wages: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>{empColConfig.getLabel("increment")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.increment}
+                    onChange={(e) => setForm({ ...form, increment: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>{empColConfig.getLabel("mobile_bill")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.mobile_bill}
+                    onChange={(e) => setForm({ ...form, mobile_bill: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>{empColConfig.getLabel("shift_benefit")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.shift_benefit}
+                    onChange={(e) => setForm({ ...form, shift_benefit: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>{empColConfig.getLabel("days_of_month")}</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={31}
+                    value={form.days_of_month}
+                    onChange={(e) => setForm({ ...form, days_of_month: Number(e.target.value) })}
+                  />
                 </div>
               </div>
               <div className="bg-muted p-3 rounded-md">
-                <Label>{empColConfig.getLabel('total_salary')} (auto-calculated)</Label>
+                <Label>{empColConfig.getLabel("total_salary")} (auto-calculated)</Label>
                 <p className="text-lg font-bold text-primary mt-1">{formatCurrency(totalSalary)}</p>
-                <p className="text-xs text-muted-foreground mt-1">Basic + House Rent + Medical + Conveyance + Food Allowance + Mobile Bill + Shift Benefit</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Basic + House Rent + Medical + Conveyance + Food Allowance + Mobile Bill + Shift
+                  Benefit
+                </p>
               </div>
             </div>
           )}
@@ -1494,13 +2211,25 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
   const [mobileCardEmp, setMobileCardEmp] = useState<EmployeeRow | null>(null);
   const [mobileCardOpen, setMobileCardOpen] = useState(false);
 
-  const { data: attendanceData, isLoading, refetch } = useQuery({
+  const {
+    data: attendanceData,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["hr-attendance", month, year, deptFilter, millId],
-    queryFn: () => hrApi.getAttendance({ month, year, mill_id: millId, department: deptFilter !== "all" ? deptFilter : undefined }),
+    queryFn: () =>
+      hrApi.getAttendance({
+        month,
+        year,
+        mill_id: millId,
+        department: deptFilter !== "all" ? deptFilter : undefined,
+      }),
     staleTime: 60_000,
   });
 
-  const attendanceRows: AttendanceRow[] = Array.isArray(attendanceData) ? attendanceData : (attendanceData?.data ?? []);
+  const attendanceRows: AttendanceRow[] = Array.isArray(attendanceData)
+    ? attendanceData
+    : (attendanceData?.data ?? []);
   const days = daysInMonth(month, year);
 
   const filteredEmployees = useMemo(() => {
@@ -1511,8 +2240,14 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
     });
   }, [employees, deptFilter, shiftFilter]);
 
-  const depts = useMemo(() => [...new Set(employees.map((e) => e.department).filter(Boolean))].sort(), [employees]);
-  const shifts = useMemo(() => [...new Set(employees.map((e) => e.shift).filter((s): s is string => !!s))].sort(), [employees]);
+  const depts = useMemo(
+    () => [...new Set(employees.map((e) => e.department).filter(Boolean))].sort(),
+    [employees],
+  );
+  const shifts = useMemo(
+    () => [...new Set(employees.map((e) => e.shift).filter((s): s is string => !!s))].sort(),
+    [employees],
+  );
 
   const getStatus = (empId: string, day: number): string => {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
@@ -1527,7 +2262,12 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
   };
 
   const calcTotals = (empId: string) => {
-    let present = 0, absent = 0, cl = 0, sl = 0, el = 0, ot = 0;
+    let present = 0,
+      absent = 0,
+      cl = 0,
+      sl = 0,
+      el = 0,
+      ot = 0;
     for (let d = 1; d <= days; d++) {
       const s = getStatus(empId, d);
       if (s === "P") present++;
@@ -1560,14 +2300,22 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
 
   const statusColor = (s: string) => {
     switch (s) {
-      case "P": return "bg-green-100 text-green-700";
-      case "A": return "bg-red-100 text-red-700";
-      case "H": return "bg-blue-100 text-blue-700";
-      case "L": return "bg-yellow-100 text-yellow-700";
-      case "CL": return "bg-yellow-100 text-yellow-700";
-      case "SL": return "bg-orange-100 text-orange-700";
-      case "EL": return "bg-purple-100 text-purple-700";
-      default: return "bg-gray-50 text-gray-400";
+      case "P":
+        return "bg-green-100 text-green-700";
+      case "A":
+        return "bg-red-100 text-red-700";
+      case "H":
+        return "bg-blue-100 text-blue-700";
+      case "L":
+        return "bg-yellow-100 text-yellow-700";
+      case "CL":
+        return "bg-yellow-100 text-yellow-700";
+      case "SL":
+        return "bg-orange-100 text-orange-700";
+      case "EL":
+        return "bg-purple-100 text-purple-700";
+      default:
+        return "bg-gray-50 text-gray-400";
     }
   };
 
@@ -1582,7 +2330,10 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
   };
 
   const dayTotals = (day: number) => {
-    let p = 0, a = 0, h = 0, l = 0;
+    let p = 0,
+      a = 0,
+      h = 0,
+      l = 0;
     for (const emp of filteredEmployees) {
       const s = getStatus(emp.id, day);
       if (s === "P") p++;
@@ -1593,7 +2344,8 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
     return { present: p, absent: a, holiday: h, leave: l };
   };
 
-  if (isLoading) return <div className="text-sm text-muted-foreground p-4">Loading attendance…</div>;
+  if (isLoading)
+    return <div className="text-sm text-muted-foreground p-4">Loading attendance…</div>;
 
   return (
     <div className="space-y-4">
@@ -1604,7 +2356,9 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
           </SelectTrigger>
           <SelectContent>
             {MONTHS.map((m, i) => (
-              <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
+              <SelectItem key={i} value={String(i + 1)}>
+                {m}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -1614,7 +2368,9 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
           </SelectTrigger>
           <SelectContent>
             {[2023, 2024, 2025, 2026, 2027].map((y) => (
-              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+              <SelectItem key={y} value={String(y)}>
+                {y}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -1624,7 +2380,11 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Departments</SelectItem>
-            {depts.map((d) => (<SelectItem key={d} value={d}>{d}</SelectItem>))}
+            {depts.map((d) => (
+              <SelectItem key={d} value={d}>
+                {d}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={shiftFilter} onValueChange={setShiftFilter}>
@@ -1633,13 +2393,22 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Shifts</SelectItem>
-            {shifts.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+            {shifts.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         {canEdit && (
           <Button size="sm" style={{ backgroundColor: "#3b82f6", color: "#ffffff" }}>
             <ClipboardCheck className="size-4 mr-1" />
-            <MarkAttendanceSheet employees={filteredEmployees} month={month} year={year} onSuccess={refetch} />
+            <MarkAttendanceSheet
+              employees={filteredEmployees}
+              month={month}
+              year={year}
+              onSuccess={refetch}
+            />
           </Button>
         )}
         {canEdit && <ImportAttendanceDialog month={month} year={year} onSuccess={refetch} />}
@@ -1670,11 +2439,17 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
         <Table className="min-w-[900px] w-full text-xs">
           <TableHeader>
             <TableRow>
-              <TableHead className="sticky left-0 bg-background z-10 min-w-[160px]" style={{ left: 0 }}>
-                {attColConfig.getLabel('employee')}
+              <TableHead
+                className="sticky left-0 bg-background z-10 min-w-[160px]"
+                style={{ left: 0 }}
+              >
+                {attColConfig.getLabel("employee")}
               </TableHead>
-              <TableHead className="sticky bg-background z-10 min-w-[120px]" style={{ left: "160px" }}>
-                {attColConfig.getLabel('department')}
+              <TableHead
+                className="sticky bg-background z-10 min-w-[120px]"
+                style={{ left: "160px" }}
+              >
+                {attColConfig.getLabel("department")}
               </TableHead>
               {Array.from({ length: days }, (_, i) => i + 1).map((d) => (
                 <TableHead
@@ -1719,10 +2494,7 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
                     return (
                       <TableCell
                         key={d}
-                        className={cn(
-                          "text-center p-0",
-                          isToday(d) && "bg-brand-50/50",
-                        )}
+                        className={cn("text-center p-0", isToday(d) && "bg-brand-50/50")}
                         style={{ width: 44, height: 32 }}
                       >
                         {canEdit ? (
@@ -1745,8 +2517,12 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
                       </TableCell>
                     );
                   })}
-                  <TableCell className="text-center font-medium text-green-600 text-xs">{totals.present}</TableCell>
-                  <TableCell className="text-center text-red-500 text-xs">{totals.absent}</TableCell>
+                  <TableCell className="text-center font-medium text-green-600 text-xs">
+                    {totals.present}
+                  </TableCell>
+                  <TableCell className="text-center text-red-500 text-xs">
+                    {totals.absent}
+                  </TableCell>
                   <TableCell className="text-center text-xs">{totals.cl}</TableCell>
                   <TableCell className="text-center text-xs">{totals.sl}</TableCell>
                   <TableCell className="text-center text-xs">{totals.el}</TableCell>
@@ -1758,12 +2534,20 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
           {filteredEmployees.length > 0 && (
             <TableFooter>
               <TableRow>
-                <TableCell className="sticky left-0 bg-background z-10 font-semibold text-xs" style={{ left: 0 }}>Total</TableCell>
+                <TableCell
+                  className="sticky left-0 bg-background z-10 font-semibold text-xs"
+                  style={{ left: 0 }}
+                >
+                  Total
+                </TableCell>
                 <TableCell className="sticky bg-background z-10" style={{ left: "160px" }} />
                 {Array.from({ length: days }, (_, i) => i + 1).map((d) => {
                   const dt = dayTotals(d);
                   return (
-                    <TableCell key={d} className={cn("text-center p-1", isToday(d) && "bg-brand-50/50")}>
+                    <TableCell
+                      key={d}
+                      className={cn("text-center p-1", isToday(d) && "bg-brand-50/50")}
+                    >
                       <div className="text-[9px] text-green-600">{dt.present}</div>
                       <div className="text-[9px] text-red-500">{dt.absent}</div>
                     </TableCell>
@@ -1808,7 +2592,9 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
                   <div className="text-right text-xs space-y-0.5">
                     <span className="text-green-600 font-medium">P:{totals.present} </span>
                     <span className="text-red-500 font-medium">A:{totals.absent} </span>
-                    <span className="text-yellow-600 font-medium">L:{totals.cl + totals.sl + totals.el}</span>
+                    <span className="text-yellow-600 font-medium">
+                      L:{totals.cl + totals.sl + totals.el}
+                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -1841,9 +2627,7 @@ function AttendanceTab({ employees, canEdit }: { employees: EmployeeRow[]; canEd
                       )}
                     >
                       <div className="text-[10px] text-muted-foreground">{d}</div>
-                      <div className={cn("font-medium", statusColor(status))}>
-                        {status || "－"}
-                      </div>
+                      <div className={cn("font-medium", statusColor(status))}>{status || "－"}</div>
                     </div>
                   );
                 })}
@@ -1929,7 +2713,7 @@ function MarkAttendanceSheet({
         <div className="space-y-4 py-4">
           <div className="flex gap-3 items-end">
             <div className="space-y-1.5">
-              <Label>{attColConfig.getLabel('date')}</Label>
+              <Label>{attColConfig.getLabel("date")}</Label>
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
           </div>
@@ -1940,51 +2724,58 @@ function MarkAttendanceSheet({
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-8">#</TableHead>
-                    <TableHead>{attColConfig.getLabel('employee')}</TableHead>
-                    <TableHead>{attColConfig.getLabel('department')}</TableHead>
-                    <TableHead>{attColConfig.getLabel('status')}</TableHead>
+                    <TableHead>{attColConfig.getLabel("employee")}</TableHead>
+                    <TableHead>{attColConfig.getLabel("department")}</TableHead>
+                    <TableHead>{attColConfig.getLabel("status")}</TableHead>
                     <TableHead>OT Hours</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(employees ?? []).map((emp, i) => emp ? (
-                    <TableRow key={emp.id ?? i}>
-                      <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
-                      <TableCell className="font-medium">{emp.name}</TableCell>
-                      <TableCell>{emp.department}</TableCell>
-                      <TableCell>
-                        <Select
-                          value={records[emp.id]?.status ?? "present"}
-                          onValueChange={(v) => setRecords((prev) => ({ ...prev, [emp.id]: { ...prev[emp.id], status: v } }))}
-                        >
-                          <SelectTrigger className="w-32 h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="present">Present</SelectItem>
-                            <SelectItem value="absent">Absent</SelectItem>
-                            <SelectItem value="half-day">Half Day</SelectItem>
-                            <SelectItem value="leave">Leave</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          min={0}
-                          step={0.5}
-                          className="w-20 h-8"
-                          value={records[emp.id]?.ot_hours ?? 0}
-                          onChange={(e) =>
-                            setRecords((prev) => ({
-                              ...prev,
-                              [emp.id]: { ...prev[emp.id], ot_hours: Number(e.target.value) },
-                            }))
-                          }
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ) : null)}
+                  {(employees ?? []).map((emp, i) =>
+                    emp ? (
+                      <TableRow key={emp.id ?? i}>
+                        <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
+                        <TableCell className="font-medium">{emp.name}</TableCell>
+                        <TableCell>{emp.department}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={records[emp.id]?.status ?? "present"}
+                            onValueChange={(v) =>
+                              setRecords((prev) => ({
+                                ...prev,
+                                [emp.id]: { ...prev[emp.id], status: v },
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="w-32 h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="present">Present</SelectItem>
+                              <SelectItem value="absent">Absent</SelectItem>
+                              <SelectItem value="half-day">Half Day</SelectItem>
+                              <SelectItem value="leave">Leave</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            min={0}
+                            step={0.5}
+                            className="w-20 h-8"
+                            value={records[emp.id]?.ot_hours ?? 0}
+                            onChange={(e) =>
+                              setRecords((prev) => ({
+                                ...prev,
+                                [emp.id]: { ...prev[emp.id], ot_hours: Number(e.target.value) },
+                              }))
+                            }
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ) : null,
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -2002,7 +2793,15 @@ function MarkAttendanceSheet({
 
 // ─── Import Attendance Dialog ──────────────────────────────────────────────────
 
-function ImportAttendanceDialog({ month, year, onSuccess }: { month: number; year: number; onSuccess: () => void }) {
+function ImportAttendanceDialog({
+  month,
+  year,
+  onSuccess,
+}: {
+  month: number;
+  year: number;
+  onSuccess: () => void;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -2026,7 +2825,17 @@ function ImportAttendanceDialog({ month, year, onSuccess }: { month: number; yea
 // TAB 3 — MONTHLY PAYROLL
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function PayrollTab({ employees, canEdit, millId, userRole }: { employees: EmployeeRow[]; canEdit: boolean; millId: string; userRole: string }) {
+function PayrollTab({
+  employees,
+  canEdit,
+  millId,
+  userRole,
+}: {
+  employees: EmployeeRow[];
+  canEdit: boolean;
+  millId: string;
+  userRole: string;
+}) {
   const payrollColConfig = useColumnConfig("hr_payroll");
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -2035,13 +2844,19 @@ function PayrollTab({ employees, canEdit, millId, userRole }: { employees: Emplo
   const [localPayroll, setLocalPayroll] = useState<PayrollRow[]>([]);
   const editRef = useRef<HTMLInputElement>(null);
 
-  const { data: payrollData, isLoading, refetch } = useQuery({
+  const {
+    data: payrollData,
+    isLoading,
+    refetch,
+  } = useQuery({
     queryKey: ["hr-payroll", month, year],
     queryFn: () => hrApi.getPayroll({ month, year, mill_id: millId }),
     staleTime: 60_000,
   });
 
-  const payroll: PayrollRow[] = Array.isArray(payrollData) ? payrollData : (payrollData?.data ?? []);
+  const payroll: PayrollRow[] = Array.isArray(payrollData)
+    ? payrollData
+    : (payrollData?.data ?? []);
 
   useEffect(() => {
     if (payroll.length > 0) {
@@ -2050,11 +2865,22 @@ function PayrollTab({ employees, canEdit, millId, userRole }: { employees: Emplo
   }, [payroll]);
 
   const recalcNetPayable = (row: PayrollRow): number => {
-    return (row.payable_salary ?? 0) + (row.ot_amount ?? 0) + (row.attendance_bonus ?? 0) +
-      (row.arrear_others ?? 0) + (row.shift_amount ?? 0) + (row.roster_amount ?? 0) +
-      (row.festival_duty_benefit ?? 0) + (row.festival_holiday_allowance ?? 0) +
-      (row.ifter_allowance ?? 0) + (row.special_food ?? 0) + (row.mobile_bill ?? 0) -
-      (row.absent_deduction ?? 0) - (row.advance_deduction ?? 0) - (row.tax_deduction ?? 0);
+    return (
+      (row.payable_salary ?? 0) +
+      (row.ot_amount ?? 0) +
+      (row.attendance_bonus ?? 0) +
+      (row.arrear_others ?? 0) +
+      (row.shift_amount ?? 0) +
+      (row.roster_amount ?? 0) +
+      (row.festival_duty_benefit ?? 0) +
+      (row.festival_holiday_allowance ?? 0) +
+      (row.ifter_allowance ?? 0) +
+      (row.special_food ?? 0) +
+      (row.mobile_bill ?? 0) -
+      (row.absent_deduction ?? 0) -
+      (row.advance_deduction ?? 0) -
+      (row.tax_deduction ?? 0)
+    );
   };
 
   const isFinalized = payroll.length > 0 && payroll.some((r) => r.is_finalized);
@@ -2116,7 +2942,8 @@ function PayrollTab({ employees, canEdit, millId, userRole }: { employees: Emplo
     { key: "tax_deduction", label: payrollColConfig.getLabel("tax_deduction") },
   ];
 
-  const canFinalize = userRole === "MILL_OWNER" || userRole === "ACCOUNTANT" || userRole === "SUPER_ADMIN";
+  const canFinalize =
+    userRole === "MILL_OWNER" || userRole === "ACCOUNTANT" || userRole === "SUPER_ADMIN";
 
   const displayData = localPayroll.length > 0 ? localPayroll : payroll;
 
@@ -2131,7 +2958,9 @@ function PayrollTab({ employees, canEdit, millId, userRole }: { employees: Emplo
             </SelectTrigger>
             <SelectContent>
               {MONTHS.map((m, i) => (
-                <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
+                <SelectItem key={i} value={String(i + 1)}>
+                  {m}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -2144,7 +2973,9 @@ function PayrollTab({ employees, canEdit, millId, userRole }: { employees: Emplo
             </SelectTrigger>
             <SelectContent>
               {[2023, 2024, 2025, 2026, 2027].map((y) => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                <SelectItem key={y} value={String(y)}>
+                  {y}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -2155,13 +2986,23 @@ function PayrollTab({ employees, canEdit, millId, userRole }: { employees: Emplo
           </Button>
         )}
         {canFinalize && canEdit && (
-          <Button size="sm" variant="destructive" onClick={() => {
-            if (confirm("Finalize this month's payroll? This action may be irreversible.")) finalizeM.mutate();
-          }} disabled={finalizeM.isPending || isFinalized}>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => {
+              if (confirm("Finalize this month's payroll? This action may be irreversible."))
+                finalizeM.mutate();
+            }}
+            disabled={finalizeM.isPending || isFinalized}
+          >
             {finalizeM.isPending ? "Finalizing…" : "Finalize Month"}
           </Button>
         )}
-        {isFinalized && <Badge variant="default" className="bg-green-600">Finalized</Badge>}
+        {isFinalized && (
+          <Badge variant="default" className="bg-green-600">
+            Finalized
+          </Badge>
+        )}
         {!isFinalized && payroll.length > 0 && <Badge variant="secondary">Draft</Badge>}
       </div>
 
@@ -2172,135 +3013,219 @@ function PayrollTab({ employees, canEdit, millId, userRole }: { employees: Emplo
           <Table className="min-w-[1400px] w-full text-xs">
             <TableHeader>
               <TableRow>
-                <TableHead className="sticky left-0 bg-background z-10">{payrollColConfig.getLabel('employee_id')}</TableHead>
-                <TableHead className="sticky left-[80px] bg-background z-10 min-w-[120px]">{payrollColConfig.getLabel('name')}</TableHead>
-                <TableHead className="text-right">{payrollColConfig.getLabel('basic')}</TableHead>
-                <TableHead className="text-right">{payrollColConfig.getLabel('payable_days')}</TableHead>
-                <TableHead className="text-right">{payrollColConfig.getLabel('payable_salary')}</TableHead>
-                <TableHead className="text-right">{payrollColConfig.getLabel('ot_hours')}</TableHead>
-                <TableHead className="text-right">{payrollColConfig.getLabel('ot_amount')}</TableHead>
-                <TableHead className="text-right">{payrollColConfig.getLabel('attendance_bonus')}</TableHead>
-                <TableHead className="text-right">{payrollColConfig.getLabel('arrear_others')}</TableHead>
-                <TableHead className="text-right">{payrollColConfig.getLabel('shift_amount')}</TableHead>
-                <TableHead className="text-right">{payrollColConfig.getLabel('roster_amount')}</TableHead>
+                <TableHead className="sticky left-0 bg-background z-10">
+                  {payrollColConfig.getLabel("employee_id")}
+                </TableHead>
+                <TableHead className="sticky left-[80px] bg-background z-10 min-w-[120px]">
+                  {payrollColConfig.getLabel("name")}
+                </TableHead>
+                <TableHead className="text-right">{payrollColConfig.getLabel("basic")}</TableHead>
+                <TableHead className="text-right">
+                  {payrollColConfig.getLabel("payable_days")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {payrollColConfig.getLabel("payable_salary")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {payrollColConfig.getLabel("ot_hours")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {payrollColConfig.getLabel("ot_amount")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {payrollColConfig.getLabel("attendance_bonus")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {payrollColConfig.getLabel("arrear_others")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {payrollColConfig.getLabel("shift_amount")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {payrollColConfig.getLabel("roster_amount")}
+                </TableHead>
                 <TableHead className="text-right">Festival Allow.</TableHead>
-                <TableHead className="text-right">{payrollColConfig.getLabel('absent_deduction')}</TableHead>
-                <TableHead className="text-right">{payrollColConfig.getLabel('advance_deduction')}</TableHead>
-                <TableHead className="text-right">{payrollColConfig.getLabel('tax_deduction')}</TableHead>
-                <TableHead className="text-right">{payrollColConfig.getLabel('net_payable')}</TableHead>
+                <TableHead className="text-right">
+                  {payrollColConfig.getLabel("absent_deduction")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {payrollColConfig.getLabel("advance_deduction")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {payrollColConfig.getLabel("tax_deduction")}
+                </TableHead>
+                <TableHead className="text-right">
+                  {payrollColConfig.getLabel("net_payable")}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(displayData ?? []).map((row, i) => row ? (
-                <TableRow key={row.id ?? i} className={row.is_finalized ? "bg-green-50" : ""}>
-                  <TableCell className="sticky left-0 bg-background z-10 font-mono">{row.employee_code}</TableCell>
-                  <TableCell className="sticky left-[80px] bg-background z-10 font-medium">{row.employee_name}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(row.basic)}</TableCell>
-                  <TableCell className="text-right">{row.payable_days ?? "-"}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(row.payable_salary ?? 0)}</TableCell>
-                  <TableCell className="text-right">
-                    <EditableCell
-                      value={row.ot_hours ?? 0}
-                      editing={editingCell?.id === row.id && editingCell?.field === "ot_hours"}
-                      onStart={() => setEditingCell({ id: row.id, field: "ot_hours" })}
-                      onChange={(v) => handleCellEdit(row.id, "ot_hours", v)}
-                      onCommit={() => { setEditingCell(null); commitCellEdit(row.id, "ot_hours"); }}
-                      editRef={editRef}
-                      disabled={row.is_finalized}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <EditableCell
-                      value={row.ot_amount ?? 0}
-                      editing={editingCell?.id === row.id && editingCell?.field === "ot_amount"}
-                      onStart={() => setEditingCell({ id: row.id, field: "ot_amount" })}
-                      onChange={(v) => handleCellEdit(row.id, "ot_amount", v)}
-                      onCommit={() => { setEditingCell(null); commitCellEdit(row.id, "ot_amount"); }}
-                      editRef={editRef}
-                      disabled={row.is_finalized}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <EditableCell
-                      value={row.attendance_bonus ?? 0}
-                      editing={editingCell?.id === row.id && editingCell?.field === "attendance_bonus"}
-                      onStart={() => setEditingCell({ id: row.id, field: "attendance_bonus" })}
-                      onChange={(v) => handleCellEdit(row.id, "attendance_bonus", v)}
-                      onCommit={() => { setEditingCell(null); commitCellEdit(row.id, "attendance_bonus"); }}
-                      editRef={editRef}
-                      disabled={row.is_finalized}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">{formatCurrency(row.arrear_others ?? 0)}</TableCell>
-                  <TableCell className="text-right">
-                    <EditableCell
-                      value={row.shift_amount ?? 0}
-                      editing={editingCell?.id === row.id && editingCell?.field === "shift_amount"}
-                      onStart={() => setEditingCell({ id: row.id, field: "shift_amount" })}
-                      onChange={(v) => handleCellEdit(row.id, "shift_amount", v)}
-                      onCommit={() => { setEditingCell(null); commitCellEdit(row.id, "shift_amount"); }}
-                      editRef={editRef}
-                      disabled={row.is_finalized}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <EditableCell
-                      value={row.roster_amount ?? 0}
-                      editing={editingCell?.id === row.id && editingCell?.field === "roster_amount"}
-                      onStart={() => setEditingCell({ id: row.id, field: "roster_amount" })}
-                      onChange={(v) => handleCellEdit(row.id, "roster_amount", v)}
-                      onCommit={() => { setEditingCell(null); commitCellEdit(row.id, "roster_amount"); }}
-                      editRef={editRef}
-                      disabled={row.is_finalized}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <EditableCell
-                      value={row.festival_duty_benefit ?? 0}
-                      editing={editingCell?.id === row.id && editingCell?.field === "festival_duty_benefit"}
-                      onStart={() => setEditingCell({ id: row.id, field: "festival_duty_benefit" })}
-                      onChange={(v) => handleCellEdit(row.id, "festival_duty_benefit", v)}
-                      onCommit={() => { setEditingCell(null); commitCellEdit(row.id, "festival_duty_benefit"); }}
-                      editRef={editRef}
-                      disabled={row.is_finalized}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <EditableCell
-                      value={row.absent_deduction ?? 0}
-                      editing={editingCell?.id === row.id && editingCell?.field === "absent_deduction"}
-                      onStart={() => setEditingCell({ id: row.id, field: "absent_deduction" })}
-                      onChange={(v) => handleCellEdit(row.id, "absent_deduction", v)}
-                      onCommit={() => { setEditingCell(null); commitCellEdit(row.id, "absent_deduction"); }}
-                      editRef={editRef}
-                      disabled={row.is_finalized}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <EditableCell
-                      value={row.advance_deduction ?? 0}
-                      editing={editingCell?.id === row.id && editingCell?.field === "advance_deduction"}
-                      onStart={() => setEditingCell({ id: row.id, field: "advance_deduction" })}
-                      onChange={(v) => handleCellEdit(row.id, "advance_deduction", v)}
-                      onCommit={() => { setEditingCell(null); commitCellEdit(row.id, "advance_deduction"); }}
-                      editRef={editRef}
-                      disabled={row.is_finalized}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <EditableCell
-                      value={row.tax_deduction ?? 0}
-                      editing={editingCell?.id === row.id && editingCell?.field === "tax_deduction"}
-                      onStart={() => setEditingCell({ id: row.id, field: "tax_deduction" })}
-                      onChange={(v) => handleCellEdit(row.id, "tax_deduction", v)}
-                      onCommit={() => { setEditingCell(null); commitCellEdit(row.id, "tax_deduction"); }}
-                      editRef={editRef}
-                      disabled={row.is_finalized}
-                    />
-                  </TableCell>
-                  <TableCell className="text-right font-semibold">{formatCurrency(row.net_payable)}</TableCell>
-                </TableRow>
-              ) : null)}
+              {(displayData ?? []).map((row, i) =>
+                row ? (
+                  <TableRow key={row.id ?? i} className={row.is_finalized ? "bg-green-50" : ""}>
+                    <TableCell className="sticky left-0 bg-background z-10 font-mono">
+                      {row.employee_code}
+                    </TableCell>
+                    <TableCell className="sticky left-[80px] bg-background z-10 font-medium">
+                      {row.employee_name}
+                    </TableCell>
+                    <TableCell className="text-right">{formatCurrency(row.basic)}</TableCell>
+                    <TableCell className="text-right">{row.payable_days ?? "-"}</TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(row.payable_salary ?? 0)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditableCell
+                        value={row.ot_hours ?? 0}
+                        editing={editingCell?.id === row.id && editingCell?.field === "ot_hours"}
+                        onStart={() => setEditingCell({ id: row.id, field: "ot_hours" })}
+                        onChange={(v) => handleCellEdit(row.id, "ot_hours", v)}
+                        onCommit={() => {
+                          setEditingCell(null);
+                          commitCellEdit(row.id, "ot_hours");
+                        }}
+                        editRef={editRef}
+                        disabled={row.is_finalized}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditableCell
+                        value={row.ot_amount ?? 0}
+                        editing={editingCell?.id === row.id && editingCell?.field === "ot_amount"}
+                        onStart={() => setEditingCell({ id: row.id, field: "ot_amount" })}
+                        onChange={(v) => handleCellEdit(row.id, "ot_amount", v)}
+                        onCommit={() => {
+                          setEditingCell(null);
+                          commitCellEdit(row.id, "ot_amount");
+                        }}
+                        editRef={editRef}
+                        disabled={row.is_finalized}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditableCell
+                        value={row.attendance_bonus ?? 0}
+                        editing={
+                          editingCell?.id === row.id && editingCell?.field === "attendance_bonus"
+                        }
+                        onStart={() => setEditingCell({ id: row.id, field: "attendance_bonus" })}
+                        onChange={(v) => handleCellEdit(row.id, "attendance_bonus", v)}
+                        onCommit={() => {
+                          setEditingCell(null);
+                          commitCellEdit(row.id, "attendance_bonus");
+                        }}
+                        editRef={editRef}
+                        disabled={row.is_finalized}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(row.arrear_others ?? 0)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditableCell
+                        value={row.shift_amount ?? 0}
+                        editing={
+                          editingCell?.id === row.id && editingCell?.field === "shift_amount"
+                        }
+                        onStart={() => setEditingCell({ id: row.id, field: "shift_amount" })}
+                        onChange={(v) => handleCellEdit(row.id, "shift_amount", v)}
+                        onCommit={() => {
+                          setEditingCell(null);
+                          commitCellEdit(row.id, "shift_amount");
+                        }}
+                        editRef={editRef}
+                        disabled={row.is_finalized}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditableCell
+                        value={row.roster_amount ?? 0}
+                        editing={
+                          editingCell?.id === row.id && editingCell?.field === "roster_amount"
+                        }
+                        onStart={() => setEditingCell({ id: row.id, field: "roster_amount" })}
+                        onChange={(v) => handleCellEdit(row.id, "roster_amount", v)}
+                        onCommit={() => {
+                          setEditingCell(null);
+                          commitCellEdit(row.id, "roster_amount");
+                        }}
+                        editRef={editRef}
+                        disabled={row.is_finalized}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditableCell
+                        value={row.festival_duty_benefit ?? 0}
+                        editing={
+                          editingCell?.id === row.id &&
+                          editingCell?.field === "festival_duty_benefit"
+                        }
+                        onStart={() =>
+                          setEditingCell({ id: row.id, field: "festival_duty_benefit" })
+                        }
+                        onChange={(v) => handleCellEdit(row.id, "festival_duty_benefit", v)}
+                        onCommit={() => {
+                          setEditingCell(null);
+                          commitCellEdit(row.id, "festival_duty_benefit");
+                        }}
+                        editRef={editRef}
+                        disabled={row.is_finalized}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditableCell
+                        value={row.absent_deduction ?? 0}
+                        editing={
+                          editingCell?.id === row.id && editingCell?.field === "absent_deduction"
+                        }
+                        onStart={() => setEditingCell({ id: row.id, field: "absent_deduction" })}
+                        onChange={(v) => handleCellEdit(row.id, "absent_deduction", v)}
+                        onCommit={() => {
+                          setEditingCell(null);
+                          commitCellEdit(row.id, "absent_deduction");
+                        }}
+                        editRef={editRef}
+                        disabled={row.is_finalized}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditableCell
+                        value={row.advance_deduction ?? 0}
+                        editing={
+                          editingCell?.id === row.id && editingCell?.field === "advance_deduction"
+                        }
+                        onStart={() => setEditingCell({ id: row.id, field: "advance_deduction" })}
+                        onChange={(v) => handleCellEdit(row.id, "advance_deduction", v)}
+                        onCommit={() => {
+                          setEditingCell(null);
+                          commitCellEdit(row.id, "advance_deduction");
+                        }}
+                        editRef={editRef}
+                        disabled={row.is_finalized}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <EditableCell
+                        value={row.tax_deduction ?? 0}
+                        editing={
+                          editingCell?.id === row.id && editingCell?.field === "tax_deduction"
+                        }
+                        onStart={() => setEditingCell({ id: row.id, field: "tax_deduction" })}
+                        onChange={(v) => handleCellEdit(row.id, "tax_deduction", v)}
+                        onCommit={() => {
+                          setEditingCell(null);
+                          commitCellEdit(row.id, "tax_deduction");
+                        }}
+                        editRef={editRef}
+                        disabled={row.is_finalized}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatCurrency(row.net_payable)}
+                    </TableCell>
+                  </TableRow>
+                ) : null,
+              )}
               {displayData.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={16} className="text-center text-muted-foreground py-8">
@@ -2355,7 +3280,11 @@ function EditableCell({
   }
 
   return (
-    <span className="cursor-pointer hover:bg-muted px-1 rounded" onClick={onStart} title="Click to edit">
+    <span
+      className="cursor-pointer hover:bg-muted px-1 rounded"
+      onClick={onStart}
+      title="Click to edit"
+    >
       {formatCurrency(value)}
     </span>
   );
@@ -2392,7 +3321,13 @@ function LeavesTab({
     }
     for (const l of leaves) {
       if (l.status === "approved" && balances[l.employee_id]) {
-        const days = Math.max(1, Math.ceil((new Date(l.to_date).getTime() - new Date(l.from_date).getTime()) / (1000 * 60 * 60 * 24)) + 1);
+        const days = Math.max(
+          1,
+          Math.ceil(
+            (new Date(l.to_date).getTime() - new Date(l.from_date).getTime()) /
+              (1000 * 60 * 60 * 24),
+          ) + 1,
+        );
         const lt = l.leave_type as keyof (typeof balances)[string];
         if (balances[l.employee_id][lt] !== undefined) {
           balances[l.employee_id][lt] = Math.max(0, balances[l.employee_id][lt] - days);
@@ -2425,39 +3360,43 @@ function LeavesTab({
         <Table className="min-w-[1000px] w-full">
           <TableHeader>
             <TableRow>
-              <TableHead>{leaveColConfig.getLabel('employee')}</TableHead>
-              <TableHead>{leaveColConfig.getLabel('department')}</TableHead>
-              <TableHead>{leaveColConfig.getLabel('from_date')}</TableHead>
-              <TableHead>{leaveColConfig.getLabel('to_date')}</TableHead>
-              <TableHead>{leaveColConfig.getLabel('type')}</TableHead>
-              <TableHead className="max-w-xs">{leaveColConfig.getLabel('reason')}</TableHead>
-              <TableHead>{leaveColConfig.getLabel('status')}</TableHead>
+              <TableHead>{leaveColConfig.getLabel("employee")}</TableHead>
+              <TableHead>{leaveColConfig.getLabel("department")}</TableHead>
+              <TableHead>{leaveColConfig.getLabel("from_date")}</TableHead>
+              <TableHead>{leaveColConfig.getLabel("to_date")}</TableHead>
+              <TableHead>{leaveColConfig.getLabel("type")}</TableHead>
+              <TableHead className="max-w-xs">{leaveColConfig.getLabel("reason")}</TableHead>
+              <TableHead>{leaveColConfig.getLabel("status")}</TableHead>
               <TableHead className="w-36">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(filteredLeaves ?? []).map((l, i) => l ? (
-              <TableRow key={l.id ?? i}>
-                <TableCell className="font-medium">{l.employee_name}</TableCell>
-                <TableCell>{l.department}</TableCell>
-                <TableCell>{formatDate(l.from_date)}</TableCell>
-                <TableCell>{formatDate(l.to_date)}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">{l.leave_type}</Badge>
-                </TableCell>
-                <TableCell className="max-w-xs truncate" title={l.reason}>{l.reason}</TableCell>
-                <TableCell>
-                  <StatusBadge status={l.status} />
-                </TableCell>
-                <TableCell>
-                  {l.status === "pending" && canEdit ? (
-                    <LeaveActionDialog leave={l} />
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-              </TableRow>
-            ) : null)}
+            {(filteredLeaves ?? []).map((l, i) =>
+              l ? (
+                <TableRow key={l.id ?? i}>
+                  <TableCell className="font-medium">{l.employee_name}</TableCell>
+                  <TableCell>{l.department}</TableCell>
+                  <TableCell>{formatDate(l.from_date)}</TableCell>
+                  <TableCell>{formatDate(l.to_date)}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{l.leave_type}</Badge>
+                  </TableCell>
+                  <TableCell className="max-w-xs truncate" title={l.reason}>
+                    {l.reason}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={l.status} />
+                  </TableCell>
+                  <TableCell>
+                    {l.status === "pending" && canEdit ? (
+                      <LeaveActionDialog leave={l} />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ) : null,
+            )}
             {filteredLeaves.length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
@@ -2478,7 +3417,7 @@ function LeavesTab({
             <Table className="min-w-[600px] w-full text-xs">
               <TableHeader>
                 <TableRow>
-                  <TableHead>{leaveColConfig.getLabel('employee')}</TableHead>
+                  <TableHead>{leaveColConfig.getLabel("employee")}</TableHead>
                   <TableHead className="text-center">CL</TableHead>
                   <TableHead className="text-center">SL</TableHead>
                   <TableHead className="text-center">EL</TableHead>
@@ -2568,21 +3507,39 @@ function NewLeaveDialog({ employees }: { employees: EmployeeRow[] }) {
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>{leaveColConfig.getLabel('employee')}{leaveColConfig.isRequired('employee') && <span className="text-destructive">*</span>}</Label>
-              <Select value={form.employee_id} onValueChange={(v) => setForm({ ...form, employee_id: v })}>
+              <Label>
+                {leaveColConfig.getLabel("employee")}
+                {leaveColConfig.isRequired("employee") && (
+                  <span className="text-destructive">*</span>
+                )}
+              </Label>
+              <Select
+                value={form.employee_id}
+                onValueChange={(v) => setForm({ ...form, employee_id: v })}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(employees ?? []).filter((emp) => emp?.id).map((emp) => (
-                    <SelectItem key={emp.id} value={emp.id}>{emp.name ?? "—"} ({emp.code ?? ""})</SelectItem>
-                  ))}
+                  {(employees ?? [])
+                    .filter((emp) => emp?.id)
+                    .map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id}>
+                        {emp.name ?? "—"} ({emp.code ?? ""})
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>{leaveColConfig.getLabel('type')}{leaveColConfig.isRequired('type') && <span className="text-destructive">*</span>}</Label>
-              <Select value={form.leave_type} onValueChange={(v) => setForm({ ...form, leave_type: v })}>
+              <Label>
+                {leaveColConfig.getLabel("type")}
+                {leaveColConfig.isRequired("type") && <span className="text-destructive">*</span>}
+              </Label>
+              <Select
+                value={form.leave_type}
+                onValueChange={(v) => setForm({ ...form, leave_type: v })}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -2596,16 +3553,44 @@ function NewLeaveDialog({ employees }: { employees: EmployeeRow[] }) {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>{leaveColConfig.getLabel('from_date')}{leaveColConfig.isRequired('from_date') && <span className="text-destructive">*</span>}</Label>
-              <Input type="date" value={form.from_date} onChange={(e) => setForm({ ...form, from_date: e.target.value })} required />
+              <Label>
+                {leaveColConfig.getLabel("from_date")}
+                {leaveColConfig.isRequired("from_date") && (
+                  <span className="text-destructive">*</span>
+                )}
+              </Label>
+              <Input
+                type="date"
+                value={form.from_date}
+                onChange={(e) => setForm({ ...form, from_date: e.target.value })}
+                required
+              />
             </div>
             <div className="space-y-1.5">
-              <Label>{leaveColConfig.getLabel('to_date')}{leaveColConfig.isRequired('to_date') && <span className="text-destructive">*</span>}</Label>
-              <Input type="date" value={form.to_date} onChange={(e) => setForm({ ...form, to_date: e.target.value })} required />
+              <Label>
+                {leaveColConfig.getLabel("to_date")}
+                {leaveColConfig.isRequired("to_date") && (
+                  <span className="text-destructive">*</span>
+                )}
+              </Label>
+              <Input
+                type="date"
+                value={form.to_date}
+                onChange={(e) => setForm({ ...form, to_date: e.target.value })}
+                required
+              />
             </div>
             <div className="space-y-1.5 col-span-2">
-              <Label>{leaveColConfig.getLabel('reason')}{leaveColConfig.isRequired('reason') && <span className="text-destructive">*</span>}</Label>
-              <Textarea value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} required rows={3} />
+              <Label>
+                {leaveColConfig.getLabel("reason")}
+                {leaveColConfig.isRequired("reason") && <span className="text-destructive">*</span>}
+              </Label>
+              <Textarea
+                value={form.reason}
+                onChange={(e) => setForm({ ...form, reason: e.target.value })}
+                required
+                rows={3}
+              />
             </div>
             <div className="space-y-1.5 col-span-2">
               <Label>Attachment</Label>
@@ -2687,18 +3672,31 @@ function LeaveActionDialog({ leave }: { leave: LeaveRow }) {
         </DialogHeader>
         <div className="space-y-3 py-2">
           <div className="text-sm space-y-1">
-            <p><strong>Employee:</strong> {leave.employee_name}</p>
-            <p><strong>Type:</strong> {leave.leave_type}</p>
-            <p><strong>From:</strong> {formatDate(leave.from_date)} <strong>To:</strong> {formatDate(leave.to_date)}</p>
-            <p><strong>Reason:</strong> {leave.reason}</p>
+            <p>
+              <strong>Employee:</strong> {leave.employee_name}
+            </p>
+            <p>
+              <strong>Type:</strong> {leave.leave_type}
+            </p>
+            <p>
+              <strong>From:</strong> {formatDate(leave.from_date)} <strong>To:</strong>{" "}
+              {formatDate(leave.to_date)}
+            </p>
+            <p>
+              <strong>Reason:</strong> {leave.reason}
+            </p>
           </div>
           <div className="space-y-1.5">
-            <Label>{leaveColConfig.getLabel('reason')} (optional)</Label>
+            <Label>{leaveColConfig.getLabel("reason")} (optional)</Label>
             <Textarea value={remarks} onChange={(e) => setRemarks(e.target.value)} rows={2} />
           </div>
         </div>
         <DialogFooter className="gap-2">
-          <Button variant="destructive" onClick={() => handleAction("rejected")} disabled={rejectM.isPending}>
+          <Button
+            variant="destructive"
+            onClick={() => handleAction("rejected")}
+            disabled={rejectM.isPending}
+          >
             {rejectM.isPending ? "…" : "Reject"}
           </Button>
           <Button onClick={() => handleAction("approved")} disabled={approveM.isPending}>

@@ -24,7 +24,9 @@ export const Route = createFileRoute("/_app")({
 
     if (DASHBOARD_ONLY_ROLES.has(user.role)) {
       const path = location.pathname;
-      const allowed = ALLOWED_DASHBOARD_ONLY_PATHS.some((p) => path === p || path.startsWith(p + "/"));
+      const allowed = ALLOWED_DASHBOARD_ONLY_PATHS.some(
+        (p) => path === p || path.startsWith(p + "/"),
+      );
       if (!allowed) {
         throw redirect({ to: "/dashboard" });
       }
@@ -81,7 +83,19 @@ function ModuleAccessGuard({ children }: { children: React.ReactNode }) {
 
   if (!user || user.role === "SUPER_ADMIN") return <>{children}</>;
 
-  const bypassPaths = ["/dashboard", "/profile", "/change-password", "/login", "/company/billing", "/onboarding", "/import-hub", "/help-center", "/recommendations", "/executive-dashboard", "/register"];
+  const bypassPaths = [
+    "/dashboard",
+    "/profile",
+    "/change-password",
+    "/login",
+    "/company/billing",
+    "/onboarding",
+    "/import-hub",
+    "/help-center",
+    "/recommendations",
+    "/executive-dashboard",
+    "/register",
+  ];
   if (bypassPaths.some((p) => location.pathname === p || location.pathname.startsWith(p + "/"))) {
     return <>{children}</>;
   }
@@ -93,9 +107,16 @@ function ModuleAccessGuard({ children }: { children: React.ReactNode }) {
           <Lock className="size-10 text-[#94a3b8]" />
         </div>
         <h2 className="text-2xl font-semibold text-[#0f172a] mb-3">Module Not Enabled</h2>
-        <p className="text-[#64748b] max-w-md mb-2">Your subscription does not include this module.</p>
-        <p className="text-[#94a3b8] text-sm mb-8">Contact your SpinFlow vendor to enable access.</p>
-        <a href="/dashboard" className="px-4 py-2 bg-[#3b82f6] text-white rounded-md text-sm font-medium hover:bg-[#2563eb]">
+        <p className="text-[#64748b] max-w-md mb-2">
+          Your subscription does not include this module.
+        </p>
+        <p className="text-[#94a3b8] text-sm mb-8">
+          Contact your SpinFlow vendor to enable access.
+        </p>
+        <a
+          href="/dashboard"
+          className="px-4 py-2 bg-[#3b82f6] text-white rounded-md text-sm font-medium hover:bg-[#2563eb]"
+        >
           Back to Dashboard
         </a>
       </div>
@@ -108,7 +129,7 @@ function ModuleAccessGuard({ children }: { children: React.ReactNode }) {
 function AppShell() {
   const { open, close } = useSidebar();
   const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem("spinflow_sidebar_collapsed") === "true"
+    () => localStorage.getItem("spinflow_sidebar_collapsed") === "true",
   );
 
   useEffect(() => {

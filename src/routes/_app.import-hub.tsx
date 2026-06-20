@@ -1,6 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download, Users, Factory, Package, Truck, Settings2, ClipboardList, Warehouse, Upload } from "lucide-react";
+import {
+  Download,
+  Users,
+  Factory,
+  Package,
+  Truck,
+  Settings2,
+  ClipboardList,
+  Warehouse,
+  Upload,
+} from "lucide-react";
 import { useState } from "react";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 
@@ -9,19 +19,84 @@ export const Route = createFileRoute("/_app/import-hub")({
   component: ImportHubPage,
 });
 
-const IMPORT_MODULES: Array<{ module: string; label: string; icon: React.ComponentType<{ className?: string }>; desc: string }> = [
-  { module: "employees",       label: "Employees",       icon: Users,        desc: "Import your workforce with employee details, departments, and designations." },
-  { module: "machines",        label: "Machines",        icon: Factory,      desc: "Register machines with types, specifications, and mill assignment." },
-  { module: "inventory_items", label: "Inventory Items", icon: Package,      desc: "Import inventory items with stock levels and minimum thresholds." },
-  { module: "customers",       label: "Customers",       icon: Truck,        desc: "Import customer records for dispatch and sales order processing." },
-  { module: "suppliers",       label: "Suppliers",       icon: Warehouse,    desc: "Import supplier records for purchase order processing." },
-  { module: "departments",     label: "Departments",     icon: Settings2,    desc: "Import department master data for organizational structure." },
-  { module: "cotton_purchases", label: "Cotton Purchases", icon: ClipboardList, desc: "Import cotton purchase records with bale details." },
-  { module: "yarn_counts",     label: "Yarn Counts",     icon: Settings2,    desc: "Import master data: yarn counts and reference data." },
+interface ImportModuleConfig {
+  key: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  desc: string;
+  tableName: string;
+  endpoint: string;
+}
+
+const IMPORT_MODULES: ImportModuleConfig[] = [
+  {
+    key: "employees",
+    label: "Employees",
+    icon: Users,
+    desc: "Import your workforce with employee details, departments, and designations.",
+    tableName: "employees",
+    endpoint: "/hr/employees/import",
+  },
+  {
+    key: "machines",
+    label: "Machines",
+    icon: Factory,
+    desc: "Register machines with types, specifications, and mill assignment.",
+    tableName: "machines",
+    endpoint: "/masters/machines/import",
+  },
+  {
+    key: "inventory_items",
+    label: "Inventory Items",
+    icon: Package,
+    desc: "Import inventory items with stock levels and minimum thresholds.",
+    tableName: "inventory_items",
+    endpoint: "/inventory/items/import",
+  },
+  {
+    key: "customers",
+    label: "Customers",
+    icon: Truck,
+    desc: "Import customer records for dispatch and sales order processing.",
+    tableName: "customers",
+    endpoint: "/masters/customers/import",
+  },
+  {
+    key: "suppliers",
+    label: "Suppliers",
+    icon: Warehouse,
+    desc: "Import supplier records for purchase order processing.",
+    tableName: "suppliers",
+    endpoint: "/purchase/suppliers/import",
+  },
+  {
+    key: "departments",
+    label: "Departments",
+    icon: Settings2,
+    desc: "Import department master data for organizational structure.",
+    tableName: "departments",
+    endpoint: "/masters/departments/import",
+  },
+  {
+    key: "cotton_purchases",
+    label: "Cotton Purchases",
+    icon: ClipboardList,
+    desc: "Import cotton purchase records with bale details.",
+    tableName: "cotton_purchases",
+    endpoint: "/purchase/cotton/import",
+  },
+  {
+    key: "yarn_counts",
+    label: "Yarn Counts",
+    icon: Settings2,
+    desc: "Import master data: yarn counts and reference data.",
+    tableName: "yarn_counts",
+    endpoint: "/masters/yarn-counts/import",
+  },
 ];
 
 function ImportHubPage() {
-  const [importModule, setImportModule] = useState<string | null>(null);
+  const [activeModule, setActiveModule] = useState<ImportModuleConfig | null>(null);
 
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-5xl mx-auto space-y-6">
@@ -39,8 +114,8 @@ function ImportHubPage() {
           <div>
             <p className="text-sm font-semibold text-blue-900">Getting Started</p>
             <p className="text-xs text-blue-700 mt-0.5">
-              Click any module below to open the import wizard. Upload a CSV/XLSX file,
-              map columns, preview, and import. All imports support validation and rollback.
+              Click any module below to open the import wizard. Upload a CSV/XLSX file, map columns,
+              preview, and import. All imports support validation and rollback.
             </p>
           </div>
         </CardContent>
@@ -51,7 +126,7 @@ function ImportHubPage() {
         {IMPORT_MODULES.map((m) => {
           const Icon = m.icon;
           return (
-            <Card key={m.module} className="hover:shadow-sm transition-shadow">
+            <Card key={m.key} className="hover:shadow-sm transition-shadow">
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
@@ -63,7 +138,7 @@ function ImportHubPage() {
               <CardContent className="space-y-3">
                 <p className="text-xs text-muted-foreground">{m.desc}</p>
                 <button
-                  onClick={() => setImportModule(m.module)}
+                  onClick={() => setActiveModule(m)}
                   className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                 >
                   <Upload className="w-3.5 h-3.5" />
@@ -75,11 +150,13 @@ function ImportHubPage() {
         })}
       </div>
 
-      {importModule && (
+      {activeModule && (
         <UniversalImportModal
-          module={importModule}
-          open={true}
-          onClose={() => setImportModule(null)}
+          isOpen={true}
+          tableName={activeModule.tableName}
+          endpoint={activeModule.endpoint}
+          title={`Import ${activeModule.label}`}
+          onClose={() => setActiveModule(null)}
         />
       )}
     </div>

@@ -8,12 +8,31 @@ import { KpiCard } from "@/components/ui/KpiCard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  LineChart, Line, BarChart, Bar, AreaChart, Area,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from "recharts";
 import {
-  Factory, Gauge, Users, Cpu, TrendingUp, Building2,
-  AlertTriangle, Package, Truck, CreditCard, Wrench,
+  Factory,
+  Gauge,
+  Users,
+  Cpu,
+  TrendingUp,
+  Building2,
+  AlertTriangle,
+  Package,
+  Truck,
+  CreditCard,
+  Wrench,
 } from "lucide-react";
 import { fmt, fmtCurrency, fmtDate } from "@/lib/formatters";
 
@@ -73,16 +92,17 @@ function DashboardPage() {
   const { millId, millName } = useActiveMill();
   const role = user?.role ?? "";
   const isSuperAdmin = role === "SUPER_ADMIN";
-  const [statusFilter, setStatusFilter] = useState<"all"|"active"|"suspended">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
 
   // SUPER_ADMIN → admin summary (vendor KPIs)
   const adminQ = useQuery({
     queryKey: ["admin-dashboard"],
     queryFn: () =>
       // Try new rich endpoint first, fallback to legacy
-      api.get("/admin/dashboard").then(r => r.data).catch(() =>
-        api.get("/dashboard/admin-summary").then(r => r.data)
-      ),
+      api
+        .get("/admin/dashboard")
+        .then((r) => r.data)
+        .catch(() => api.get("/dashboard/admin-summary").then((r) => r.data)),
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     enabled: isSuperAdmin,
@@ -92,7 +112,7 @@ function DashboardPage() {
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ["dashboard-summary", millId],
     queryFn: () =>
-      api.get("/dashboard/summary", { params: { mill_id: millId } }).then(r => r.data),
+      api.get("/dashboard/summary", { params: { mill_id: millId } }).then((r) => r.data),
     staleTime: 3 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -104,9 +124,8 @@ function DashboardPage() {
   if (isSuperAdmin) {
     const ad = adminQ.data ?? {};
     const allCompanies: any[] = ad.companies ?? [];
-    const filteredCompanies = statusFilter === "all"
-      ? allCompanies
-      : allCompanies.filter(c => c.status === statusFilter);
+    const filteredCompanies =
+      statusFilter === "all" ? allCompanies : allCompanies.filter((c) => c.status === statusFilter);
 
     return (
       <div className="flex flex-col min-h-full bg-[#f8fafc]">
@@ -119,9 +138,27 @@ function DashboardPage() {
         <div className="p-6 space-y-6">
           {/* KPI row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard label="Total Companies" value={fmt(ad.total_companies ?? 0)} icon={Building2} iconColor="text-blue-600" iconBg="bg-blue-50" />
-            <KpiCard label="Total Mills" value={fmt(ad.total_mills ?? 0)} icon={Factory} iconColor="text-cyan-600" iconBg="bg-cyan-50" />
-            <KpiCard label="Total Users" value={fmt(ad.total_users ?? 0)} icon={Users} iconColor="text-green-600" iconBg="bg-green-50" />
+            <KpiCard
+              label="Total Companies"
+              value={fmt(ad.total_companies ?? 0)}
+              icon={Building2}
+              iconColor="text-blue-600"
+              iconBg="bg-blue-50"
+            />
+            <KpiCard
+              label="Total Mills"
+              value={fmt(ad.total_mills ?? 0)}
+              icon={Factory}
+              iconColor="text-cyan-600"
+              iconBg="bg-cyan-50"
+            />
+            <KpiCard
+              label="Total Users"
+              value={fmt(ad.total_users ?? 0)}
+              icon={Users}
+              iconColor="text-green-600"
+              iconBg="bg-green-50"
+            />
             <KpiCard
               label="Over User Limit"
               value={fmt(ad.companies_over_limit ?? 0)}
@@ -138,7 +175,7 @@ function DashboardPage() {
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-semibold text-[#0f172a]">Companies</h3>
                   <div className="flex gap-1">
-                    {(["all", "active", "suspended"] as const).map(f => (
+                    {(["all", "active", "suspended"] as const).map((f) => (
                       <button
                         key={f}
                         onClick={() => setStatusFilter(f)}
@@ -148,41 +185,69 @@ function DashboardPage() {
                             : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                         }`}
                       >
-                        {f === "all" ? `All (${allCompanies.length})` : f === "active" ? `Active (${allCompanies.filter(c => c.status === "active").length})` : `Suspended (${allCompanies.filter(c => c.status !== "active").length})`}
+                        {f === "all"
+                          ? `All (${allCompanies.length})`
+                          : f === "active"
+                            ? `Active (${allCompanies.filter((c) => c.status === "active").length})`
+                            : `Suspended (${allCompanies.filter((c) => c.status !== "active").length})`}
                       </button>
                     ))}
                   </div>
                 </div>
-                <a href="/admin" className="text-xs text-blue-600 hover:underline whitespace-nowrap">Manage →</a>
+                <a
+                  href="/admin"
+                  className="text-xs text-blue-600 hover:underline whitespace-nowrap"
+                >
+                  Manage →
+                </a>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-[#f1f5f9] border-b border-[#e2e8f0]">
-                      {["Company","Plan","Status","Mills","Users","Modules"].map(h => (
-                        <th key={h} className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">{h}</th>
+                      {["Company", "Plan", "Status", "Mills", "Users", "Modules"].map((h) => (
+                        <th
+                          key={h}
+                          className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide"
+                        >
+                          {h}
+                        </th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredCompanies.map((c: any) => (
-                      <tr key={c.id} className={`border-t border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors ${c.status !== "active" ? "opacity-60" : ""}`}>
+                      <tr
+                        key={c.id}
+                        className={`border-t border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors ${c.status !== "active" ? "opacity-60" : ""}`}
+                      >
                         <td className="px-4 py-3">
                           <div className="font-semibold text-[#0f172a]">{c.name}</div>
                           <div className="text-[11px] text-[#94a3b8] font-mono">{c.code}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#f1f5f9] text-[#475569] font-medium uppercase">{c.plan || "starter"}</span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#f1f5f9] text-[#475569] font-medium uppercase">
+                            {c.plan || "starter"}
+                          </span>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${c.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                          <span
+                            className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${c.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
+                          >
                             {c.status || "active"}
                           </span>
                         </td>
                         <td className="px-4 py-3 font-mono text-[#0f172a]">{c.mills ?? 0}</td>
                         <td className="px-4 py-3">
-                          <span className={c.is_over_limit ? "font-semibold text-red-600" : "font-mono text-[#0f172a]"}>
-                            {c.users ?? 0}{c.max_users ? `/${c.max_users}` : ""}
+                          <span
+                            className={
+                              c.is_over_limit
+                                ? "font-semibold text-red-600"
+                                : "font-mono text-[#0f172a]"
+                            }
+                          >
+                            {c.users ?? 0}
+                            {c.max_users ? `/${c.max_users}` : ""}
                             {c.is_over_limit && " ⚠"}
                           </span>
                         </td>
@@ -201,17 +266,17 @@ function DashboardPage() {
 
   // Convenience: check if a top-level section key exists in the response
   const has = (...keys: string[]) =>
-    keys.some(k => data?.[k] !== undefined && data?.[k] !== null);
+    keys.some((k) => data?.[k] !== undefined && data?.[k] !== null);
 
   if (isLoading) return <DashboardSkeleton />;
 
-  const prod  = data?.production;
-  const att   = data?.attendance;
-  const mach  = data?.machines;
-  const fin   = data?.finance;
-  const inv   = data?.inventory;
-  const dis   = data?.dispatch;
-  const qual  = data?.quality;
+  const prod = data?.production;
+  const att = data?.attendance;
+  const mach = data?.machines;
+  const fin = data?.finance;
+  const inv = data?.inventory;
+  const dis = data?.dispatch;
+  const qual = data?.quality;
 
   const isDashboardOnly = ["MACHINE_OPERATOR", "SECURITY_GATE", "AUDITOR"].includes(role);
 
@@ -225,7 +290,6 @@ function DashboardPage() {
       />
 
       <div className="p-6 space-y-6">
-
         {/* ── Dashboard-only role: simple welcome card ────────────────────── */}
         {isDashboardOnly && (
           <div className="bg-white border border-[#e2e8f0] rounded-lg p-10 text-center">
@@ -239,7 +303,8 @@ function DashboardPage() {
             {data?.schedule && (
               <div className="mt-5 inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-5 py-2.5 rounded-full text-sm font-semibold">
                 <Cpu className="w-4 h-4" />
-                Current shift: {data.schedule.current_shift} · {data.schedule.shift_start}–{data.schedule.shift_end}
+                Current shift: {data.schedule.current_shift} · {data.schedule.shift_start}–
+                {data.schedule.shift_end}
               </div>
             )}
           </div>
@@ -386,14 +451,36 @@ function DashboardPage() {
                     axisLine={false}
                     tickLine={false}
                   />
-                  <YAxis tick={{ fontSize: 12, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                  <YAxis
+                    tick={{ fontSize: 12, fill: "#94a3b8" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
                   <Tooltip
-                    contentStyle={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }}
+                    contentStyle={{
+                      background: "#fff",
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
                     formatter={(v: number) => [`${fmt(v)} kg`]}
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Line dataKey="output_kg" stroke="#3b82f6" name="Actual" strokeWidth={2} dot={false} />
-                  <Line dataKey="target_kg" stroke="#94a3b8" name="Target" strokeDasharray="4 2" strokeWidth={1.5} dot={false} />
+                  <Line
+                    dataKey="output_kg"
+                    stroke="#3b82f6"
+                    name="Actual"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    dataKey="target_kg"
+                    stroke="#94a3b8"
+                    name="Target"
+                    strokeDasharray="4 2"
+                    strokeWidth={1.5}
+                    dot={false}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -407,7 +494,12 @@ function DashboardPage() {
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={att!.by_department} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis type="number" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: 11, fill: "#94a3b8" }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
                     <YAxis
                       dataKey="department"
                       type="category"
@@ -417,10 +509,15 @@ function DashboardPage() {
                       tickLine={false}
                     />
                     <Tooltip
-                      contentStyle={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }}
+                      contentStyle={{
+                        background: "#fff",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: 8,
+                        fontSize: 12,
+                      }}
                     />
                     <Bar dataKey="present" fill="#3b82f6" name="Present" stackId="a" />
-                    <Bar dataKey="absent"  fill="#fca5a5" name="Absent"  stackId="a" />
+                    <Bar dataKey="absent" fill="#fca5a5" name="Absent" stackId="a" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -437,20 +534,44 @@ function DashboardPage() {
             <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={fin!.revenue_trend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="month" tick={{ fontSize: 12, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fontSize: 12, fill: "#94a3b8" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
                 <YAxis
                   tick={{ fontSize: 12, fill: "#94a3b8" }}
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={v => `₹${(v / 100000).toFixed(1)}L`}
+                  tickFormatter={(v) => `₹${(v / 100000).toFixed(1)}L`}
                 />
                 <Tooltip
-                  contentStyle={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, fontSize: 12 }}
+                  contentStyle={{
+                    background: "#fff",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
                   formatter={(v: number) => [fmtCurrency(v)]}
                 />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Area dataKey="revenue"   stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.12} name="Revenue"   strokeWidth={2} />
-                <Area dataKey="purchases" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.12} name="Purchases" strokeWidth={2} />
+                <Area
+                  dataKey="revenue"
+                  stroke="#3b82f6"
+                  fill="#3b82f6"
+                  fillOpacity={0.12}
+                  name="Revenue"
+                  strokeWidth={2}
+                />
+                <Area
+                  dataKey="purchases"
+                  stroke="#f59e0b"
+                  fill="#f59e0b"
+                  fillOpacity={0.12}
+                  name="Purchases"
+                  strokeWidth={2}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -466,18 +587,33 @@ function DashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[#f1f5f9] border-b border-[#e2e8f0]">
-                  <th className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">Item</th>
-                  <th className="text-right px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">Current</th>
-                  <th className="text-right px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">Reorder Level</th>
-                  <th className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">Unit</th>
+                  <th className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">
+                    Item
+                  </th>
+                  <th className="text-right px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">
+                    Current
+                  </th>
+                  <th className="text-right px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">
+                    Reorder Level
+                  </th>
+                  <th className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide">
+                    Unit
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {inv!.low_stock_items.map((item: any, i: number) => (
-                  <tr key={i} className="border-t border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors">
+                  <tr
+                    key={i}
+                    className="border-t border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors"
+                  >
                     <td className="px-4 py-3 text-[#0f172a]">{item.name}</td>
-                    <td className="px-4 py-3 text-right font-mono text-red-600 font-semibold">{fmt(item.current)}</td>
-                    <td className="px-4 py-3 text-right font-mono text-[#64748b]">{fmt(item.reorder_level)}</td>
+                    <td className="px-4 py-3 text-right font-mono text-red-600 font-semibold">
+                      {fmt(item.current)}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono text-[#64748b]">
+                      {fmt(item.reorder_level)}
+                    </td>
                     <td className="px-4 py-3 text-[#64748b]">{item.unit}</td>
                   </tr>
                 ))}
@@ -489,7 +625,6 @@ function DashboardPage() {
         {/* ── Bottom row: Alerts + Pending Actions + Schedule ──────────────── */}
         {!isDashboardOnly && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
             {/* Live Alerts */}
             <div className="bg-white border border-[#e2e8f0] rounded-lg p-5">
               <div className="flex items-center justify-between mb-3">
@@ -506,9 +641,11 @@ function DashboardPage() {
                     <div
                       key={i}
                       className={`flex items-start gap-2 p-2.5 rounded-lg text-sm ${
-                        a.type === "error"   ? "bg-red-50 text-red-700"   :
-                        a.type === "warning" ? "bg-amber-50 text-amber-700" :
-                        "bg-blue-50 text-blue-700"
+                        a.type === "error"
+                          ? "bg-red-50 text-red-700"
+                          : a.type === "warning"
+                            ? "bg-amber-50 text-amber-700"
+                            : "bg-blue-50 text-blue-700"
                       }`}
                     >
                       <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
@@ -535,7 +672,9 @@ function DashboardPage() {
                       href={a.route}
                       className="flex justify-between items-center p-2.5 rounded-lg hover:bg-[#f8fafc] text-sm text-[#374151] group transition-colors"
                     >
-                      <span className="group-hover:text-[#3b82f6] transition-colors">{a.label}</span>
+                      <span className="group-hover:text-[#3b82f6] transition-colors">
+                        {a.label}
+                      </span>
                       <span className="bg-[#f1f5f9] text-[#475569] text-xs px-2 py-0.5 rounded-full font-mono font-semibold ml-2">
                         {a.count}
                       </span>
@@ -564,7 +703,6 @@ function DashboardPage() {
             )}
           </div>
         )}
-
       </div>
     </div>
   );

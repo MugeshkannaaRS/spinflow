@@ -50,20 +50,25 @@ export const useAuth = create<AuthState>()(
       ...initialState,
       login: (user, token, refreshToken) => {
         // Resolve the code from companyMills if available
-        const millCode = user.companyMills?.find(m => m.id === user.millId)?.code ?? "";
-        const activeMill = (user.millId && user.millName)
-          ? { id: user.millId, name: user.millName, code: millCode }
-          : null;
+        const millCode = user.companyMills?.find((m) => m.id === user.millId)?.code ?? "";
+        const activeMill =
+          user.millId && user.millName
+            ? { id: user.millId, name: user.millName, code: millCode }
+            : null;
         set({ user, token, refreshToken: refreshToken ?? null, isAuthenticated: true, activeMill });
         setAuthHeader(token);
       },
-      setUser: (updates) => set((state) => {
-        const merged = state.user ? { ...state.user, ...updates } : null;
-        if (merged && !state.activeMill && merged.millId && merged.millName) {
-          return { user: merged, activeMill: { id: merged.millId, name: merged.millName, code: "" } };
-        }
-        return { user: merged };
-      }),
+      setUser: (updates) =>
+        set((state) => {
+          const merged = state.user ? { ...state.user, ...updates } : null;
+          if (merged && !state.activeMill && merged.millId && merged.millName) {
+            return {
+              user: merged,
+              activeMill: { id: merged.millId, name: merged.millName, code: "" },
+            };
+          }
+          return { user: merged };
+        }),
       setTokens: (token, refreshToken) => {
         set({ token, refreshToken });
         setAuthHeader(token);
@@ -109,7 +114,7 @@ export const useAuth = create<AuthState>()(
           activeMill: (p.activeMill as CompanyMill | null) ?? null,
         };
       },
-      version: 4,  // bumped: removes token from localStorage
+      version: 4, // bumped: removes token from localStorage
     },
   ),
 );

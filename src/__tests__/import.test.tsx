@@ -3,45 +3,37 @@ import { describe, it, expect } from "vitest";
 describe("Import Modal - successCount logic", () => {
   it("uses data.created when it is a number", () => {
     const batchLength = 20;
-    const batchCreated = typeof ({ created: 15 })?.created === "number"
-      ? ({ created: 15 }).created
-      : batchLength;
+    const batchCreated =
+      typeof { created: 15 }?.created === "number" ? { created: 15 }.created : batchLength;
     expect(batchCreated).toBe(15);
   });
 
   it("falls back to batch.length when data.created is not a number", () => {
     const batchLength = 20;
-    const batchCreated = typeof ({})?.created === "number"
-      ? ({}).created
-      : batchLength;
+    const batchCreated = typeof {}?.created === "number" ? {}.created : batchLength;
     expect(batchCreated).toBe(20);
   });
 
   it("falls back to batch.length when data.created is null", () => {
     const batchLength = 20;
-    const batchCreated = typeof ({ created: null })?.created === "number"
-      ? ({ created: null }).created
-      : batchLength;
+    const batchCreated =
+      typeof { created: null }?.created === "number" ? { created: null }.created : batchLength;
     expect(batchCreated).toBe(20);
   });
 });
 
 describe("Import Modal - error/warning display", () => {
   it("warnings (severity=warning) should show in yellow, not red", () => {
-    const errors = [
-      { row: 1, message: "Department not found", severity: "warning" },
-    ];
-    const hardErrors = errors.filter(e => !e.severity || e.severity === "error");
-    const warnings = errors.filter(e => e.severity === "warning");
+    const errors = [{ row: 1, message: "Department not found", severity: "warning" }];
+    const hardErrors = errors.filter((e) => !e.severity || e.severity === "error");
+    const warnings = errors.filter((e) => e.severity === "warning");
     expect(hardErrors.length).toBe(0);
     expect(warnings.length).toBe(1);
   });
 
   it("hard errors show in red", () => {
-    const errors = [
-      { row: 1, message: "Invalid value", severity: "error" },
-    ];
-    const hardErrors = errors.filter(e => !e.severity || e.severity === "error");
+    const errors = [{ row: 1, message: "Invalid value", severity: "error" }];
+    const hardErrors = errors.filter((e) => !e.severity || e.severity === "error");
     expect(hardErrors.length).toBe(1);
   });
 

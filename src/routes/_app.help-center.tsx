@@ -78,7 +78,10 @@ function HelpCenterPage() {
           className="pl-9"
           placeholder="Search help articles…"
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setSelectedCategory(null); }}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setSelectedCategory(null);
+          }}
         />
       </div>
 
@@ -113,7 +116,9 @@ function HelpCenterPage() {
               {articleDetail?.tags && articleDetail.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-4 pt-4 border-t">
                   {articleDetail.tags.map((tag: string) => (
-                    <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
+                    <Badge key={tag} variant="secondary" className="text-[10px]">
+                      {tag}
+                    </Badge>
                   ))}
                 </div>
               )}
@@ -128,7 +133,9 @@ function HelpCenterPage() {
               onClick={() => setSelectedCategory(null)}
               className={cn(
                 "px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
-                !selectedCategory ? "bg-gray-900 border-gray-900 text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                !selectedCategory
+                  ? "bg-gray-900 border-gray-900 text-white"
+                  : "border-gray-200 text-gray-600 hover:bg-gray-50",
               )}
             >
               All
@@ -139,7 +146,9 @@ function HelpCenterPage() {
                 onClick={() => setSelectedCategory(selectedCategory === cat.slug ? null : cat.slug)}
                 className={cn(
                   "px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
-                  selectedCategory === cat.slug ? "bg-blue-600 border-blue-600 text-white" : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                  selectedCategory === cat.slug
+                    ? "bg-blue-600 border-blue-600 text-white"
+                    : "border-gray-200 text-gray-600 hover:bg-gray-50",
                 )}
               >
                 {cat.name}
@@ -160,7 +169,9 @@ function HelpCenterPage() {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-gray-900">{article.title}</p>
                     {article.summary && (
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{article.summary}</p>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                        {article.summary}
+                      </p>
                     )}
                   </div>
                 </div>

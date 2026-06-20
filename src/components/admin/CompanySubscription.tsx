@@ -4,8 +4,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Building2, Users, Package, ArrowUpDown } from "lucide-react";
@@ -59,14 +72,27 @@ interface Plan {
 }
 
 const MODULE_LABELS: Record<string, string> = {
-  production: "Production", quality: "Quality", inventory: "Inventory",
-  dispatch: "Dispatch", purchase: "Purchase", stores: "Stores",
-  hr: "HR", accounts: "Accounts", maintenance: "Maintenance",
-  payroll: "Payroll", sales: "Sales", lotrac: "LoTrac", reports: "Reports",
+  production: "Production",
+  quality: "Quality",
+  inventory: "Inventory",
+  dispatch: "Dispatch",
+  purchase: "Purchase",
+  stores: "Stores",
+  hr: "HR",
+  accounts: "Accounts",
+  maintenance: "Maintenance",
+  payroll: "Payroll",
+  sales: "Sales",
+  lotrac: "LoTrac",
+  reports: "Reports",
 };
 
 function formatINR(n: number): string {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 
 function UsageBar({ current, limit, label }: { current: number; limit: number; label: string }) {
@@ -75,15 +101,29 @@ function UsageBar({ current, limit, label }: { current: number; limit: number; l
     <div className="space-y-1">
       <div className="flex justify-between text-sm">
         <span className="text-muted-foreground">{label}</span>
-        <span className="font-medium">{current} / {limit}</span>
+        <span className="font-medium">
+          {current} / {limit}
+        </span>
       </div>
       <Progress value={Math.min(pct, 100)} className="h-2" />
-      {pct >= 80 && <p className="text-xs text-amber-600 font-medium">{pct >= 100 ? "Limit reached" : `${100 - pct}% remaining`}</p>}
+      {pct >= 80 && (
+        <p className="text-xs text-amber-600 font-medium">
+          {pct >= 100 ? "Limit reached" : `${100 - pct}% remaining`}
+        </p>
+      )}
     </div>
   );
 }
 
-function UpgradeDialog({ companyId, currentPlanId, onClose }: { companyId: string; currentPlanId: string; onClose: () => void }) {
+function UpgradeDialog({
+  companyId,
+  currentPlanId,
+  onClose,
+}: {
+  companyId: string;
+  currentPlanId: string;
+  onClose: () => void;
+}) {
   const qc = useQueryClient();
   const [selectedPlanId, setSelectedPlanId] = useState(currentPlanId);
   const [billingCycle, setBillingCycle] = useState("monthly");
@@ -110,12 +150,16 @@ function UpgradeDialog({ companyId, currentPlanId, onClose }: { companyId: strin
 
   return (
     <DialogContent>
-      <DialogHeader><DialogTitle>Change Plan</DialogTitle></DialogHeader>
+      <DialogHeader>
+        <DialogTitle>Change Plan</DialogTitle>
+      </DialogHeader>
       <div className="space-y-4 py-4">
         <div className="space-y-2">
           <label className="text-sm font-medium">New Plan</label>
           <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               {plans?.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
@@ -128,7 +172,9 @@ function UpgradeDialog({ companyId, currentPlanId, onClose }: { companyId: strin
         <div className="space-y-2">
           <label className="text-sm font-medium">Billing Cycle</label>
           <Select value={billingCycle} onValueChange={setBillingCycle}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="monthly">Monthly</SelectItem>
               <SelectItem value="yearly">Yearly (save ~17%)</SelectItem>
@@ -137,8 +183,12 @@ function UpgradeDialog({ companyId, currentPlanId, onClose }: { companyId: strin
         </div>
       </div>
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>Cancel</Button>
-        <Button onClick={() => upgrade.mutate()} disabled={upgrade.isPending}>Upgrade</Button>
+        <Button variant="outline" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button onClick={() => upgrade.mutate()} disabled={upgrade.isPending}>
+          Upgrade
+        </Button>
       </DialogFooter>
     </DialogContent>
   );
@@ -192,7 +242,9 @@ export function CompanySubscriptionPanel({ companyId }: { companyId: string }) {
             <div>
               <h3 className="text-lg font-semibold">{sub.plan_name}</h3>
               <div className="flex items-center gap-3 mt-1">
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[sub.status] ?? "text-gray-600 bg-gray-50"}`}>
+                <span
+                  className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColors[sub.status] ?? "text-gray-600 bg-gray-50"}`}
+                >
                   {sub.status.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}
                 </span>
                 <span className="text-xs text-muted-foreground">{sub.billing_cycle} billing</span>
@@ -229,13 +281,21 @@ export function CompanySubscriptionPanel({ companyId }: { companyId: string }) {
 
       {/* Cost Breakdown */}
       <Card>
-        <CardHeader><CardTitle className="text-base">Cost Breakdown</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Cost Breakdown</CardTitle>
+        </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            <div className="flex justify-between text-sm"><span>Plan ({sub.billing_cycle})</span><span>{formatINR(sub.cost.plan_monthly)}</span></div>
+            <div className="flex justify-between text-sm">
+              <span>Plan ({sub.billing_cycle})</span>
+              <span>{formatINR(sub.cost.plan_monthly)}</span>
+            </div>
             {sub.cost.extra_mills > 0 && (
               <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Extra Mills ({sub.cost.extra_mills} × {formatINR(sub.cost.extra_mill_cost_monthly / Math.max(sub.cost.extra_mills, 1))})</span>
+                <span>
+                  Extra Mills ({sub.cost.extra_mills} ×{" "}
+                  {formatINR(sub.cost.extra_mill_cost_monthly / Math.max(sub.cost.extra_mills, 1))})
+                </span>
                 <span>{formatINR(sub.cost.extra_mill_cost_monthly)}</span>
               </div>
             )}
@@ -248,7 +308,11 @@ export function CompanySubscriptionPanel({ companyId }: { companyId: string }) {
             <div className="border-t pt-2 mt-2">
               <div className="flex justify-between font-semibold">
                 <span>Total ({sub.billing_cycle})</span>
-                <span>{formatINR(sub.billing_cycle === "yearly" ? sub.cost.total_yearly : sub.cost.total_monthly)}</span>
+                <span>
+                  {formatINR(
+                    sub.billing_cycle === "yearly" ? sub.cost.total_yearly : sub.cost.total_monthly,
+                  )}
+                </span>
               </div>
             </div>
           </div>
@@ -257,7 +321,9 @@ export function CompanySubscriptionPanel({ companyId }: { companyId: string }) {
 
       {/* Modules */}
       <Card>
-        <CardHeader><CardTitle className="text-base">Modules</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Modules</CardTitle>
+        </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
             {sub.cost.included_modules.map((m) => (
@@ -270,7 +336,9 @@ export function CompanySubscriptionPanel({ companyId }: { companyId: string }) {
               <div key={m.module_name} className="flex items-center gap-2 text-sm">
                 <div className="size-2 rounded-full bg-blue-500" />
                 <span>{MODULE_LABELS[m.module_name] ?? m.module_name}</span>
-                <span className="text-xs text-muted-foreground">(+{formatINR(m.monthly_price)})</span>
+                <span className="text-xs text-muted-foreground">
+                  (+{formatINR(m.monthly_price)})
+                </span>
               </div>
             ))}
           </div>
@@ -278,7 +346,13 @@ export function CompanySubscriptionPanel({ companyId }: { companyId: string }) {
       </Card>
 
       <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
-        {upgradeOpen && <UpgradeDialog companyId={companyId} currentPlanId={sub.plan_id} onClose={() => setUpgradeOpen(false)} />}
+        {upgradeOpen && (
+          <UpgradeDialog
+            companyId={companyId}
+            currentPlanId={sub.plan_id}
+            onClose={() => setUpgradeOpen(false)}
+          />
+        )}
       </Dialog>
     </div>
   );

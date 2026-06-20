@@ -9,18 +9,40 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
 } from "@/components/ui/select";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import {
-  Eye, EyeOff, UserPlus, KeyRound, Copy, Check,
-  Search, X, CheckCircle2, XCircle, AlertTriangle,
-  ChevronUp, ChevronDown, RefreshCw, Users, Building2,
-  ShieldCheck, UserMinus,
+  Eye,
+  EyeOff,
+  UserPlus,
+  KeyRound,
+  Copy,
+  Check,
+  Search,
+  X,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  ChevronUp,
+  ChevronDown,
+  RefreshCw,
+  Users,
+  Building2,
+  ShieldCheck,
+  UserMinus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,46 +53,72 @@ export const Route = createFileRoute("/_app/admin/users")({
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const ROLE_BADGE: Record<string, string> = {
-  SUPER_ADMIN:          "bg-red-100 text-red-800 border-red-200",
-  MILL_OWNER:           "bg-purple-100 text-purple-800 border-purple-200",
-  GENERAL_MANAGER:      "bg-blue-100 text-blue-800 border-blue-200",
-  PRODUCTION_MANAGER:   "bg-cyan-100 text-cyan-800 border-cyan-200",
-  QUALITY_MANAGER:      "bg-green-100 text-green-800 border-green-200",
-  DISPATCH_MANAGER:     "bg-amber-100 text-amber-800 border-amber-200",
-  STORE_MANAGER:        "bg-orange-100 text-orange-800 border-orange-200",
-  HR_MANAGER:           "bg-pink-100 text-pink-800 border-pink-200",
-  ACCOUNTANT:           "bg-indigo-100 text-indigo-800 border-indigo-200",
-  MAINTENANCE_MANAGER:  "bg-teal-100 text-teal-800 border-teal-200",
-  SUPERVISOR:           "bg-slate-100 text-slate-700 border-slate-200",
-  MACHINE_OPERATOR:     "bg-stone-100 text-stone-700 border-stone-200",
-  SECURITY_GATE:        "bg-yellow-100 text-yellow-800 border-yellow-200",
-  AUDITOR:              "bg-violet-100 text-violet-800 border-violet-200",
+  SUPER_ADMIN: "bg-red-100 text-red-800 border-red-200",
+  MILL_OWNER: "bg-purple-100 text-purple-800 border-purple-200",
+  GENERAL_MANAGER: "bg-blue-100 text-blue-800 border-blue-200",
+  PRODUCTION_MANAGER: "bg-cyan-100 text-cyan-800 border-cyan-200",
+  QUALITY_MANAGER: "bg-green-100 text-green-800 border-green-200",
+  DISPATCH_MANAGER: "bg-amber-100 text-amber-800 border-amber-200",
+  STORE_MANAGER: "bg-orange-100 text-orange-800 border-orange-200",
+  HR_MANAGER: "bg-pink-100 text-pink-800 border-pink-200",
+  ACCOUNTANT: "bg-indigo-100 text-indigo-800 border-indigo-200",
+  MAINTENANCE_MANAGER: "bg-teal-100 text-teal-800 border-teal-200",
+  SUPERVISOR: "bg-slate-100 text-slate-700 border-slate-200",
+  MACHINE_OPERATOR: "bg-stone-100 text-stone-700 border-stone-200",
+  SECURITY_GATE: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  AUDITOR: "bg-violet-100 text-violet-800 border-violet-200",
 };
 
 const ROLES_FOR_CREATE = [
-  "MILL_OWNER", "GENERAL_MANAGER", "PRODUCTION_MANAGER", "QUALITY_MANAGER",
-  "DISPATCH_MANAGER", "STORE_MANAGER", "HR_MANAGER", "ACCOUNTANT",
-  "MAINTENANCE_MANAGER", "SUPERVISOR", "MACHINE_OPERATOR", "SECURITY_GATE", "AUDITOR",
+  "MILL_OWNER",
+  "GENERAL_MANAGER",
+  "PRODUCTION_MANAGER",
+  "QUALITY_MANAGER",
+  "DISPATCH_MANAGER",
+  "STORE_MANAGER",
+  "HR_MANAGER",
+  "ACCOUNTANT",
+  "MAINTENANCE_MANAGER",
+  "SUPERVISOR",
+  "MACHINE_OPERATOR",
+  "SECURITY_GATE",
+  "AUDITOR",
 ];
 
 const ALL_FILTERABLE_ROLES = ROLES_FOR_CREATE;
 
 const AVATAR_COLORS = [
-  "bg-blue-500", "bg-violet-500", "bg-emerald-500",
-  "bg-amber-500", "bg-pink-500", "bg-cyan-500",
-  "bg-rose-500", "bg-indigo-500",
+  "bg-blue-500",
+  "bg-violet-500",
+  "bg-emerald-500",
+  "bg-amber-500",
+  "bg-pink-500",
+  "bg-cyan-500",
+  "bg-rose-500",
+  "bg-indigo-500",
 ];
 
 const INIT_FORM = {
-  name: "", email: "", password: "", confirm: "",
-  role_code: "MILL_OWNER", company_id: "", mill_id: "",
+  name: "",
+  email: "",
+  password: "",
+  confirm: "",
+  role_code: "MILL_OWNER",
+  company_id: "",
+  mill_id: "",
 };
 
 const PAGE_SIZE = 25;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function initials(name: string) {
-  return (name ?? "?").split(" ").slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "?";
+  return (
+    (name ?? "?")
+      .split(" ")
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase())
+      .join("") || "?"
+  );
 }
 function avatarColor(name: string) {
   const code = (name ?? "A").charCodeAt(0) + ((name ?? "A").charCodeAt(1) || 0);
@@ -86,7 +134,9 @@ function genPwd() {
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 }
 
@@ -102,31 +152,33 @@ function useDebounce<T>(value: T, delay = 350): T {
 
 // ── Main component ────────────────────────────────────────────────────────────
 function AdminUsersPage() {
-  const qc       = useQueryClient();
+  const qc = useQueryClient();
   const authUser = useAuth((s) => s.user);
 
   // ── Filter state (client-controlled, sent to server) ──────────────────
-  const [searchInput, setSearchInput]       = useState("");
-  const [companyFilter, setCompanyFilter]   = useState("all");
-  const [roleFilter, setRoleFilter]         = useState("all");
-  const [statusFilter, setStatusFilter]     = useState("all");
-  const [page, setPage]                     = useState(1);
-  const [sortField, setSortField]           = useState<"created_at" | "name">("created_at");
-  const [sortDir, setSortDir]               = useState<"asc" | "desc">("desc");
+  const [searchInput, setSearchInput] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [sortField, setSortField] = useState<"created_at" | "name">("created_at");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const search = useDebounce(searchInput, 350);
 
   // Reset page whenever filters change
-  useEffect(() => { setPage(1); }, [search, companyFilter, roleFilter, statusFilter]);
+  useEffect(() => {
+    setPage(1);
+  }, [search, companyFilter, roleFilter, statusFilter]);
 
   // ── Dialog state ──────────────────────────────────────────────────────
-  const [createOpen, setCreateOpen]     = useState(false);
-  const [form, setForm]                 = useState(INIT_FORM);
-  const [showPwd, setShowPwd]           = useState(false);
-  const [successDlg, setSuccessDlg]     = useState<{ user: any; pwd: string } | null>(null);
-  const [resetDlg, setResetDlg]         = useState<{ user: any; pwd: string } | null>(null);
-  const [highlightId, setHighlightId]   = useState<string | null>(null);
-  const [copied, setCopied]             = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [form, setForm] = useState(INIT_FORM);
+  const [showPwd, setShowPwd] = useState(false);
+  const [successDlg, setSuccessDlg] = useState<{ user: any; pwd: string } | null>(null);
+  const [resetDlg, setResetDlg] = useState<{ user: any; pwd: string } | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // ── Data queries ──────────────────────────────────────────────────────
 
@@ -147,24 +199,26 @@ function AdminUsersPage() {
   const companies: any[] = (companiesQ.data as any[]) ?? [];
 
   // Users: server-side filtered + paginated
-  const usersParams = useMemo(() => ({
-    page,
-    page_size: PAGE_SIZE,
-    ...(search               ? { search }                  : {}),
-    ...(companyFilter !== "all" ? { company_id: companyFilter } : {}),
-    ...(roleFilter !== "all"    ? { role: roleFilter }         : {}),
-    ...(statusFilter !== "all"  ? { status_filter: statusFilter } : {}),
-  }), [page, search, companyFilter, roleFilter, statusFilter]);
+  const usersParams = useMemo(
+    () => ({
+      page,
+      page_size: PAGE_SIZE,
+      ...(search ? { search } : {}),
+      ...(companyFilter !== "all" ? { company_id: companyFilter } : {}),
+      ...(roleFilter !== "all" ? { role: roleFilter } : {}),
+      ...(statusFilter !== "all" ? { status_filter: statusFilter } : {}),
+    }),
+    [page, search, companyFilter, roleFilter, statusFilter],
+  );
 
   const usersQ = useQuery({
     queryKey: ["admin-users", usersParams],
-    queryFn: () =>
-      api.get("/admin/users", { params: usersParams }).then((r) => r.data),
+    queryFn: () => api.get("/admin/users", { params: usersParams }).then((r) => r.data),
     staleTime: 15_000,
-    placeholderData: (prev) => prev,   // keep previous data while loading next page
+    placeholderData: (prev) => prev, // keep previous data while loading next page
   });
 
-  const users: any[]  = usersQ.data?.items ?? [];
+  const users: any[] = usersQ.data?.items ?? [];
   const totalFiltered: number = usersQ.data?.total ?? 0;
   const totalPages = Math.ceil(totalFiltered / PAGE_SIZE) || 1;
 
@@ -188,7 +242,10 @@ function AdminUsersPage() {
 
   function toggleSort(field: "created_at" | "name") {
     if (sortField === field) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortField(field); setSortDir("asc"); }
+    else {
+      setSortField(field);
+      setSortDir("asc");
+    }
   }
 
   // ── Mutations ────────────────────────────────────────────────────────
@@ -263,8 +320,11 @@ function AdminUsersPage() {
     if (!pwOk(form.password))
       return toast.error("Password must be 8+ chars with uppercase, lowercase, and a digit");
     createMut.mutate({
-      name: form.name, email: form.email, password: form.password,
-      role_code: form.role_code, company_id: form.company_id,
+      name: form.name,
+      email: form.email,
+      password: form.password,
+      role_code: form.role_code,
+      company_id: form.company_id,
       mill_id: form.mill_id || undefined,
     });
   }
@@ -277,10 +337,19 @@ function AdminUsersPage() {
 
   // ── Stat card ─────────────────────────────────────────────────────────
   function StatCard({
-    label, value, icon: Icon, iconClass, onClick, active,
+    label,
+    value,
+    icon: Icon,
+    iconClass,
+    onClick,
+    active,
   }: {
-    label: string; value: number; icon: any; iconClass: string;
-    onClick?: () => void; active?: boolean;
+    label: string;
+    value: number;
+    icon: any;
+    iconClass: string;
+    onClick?: () => void;
+    active?: boolean;
   }) {
     return (
       <button
@@ -295,7 +364,9 @@ function AdminUsersPage() {
         )}
       >
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{label}</p>
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+            {label}
+          </p>
           <div className={cn("p-1.5 rounded-lg", iconClass)}>
             <Icon className="size-3.5" />
           </div>
@@ -312,11 +383,7 @@ function AdminUsersPage() {
   }
 
   // ── Column header with sort ───────────────────────────────────────────
-  function ColHeader({
-    label, field,
-  }: {
-    label: string; field?: "created_at" | "name";
-  }) {
+  function ColHeader({ label, field }: { label: string; field?: "created_at" | "name" }) {
     const active = field && sortField === field;
     return (
       <th
@@ -327,15 +394,16 @@ function AdminUsersPage() {
         )}
       >
         {label}
-        {field && (
-          active ? (
-            sortDir === "asc"
-              ? <ChevronUp className="inline size-3 ml-0.5 text-blue-600" />
-              : <ChevronDown className="inline size-3 ml-0.5 text-blue-600" />
+        {field &&
+          (active ? (
+            sortDir === "asc" ? (
+              <ChevronUp className="inline size-3 ml-0.5 text-blue-600" />
+            ) : (
+              <ChevronDown className="inline size-3 ml-0.5 text-blue-600" />
+            )
           ) : (
             <span className="ml-1 opacity-25 text-[10px]">⇅</span>
-          )
-        )}
+          ))}
       </th>
     );
   }
@@ -343,19 +411,20 @@ function AdminUsersPage() {
   // ─────────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 space-y-5 max-w-[1400px]">
-
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">User Management</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Manage users across all companies
-          </p>
+          <p className="text-sm text-muted-foreground mt-0.5">Manage users across all companies</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
-            variant="outline" size="sm"
-            onClick={() => { invalidate(); statsQ.refetch(); }}
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              invalidate();
+              statsQ.refetch();
+            }}
             disabled={usersQ.isFetching || statsQ.isFetching}
           >
             <RefreshCw className={cn("size-3.5 mr-1.5", usersQ.isFetching && "animate-spin")} />
@@ -370,27 +439,48 @@ function AdminUsersPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
-          label="Total Users" value={stats.total}
-          icon={Users} iconClass="bg-blue-50 text-blue-600"
-          onClick={() => { setStatusFilter("all"); setPage(1); }}
+          label="Total Users"
+          value={stats.total}
+          icon={Users}
+          iconClass="bg-blue-50 text-blue-600"
+          onClick={() => {
+            setStatusFilter("all");
+            setPage(1);
+          }}
           active={statusFilter === "all" && roleFilter === "all"}
         />
         <StatCard
-          label="Active" value={stats.active}
-          icon={CheckCircle2} iconClass="bg-emerald-50 text-emerald-600"
-          onClick={() => { setStatusFilter("active"); setPage(1); }}
+          label="Active"
+          value={stats.active}
+          icon={CheckCircle2}
+          iconClass="bg-emerald-50 text-emerald-600"
+          onClick={() => {
+            setStatusFilter("active");
+            setPage(1);
+          }}
           active={statusFilter === "active"}
         />
         <StatCard
-          label="Inactive" value={stats.inactive}
-          icon={UserMinus} iconClass="bg-amber-50 text-amber-600"
-          onClick={() => { setStatusFilter("inactive"); setPage(1); }}
+          label="Inactive"
+          value={stats.inactive}
+          icon={UserMinus}
+          iconClass="bg-amber-50 text-amber-600"
+          onClick={() => {
+            setStatusFilter("inactive");
+            setPage(1);
+          }}
           active={statusFilter === "inactive"}
         />
         <StatCard
-          label="Mill Owners" value={stats.mill_owners}
-          icon={ShieldCheck} iconClass="bg-purple-50 text-purple-600"
-          onClick={() => { setRoleFilter("MILL_OWNER"); setStatusFilter("all"); setPage(1); }}
+          label="Mill Owners"
+          value={stats.mill_owners}
+          icon={ShieldCheck}
+          iconClass="bg-purple-50 text-purple-600"
+          onClick={() => {
+            setRoleFilter("MILL_OWNER");
+            setStatusFilter("all");
+            setPage(1);
+          }}
           active={roleFilter === "MILL_OWNER"}
         />
       </div>
@@ -425,9 +515,13 @@ function AdminUsersPage() {
             className="text-sm border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 bg-gray-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[150px]"
           >
             <option value="all">All companies</option>
-            {companies.filter((c: any) => c?.id).map((c: any) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
+            {companies
+              .filter((c: any) => c?.id)
+              .map((c: any) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
           </select>
 
           {/* Role */}
@@ -438,7 +532,9 @@ function AdminUsersPage() {
           >
             <option value="all">All roles</option>
             {ALL_FILTERABLE_ROLES.map((r) => (
-              <option key={r} value={r}>{ROLE_LABELS[r as Role] ?? r}</option>
+              <option key={r} value={r}>
+                {ROLE_LABELS[r as Role] ?? r}
+              </option>
             ))}
           </select>
 
@@ -456,8 +552,11 @@ function AdminUsersPage() {
           {hasFilter && (
             <button
               onClick={() => {
-                setSearchInput(""); setCompanyFilter("all");
-                setRoleFilter("all"); setStatusFilter("all"); setPage(1);
+                setSearchInput("");
+                setCompanyFilter("all");
+                setRoleFilter("all");
+                setStatusFilter("all");
+                setPage(1);
               }}
               className="text-xs text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap px-1"
             >
@@ -482,25 +581,29 @@ function AdminUsersPage() {
             <AlertTriangle className="size-4 text-red-500 shrink-0" />
             <p className="text-sm text-red-700 dark:text-red-400">Failed to load users.</p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => usersQ.refetch()}>Retry</Button>
+          <Button variant="outline" size="sm" onClick={() => usersQ.refetch()}>
+            Retry
+          </Button>
         </div>
       )}
 
       {/* Table */}
-      <div className={cn(
-        "bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm transition-opacity",
-        usersQ.isFetching && !usersQ.isLoading && "opacity-60",
-      )}>
+      <div
+        className={cn(
+          "bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm transition-opacity",
+          usersQ.isFetching && !usersQ.isLoading && "opacity-60",
+        )}
+      >
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-50 dark:bg-slate-800/60 border-b border-gray-200 dark:border-slate-700">
-                <ColHeader label="User"       field="name" />
+                <ColHeader label="User" field="name" />
                 <ColHeader label="Role" />
                 <ColHeader label="Company" />
                 <ColHeader label="Mill" />
                 <ColHeader label="Last Login" />
-                <ColHeader label="Created"    field="created_at" />
+                <ColHeader label="Created" field="created_at" />
                 <ColHeader label="Status" />
                 <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">
                   Actions
@@ -515,7 +618,10 @@ function AdminUsersPage() {
                       <td key={j} className="px-4 py-3.5">
                         <div
                           className="h-3.5 bg-gray-100 dark:bg-slate-700 rounded-full animate-pulse"
-                          style={{ width: j === 0 ? "160px" : j === 1 ? "90px" : j === 2 ? "130px" : "70px" }}
+                          style={{
+                            width:
+                              j === 0 ? "160px" : j === 1 ? "90px" : j === 2 ? "130px" : "70px",
+                          }}
                         />
                       </td>
                     ))}
@@ -532,8 +638,11 @@ function AdminUsersPage() {
                       {hasFilter && (
                         <button
                           onClick={() => {
-                            setSearchInput(""); setCompanyFilter("all");
-                            setRoleFilter("all"); setStatusFilter("all"); setPage(1);
+                            setSearchInput("");
+                            setCompanyFilter("all");
+                            setRoleFilter("all");
+                            setStatusFilter("all");
+                            setPage(1);
                           }}
                           className="text-xs text-blue-600 hover:underline mt-1"
                         >
@@ -545,7 +654,7 @@ function AdminUsersPage() {
                 </tr>
               ) : (
                 sortedUsers.map((u) => {
-                  const av   = initials(u.name);
+                  const av = initials(u.name);
                   const avBg = avatarColor(u.name ?? "");
                   const isNew = u.id === highlightId;
                   return (
@@ -562,10 +671,12 @@ function AdminUsersPage() {
                       {/* User */}
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className={cn(
-                            "w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ring-2 ring-white dark:ring-slate-900",
-                            avBg,
-                          )}>
+                          <div
+                            className={cn(
+                              "w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ring-2 ring-white dark:ring-slate-900",
+                              avBg,
+                            )}
+                          >
                             {av}
                           </div>
                           <div className="min-w-0">
@@ -586,10 +697,12 @@ function AdminUsersPage() {
 
                       {/* Role */}
                       <td className="px-4 py-3.5">
-                        <span className={cn(
-                          "text-xs px-2.5 py-1 rounded-full font-medium border whitespace-nowrap",
-                          ROLE_BADGE[u.role] ?? "bg-gray-100 text-gray-700 border-gray-200",
-                        )}>
+                        <span
+                          className={cn(
+                            "text-xs px-2.5 py-1 rounded-full font-medium border whitespace-nowrap",
+                            ROLE_BADGE[u.role] ?? "bg-gray-100 text-gray-700 border-gray-200",
+                          )}
+                        >
                           {ROLE_LABELS[u.role as Role] ?? u.role}
                         </span>
                       </td>
@@ -663,10 +776,15 @@ function AdminUsersPage() {
                                 : "border-emerald-200 text-emerald-700 hover:bg-emerald-50",
                             )}
                           >
-                            {u.is_active
-                              ? <><XCircle className="size-3" /> Deactivate</>
-                              : <><CheckCircle2 className="size-3" /> Reactivate</>
-                            }
+                            {u.is_active ? (
+                              <>
+                                <XCircle className="size-3" /> Deactivate
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle2 className="size-3" /> Reactivate
+                              </>
+                            )}
                           </button>
                         </div>
                       </td>
@@ -688,13 +806,19 @@ function AdminUsersPage() {
             </span>
             <div className="flex items-center gap-1">
               <button
-                onClick={() => setPage(1)} disabled={page === 1}
+                onClick={() => setPage(1)}
+                disabled={page === 1}
                 className="px-2 py-1 border border-gray-200 dark:border-slate-600 rounded-lg disabled:opacity-40 hover:bg-white dark:hover:bg-slate-700 transition-colors"
-              >«</button>
+              >
+                «
+              </button>
               <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
                 className="px-2 py-1 border border-gray-200 dark:border-slate-600 rounded-lg disabled:opacity-40 hover:bg-white dark:hover:bg-slate-700 transition-colors"
-              >‹</button>
+              >
+                ‹
+              </button>
 
               {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
                 let p = i + 1;
@@ -705,25 +829,34 @@ function AdminUsersPage() {
                 }
                 return (
                   <button
-                    key={p} onClick={() => setPage(p)}
+                    key={p}
+                    onClick={() => setPage(p)}
                     className={cn(
                       "w-7 h-7 rounded-lg border text-xs transition-colors",
                       page === p
                         ? "bg-blue-600 text-white border-blue-600 font-semibold"
                         : "border-gray-200 dark:border-slate-600 hover:bg-white dark:hover:bg-slate-700",
                     )}
-                  >{p}</button>
+                  >
+                    {p}
+                  </button>
                 );
               })}
 
               <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
                 className="px-2 py-1 border border-gray-200 dark:border-slate-600 rounded-lg disabled:opacity-40 hover:bg-white dark:hover:bg-slate-700 transition-colors"
-              >›</button>
+              >
+                ›
+              </button>
               <button
-                onClick={() => setPage(totalPages)} disabled={page === totalPages}
+                onClick={() => setPage(totalPages)}
+                disabled={page === totalPages}
                 className="px-2 py-1 border border-gray-200 dark:border-slate-600 rounded-lg disabled:opacity-40 hover:bg-white dark:hover:bg-slate-700 transition-colors"
-              >»</button>
+              >
+                »
+              </button>
             </div>
           </div>
         )}
@@ -741,75 +874,137 @@ function AdminUsersPage() {
           <div className="space-y-3 mt-2">
             <div className="space-y-1.5">
               <Label>Full Name</Label>
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="John Doe" />
+              <Input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="John Doe"
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Email</Label>
-              <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="john@mill.com" />
+              <Input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="john@mill.com"
+              />
             </div>
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label>Password</Label>
-                <button type="button" onClick={() => setForm({ ...form, password: genPwd(), confirm: form.confirm })}
-                  className="text-xs text-blue-600 hover:underline">Generate</button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, password: genPwd(), confirm: form.confirm })}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  Generate
+                </button>
               </div>
               <div className="relative">
-                <Input type={showPwd ? "text" : "password"} value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Min 8 chars" />
-                <button type="button"
+                <Input
+                  type={showPwd ? "text" : "password"}
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder="Min 8 chars"
+                />
+                <button
+                  type="button"
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowPwd(!showPwd)}>
+                  onClick={() => setShowPwd(!showPwd)}
+                >
                   {showPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
               {form.password && (
-                <p className={cn("text-xs", pwOk(form.password) ? "text-emerald-600" : "text-amber-600")}>
+                <p
+                  className={cn(
+                    "text-xs",
+                    pwOk(form.password) ? "text-emerald-600" : "text-amber-600",
+                  )}
+                >
                   {pwOk(form.password) ? "✓ Strong" : "Need uppercase, lowercase, and a digit"}
                 </p>
               )}
             </div>
             <div className="space-y-1.5">
               <Label>Confirm Password</Label>
-              <Input type="password" value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} placeholder="Re-enter" />
+              <Input
+                type="password"
+                value={form.confirm}
+                onChange={(e) => setForm({ ...form, confirm: e.target.value })}
+                placeholder="Re-enter"
+              />
               {form.confirm && form.password !== form.confirm && (
                 <p className="text-xs text-red-500">Passwords do not match</p>
               )}
             </div>
             <div className="space-y-1.5">
               <Label>Role</Label>
-              <Select value={form.role_code} onValueChange={(v) => setForm({ ...form, role_code: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={form.role_code}
+                onValueChange={(v) => setForm({ ...form, role_code: v })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {ROLES_FOR_CREATE.map((r) => (
-                    <SelectItem key={r} value={r}>{ROLE_LABELS[r as Role]}</SelectItem>
+                    <SelectItem key={r} value={r}>
+                      {ROLE_LABELS[r as Role]}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Company</Label>
-              <Select value={form.company_id} onValueChange={(v) => setForm({ ...form, company_id: v, mill_id: "" })}>
-                <SelectTrigger><SelectValue placeholder="Select company" /></SelectTrigger>
+              <Select
+                value={form.company_id}
+                onValueChange={(v) => setForm({ ...form, company_id: v, mill_id: "" })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select company" />
+                </SelectTrigger>
                 <SelectContent>
-                  {companies.filter((c: any) => c?.id).map((c: any) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
+                  {companies
+                    .filter((c: any) => c?.id)
+                    .map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Mill <span className="text-muted-foreground font-normal">(optional)</span></Label>
-              <Select value={form.mill_id} onValueChange={(v) => setForm({ ...form, mill_id: v })} disabled={!form.company_id}>
-                <SelectTrigger><SelectValue placeholder={form.company_id ? "Select mill" : "Select company first"} /></SelectTrigger>
+              <Label>
+                Mill <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Select
+                value={form.mill_id}
+                onValueChange={(v) => setForm({ ...form, mill_id: v })}
+                disabled={!form.company_id}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={form.company_id ? "Select mill" : "Select company first"}
+                  />
+                </SelectTrigger>
                 <SelectContent>
-                  {formMills.filter((m: any) => m?.id).map((m: any) => (
-                    <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
-                  ))}
+                  {formMills
+                    .filter((m: any) => m?.id)
+                    .map((m: any) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex gap-2 pt-1">
-              <Button variant="outline" className="flex-1" onClick={() => setCreateOpen(false)}>Cancel</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setCreateOpen(false)}>
+                Cancel
+              </Button>
               <Button className="flex-1" onClick={handleCreate} disabled={createMut.isPending}>
                 {createMut.isPending ? "Creating…" : "Create User"}
               </Button>
@@ -825,20 +1020,29 @@ function AdminUsersPage() {
             <DialogTitle className="flex items-center gap-2">
               <KeyRound className="size-4" /> Reset Password
             </DialogTitle>
-            <DialogDescription>New password for <strong>{resetDlg?.user?.name}</strong></DialogDescription>
+            <DialogDescription>
+              New password for <strong>{resetDlg?.user?.name}</strong>
+            </DialogDescription>
           </DialogHeader>
           {resetDlg && (
             <div className="space-y-3 mt-2">
               <div className="flex items-center gap-2">
-                <code className="flex-1 px-3 py-2.5 rounded-lg bg-muted text-sm font-mono">{resetDlg.pwd}</code>
+                <code className="flex-1 px-3 py-2.5 rounded-lg bg-muted text-sm font-mono">
+                  {resetDlg.pwd}
+                </code>
                 <Button variant="outline" size="icon" onClick={() => copyText(resetDlg.pwd)}>
                   <Copy className="size-4" />
                 </Button>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => setResetDlg(null)}>Cancel</Button>
-                <Button className="flex-1" disabled={resetMut.isPending}
-                  onClick={() => resetMut.mutate({ id: resetDlg.user.id, pwd: resetDlg.pwd })}>
+                <Button variant="outline" className="flex-1" onClick={() => setResetDlg(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  disabled={resetMut.isPending}
+                  onClick={() => resetMut.mutate({ id: resetDlg.user.id, pwd: resetDlg.pwd })}
+                >
                   {resetMut.isPending ? "Resetting…" : "Confirm Reset"}
                 </Button>
               </div>
@@ -864,8 +1068,12 @@ function AdminUsersPage() {
                   <code className="flex-1 px-3 py-2 rounded-lg bg-muted text-sm truncate">
                     {successDlg.user?.email ?? "—"}
                   </code>
-                  <Button variant="outline" size="icon" className="shrink-0"
-                    onClick={() => copyText(successDlg.user?.email ?? "")}>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={() => copyText(successDlg.user?.email ?? "")}
+                  >
                     <Copy className="size-3.5" />
                   </Button>
                 </div>
@@ -876,14 +1084,20 @@ function AdminUsersPage() {
                   <code className="flex-1 px-3 py-2 rounded-lg bg-muted text-sm font-mono">
                     {successDlg.pwd}
                   </code>
-                  <Button variant="outline" size="icon" className="shrink-0"
-                    onClick={() => copyText(successDlg.pwd)}>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={() => copyText(successDlg.pwd)}
+                  >
                     <Copy className="size-3.5" />
                   </Button>
                 </div>
               </div>
               {copied && <p className="text-xs text-emerald-600 font-medium">✓ Copied</p>}
-              <Button className="w-full" onClick={() => setSuccessDlg(null)}>Done</Button>
+              <Button className="w-full" onClick={() => setSuccessDlg(null)}>
+                Done
+              </Button>
             </div>
           )}
         </DialogContent>

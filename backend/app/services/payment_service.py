@@ -173,13 +173,19 @@ class PaymentService:
         result = await self.db.execute(stmt)
         payments = result.scalars().all()
 
+        # Batch-load invoices
+        invoice_ids = [p.invoice_id for p in payments if p.invoice_id]
+        inv_map: Dict[str, BillingInvoice] = {}
+        if invoice_ids:
+            inv_result = await self.db.execute(
+                select(BillingInvoice).where(BillingInvoice.id.in_(invoice_ids))
+            )
+            for inv in inv_result.scalars().all():
+                inv_map[inv.id] = inv
+
         rows = []
         for p in payments:
-            invoice_number = None
-            if p.invoice_id:
-                inv = await self.db.get(BillingInvoice, p.invoice_id)
-                if inv:
-                    invoice_number = inv.invoice_number
+            invoice_number = inv_map[p.invoice_id].invoice_number if p.invoice_id and p.invoice_id in inv_map else None
 
             rows.append({
                 "id": p.id,
@@ -218,14 +224,28 @@ class PaymentService:
         result = await self.db.execute(stmt)
         payments = result.scalars().all()
 
+        # Batch-load companies and invoices
+        company_ids = list({p.company_id for p in payments})
+        co_map: Dict[str, Company] = {}
+        if company_ids:
+            co_result = await self.db.execute(
+                select(Company).where(Company.id.in_(company_ids))
+            )
+            for co in co_result.scalars().all():
+                co_map[co.id] = co
+        invoice_ids = [p.invoice_id for p in payments if p.invoice_id]
+        inv_map: Dict[str, BillingInvoice] = {}
+        if invoice_ids:
+            inv_result = await self.db.execute(
+                select(BillingInvoice).where(BillingInvoice.id.in_(invoice_ids))
+            )
+            for inv in inv_result.scalars().all():
+                inv_map[inv.id] = inv
+
         rows = []
         for p in payments:
-            co = await self.db.get(Company, p.company_id)
-            invoice_number = None
-            if p.invoice_id:
-                inv = await self.db.get(BillingInvoice, p.invoice_id)
-                if inv:
-                    invoice_number = inv.invoice_number
+            co = co_map.get(p.company_id)
+            invoice_number = inv_map[p.invoice_id].invoice_number if p.invoice_id and p.invoice_id in inv_map else None
 
             rows.append({
                 "id": p.id,
@@ -349,7 +369,7 @@ class PaymentService:
             from app.models.audit import AuditLog
             log = AuditLog(
                 user_id=self.current_user.id if self.current_user else "system",
-                role=self.current_user.role if self.current_user else "system",
+                role=self.current_user.role_rel.code if self.current_user and self.current_user.role_rel else "system",
                 action=action,
                 entity=entity,
                 entity_id=entity_id,

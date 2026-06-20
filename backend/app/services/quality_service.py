@@ -104,6 +104,8 @@ class QualityService(BaseService):
         tested_by: Optional[str] = None,
         u_percent: Optional[float] = None,
         csp: Optional[float] = None,
+        mill_id: Optional[str] = None,
+        company_id: Optional[str] = None,
     ) -> QualityTest:
         if lot_id:
             lot_result = await self.db.execute(select(Lot).where(Lot.id == lot_id))
@@ -132,6 +134,8 @@ class QualityService(BaseService):
             standard=standard,
             u_percent=u_percent,
             csp=csp,
+            mill_id=mill_id,
+            company_id=company_id,
             status=auto_status,
             tested_by=tested_by or self.current_user.name,
         )

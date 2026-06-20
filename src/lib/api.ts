@@ -2,16 +2,12 @@ import axios from "axios";
 import { useAuth } from "@/stores/auth";
 import { toast } from "sonner";
 
-const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ||
-  "https://spinflow.onrender.com";
-
 if (!import.meta.env.VITE_API_BASE_URL) {
-  console.warn(
-    "[SpinFlow] VITE_API_BASE_URL is not set. " +
-    "Falling back to https://spinflow.onrender.com"
+  throw new Error(
+    "VITE_API_BASE_URL is not set. Set it in .env or the environment before starting.",
   );
 }
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
 export { API_BASE };
 
 export const api = axios.create({
@@ -84,12 +80,14 @@ api.interceptors.response.use(
         if (isRefreshing) {
           return new Promise<string>((resolve, reject) => {
             refreshQueue.push({ resolve, reject });
-          }).then((token) => {
-            error.config.headers.Authorization = `Bearer ${token}`;
-            return api(error.config);
-          }).catch((err) => {
-            return Promise.reject(err);
-          });
+          })
+            .then((token) => {
+              error.config.headers.Authorization = `Bearer ${token}`;
+              return api(error.config);
+            })
+            .catch((err) => {
+              return Promise.reject(err);
+            });
         }
 
         isRefreshing = true;

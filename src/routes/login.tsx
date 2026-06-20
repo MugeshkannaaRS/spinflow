@@ -16,7 +16,10 @@ export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
       { title: "Sign in — SpinFlow ERP" },
-      { name: "description", content: "Sign in to SpinFlow ERP — spinning mill operations platform." },
+      {
+        name: "description",
+        content: "Sign in to SpinFlow ERP — spinning mill operations platform.",
+      },
     ],
   }),
   component: LoginPage,
@@ -34,16 +37,23 @@ function mapUser(u: Record<string, unknown>): AuthUser {
     mustChangePassword: u.must_change_password as boolean,
     moduleRestrictions: (u.module_restrictions as Record<string, boolean> | undefined) ?? null,
     allowedModules: (u.enabled_modules as string[]) ?? [],
-    companyMills: (u.company_mills as { id: string; name: string; code: string }[] | undefined) ?? [],
+    companyMills:
+      (u.company_mills as { id: string; name: string; code: string }[] | undefined) ?? [],
   };
 }
 
-const DEMO_ACCOUNTS = [
-  {
-    id: "u1",
-    email: "admin@mill.spinflow",
-    password: "Admin@1234",
-    role: "SUPER_ADMIN",
+const DEMO_ACCOUNTS: {
+  id: string; email: string; password: string; role: Role;
+  label: string; desc: string; color: string;
+}[] = [];
+
+if (import.meta.env.VITE_SHOW_DEMO_ACCOUNTS === "true") {
+  DEMO_ACCOUNTS.push(
+    {
+      id: "u1",
+      email: "admin@mill.spinflow",
+      password: "Admin@1234",
+      role: "SUPER_ADMIN",
     label: "Super Admin",
     desc: "Full access across all companies",
     color: "bg-purple-100 text-purple-700 border-purple-200",
@@ -75,12 +85,25 @@ const DEMO_ACCOUNTS = [
     desc: "Machines, output & efficiency",
     color: "bg-green-100 text-green-700 border-green-200",
   },
-];
+  );
+}
 
 const FEATURES = [
-  { icon: Factory, title: "Production Tracking", desc: "Real-time machine output, efficiency, and waste monitoring across all departments." },
-  { icon: QrCode,  title: "QR Dispatch & LoTrac", desc: "Scan-based bag loading, trip management and proof-of-delivery for every delivery." },
-  { icon: ShieldCheck, title: "Role-Based Access", desc: "14 roles — from mill owner to gate security — each sees only what they need." },
+  {
+    icon: Factory,
+    title: "Production Tracking",
+    desc: "Real-time machine output, efficiency, and waste monitoring across all departments.",
+  },
+  {
+    icon: QrCode,
+    title: "QR Dispatch & LoTrac",
+    desc: "Scan-based bag loading, trip management and proof-of-delivery for every delivery.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Role-Based Access",
+    desc: "14 roles — from mill owner to gate security — each sees only what they need.",
+  },
 ];
 
 function LoginPage() {
@@ -102,7 +125,10 @@ function LoginPage() {
     mutationFn: async (creds?: { email: string; password: string }) => {
       const res = await api.post(
         "/auth/login",
-        new URLSearchParams({ username: creds?.email ?? email, password: creds?.password ?? password }),
+        new URLSearchParams({
+          username: creds?.email ?? email,
+          password: creds?.password ?? password,
+        }),
         { headers: { "Content-Type": "application/x-www-form-urlencoded" }, timeout: 15000 },
       );
       return res.data;
@@ -125,13 +151,16 @@ function LoginPage() {
     toast.error(getApiError(e));
   };
 
-  const handleDemoLogin = (demo: typeof DEMO_ACCOUNTS[0]) => {
+  const handleDemoLogin = (demo: (typeof DEMO_ACCOUNTS)[0]) => {
     setEmail(demo.email);
     setPassword(demo.password);
-    m.mutate({ email: demo.email, password: demo.password }, {
-      onSuccess: handleSuccess,
-      onError: handleError,
-    });
+    m.mutate(
+      { email: demo.email, password: demo.password },
+      {
+        onSuccess: handleSuccess,
+        onError: handleError,
+      },
+    );
   };
 
   return (
@@ -152,11 +181,13 @@ function LoginPage() {
         {/* Hero text */}
         <div>
           <h2 className="text-4xl font-bold text-white leading-tight tracking-tight">
-            Your mill.<br />In your hands.
+            Your mill.
+            <br />
+            In your hands.
           </h2>
           <p className="mt-4 text-[#94a3b8] text-base max-w-sm leading-relaxed">
-            Production, quality, dispatch, inventory and people — one platform,
-            role-aware, audit-ready, QR-traceable.
+            Production, quality, dispatch, inventory and people — one platform, role-aware,
+            audit-ready, QR-traceable.
           </p>
 
           {/* Feature bullets */}
@@ -186,12 +217,18 @@ function LoginPage() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">S</div>
+            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold">
+              S
+            </div>
             <span className="font-bold text-lg text-[#0f172a]">SpinFlow ERP</span>
           </div>
 
-          <h1 className="text-[26px] font-bold text-[#0f172a] leading-tight">Sign in to SpinFlow</h1>
-          <p className="text-[14px] text-[#64748b] mt-1">Enter your mill credentials to continue.</p>
+          <h1 className="text-[26px] font-bold text-[#0f172a] leading-tight">
+            Sign in to SpinFlow
+          </h1>
+          <p className="text-[14px] text-[#64748b] mt-1">
+            Enter your mill credentials to continue.
+          </p>
 
           {/* Lockout warning */}
           {isLockedOut && (
@@ -211,7 +248,10 @@ function LoginPage() {
             className="mt-6 space-y-4"
           >
             <div>
-              <label htmlFor="email" className="block text-[14px] font-semibold text-[#374151] mb-1">
+              <label
+                htmlFor="email"
+                className="block text-[14px] font-semibold text-[#374151] mb-1"
+              >
                 Email address
               </label>
               <input
@@ -230,7 +270,10 @@ function LoginPage() {
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-[14px] font-semibold text-[#374151] mb-1">
+              <label
+                htmlFor="password"
+                className="block text-[14px] font-semibold text-[#374151] mb-1"
+              >
                 Password
               </label>
               <input
@@ -248,10 +291,7 @@ function LoginPage() {
                 placeholder="••••••••"
               />
               <div className="flex justify-end mt-1">
-                <Link
-                  to="/forgot-password"
-                  className="text-[13px] text-blue-600 hover:underline"
-                >
+                <Link to="/forgot-password" className="text-[13px] text-blue-600 hover:underline">
                   Forgot password?
                 </Link>
               </div>
@@ -275,7 +315,6 @@ function LoginPage() {
               )}
             </button>
           </form>
-
         </div>
       </div>
     </div>

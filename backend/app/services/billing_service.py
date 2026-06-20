@@ -86,24 +86,40 @@ class BillingService:
 
         revenue_trend = []
         today = date_type.today()
+        six_months_ago = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+        for _ in range(5):
+            six_months_ago = (six_months_ago - timedelta(days=1)).replace(day=1)
+        try:
+            trend_res = await self.db.execute(
+                select(
+                    func.date_trunc("month", BillingInvoice.paid_at).label("month"),
+                    func.coalesce(func.sum(BillingInvoice.amount), 0).label("revenue"),
+                ).where(
+                    BillingInvoice.status == "paid",
+                    BillingInvoice.paid_at >= six_months_ago,
+                ).group_by(
+                    func.date_trunc("month", BillingInvoice.paid_at)
+                ).order_by(
+                    func.date_trunc("month", BillingInvoice.paid_at)
+                )
+            )
+            trend_map = {}
+            for row in trend_res.all():
+                mn = row[0]
+                if hasattr(mn, "strftime"):
+                    key = mn.strftime("%b %Y")
+                else:
+                    key = str(mn)
+                trend_map[key] = float(row[1])
+        except Exception:
+            trend_map = {}
+
         for i in range(5, -1, -1):
             mn = today.replace(day=1)
             for _ in range(i):
                 mn = (mn - timedelta(days=1)).replace(day=1)
-            me_raw = mn.replace(day=28) + timedelta(days=4)
-            me = me_raw - timedelta(days=me_raw.day)
-            try:
-                rev_res = await self.db.execute(
-                    select(func.coalesce(func.sum(BillingInvoice.amount), 0)).where(
-                        BillingInvoice.status == "paid",
-                        BillingInvoice.paid_at >= mn,
-                        BillingInvoice.paid_at <= me,
-                    )
-                )
-                rev = float(rev_res.scalar() or 0)
-            except Exception:
-                rev = 0
-            revenue_trend.append({"month": mn.strftime("%b %Y"), "revenue": rev})
+            key = mn.strftime("%b %Y")
+            revenue_trend.append({"month": key, "revenue": trend_map.get(key, 0.0)})
 
         prev_6m = today.replace(day=1)
         for _ in range(6):

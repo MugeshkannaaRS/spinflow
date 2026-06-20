@@ -88,6 +88,9 @@ class Mill(TimestampMixin, Base):
 
 class Department(TimestampMixin, Base):
     __tablename__ = "master_departments"
+    __table_args__ = (
+        UniqueConstraint("mill_id", "code", name="uq_departments_mill_code"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
@@ -124,10 +127,13 @@ class YarnCount(TimestampMixin, Base):
 
 class Customer(TimestampMixin, Base):
     __tablename__ = "customers"
+    __table_args__ = (
+        UniqueConstraint("mill_id", "code", name="uq_customers_mill_code"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     gstin: Mapped[str] = mapped_column(String(20), nullable=True)
     pan: Mapped[str] = mapped_column(String(20), nullable=True)
@@ -139,7 +145,7 @@ class Customer(TimestampMixin, Base):
     contact_person: Mapped[str] = mapped_column(String(200), nullable=True)
     phone: Mapped[str] = mapped_column(String(20), nullable=True)
     email: Mapped[str] = mapped_column(String(200), nullable=True)
-    credit_limit: Mapped[float] = mapped_column(Float, default=0)
+    credit_limit: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
     payment_terms_days: Mapped[int] = mapped_column(Integer, default=30)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -148,10 +154,13 @@ class Customer(TimestampMixin, Base):
 
 class MasterVehicle(TimestampMixin, Base):
     __tablename__ = "master_vehicles"
+    __table_args__ = (
+        UniqueConstraint("mill_id", "vehicle_no", name="uq_vehicles_mill_vehicle_no"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    vehicle_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    vehicle_no: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     vehicle_type: Mapped[str] = mapped_column(String(20), nullable=False)
     make: Mapped[str] = mapped_column(String(100), nullable=True)
     model: Mapped[str] = mapped_column(String(100), nullable=True)
@@ -164,10 +173,13 @@ class MasterVehicle(TimestampMixin, Base):
 
 class Route(TimestampMixin, Base):
     __tablename__ = "master_routes"
+    __table_args__ = (
+        UniqueConstraint("mill_id", "code", name="uq_routes_mill_code"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     origin: Mapped[str] = mapped_column(String(200), nullable=False)
     destination: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -180,6 +192,9 @@ class Route(TimestampMixin, Base):
 
 class CompanyModule(Base):
     __tablename__ = "company_modules"
+    __table_args__ = (
+        UniqueConstraint("company_id", "module_name", name="uq_company_modules_company_module"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     company_id: Mapped[str] = mapped_column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)

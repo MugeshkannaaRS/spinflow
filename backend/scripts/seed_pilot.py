@@ -18,6 +18,7 @@ Use --force to drop and recreate.
 
 import argparse
 import asyncio
+import os
 import random
 import sys
 import time
@@ -240,7 +241,7 @@ class PilotSeeder:
             admin_user = User(
                 name="superadmin",
                 email="admin@mill.spinflow",
-                password_hash=hash_password("Admin@1234"),
+                password_hash=hash_password(os.environ.get("SEED_ADMIN_PASSWORD", "Admin@1234")),
                 role_id=self.roles["SUPER_ADMIN"].id,
                 department="Management",
                 mill_id=self.mills[0].id,
@@ -484,7 +485,7 @@ class PilotSeeder:
                 idx += 1
                 u = User(
                     name=name, email=random_email(name, idx),
-                    password_hash=hash_password("Pilot@1234"),
+                    password_hash=hash_password(os.environ.get("SEED_USER_PASSWORD", "Pilot@1234")),
                     role_id=role.id, department=random.choice(DEPT_NAMES),
                     mill_id=mill.id, mill_name=mill.name,
                     company_id=self.company.id,
@@ -897,8 +898,10 @@ class PilotSeeder:
         total_time = self.timings.get("total", 0)
         print(f"{'TOTAL':<30} {total_count:>10} {total_time:>10.2f}")
         print()
-        print(f"Login with: admin@mill.spinflow / Admin@1234")
-        print(f"Login with: any seeded user / Pilot@1234")
+        admin_pwd = os.environ.get("SEED_ADMIN_PASSWORD", "Admin@1234")
+        user_pwd = os.environ.get("SEED_USER_PASSWORD", "Pilot@1234")
+        print(f"Login with: admin@mill.spinflow / {admin_pwd}")
+        print(f"Login with: any seeded user / {user_pwd}")
 
 
 async def main():

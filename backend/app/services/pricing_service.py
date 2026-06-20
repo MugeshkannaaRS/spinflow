@@ -565,9 +565,14 @@ class PricingService:
             await self.db.execute(
                 update(User).where(User.company_id == sub.company_id).values(is_active=False)
             )
-            await self.db.execute(
-                update(UserSession).where(UserSession.company_id == sub.company_id).values(is_active=False)
+            user_ids_sub = await self.db.execute(
+                select(User.id).where(User.company_id == sub.company_id)
             )
+            uids = [row[0] for row in user_ids_sub.all()]
+            if uids:
+                await self.db.execute(
+                    update(UserSession).where(UserSession.user_id.in_(uids)).values(is_active=False)
+                )
 
         # Grace period past 30 days → suspended with cascade
         grace_to_suspend = await self.db.execute(
@@ -591,12 +596,18 @@ class PricingService:
             await self.db.execute(
                 update(User).where(User.company_id == sub.company_id).values(is_active=False)
             )
-            await self.db.execute(
-                update(UserSession).where(UserSession.company_id == sub.company_id).values(is_active=False)
+            user_ids_sub = await self.db.execute(
+                select(User.id).where(User.company_id == sub.company_id)
             )
+            uids = [row[0] for row in user_ids_sub.all()]
+            if uids:
+                await self.db.execute(
+                    update(UserSession).where(UserSession.user_id.in_(uids)).values(is_active=False)
+                )
 
         if has_suspensions:
             logger = __import__("logging").getLogger(__name__)
             logger.warning("Subscription suspensions applied via process_expirations")
 
         await self.db.flush()
+        await self.db.commit()

@@ -3,6 +3,7 @@ Run: python backend/scripts/seed_demo.py
 Seeds realistic demo data for Arafath Spinning Mills presentation
 """
 
+import os
 import random
 import asyncio
 from datetime import datetime, timedelta, date
@@ -114,7 +115,7 @@ async def seed():
             admin = User(
                 name="Super Admin",
                 email="admin@mill.spinflow",
-                password_hash=hash_password("Admin@1234"),
+                password_hash=hash_password(os.environ.get("SEED_ADMIN_PASSWORD", "Admin@1234")),
                 role_id=admin_role.id,
                 mill_id=mill.id,
                 mill_name=mill.name,
@@ -124,7 +125,8 @@ async def seed():
             )
             db.add(admin)
             await db.flush()
-            print(f"Created admin user: {admin.email} / Admin@1234")
+            pwd = os.environ.get("SEED_ADMIN_PASSWORD", "Admin@1234")
+            print(f"Created admin user: {admin.email} / {pwd}")
 
         # Create customers
         for c in CUSTOMERS:
@@ -208,7 +210,8 @@ async def seed():
         print(f"   Mill: {DEMO_DATA['mill']}")
         print(f"   Employees: {DEMO_DATA['total_employees']}")
         print(f"   Production entries: {len(production_entries)}")
-        print(f"   Login: admin@mill.spinflow / Admin@1234")
+        pwd = os.environ.get("SEED_ADMIN_PASSWORD", "Admin@1234")
+    print(f"   Login: admin@mill.spinflow / {pwd}")
 
 
 if __name__ == "__main__":

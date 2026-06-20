@@ -61,10 +61,22 @@ function DispatchPage() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  const ordersQ = useQuery({ queryKey: ["dispatch-orders", millId], queryFn: dispatchApi.getOrders, staleTime: 60_000, retry: 1, enabled: !!millId });
+  const ordersQ = useQuery({
+    queryKey: ["dispatch-orders", millId],
+    queryFn: dispatchApi.getOrders,
+    staleTime: 60_000,
+    retry: 1,
+    enabled: !!millId,
+  });
   const tripsQ = useQuery({
     queryKey: ["dispatch-trips", page, pageSize, search, millId],
-    queryFn: () => dispatchApi.getTrips({ page, page_size: pageSize, mill_id: millId ?? "", ...(search ? { search } : {}) }),
+    queryFn: () =>
+      dispatchApi.getTrips({
+        page,
+        page_size: pageSize,
+        mill_id: millId ?? "",
+        ...(search ? { search } : {}),
+      }),
     staleTime: 30_000,
     retry: 1,
     enabled: !!millId,
@@ -105,7 +117,9 @@ function DispatchPage() {
     },
     onError: (err: any) => {
       const detail = err?.response?.data?.detail;
-      const msg = Array.isArray(detail) ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ") : detail || "Failed to create trip";
+      const msg = Array.isArray(detail)
+        ? detail.map((e: any) => `${e.loc?.slice(-1)[0]}: ${e.msg}`).join(", ")
+        : detail || "Failed to create trip";
       toast.error(msg);
     },
   });
@@ -146,40 +160,69 @@ function DispatchPage() {
     });
   }
 
-  if (!user) return (
-    <div className="p-6 space-y-4">
-      <Skeleton className="h-8 w-64" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-96 w-full" />
-    </div>
-  );
+  if (!user)
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    );
 
   const orderCols: ColDef[] = [
-    { key: "order_no", label: orderColConfig.getLabel('order_no'), className: "font-mono text-xs" },
-    { key: "customer", label: orderColConfig.getLabel('customer'), render: (o: any) => <span className="font-medium">{o.customer || o.customer_name || ""}</span> },
-    { key: "date", label: orderColConfig.getLabel('date'), type: "date" },
-    { key: "lot_no", label: orderColConfig.getLabel('items') },
-    { key: "quantity_kg", label: orderColConfig.getLabel('quantity_kg') },
+    { key: "order_no", label: orderColConfig.getLabel("order_no"), className: "font-mono text-xs" },
     {
-      key: "status", label: orderColConfig.getLabel('status'), type: "status",
+      key: "customer",
+      label: orderColConfig.getLabel("customer"),
+      render: (o: any) => (
+        <span className="font-medium">{o.customer || o.customer_name || ""}</span>
+      ),
+    },
+    { key: "date", label: orderColConfig.getLabel("date"), type: "date" },
+    { key: "lot_no", label: orderColConfig.getLabel("items") },
+    { key: "quantity_kg", label: orderColConfig.getLabel("quantity_kg") },
+    {
+      key: "status",
+      label: orderColConfig.getLabel("status"),
+      type: "status",
       render: (o: any) => <StatusBadge status={o.status} size="sm" />,
     },
   ];
 
   const tripCols: ColDef[] = [
-    { key: "trip_no", label: tripColConfig.getLabel('trip_no') || "Trip No", className: "font-mono text-xs" },
-    { key: "vehicle_no", label: tripColConfig.getLabel('vehicle_no') || "Vehicle", className: "font-mono text-xs" },
-    { key: "driver_name", label: tripColConfig.getLabel('driver_name') || "Driver" },
-    { key: "destination_name", label: tripColConfig.getLabel('destination_name') || "Destination" },
-    { key: "planned_bags", label: tripColConfig.getLabel('planned_bags') || "Bags", type: "number" },
-    { key: "planned_weight_kg", label: tripColConfig.getLabel('planned_weight_kg') || "Weight (kg)", type: "number" },
     {
-      key: "status", label: tripColConfig.getLabel('status') || "Status", type: "status",
+      key: "trip_no",
+      label: tripColConfig.getLabel("trip_no") || "Trip No",
+      className: "font-mono text-xs",
+    },
+    {
+      key: "vehicle_no",
+      label: tripColConfig.getLabel("vehicle_no") || "Vehicle",
+      className: "font-mono text-xs",
+    },
+    { key: "driver_name", label: tripColConfig.getLabel("driver_name") || "Driver" },
+    { key: "destination_name", label: tripColConfig.getLabel("destination_name") || "Destination" },
+    {
+      key: "planned_bags",
+      label: tripColConfig.getLabel("planned_bags") || "Bags",
+      type: "number",
+    },
+    {
+      key: "planned_weight_kg",
+      label: tripColConfig.getLabel("planned_weight_kg") || "Weight (kg)",
+      type: "number",
+    },
+    {
+      key: "status",
+      label: tripColConfig.getLabel("status") || "Status",
+      type: "status",
       render: (t: any) => <StatusBadge status={t.status} size="sm" />,
     },
     {
-      key: "created_at", label: "Created", type: "date",
-      render: (t: any) => t.created_at ? new Date(t.created_at).toLocaleDateString() : "—",
+      key: "created_at",
+      label: "Created",
+      type: "date",
+      render: (t: any) => (t.created_at ? new Date(t.created_at).toLocaleDateString() : "—"),
     },
   ];
 
@@ -194,10 +237,50 @@ function DispatchPage() {
       <AccessGuard module="dispatch">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-            <Card><CardContent className="p-5"><div className="text-xs uppercase text-muted-foreground font-medium">Pending Orders</div><div className="text-2xl font-semibold mt-2 flex items-center gap-2"><ClipboardList className="size-5 text-amber-500" />{pendingOrders}</div></CardContent></Card>
-            <Card><CardContent className="p-5"><div className="text-xs uppercase text-muted-foreground font-medium">Active Trips</div><div className="text-2xl font-semibold mt-2 flex items-center gap-2"><Loader2 className="size-5 text-primary" />{activeTrips}</div></CardContent></Card>
-            <Card><CardContent className="p-5"><div className="text-xs uppercase text-muted-foreground font-medium">Total Dispatched (kg)</div><div className="text-2xl font-semibold mt-2 flex items-center gap-2"><Truck className="size-5 text-green-600" />{totalDispatched.toLocaleString()}</div></CardContent></Card>
-            <Card><CardContent className="p-5"><div className="text-xs uppercase text-muted-foreground font-medium">Delivered Trips</div><div className="text-2xl font-semibold mt-2 flex items-center gap-2"><MapPin className="size-5 text-blue-600" />{deliveredTrips}</div></CardContent></Card>
+            <Card>
+              <CardContent className="p-5">
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Pending Orders
+                </div>
+                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
+                  <ClipboardList className="size-5 text-amber-500" />
+                  {pendingOrders}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5">
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Active Trips
+                </div>
+                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
+                  <Loader2 className="size-5 text-primary" />
+                  {activeTrips}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5">
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Total Dispatched (kg)
+                </div>
+                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
+                  <Truck className="size-5 text-green-600" />
+                  {totalDispatched.toLocaleString()}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-5">
+                <div className="text-xs uppercase text-muted-foreground font-medium">
+                  Delivered Trips
+                </div>
+                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
+                  <MapPin className="size-5 text-blue-600" />
+                  {deliveredTrips}
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           <Tabs defaultValue="trips">
@@ -208,75 +291,98 @@ function DispatchPage() {
 
             <TabsContent value="trips">
               <ErrorBoundary inline label="Dispatch Trips">
-              <DataTable
-                tableId="dispatch_trips_table"
-                columns={tripCols}
-                data={trips}
-                total={tripsData.total}
-                isLoading={tripsQ.isLoading}
-                isError={tripsQ.isError}
-                onRetry={() => tripsQ.refetch()}
-                page={page}
-                pageSize={pageSize}
-                onPageChange={setPage}
-                onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
-                searchValue={search}
-                onSearchChange={(v) => { setSearch(v); setPage(1); }}
-                rowKey={(t) => t.id}
-                exportFilename="dispatch_trips"
-                onRowClick={undefined}
-                rowActions={(t: any) => (
-                  <div className="flex gap-1">
-                    {t.status === "draft" && (
-                      <Button size="sm" onClick={() => dispatchM.mutate(t.id)} disabled={dispatchM.isPending}>
-                        {dispatchM.isPending ? <Loader2 className="size-3 animate-spin" /> : null}
-                        Dispatch
-                      </Button>
-                    )}
-                    {t.status === "dispatched" && (
-                      <Button size="sm" onClick={() => deliverM.mutate(t.id)} disabled={deliverM.isPending}>
-                        {deliverM.isPending ? <Loader2 className="size-3 animate-spin" /> : null}
-                        Deliver
-                      </Button>
-                    )}
-                  </div>
-                )}
-                toolbar={
-                  <Button size="sm" className="h-8 gap-1" onClick={() => setSheetOpen(true)}>
-                    <Plus className="size-3.5" />
-                    New Trip
-                  </Button>
-                }
-              />
+                <DataTable
+                  tableId="dispatch_trips_table"
+                  columns={tripCols}
+                  data={trips}
+                  total={tripsData.total}
+                  isLoading={tripsQ.isLoading}
+                  isError={tripsQ.isError}
+                  onRetry={() => tripsQ.refetch()}
+                  page={page}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                  onPageSizeChange={(s) => {
+                    setPageSize(s);
+                    setPage(1);
+                  }}
+                  searchValue={search}
+                  onSearchChange={(v) => {
+                    setSearch(v);
+                    setPage(1);
+                  }}
+                  rowKey={(t) => t.id}
+                  exportFilename="dispatch_trips"
+                  onRowClick={undefined}
+                  rowActions={(t: any) => (
+                    <div className="flex gap-1">
+                      {t.status === "draft" && (
+                        <Button
+                          size="sm"
+                          onClick={() => dispatchM.mutate(t.id)}
+                          disabled={dispatchM.isPending}
+                        >
+                          {dispatchM.isPending ? <Loader2 className="size-3 animate-spin" /> : null}
+                          Dispatch
+                        </Button>
+                      )}
+                      {t.status === "dispatched" && (
+                        <Button
+                          size="sm"
+                          onClick={() => deliverM.mutate(t.id)}
+                          disabled={deliverM.isPending}
+                        >
+                          {deliverM.isPending ? <Loader2 className="size-3 animate-spin" /> : null}
+                          Deliver
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                  toolbar={
+                    <Button size="sm" className="h-8 gap-1" onClick={() => setSheetOpen(true)}>
+                      <Plus className="size-3.5" />
+                      New Trip
+                    </Button>
+                  }
+                />
               </ErrorBoundary>
             </TabsContent>
 
             <TabsContent value="orders">
               <ErrorBoundary inline label="Dispatch Orders">
-              <DataTable
-                tableId="dispatch_orders_table"
-                columns={orderCols}
-                data={orders}
-                loading={ordersQ.isLoading}
-                rowKey={(o) => o.id}
-                exportFilename="dispatch_orders"
-                disableExport={true}
-                toolbar={<ExportDateRangeButton onExportXlsx={(f, t) => exportApi.dispatchXlsx(f, t)} />}
-                actions={canEdit ? (o: any) => (
-                  (o.status === "pending" || o.status === "draft" || o.status === "created") ? (
-                    <ConfirmDeleteButton
-                      onConfirm={async () => {
-                        await dispatchApi.deleteOrder(o.id);
-                        queryClient.invalidateQueries({ queryKey: ["dispatch-orders"] });
-                      }}
-                      label={`Cancel order ${o.order_no}? This cannot be undone.`}
-                      title="Cancel Order?"
-                      confirmText="Cancel Order"
-                      successMessage="Order cancelled"
-                    />
-                  ) : <></>
-                ) : undefined}
-              />
+                <DataTable
+                  tableId="dispatch_orders_table"
+                  columns={orderCols}
+                  data={orders}
+                  loading={ordersQ.isLoading}
+                  rowKey={(o) => o.id}
+                  exportFilename="dispatch_orders"
+                  disableExport={true}
+                  toolbar={
+                    <ExportDateRangeButton onExportXlsx={(f, t) => exportApi.dispatchXlsx(f, t)} />
+                  }
+                  actions={
+                    canEdit
+                      ? (o: any) =>
+                          o.status === "pending" ||
+                          o.status === "draft" ||
+                          o.status === "created" ? (
+                            <ConfirmDeleteButton
+                              onConfirm={async () => {
+                                await dispatchApi.deleteOrder(o.id);
+                                queryClient.invalidateQueries({ queryKey: ["dispatch-orders"] });
+                              }}
+                              label={`Cancel order ${o.order_no}? This cannot be undone.`}
+                              title="Cancel Order?"
+                              confirmText="Cancel Order"
+                              successMessage="Order cancelled"
+                            />
+                          ) : (
+                            <></>
+                          )
+                      : undefined
+                  }
+                />
               </ErrorBoundary>
             </TabsContent>
           </Tabs>
@@ -292,31 +398,46 @@ function DispatchPage() {
                 <Label htmlFor="customer">Customer</Label>
                 <Select
                   value={form.customer_id}
-                  onValueChange={(v) => { setForm({ ...form, customer_id: v }); setFormErrors((p) => ({ ...p, customer_id: "" })); }}
+                  onValueChange={(v) => {
+                    setForm({ ...form, customer_id: v });
+                    setFormErrors((p) => ({ ...p, customer_id: "" }));
+                  }}
                 >
-                  <SelectTrigger id="customer" className={formErrors.customer_id ? "border-destructive" : ""}>
+                  <SelectTrigger
+                    id="customer"
+                    className={formErrors.customer_id ? "border-destructive" : ""}
+                  >
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
                   <SelectContent>
-                    {customers.filter((c: any) => c?.id).map((c: any) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name || c.customer_name || c.company_name}
-                      </SelectItem>
-                    ))}
+                    {customers
+                      .filter((c: any) => c?.id)
+                      .map((c: any) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name || c.customer_name || c.company_name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
-                {formErrors.customer_id && <p className="text-xs text-destructive">{formErrors.customer_id}</p>}
+                {formErrors.customer_id && (
+                  <p className="text-xs text-destructive">{formErrors.customer_id}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="vehicle_no">Vehicle No</Label>
                 <Input
                   id="vehicle_no"
                   value={form.vehicle_no}
-                  onChange={(e) => { setForm({ ...form, vehicle_no: e.target.value }); setFormErrors((p) => ({ ...p, vehicle_no: "" })); }}
+                  onChange={(e) => {
+                    setForm({ ...form, vehicle_no: e.target.value });
+                    setFormErrors((p) => ({ ...p, vehicle_no: "" }));
+                  }}
                   placeholder="TN-38-AB-1234"
                   className={formErrors.vehicle_no ? "border-destructive" : ""}
                 />
-                {formErrors.vehicle_no && <p className="text-xs text-destructive">{formErrors.vehicle_no}</p>}
+                {formErrors.vehicle_no && (
+                  <p className="text-xs text-destructive">{formErrors.vehicle_no}</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -344,10 +465,15 @@ function DispatchPage() {
                   id="dispatch_date"
                   type="date"
                   value={form.dispatch_date}
-                  onChange={(e) => { setForm({ ...form, dispatch_date: e.target.value }); setFormErrors((p) => ({ ...p, dispatch_date: "" })); }}
+                  onChange={(e) => {
+                    setForm({ ...form, dispatch_date: e.target.value });
+                    setFormErrors((p) => ({ ...p, dispatch_date: "" }));
+                  }}
                   className={formErrors.dispatch_date ? "border-destructive" : ""}
                 />
-                {formErrors.dispatch_date && <p className="text-xs text-destructive">{formErrors.dispatch_date}</p>}
+                {formErrors.dispatch_date && (
+                  <p className="text-xs text-destructive">{formErrors.dispatch_date}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="eway">E-Way Bill No</Label>
@@ -370,7 +496,11 @@ function DispatchPage() {
               </div>
             </div>
             <SheetFooter className="mt-6">
-              <Button onClick={handleCreateTrip} disabled={createTripM.isPending} className="w-full">
+              <Button
+                onClick={handleCreateTrip}
+                disabled={createTripM.isPending}
+                className="w-full"
+              >
                 {createTripM.isPending ? <Loader2 className="size-4 mr-1 animate-spin" /> : null}
                 Create Trip
               </Button>

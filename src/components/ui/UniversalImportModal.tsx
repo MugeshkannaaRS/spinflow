@@ -5,15 +5,23 @@ import { useInvalidateMillMasters } from "@/hooks/useMillConfig";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import {
-  fuzzyMatchColumns, parseExcelDate, filterBlankRows, generateImportTemplate,
-  isValidNumericString, validateDateString,
+  fuzzyMatchColumns,
+  parseExcelDate,
+  filterBlankRows,
+  generateImportTemplate,
+  isValidNumericString,
+  validateDateString,
   FIELD_ALIASES,
   type ImportMapping,
 } from "@/lib/excel-import";
 import { useColumnConfig, type ColumnConfig } from "@/hooks/useColumnConfig";
 import { useAuth } from "@/stores/auth";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,16 +29,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
-  Upload, Download, FileSpreadsheet, CheckCircle2, AlertTriangle,
-  XCircle, ArrowLeft, ArrowRight,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  ArrowLeft,
+  ArrowRight,
 } from "lucide-react";
 
 interface UniversalImportModalProps {
@@ -62,27 +85,36 @@ interface ImportError {
 }
 
 function normalizeCustomFieldKey(header: string): string {
-  return header.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "custom_field";
+  return (
+    header
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "") || "custom_field"
+  );
 }
 
-function computeConfidence(
-  header: string,
-  col: ColumnConfig,
-): number {
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, " ").replace(/\s+/g, " ").trim();
+function computeConfidence(header: string, col: ColumnConfig): number {
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   const nh = norm(header);
   const aliases = FIELD_ALIASES[col.key];
   if (aliases && aliases.some((a) => norm(a) === nh)) return 100;
   const levenshtein = (a: string, b: string): number => {
-    const m = a.length; const n = b.length;
+    const m = a.length;
+    const n = b.length;
     const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
     for (let i = 0; i <= m; i++) dp[i][0] = i;
     for (let j = 0; j <= n; j++) dp[0][j] = j;
     for (let i = 1; i <= m; i++) {
       for (let j = 1; j <= n; j++) {
-        dp[i][j] = a[i - 1] === b[j - 1]
-          ? dp[i - 1][j - 1]
-          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+        dp[i][j] =
+          a[i - 1] === b[j - 1]
+            ? dp[i - 1][j - 1]
+            : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
       }
     }
     return dp[m][n];
@@ -164,7 +196,7 @@ export function UniversalImportModal({
         .get("/import/mappings", { params: { table: tableName, mill_id: millId } })
         .then((r) => {
           const data = r.data;
-          const list = Array.isArray(data) ? data : data?.mappings ?? [];
+          const list = Array.isArray(data) ? data : (data?.mappings ?? []);
           setSavedMappings(list);
         })
         .catch(() => {});
@@ -176,7 +208,8 @@ export function UniversalImportModal({
     if (ext === "csv") return true;
     const bytes = await file.slice(0, 4).arrayBuffer();
     const header = new Uint8Array(bytes);
-    const isZip = header[0] === 0x50 && header[1] === 0x4B && header[2] === 0x03 && header[3] === 0x04;
+    const isZip =
+      header[0] === 0x50 && header[1] === 0x4b && header[2] === 0x03 && header[3] === 0x04;
     if (!isZip) {
       toast.error("Invalid file. Please upload a real Excel (.xlsx) or CSV file.");
       return false;
@@ -204,7 +237,9 @@ export function UniversalImportModal({
         toast.error("No headers found in first row");
         return;
       }
-      const data = rows.slice(1).filter((r: any[]) => r.some((c) => c !== undefined && c !== null && c !== ""));
+      const data = rows
+        .slice(1)
+        .filter((r: any[]) => r.some((c) => c !== undefined && c !== null && c !== ""));
       setFile(f);
       setHeaders(hdrs);
       setRawRows(data);
@@ -219,7 +254,7 @@ export function UniversalImportModal({
       }
       for (const h of hdrs) {
         if (h.toLowerCase() === "column1" && !newMapping[h]) {
-          const netPayableCol = colConfigs.find(c => c.key === "net_payable");
+          const netPayableCol = colConfigs.find((c) => c.key === "net_payable");
           if (netPayableCol) {
             newMapping[h] = "net_payable";
             newConfidence[h] = 100;
@@ -331,14 +366,23 @@ export function UniversalImportModal({
         const fieldKey = mapping[header];
         const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
         const nh = norm(header);
-        const isCustom = !fieldKey && !colConfigs.some(
-          c => norm(c.key) === nh || norm(c.label) === nh
-        );
+        const isCustom =
+          !fieldKey && !colConfigs.some((c) => norm(c.key) === nh || norm(c.label) === nh);
 
         if (isCustom) {
           // Respect explicit skip by user, and auto-skip serial number columns
           const cfKey = normalizeCustomFieldKey(header);
-          const isSerialCol = ["sl_no","si_no","sr_no","s_no","slno","sno","serial_no","serial","sno"].includes(cfKey);
+          const isSerialCol = [
+            "sl_no",
+            "si_no",
+            "sr_no",
+            "s_no",
+            "slno",
+            "sno",
+            "serial_no",
+            "serial",
+            "sno",
+          ].includes(cfKey);
           if (skippedCustomHeaders.has(header) || isSerialCol) continue;
           record.custom_fields[cfKey] = row[i] != null ? String(row[i]) : null;
           continue;
@@ -383,7 +427,7 @@ export function UniversalImportModal({
           const val = record[c.key];
           if (val === undefined || val === null || val === "") {
             // Don't double-report if TABLE_RULES already added an error
-            if (!errors.some(e => e.toLowerCase().includes(c.label.toLowerCase()))) {
+            if (!errors.some((e) => e.toLowerCase().includes(c.label.toLowerCase()))) {
               errors.push(`${c.label} is required`);
             }
           }
@@ -395,12 +439,12 @@ export function UniversalImportModal({
 
     setPreviewRecords(records);
 
-      const mappingsToSave: ImportMapping[] = Object.entries(mapping)
-        .filter(([header, v]) => v !== null)
-        .map(([header, field]) => ({
-          excel_header: header,
-          spinflow_field: field,
-        }));
+    const mappingsToSave: ImportMapping[] = Object.entries(mapping)
+      .filter(([header, v]) => v !== null)
+      .map(([header, field]) => ({
+        excel_header: header,
+        spinflow_field: field,
+      }));
     try {
       saveMappingsMutation.mutate(mappingsToSave);
     } catch {
@@ -463,7 +507,21 @@ export function UniversalImportModal({
   function validateAttendanceStatus(record: Record<string, any>): string | null {
     const status = record.status;
     if (!status) return null;
-    const valid = ["present", "absent", "half-day", "leave", "holiday", "P", "A", "H", "CL", "SL", "EL", "OD", "WO"];
+    const valid = [
+      "present",
+      "absent",
+      "half-day",
+      "leave",
+      "holiday",
+      "P",
+      "A",
+      "H",
+      "CL",
+      "SL",
+      "EL",
+      "OD",
+      "WO",
+    ];
     if (!valid.includes(String(status).toLowerCase())) {
       return `Invalid attendance status '${status}'`;
     }
@@ -480,7 +538,10 @@ export function UniversalImportModal({
     return null;
   }
 
-  const TABLE_RULES: Record<string, (record: Record<string, any>, configs: ColumnConfig[], rowIdx?: number) => string[]> = {
+  const TABLE_RULES: Record<
+    string,
+    (record: Record<string, any>, configs: ColumnConfig[], rowIdx?: number) => string[]
+  > = {
     masters_machines: (rec, _cfgs, rowIdx) => {
       const errors: string[] = [];
       // Auto-generate code if missing (warning, not error)
@@ -527,26 +588,50 @@ export function UniversalImportModal({
         else rec.gender = "Other";
       }
       // Strip commas from salary fields
-      for (const f of ["basic", "wages", "total_salary", "house_rent", "medical",
-                       "conveyance", "food_allowance", "mobile_bill", "shift_benefit"]) {
+      for (const f of [
+        "basic",
+        "wages",
+        "total_salary",
+        "house_rent",
+        "medical",
+        "conveyance",
+        "food_allowance",
+        "mobile_bill",
+        "shift_benefit",
+      ]) {
         if (rec[f] !== undefined && typeof rec[f] === "string") {
           rec[f] = parseFloat(rec[f].replace(/,/g, "")) || 0;
         }
       }
       return [
-        ...validateNumericFields(rec, cfgs, ["basic", "house_rent", "medical", "conveyance", "food_allowance", "wages", "increment", "total_salary", "mobile_bill", "shift_benefit"]),
-        ...(rec.date_of_joining ? (() => {
-          const e = validateFutureDate(rec.date_of_joining, "Date of Joining");
-          return e ? [e] : [];
-        })() : []),
+        ...validateNumericFields(rec, cfgs, [
+          "basic",
+          "house_rent",
+          "medical",
+          "conveyance",
+          "food_allowance",
+          "wages",
+          "increment",
+          "total_salary",
+          "mobile_bill",
+          "shift_benefit",
+        ]),
+        ...(rec.date_of_joining
+          ? (() => {
+              const e = validateFutureDate(rec.date_of_joining, "Date of Joining");
+              return e ? [e] : [];
+            })()
+          : []),
       ];
     },
     hr_attendance: (rec, cfgs) => [
       ...(validateAttendanceStatus(rec) ? [validateAttendanceStatus(rec)!] : []),
-      ...(rec.date ? (() => {
-        const e = validateFutureDate(rec.date, "Date");
-        return e ? [e] : [];
-      })() : []),
+      ...(rec.date
+        ? (() => {
+            const e = validateFutureDate(rec.date, "Date");
+            return e ? [e] : [];
+          })()
+        : []),
     ],
   };
 
@@ -597,19 +682,15 @@ export function UniversalImportModal({
       stock: "current_stock",
       min_stock: "reorder_level",
     },
-    production_entries: {
-    },
-    quality_tests: {
-    },
+    production_entries: {},
+    quality_tests: {},
     maintenance_schedules: {
       description: "task_description",
       last_done: "last_done_date",
       next_due: "next_due_date",
     },
-    masters_machines: {
-    },
-    masters_customers: {
-    },
+    masters_machines: {},
+    masters_customers: {},
   };
 
   const TABLE_KEY_FIELDS: Record<string, string[]> = {
@@ -668,7 +749,7 @@ export function UniversalImportModal({
 
       // Send all records in a single request — avoids silent batch failures on
       // slower deployments (Render free tier). Backend supports up to 1000 rows.
-      const sanitized = validRecords.map(record => ({
+      const sanitized = validRecords.map((record) => ({
         ...record,
         employee_code: record.employee_code != null ? String(record.employee_code).trim() : "",
         gen: record.gen != null ? String(record.gen).trim() : null,
@@ -687,7 +768,7 @@ export function UniversalImportModal({
         } catch (err: any) {
           lastErr = err;
           if (attempt < MAX_RETRIES) {
-            await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+            await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
           }
         }
       }
@@ -696,7 +777,9 @@ export function UniversalImportModal({
 
       if (!res) {
         const errMsg = lastErr?.response?.data?.detail ?? lastErr?.message ?? "Network error";
-        setImportError(`Import failed: ${Array.isArray(errMsg) ? errMsg.map((e: any) => e.msg).join(", ") : errMsg}`);
+        setImportError(
+          `Import failed: ${Array.isArray(errMsg) ? errMsg.map((e: any) => e.msg).join(", ") : errMsg}`,
+        );
         setIsImporting(false);
         setImportResult({ success: 0, created: 0, updated: 0, skipped: 0, errors: [] });
         setStep(5);
@@ -728,7 +811,7 @@ export function UniversalImportModal({
         success: successCount,
         created: totalCreated,
         updated: totalUpdated,
-        skipped: totalSkipped || (validRecords.length - successCount),
+        skipped: totalSkipped || validRecords.length - successCount,
         errors,
         auto_created_departments: autoDepts.length > 0 ? [...new Set(autoDepts)] : undefined,
       });
@@ -743,7 +826,7 @@ export function UniversalImportModal({
       invalidateMillMasters();
     } catch (err: any) {
       setIsImporting(false);
-      const msg = err?.message ?? String(err) ?? "Unknown error during import";
+      const msg = err?.message || String(err) || "Unknown error during import";
       setImportError(msg);
       setImportResult({
         success: 0,
@@ -762,7 +845,10 @@ export function UniversalImportModal({
   const renderStep1 = () => (
     <div className="space-y-6">
       <div
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
         onClick={() => document.getElementById("import-file-input")?.click()}
@@ -801,10 +887,18 @@ export function UniversalImportModal({
 
   const getConfidenceBadge = (value: number) => {
     if (value >= 80) {
-      return <Badge variant="default" className="bg-green-600 hover:bg-green-600">{value}%</Badge>;
+      return (
+        <Badge variant="default" className="bg-green-600 hover:bg-green-600">
+          {value}%
+        </Badge>
+      );
     }
     if (value >= 40) {
-      return <Badge variant="secondary" className="bg-yellow-500 hover:bg-yellow-500 text-white">{value}%</Badge>;
+      return (
+        <Badge variant="secondary" className="bg-yellow-500 hover:bg-yellow-500 text-white">
+          {value}%
+        </Badge>
+      );
     }
     return <Badge variant="destructive">{value}%</Badge>;
   };
@@ -835,82 +929,94 @@ export function UniversalImportModal({
               <TableHead className="w-16 text-center">Skip</TableHead>
             </TableRow>
           </TableHeader>
-              <TableBody>
-                {headers.map((header) => {
-                  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-                  const nh = norm(header);
-                  const autoCustom = !mapping[header] && !colConfigs.some(
-                    c => norm(c.key) === nh || norm(c.label) === nh
-                  );
-                  return (
-                    <TableRow key={header}>
-                      <TableCell className="font-medium">{header}</TableCell>
-                      <TableCell>
-                        {autoCustom ? (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
-                              Custom field
-                            </span>
-                            <span className="text-xs text-[#64748b]">
-                              Will appear as extra column in list
-                            </span>
-                          </div>
-                        ) : (
-                          <Select
-                            value={mapping[header] ?? "__skip__"}
-                            onValueChange={(v) => handleMappingChange(header, v === "__skip__" ? null : v)}
-                          >
-                            <SelectTrigger className="w-56">
-                              <SelectValue placeholder="— Skip —" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__skip__">— Skip —</SelectItem>
-                              {colConfigs.map((c) => (
-                                <SelectItem key={c.key} value={c.key}>
-                                  {c.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {autoCustom ? (
-                          <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300">
-                            Custom
-                          </Badge>
-                        ) : mapping[header] ? (
-                          getConfidenceBadge(confidence[header] ?? 0)
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Checkbox
-                          checked={autoCustom ? skippedCustomHeaders.has(header) : mapping[header] === null}
-                          onCheckedChange={(chk) => {
-                            if (autoCustom) {
-                              setSkippedCustomHeaders(prev => {
-                                const next = new Set(prev);
-                                chk ? next.add(header) : next.delete(header);
-                                return next;
-                              });
-                            } else {
-                              if (chk) {
-                                handleMappingChange(header, null);
-                              } else {
-                                const fuzzyResult = fuzzyMatchColumns([header], colConfigs, savedMappings);
-                                const matched = fuzzyResult.get(header);
-                                handleMappingChange(header, matched?.key ?? null);
-                              }
-                            }
-                          }}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
+          <TableBody>
+            {headers.map((header) => {
+              const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+              const nh = norm(header);
+              const autoCustom =
+                !mapping[header] &&
+                !colConfigs.some((c) => norm(c.key) === nh || norm(c.label) === nh);
+              return (
+                <TableRow key={header}>
+                  <TableCell className="font-medium">{header}</TableCell>
+                  <TableCell>
+                    {autoCustom ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                          Custom field
+                        </span>
+                        <span className="text-xs text-[#64748b]">
+                          Will appear as extra column in list
+                        </span>
+                      </div>
+                    ) : (
+                      <Select
+                        value={mapping[header] ?? "__skip__"}
+                        onValueChange={(v) =>
+                          handleMappingChange(header, v === "__skip__" ? null : v)
+                        }
+                      >
+                        <SelectTrigger className="w-56">
+                          <SelectValue placeholder="— Skip —" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__skip__">— Skip —</SelectItem>
+                          {colConfigs.map((c) => (
+                            <SelectItem key={c.key} value={c.key}>
+                              {c.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {autoCustom ? (
+                      <Badge
+                        variant="outline"
+                        className="bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300"
+                      >
+                        Custom
+                      </Badge>
+                    ) : mapping[header] ? (
+                      getConfidenceBadge(confidence[header] ?? 0)
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Checkbox
+                      checked={
+                        autoCustom ? skippedCustomHeaders.has(header) : mapping[header] === null
+                      }
+                      onCheckedChange={(chk) => {
+                        if (autoCustom) {
+                          setSkippedCustomHeaders((prev) => {
+                            const next = new Set(prev);
+                            if (chk) next.add(header);
+                            else next.delete(header);
+                            return next;
+                          });
+                        } else {
+                          if (chk) {
+                            handleMappingChange(header, null);
+                          } else {
+                            const fuzzyResult = fuzzyMatchColumns(
+                              [header],
+                              colConfigs,
+                              savedMappings,
+                            );
+                            const matched = fuzzyResult.get(header);
+                            handleMappingChange(header, matched?.key ?? null);
+                          }
+                        }
+                      }}
+                    />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
         </Table>
       </div>
 
@@ -936,9 +1042,13 @@ export function UniversalImportModal({
   const renderStep3 = () => {
     const displayRecords = previewRecords.slice(0, 50);
     const standardFields = Object.values(mapping).filter(Boolean) as string[];
-    const customKeys = [...new Set(displayRecords.flatMap(r =>
-      Object.keys(r.data.custom_fields || {}).map(k => `__custom__:${k}`)
-    ))];
+    const customKeys = [
+      ...new Set(
+        displayRecords.flatMap((r) =>
+          Object.keys(r.data.custom_fields || {}).map((k) => `__custom__:${k}`),
+        ),
+      ),
+    ];
     const mappedFields = [...standardFields, ...customKeys];
     const isCustomKey = (k: string) => k.startsWith("__custom__:");
     const customKeyToHeader = (k: string) => k.replace("__custom__:", "");
@@ -949,9 +1059,7 @@ export function UniversalImportModal({
           <Badge variant="default" className="bg-green-600 hover:bg-green-600">
             {validCount} Valid
           </Badge>
-          {errorCount > 0 && (
-            <Badge variant="destructive">{errorCount} Errors</Badge>
-          )}
+          {errorCount > 0 && <Badge variant="destructive">{errorCount} Errors</Badge>}
           <span className="text-muted-foreground">
             {previewRecords.length - validCount - errorCount} Skipped
           </span>
@@ -970,7 +1078,9 @@ export function UniversalImportModal({
                 {mappedFields.map((fk) => (
                   <TableHead key={fk}>
                     {isCustomKey(fk)
-                      ? customKeyToHeader(fk).replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())
+                      ? customKeyToHeader(fk)
+                          .replace(/_/g, " ")
+                          .replace(/\b\w/g, (l) => l.toUpperCase())
                       : (colMap[fk]?.label ?? fk)}
                   </TableHead>
                 ))}
@@ -987,7 +1097,12 @@ export function UniversalImportModal({
                       return (
                         <TableCell key={fk}>
                           <div className="flex items-center gap-1">
-                            <Badge variant="outline" className="h-5 text-[10px] px-1 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300">Custom</Badge>
+                            <Badge
+                              variant="outline"
+                              className="h-5 text-[10px] px-1 bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300"
+                            >
+                              Custom
+                            </Badge>
                             <Input
                               className="h-7 text-xs border-0 bg-transparent p-0 focus-visible:ring-1 focus-visible:ring-offset-0"
                               value={String(record.data.custom_fields?.[cfKey] ?? "")}
@@ -1013,7 +1128,10 @@ export function UniversalImportModal({
                   })}
                   <TableCell>
                     {record.errors.length > 0 ? (
-                      <div className="flex items-center gap-1 text-red-600 text-xs" title={record.errors.join("; ")}>
+                      <div
+                        className="flex items-center gap-1 text-red-600 text-xs"
+                        title={record.errors.join("; ")}
+                      >
                         <XCircle className="size-3.5" />
                         <span className="truncate max-w-24">{record.errors[0]}</span>
                       </div>
@@ -1055,9 +1173,10 @@ export function UniversalImportModal({
   };
 
   const renderStep4 = () => {
-    const pct = importProgress.total > 0
-      ? Math.round((importProgress.current / importProgress.total) * 100)
-      : 0;
+    const pct =
+      importProgress.total > 0
+        ? Math.round((importProgress.current / importProgress.total) * 100)
+        : 0;
 
     return (
       <div className="py-12 space-y-6 text-center">
@@ -1078,8 +1197,9 @@ export function UniversalImportModal({
   };
 
   const renderStep5 = () => {
-    const hardErrors = importResult?.errors.filter(e => !e.severity || e.severity === "error") ?? [];
-    const warnings = importResult?.errors.filter(e => e.severity === "warning") ?? [];
+    const hardErrors =
+      importResult?.errors.filter((e) => !e.severity || e.severity === "error") ?? [];
+    const warnings = importResult?.errors.filter((e) => e.severity === "warning") ?? [];
     const hasErrors = hardErrors.length > 0 || warnings.length > 0;
     const hasHardErrors = hardErrors.length > 0;
     const isTotalFailure = importError !== null;
@@ -1163,7 +1283,9 @@ export function UniversalImportModal({
               <div className="mt-3 text-left bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-sm text-blue-800">
                 <strong>New departments auto-created:</strong>{" "}
                 {importResult!.auto_created_departments!.join(", ")}
-                <div className="text-xs text-blue-600 mt-1">Review them in Masters → Departments.</div>
+                <div className="text-xs text-blue-600 mt-1">
+                  Review them in Masters → Departments.
+                </div>
               </div>
             )}
 
@@ -1178,15 +1300,22 @@ export function UniversalImportModal({
               const cfKeys = cfHeaders.map((h) => normalizeCustomFieldKey(h));
               return (
                 <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md text-left">
-                  <p className="text-sm font-medium text-blue-800">Custom fields detected and saved:</p>
+                  <p className="text-sm font-medium text-blue-800">
+                    Custom fields detected and saved:
+                  </p>
                   <div className="mt-1 flex flex-wrap gap-1">
                     {cfKeys.map((k) => (
-                      <span key={k} className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-mono">
+                      <span
+                        key={k}
+                        className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-mono"
+                      >
                         {k}
                       </span>
                     ))}
                   </div>
-                  <p className="text-xs text-blue-600 mt-1">These appear as extra columns in the {tableName.replace(/_/g, " ")} list.</p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    These appear as extra columns in the {tableName.replace(/_/g, " ")} list.
+                  </p>
                 </div>
               );
             })()}
@@ -1205,22 +1334,27 @@ export function UniversalImportModal({
             {showStep5Errors && (hasHardErrors || warnings.length > 0) && (
               <div className="mt-3 max-h-48 overflow-y-auto text-left space-y-1">
                 {hardErrors.map((err, i) => (
-                  <div key={i} className="text-sm p-2 rounded border bg-red-50 text-red-700 border-red-200">
+                  <div
+                    key={i}
+                    className="text-sm p-2 rounded border bg-red-50 text-red-700 border-red-200"
+                  >
                     <span className="font-medium">Row {err.row}</span>
-                    {err.code ? <span className="ml-1 font-mono">[{err.code}]</span> : ''}
-                    {err.name ? <span className="ml-1 font-medium">{err.name}</span> : ''}
-                    {err.dept ? <span className="ml-1 text-slate-500">({err.dept})</span> : ''}
-                    {err.field ? ` — ${err.field}` : ''}
-                    {err.value ? ` ("${err.value}")` : ''}
-                    <span className="ml-1">{(err.message || err.error || '')}</span>
+                    {err.code ? <span className="ml-1 font-mono">[{err.code}]</span> : ""}
+                    {err.name ? <span className="ml-1 font-medium">{err.name}</span> : ""}
+                    {err.dept ? <span className="ml-1 text-slate-500">({err.dept})</span> : ""}
+                    {err.field ? ` — ${err.field}` : ""}
+                    {err.value ? ` ("${err.value}")` : ""}
+                    <span className="ml-1">{err.message || err.error || ""}</span>
                   </div>
                 ))}
                 {warnings.map((err, i) => (
-                  <div key={`w-${i}`} className="text-sm p-2 rounded border bg-yellow-50 text-yellow-700 border-yellow-200">
+                  <div
+                    key={`w-${i}`}
+                    className="text-sm p-2 rounded border bg-yellow-50 text-yellow-700 border-yellow-200"
+                  >
                     <span className="font-medium">Row {err.row}</span>
-                    {err.field ? ` — ${err.field}` : ''}
-                    {err.value ? ` ("${err.value}")` : ''}
-                    : {err.message || 'Unknown warning'}
+                    {err.field ? ` — ${err.field}` : ""}
+                    {err.value ? ` ("${err.value}")` : ""}: {err.message || "Unknown warning"}
                   </div>
                 ))}
               </div>
@@ -1244,11 +1378,15 @@ export function UniversalImportModal({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className={cn(
-        "max-w-5xl max-h-[90vh] overflow-y-auto",
-        step === 1 && "max-w-lg",
-      )}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent
+        className={cn("max-w-5xl max-h-[90vh] overflow-y-auto", step === 1 && "max-w-lg")}
+      >
         <DialogHeader>
           <DialogTitle>{title ?? `Import ${tableName}`}</DialogTitle>
         </DialogHeader>
@@ -1269,12 +1407,7 @@ export function UniversalImportModal({
                 {s < step ? <CheckCircle2 className="size-4" /> : s}
               </div>
               {s < 5 && (
-                <div
-                  className={cn(
-                    "h-0.5 flex-1",
-                    s < step ? "bg-green-500" : "bg-muted",
-                  )}
-                />
+                <div className={cn("h-0.5 flex-1", s < step ? "bg-green-500" : "bg-muted")} />
               )}
             </div>
           ))}

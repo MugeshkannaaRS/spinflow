@@ -2,13 +2,15 @@ from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Te
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin, generate_uuid
 from datetime import datetime
-from app.db.base import Base, TimestampMixin, generate_uuid
+from typing import Optional
 
 
 class Dispatch(TimestampMixin, Base):
     __tablename__ = "dispatches"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("mills.id"), nullable=True, index=True)
+    company_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("companies.id"), nullable=True, index=True)
     dispatch_no: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
     order_no: Mapped[str] = mapped_column(String(50), nullable=True)

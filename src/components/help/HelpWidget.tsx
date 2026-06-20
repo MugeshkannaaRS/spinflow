@@ -33,7 +33,7 @@ export function HelpWidget() {
         onClick={() => setOpen(!open)}
         className={cn(
           "fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all",
-          open ? "bg-gray-800 text-white" : "bg-blue-600 text-white hover:bg-blue-700"
+          open ? "bg-gray-800 text-white" : "bg-blue-600 text-white hover:bg-blue-700",
         )}
       >
         {open ? <X className="w-5 h-5" /> : <HelpCircle className="w-5 h-5" />}
@@ -60,7 +60,9 @@ export function HelpWidget() {
                   <div className="min-w-0">
                     <p className="text-xs font-medium text-gray-900">{a.title}</p>
                     {a.summary && (
-                      <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{a.summary}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
+                        {a.summary}
+                      </p>
                     )}
                   </div>
                 </a>

@@ -47,15 +47,17 @@ interface ImportButtonProps {
 // ─── Column mapping helpers ────────────────────────────────────────────────
 
 function levenshtein(a: string, b: string): number {
-  const m = a.length; const n = b.length;
+  const m = a.length;
+  const n = b.length;
   const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
   for (let i = 0; i <= m; i++) dp[i][0] = i;
   for (let j = 0; j <= n; j++) dp[0][j] = j;
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1]
-        ? dp[i - 1][j - 1]
-        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
     }
   }
   return dp[m][n];
@@ -73,12 +75,14 @@ function detectColIndex(headers: string[], candidates: string[], threshold = 0.5
     const idx = lowerHeaders.findIndex((h) => h === cand.toLowerCase().trim());
     if (idx !== -1) return idx;
   }
-  let bestIdx = -1; let bestScore = 0;
+  let bestIdx = -1;
+  let bestScore = 0;
   for (let i = 0; i < lowerHeaders.length; i++) {
     for (const cand of candidates) {
       const score = similarity(lowerHeaders[i], cand.toLowerCase().trim());
       if (score > bestScore && score >= threshold) {
-        bestScore = score; bestIdx = i;
+        bestScore = score;
+        bestIdx = i;
       }
     }
   }
@@ -122,7 +126,11 @@ export function ImportButton({
   // import progress
   const [progress, setProgress] = useState(0);
   const [importDone, setImportDone] = useState(false);
-  const [importResult, setImportResult] = useState({ success: 0, failed: 0, errors: [] as string[] });
+  const [importResult, setImportResult] = useState({
+    success: 0,
+    failed: 0,
+    errors: [] as string[],
+  });
 
   // ── File pick ───────────────────────────────────────────────────────────
   const handleFile = (file: File) => {
@@ -137,9 +145,10 @@ export function ImportButton({
         return;
       }
       const hdrs = aoa[0].map((v: any) => String(v ?? "").trim());
-      const rows = aoa.slice(1).filter((r) => r.some((c: any) => c !== "")).map((r) =>
-        r.map((c: any) => String(c ?? "").trim()),
-      );
+      const rows = aoa
+        .slice(1)
+        .filter((r) => r.some((c: any) => c !== ""))
+        .map((r) => r.map((c: any) => String(c ?? "").trim()));
       setHeaders(hdrs);
       setRawRows(rows);
 
@@ -209,7 +218,7 @@ export function ImportButton({
       setProgress(100);
       const data = res.data;
       const success = data.created ?? data.success ?? body.length;
-      const failed = data.failed ?? (data.errors?.length ?? 0);
+      const failed = data.failed ?? data.errors?.length ?? 0;
       const errors: string[] = data.errors ?? [];
       setImportResult({ success, failed, errors });
       setImportDone(true);
@@ -249,10 +258,16 @@ export function ImportButton({
         if (exampleRow[col.key]) {
           const v = exampleRow[col.key];
           if (/^\d+$/.test(v)) variant[col.key] = String(Number(v) + Math.ceil(Math.random() * 10));
-          else if (v.length > 2) variant[col.key] = v.slice(0, -1) + String.fromCharCode(v.charCodeAt(v.length - 1) + 1);
+          else if (v.length > 2)
+            variant[col.key] = v.slice(0, -1) + String.fromCharCode(v.charCodeAt(v.length - 1) + 1);
           else variant[col.key] = `Example ${col.label}`;
         } else {
-          variant[col.key] = col.type === "number" ? "0" : col.type === "date" ? "01/01/2025" : `Example ${col.label}`;
+          variant[col.key] =
+            col.type === "number"
+              ? "0"
+              : col.type === "date"
+                ? "01/01/2025"
+                : `Example ${col.label}`;
         }
       }
       exampleRows.push(templateCols.map((c) => variant[c.key] ?? ""));
@@ -264,7 +279,12 @@ export function ImportButton({
           else if (col.type === "number") third[col.key] = String(Math.floor(Math.random() * 100));
           else third[col.key] = `Example ${col.label} B`;
         } else {
-          third[col.key] = col.type === "number" ? "0" : col.type === "date" ? "02/01/2025" : `Example ${col.label} 2`;
+          third[col.key] =
+            col.type === "number"
+              ? "0"
+              : col.type === "date"
+                ? "02/01/2025"
+                : `Example ${col.label} 2`;
         }
       }
       exampleRows.push(templateCols.map((c) => third[c.key] ?? ""));
@@ -272,7 +292,11 @@ export function ImportButton({
       for (let r = 0; r < 3; r++) {
         exampleRows.push(
           templateCols.map((c) =>
-            c.type === "number" ? String((r + 1) * 10) : c.type === "date" ? `0${r + 1}/01/2025` : `Example ${c.label}`,
+            c.type === "number"
+              ? String((r + 1) * 10)
+              : c.type === "date"
+                ? `0${r + 1}/01/2025`
+                : `Example ${c.label}`,
           ),
         );
       }
@@ -334,7 +358,8 @@ export function ImportButton({
             <DialogTitle>Import Records</DialogTitle>
             <DialogDescription>
               {step === "mapping" && `${rawRows.length} rows detected. Verify column mapping.`}
-              {step === "preview" && `${validRows.length} valid · ${invalidRows.length} errors. Click cells to fix.`}
+              {step === "preview" &&
+                `${validRows.length} valid · ${invalidRows.length} errors. Click cells to fix.`}
               {step === "importing" && "Importing…"}
             </DialogDescription>
           </DialogHeader>
@@ -360,9 +385,13 @@ export function ImportButton({
                           <td className="px-3 py-2 font-medium text-xs">{col.label}</td>
                           <td className="px-3 py-2">
                             {col.required ? (
-                              <Badge variant="destructive" className="text-[10px] h-4">Required</Badge>
+                              <Badge variant="destructive" className="text-[10px] h-4">
+                                Required
+                              </Badge>
                             ) : (
-                              <Badge variant="secondary" className="text-[10px] h-4">Optional</Badge>
+                              <Badge variant="secondary" className="text-[10px] h-4">
+                                Optional
+                              </Badge>
                             )}
                           </td>
                           <td className="px-3 py-2">
@@ -379,7 +408,10 @@ export function ImportButton({
                                 <SelectValue placeholder="Not mapped" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="__none__" className="text-xs text-muted-foreground">
+                                <SelectItem
+                                  value="__none__"
+                                  className="text-xs text-muted-foreground"
+                                >
                                   — Not mapped —
                                 </SelectItem>
                                 {headers.map((h, i) => (
@@ -398,7 +430,9 @@ export function ImportButton({
               </div>
 
               <DialogFooter>
-                <Button variant="ghost" size="sm" onClick={reset}>Cancel</Button>
+                <Button variant="ghost" size="sm" onClick={reset}>
+                  Cancel
+                </Button>
                 <Button size="sm" onClick={applyMapping}>
                   Apply Mapping →
                 </Button>
@@ -424,7 +458,10 @@ export function ImportButton({
                     <tr>
                       <th className="px-2 py-1.5 text-left font-medium w-8">#</th>
                       {templateCols.map((col) => (
-                        <th key={col.key} className="px-2 py-1.5 text-left font-medium whitespace-nowrap">
+                        <th
+                          key={col.key}
+                          className="px-2 py-1.5 text-left font-medium whitespace-nowrap"
+                        >
                           {col.label}
                           {col.required && <span className="text-destructive ml-0.5">*</span>}
                         </th>
@@ -436,7 +473,11 @@ export function ImportButton({
                     {preview.map((row, ri) => (
                       <tr
                         key={ri}
-                        className={row.errors.length > 0 ? "bg-destructive/5" : "bg-green-50/50 dark:bg-green-950/10"}
+                        className={
+                          row.errors.length > 0
+                            ? "bg-destructive/5"
+                            : "bg-green-50/50 dark:bg-green-950/10"
+                        }
                       >
                         <td className="px-2 py-1 text-muted-foreground">{ri + 1}</td>
                         {templateCols.map((col) => {
@@ -460,7 +501,9 @@ export function ImportButton({
                         })}
                         <td className="px-2 py-1">
                           {row.errors.length > 0 ? (
-                            <span className="text-destructive text-[10px]">{row.errors.join("; ")}</span>
+                            <span className="text-destructive text-[10px]">
+                              {row.errors.join("; ")}
+                            </span>
                           ) : (
                             <CheckCircle2 className="size-3 text-green-600" />
                           )}
@@ -472,13 +515,13 @@ export function ImportButton({
               </div>
 
               <DialogFooter>
-                <Button variant="ghost" size="sm" onClick={() => setStep("mapping")}>← Back</Button>
-                <Button variant="ghost" size="sm" onClick={reset}>Cancel</Button>
-                <Button
-                  size="sm"
-                  disabled={validRows.length === 0}
-                  onClick={handleImport}
-                >
+                <Button variant="ghost" size="sm" onClick={() => setStep("mapping")}>
+                  ← Back
+                </Button>
+                <Button variant="ghost" size="sm" onClick={reset}>
+                  Cancel
+                </Button>
+                <Button size="sm" disabled={validRows.length === 0} onClick={handleImport}>
                   Import {validRows.length} Records
                 </Button>
               </DialogFooter>
@@ -513,12 +556,16 @@ export function ImportButton({
                   {importResult.errors.length > 0 && (
                     <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 max-h-40 overflow-y-auto space-y-1">
                       {importResult.errors.map((e, i) => (
-                        <p key={i} className="text-xs text-destructive">{e}</p>
+                        <p key={i} className="text-xs text-destructive">
+                          {e}
+                        </p>
                       ))}
                     </div>
                   )}
                   <DialogFooter>
-                    <Button size="sm" onClick={reset}>Done</Button>
+                    <Button size="sm" onClick={reset}>
+                      Done
+                    </Button>
                   </DialogFooter>
                 </div>
               )}

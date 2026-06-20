@@ -2,15 +2,15 @@ import { type LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface KpiTrend {
-  value: number;       // absolute value, e.g. 4.2
+  value: number; // absolute value, e.g. 4.2
   direction: "up" | "down";
-  positive: boolean;   // true = up-is-good; false = down-is-good (e.g. waste%)
+  positive: boolean; // true = up-is-good; false = down-is-good (e.g. waste%)
 }
 
 interface KpiProgress {
-  value: number;       // current value
-  max: number;         // max value (100 for pct, or target qty)
-  color?: string;      // tailwind bg class, e.g. "bg-blue-500"
+  value: number; // current value
+  max: number; // max value (100 for pct, or target qty)
+  color?: string; // tailwind bg class, e.g. "bg-blue-500"
 }
 
 export interface KpiCardProps {
@@ -18,8 +18,8 @@ export interface KpiCardProps {
   value: string | number;
   subLabel?: string;
   icon: LucideIcon;
-  iconColor?: string;   // e.g. "text-blue-600"
-  iconBg?: string;      // e.g. "bg-blue-50"
+  iconColor?: string; // e.g. "text-blue-600"
+  iconBg?: string; // e.g. "bg-blue-50"
   trend?: KpiTrend;
   progress?: KpiProgress;
   className?: string;
@@ -47,7 +47,7 @@ export function KpiCard({
   const trendPositive =
     trend &&
     ((trend.direction === "up" && trend.positive) ||
-     (trend.direction === "down" && !trend.positive));
+      (trend.direction === "down" && !trend.positive));
 
   return (
     <div
@@ -61,7 +61,12 @@ export function KpiCard({
         <p className="text-[11px] font-semibold uppercase tracking-widest text-[#64748b]">
           {label}
         </p>
-        <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0", iconBg)}>
+        <div
+          className={cn(
+            "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
+            iconBg,
+          )}
+        >
           <Icon className={cn("w-4 h-4", iconColor)} />
         </div>
       </div>
@@ -74,22 +79,19 @@ export function KpiCard({
 
         {/* Sub-label + trend */}
         <div className="flex items-center gap-2 mt-1 flex-wrap">
-          {subLabel && (
-            <span className="text-[13px] text-[#64748b]">{subLabel}</span>
-          )}
+          {subLabel && <span className="text-[13px] text-[#64748b]">{subLabel}</span>}
           {trend && (
             <span
               className={cn(
                 "inline-flex items-center gap-0.5 text-[11px] font-semibold px-1.5 py-0.5 rounded",
-                trendPositive
-                  ? "bg-green-100 text-green-700"
-                  : "bg-red-100 text-red-700",
+                trendPositive ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700",
               )}
             >
-              {trend.direction === "up"
-                ? <TrendingUp className="w-3 h-3" />
-                : <TrendingDown className="w-3 h-3" />
-              }
+              {trend.direction === "up" ? (
+                <TrendingUp className="w-3 h-3" />
+              ) : (
+                <TrendingDown className="w-3 h-3" />
+              )}
               {trend.value.toFixed(1)}%
             </span>
           )}
@@ -103,10 +105,9 @@ export function KpiCard({
             className="h-full rounded-full transition-all duration-500"
             style={{
               width: `${progressPct}%`,
-              backgroundColor: progress.color ??
-                (progressPct >= 90 ? "#16a34a"
-               : progressPct >= 70 ? "#d97706"
-               : "#dc2626"),
+              backgroundColor:
+                progress.color ??
+                (progressPct >= 90 ? "#16a34a" : progressPct >= 70 ? "#d97706" : "#dc2626"),
             }}
           />
         </div>

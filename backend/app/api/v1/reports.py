@@ -39,7 +39,7 @@ async def get_report_summary(
         tgt_res = await db.execute(select(func.coalesce(func.sum(Machine.target_kg), 0)))
         total_target = float(tgt_res.scalar() or 1)
     except Exception:
-        pass
+        logger.exception("reports.summary: failed to fetch production stats")
 
     eff_stmt = select(func.coalesce(func.avg(
         ProductionEntry.produced_kg / func.nullif(Machine.target_kg, 0) * 100

@@ -160,7 +160,7 @@ class OnboardingService:
 
         # ── 8. Audit log ──────────────────────────────────────
         self.db.add(AuditLog(
-            user_id=self.current_user.id if self.current_user else "SYSTEM",
+            user_id=self.current_user.id if self.current_user else None,
             user_name=self.current_user.name if self.current_user else "System",
             role=self.current_user.role_rel.code if self.current_user and self.current_user.role_rel else "SUPER_ADMIN",
             action="COMPANY_ONBOARDED",

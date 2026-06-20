@@ -8,12 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   Dialog,
   DialogContent,
@@ -91,49 +86,51 @@ interface AlertRule {
 
 const SEV_DOT: Record<string, string> = {
   EMERGENCY: "bg-red-600",
-  CRITICAL:  "bg-red-500",
-  WARNING:   "bg-amber-500",
-  INFO:      "bg-blue-400",
+  CRITICAL: "bg-red-500",
+  WARNING: "bg-amber-500",
+  INFO: "bg-blue-400",
 };
 
 const SEV_BADGE: Record<string, string> = {
   EMERGENCY: "bg-red-100 text-red-700",
-  CRITICAL:  "bg-red-100 text-red-600",
-  WARNING:   "bg-amber-100 text-amber-700",
-  INFO:      "bg-blue-100 text-blue-700",
+  CRITICAL: "bg-red-100 text-red-600",
+  WARNING: "bg-amber-100 text-amber-700",
+  INFO: "bg-blue-100 text-blue-700",
 };
 
 const SEV_ROW: Record<string, string> = {
   EMERGENCY: "border-l-4 border-l-red-600 bg-red-50/40",
-  CRITICAL:  "border-l-4 border-l-red-400 bg-red-50/20",
-  WARNING:   "border-l-4 border-l-amber-400 bg-amber-50/20",
-  INFO:      "border-l-4 border-l-blue-300",
+  CRITICAL: "border-l-4 border-l-red-400 bg-red-50/20",
+  WARNING: "border-l-4 border-l-amber-400 bg-amber-50/20",
+  INFO: "border-l-4 border-l-blue-300",
 };
 
 const STATUS_BADGE: Record<string, string> = {
-  OPEN:      "bg-red-100 text-red-700",
+  OPEN: "bg-red-100 text-red-700",
   ESCALATED: "bg-orange-100 text-orange-700",
   ACKNOWLEDGED: "bg-blue-100 text-blue-700",
-  RESOLVED:  "bg-green-100 text-green-700",
+  RESOLVED: "bg-green-100 text-green-700",
 };
 
 const CAT_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
-  MACHINE:   Factory,
-  SECURITY:  Shield,
-  BILLING:   TrendingDown,
+  MACHINE: Factory,
+  SECURITY: Shield,
+  BILLING: TrendingDown,
   MAINTENANCE: Wrench,
-  QUALITY:   Zap,
-  SYSTEM:    Zap,
+  QUALITY: Zap,
+  SYSTEM: Zap,
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function SevBadge({ severity }: { severity: string }) {
   return (
-    <span className={cn(
-      "text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded",
-      SEV_BADGE[severity] ?? "bg-gray-100 text-gray-600"
-    )}>
+    <span
+      className={cn(
+        "text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded",
+        SEV_BADGE[severity] ?? "bg-gray-100 text-gray-600",
+      )}
+    >
       {severity}
     </span>
   );
@@ -141,10 +138,12 @@ function SevBadge({ severity }: { severity: string }) {
 
 function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={cn(
-      "text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full",
-      STATUS_BADGE[status] ?? "bg-gray-100 text-gray-600"
-    )}>
+    <span
+      className={cn(
+        "text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full",
+        STATUS_BADGE[status] ?? "bg-gray-100 text-gray-600",
+      )}
+    >
       {status}
     </span>
   );
@@ -182,10 +181,12 @@ function TimelineDrawer({
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <span className={cn(
-              "w-2.5 h-2.5 rounded-full shrink-0",
-              SEV_DOT[alert?.severity ?? "INFO"] ?? "bg-gray-300"
-            )} />
+            <span
+              className={cn(
+                "w-2.5 h-2.5 rounded-full shrink-0",
+                SEV_DOT[alert?.severity ?? "INFO"] ?? "bg-gray-300",
+              )}
+            />
             {alert?.title ?? "Alert Detail"}
           </SheetTitle>
         </SheetHeader>
@@ -201,7 +202,9 @@ function TimelineDrawer({
             {/* Meta */}
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Severity</p>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                  Severity
+                </p>
                 <SevBadge severity={alert.severity} />
               </div>
               <div>
@@ -209,11 +212,15 @@ function TimelineDrawer({
                 <StatusBadge status={alert.status} />
               </div>
               <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Category</p>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                  Category
+                </p>
                 <p className="font-medium">{alert.category}</p>
               </div>
               <div>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Escalation</p>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                  Escalation
+                </p>
                 <p className="font-medium">Level {alert.escalation_level}</p>
               </div>
               <div className="col-span-2">
@@ -222,7 +229,9 @@ function TimelineDrawer({
               </div>
               {alert.message && (
                 <div className="col-span-2">
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide">Message</p>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                    Message
+                  </p>
                   <p className="text-sm text-gray-700">{alert.message}</p>
                 </div>
               )}
@@ -251,7 +260,9 @@ function TimelineDrawer({
             {/* Action area */}
             {(alert.status === "OPEN" || alert.status === "ESCALATED") && (
               <div className="border-t pt-4 space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Action</p>
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Action
+                </p>
                 <Input
                   placeholder="Optional notes…"
                   value={notes}
@@ -262,14 +273,20 @@ function TimelineDrawer({
                     size="sm"
                     variant="outline"
                     className="flex-1"
-                    onClick={() => { onAck(alert.id, notes); onClose(); }}
+                    onClick={() => {
+                      onAck(alert.id, notes);
+                      onClose();
+                    }}
                   >
                     <Check className="w-3.5 h-3.5 mr-1" /> Acknowledge
                   </Button>
                   <Button
                     size="sm"
                     className="flex-1 bg-green-600 hover:bg-green-700"
-                    onClick={() => { onResolve(alert.id, notes); onClose(); }}
+                    onClick={() => {
+                      onResolve(alert.id, notes);
+                      onClose();
+                    }}
                   >
                     <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Resolve
                   </Button>
@@ -287,15 +304,29 @@ function TimelineDrawer({
 
 const CATEGORIES = ["MACHINE", "SECURITY", "BILLING", "MAINTENANCE", "QUALITY", "SYSTEM"];
 const CONDITION_TYPES = [
-  "machine_breakdown", "machine_idle", "efficiency_below", "waste_above",
-  "target_miss", "failed_login_burst", "billing_80", "billing_90", "billing_100",
-  "maintenance_pm_due", "maintenance_calibration_due", "maintenance_inspection_due",
+  "machine_breakdown",
+  "machine_idle",
+  "efficiency_below",
+  "waste_above",
+  "target_miss",
+  "failed_login_burst",
+  "billing_80",
+  "billing_90",
+  "billing_100",
+  "maintenance_pm_due",
+  "maintenance_calibration_due",
+  "maintenance_inspection_due",
   "custom_threshold",
 ];
 const SEVERITIES = ["INFO", "WARNING", "CRITICAL", "EMERGENCY"];
 const ROLES = [
-  "SUPERVISOR", "PRODUCTION_MANAGER", "GENERAL_MANAGER", "MILL_OWNER",
-  "QUALITY_MANAGER", "MAINTENANCE_MANAGER", "SECURITY_GATE",
+  "SUPERVISOR",
+  "PRODUCTION_MANAGER",
+  "GENERAL_MANAGER",
+  "MILL_OWNER",
+  "QUALITY_MANAGER",
+  "MAINTENANCE_MANAGER",
+  "SECURITY_GATE",
 ];
 
 function CreateRuleDialog({
@@ -331,7 +362,10 @@ function CreateRuleDialog({
   }
 
   async function handleSave() {
-    if (!form.name.trim()) { setErr("Rule name is required"); return; }
+    if (!form.name.trim()) {
+      setErr("Rule name is required");
+      return;
+    }
     setSaving(true);
     setErr("");
     try {
@@ -349,9 +383,15 @@ function CreateRuleDialog({
       onCreated();
       onClose();
       setForm({
-        name: "", category: "MACHINE", condition_type: "machine_breakdown",
-        severity: "CRITICAL", threshold_value: "", threshold_unit: "",
-        cooldown_minutes: "30", description: "", target_roles: ["SUPERVISOR"],
+        name: "",
+        category: "MACHINE",
+        condition_type: "machine_breakdown",
+        severity: "CRITICAL",
+        threshold_value: "",
+        threshold_unit: "",
+        cooldown_minutes: "30",
+        description: "",
+        target_roles: ["SUPERVISOR"],
       });
     } catch (e: any) {
       setErr(e?.response?.data?.detail ?? "Failed to save rule");
@@ -381,36 +421,48 @@ function CreateRuleDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Category</label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Category
+              </label>
               <select
                 className="mt-1 w-full border rounded-md px-2 py-1.5 text-sm"
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
               >
-                {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                {CATEGORIES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Severity</label>
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Severity
+              </label>
               <select
                 className="mt-1 w-full border rounded-md px-2 py-1.5 text-sm"
                 value={form.severity}
                 onChange={(e) => setForm((f) => ({ ...f, severity: e.target.value }))}
               >
-                {SEVERITIES.map((s) => <option key={s}>{s}</option>)}
+                {SEVERITIES.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
               </select>
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Condition Type</label>
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Condition Type
+            </label>
             <select
               className="mt-1 w-full border rounded-md px-2 py-1.5 text-sm"
               value={form.condition_type}
               onChange={(e) => setForm((f) => ({ ...f, condition_type: e.target.value }))}
             >
               {CONDITION_TYPES.map((c) => (
-                <option key={c} value={c}>{c.replace(/_/g, " ")}</option>
+                <option key={c} value={c}>
+                  {c.replace(/_/g, " ")}
+                </option>
               ))}
             </select>
           </div>
@@ -467,7 +519,7 @@ function CreateRuleDialog({
                     "text-xs px-2 py-1 rounded-full border transition-colors",
                     form.target_roles.includes(role)
                       ? "bg-blue-600 border-blue-600 text-white"
-                      : "border-gray-300 text-gray-600 hover:bg-gray-50"
+                      : "border-gray-300 text-gray-600 hover:bg-gray-50",
                   )}
                 >
                   {role.replace(/_/g, " ")}
@@ -477,7 +529,9 @@ function CreateRuleDialog({
           </div>
 
           <div>
-            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Description</label>
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Description
+            </label>
             <Input
               className="mt-1"
               placeholder="Optional description"
@@ -489,7 +543,9 @@ function CreateRuleDialog({
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving ? "Saving…" : "Create Rule"}
           </Button>
@@ -516,7 +572,11 @@ function OpsCenter() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: alertsData, isLoading: alertsLoading, isFetching } = useQuery({
+  const {
+    data: alertsData,
+    isLoading: alertsLoading,
+    isFetching,
+  } = useQuery({
     queryKey: ["alerts-feed", statusFilter, categoryFilter, severityFilter],
     queryFn: () =>
       alertsApi.getAlerts({
@@ -531,8 +591,7 @@ function OpsCenter() {
   });
 
   const ackMut = useMutation({
-    mutationFn: ({ id, notes }: { id: string; notes?: string }) =>
-      alertsApi.acknowledge(id, notes),
+    mutationFn: ({ id, notes }: { id: string; notes?: string }) => alertsApi.acknowledge(id, notes),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["alerts-feed"] });
       qc.invalidateQueries({ queryKey: ["alerts-ops-center"] });
@@ -540,8 +599,7 @@ function OpsCenter() {
   });
 
   const resolveMut = useMutation({
-    mutationFn: ({ id, notes }: { id: string; notes?: string }) =>
-      alertsApi.resolve(id, notes),
+    mutationFn: ({ id, notes }: { id: string; notes?: string }) => alertsApi.resolve(id, notes),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["alerts-feed"] });
       qc.invalidateQueries({ queryKey: ["alerts-ops-center"] });
@@ -628,7 +686,7 @@ function OpsCenter() {
               "px-3 py-1 text-xs font-medium rounded-full border transition-colors",
               statusFilter === s.value
                 ? "bg-gray-900 border-gray-900 text-white"
-                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                : "border-gray-200 text-gray-600 hover:bg-gray-50",
             )}
           >
             {s.label}
@@ -641,12 +699,12 @@ function OpsCenter() {
         {["MACHINE", "SECURITY", "BILLING", "MAINTENANCE"].map((cat) => (
           <button
             key={cat}
-            onClick={() => setCategoryFilter((v) => v === cat ? "" : cat)}
+            onClick={() => setCategoryFilter((v) => (v === cat ? "" : cat))}
             className={cn(
               "px-3 py-1 text-xs font-medium rounded-full border transition-colors",
               categoryFilter === cat
                 ? "bg-blue-600 border-blue-600 text-white"
-                : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                : "border-gray-200 text-gray-500 hover:bg-gray-50",
             )}
           >
             {cat}
@@ -654,9 +712,7 @@ function OpsCenter() {
         ))}
 
         <div className="ml-auto flex items-center gap-2">
-          {isFetching && (
-            <RefreshCw className="w-3.5 h-3.5 text-gray-400 animate-spin" />
-          )}
+          {isFetching && <RefreshCw className="w-3.5 h-3.5 text-gray-400 animate-spin" />}
           <Button
             size="sm"
             variant="outline"
@@ -703,7 +759,7 @@ function OpsCenter() {
                     key={a.id}
                     className={cn(
                       "flex items-center gap-3 px-4 py-3 hover:bg-gray-50/60 transition-colors group cursor-pointer",
-                      SEV_ROW[a.severity] ?? ""
+                      SEV_ROW[a.severity] ?? "",
                     )}
                     onClick={() => openTimeline(a.id)}
                   >
@@ -823,7 +879,7 @@ function AlertRules() {
 
   const canManage = user && ["SUPER_ADMIN", "MILL_OWNER"].includes(user.role);
 
-  const ruleList: AlertRule[] = Array.isArray(rules) ? rules : (rules as any)?.data ?? [];
+  const ruleList: AlertRule[] = Array.isArray(rules) ? rules : ((rules as any)?.data ?? []);
 
   return (
     <div className="space-y-4">
@@ -836,7 +892,7 @@ function AlertRules() {
               "px-3 py-1.5 text-xs font-medium rounded-full border transition-colors",
               showAll
                 ? "bg-gray-900 border-gray-900 text-white"
-                : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                : "border-gray-200 text-gray-600 hover:bg-gray-50",
             )}
           >
             {showAll ? "All Rules" : "Active Only"}
@@ -852,7 +908,9 @@ function AlertRules() {
                 onClick={() => seedMut.mutate()}
                 disabled={seedMut.isPending}
               >
-                <RefreshCw className={cn("w-3.5 h-3.5 mr-1", seedMut.isPending && "animate-spin")} />
+                <RefreshCw
+                  className={cn("w-3.5 h-3.5 mr-1", seedMut.isPending && "animate-spin")}
+                />
                 Re-seed Defaults
               </Button>
               <Button size="sm" onClick={() => setCreateOpen(true)}>
@@ -889,23 +947,29 @@ function AlertRules() {
                 return (
                   <div key={rule.id} className="flex items-start gap-3 px-4 py-3">
                     {/* Icon */}
-                    <div className={cn(
-                      "mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
-                      rule.is_active ? "bg-blue-50" : "bg-gray-100"
-                    )}>
-                      <CatIcon className={cn(
-                        "w-4 h-4",
-                        rule.is_active ? "text-blue-600" : "text-gray-400"
-                      )} />
+                    <div
+                      className={cn(
+                        "mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center shrink-0",
+                        rule.is_active ? "bg-blue-50" : "bg-gray-100",
+                      )}
+                    >
+                      <CatIcon
+                        className={cn(
+                          "w-4 h-4",
+                          rule.is_active ? "text-blue-600" : "text-gray-400",
+                        )}
+                      />
                     </div>
 
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className={cn(
-                          "text-sm font-semibold",
-                          !rule.is_active && "text-gray-400"
-                        )}>
+                        <p
+                          className={cn(
+                            "text-sm font-semibold",
+                            !rule.is_active && "text-gray-400",
+                          )}
+                        >
                           {rule.name}
                         </p>
                         <SevBadge severity={rule.severity} />
@@ -916,9 +980,14 @@ function AlertRules() {
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {rule.condition_type.replace(/_/g, " ")}
                         {rule.threshold_value != null && (
-                          <> · threshold: {rule.threshold_value}{rule.threshold_unit ?? ""}</>
+                          <>
+                            {" "}
+                            · threshold: {rule.threshold_value}
+                            {rule.threshold_unit ?? ""}
+                          </>
                         )}
-                        {" · cooldown: "}{rule.cooldown_minutes}m
+                        {" · cooldown: "}
+                        {rule.cooldown_minutes}m
                       </p>
                       {rule.description && (
                         <p className="text-xs text-gray-400 mt-0.5">{rule.description}</p>
@@ -936,16 +1005,16 @@ function AlertRules() {
                           disabled={toggleMut.isPending}
                           className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-800 transition-colors"
                         >
-                          {rule.is_active
-                            ? <ToggleRight className="w-5 h-5 text-blue-600" />
-                            : <ToggleLeft className="w-5 h-5 text-gray-400" />
-                          }
+                          {rule.is_active ? (
+                            <ToggleRight className="w-5 h-5 text-blue-600" />
+                          ) : (
+                            <ToggleLeft className="w-5 h-5 text-gray-400" />
+                          )}
                         </button>
                         <button
                           title="Delete"
                           onClick={() => {
-                            if (confirm(`Delete rule "${rule.name}"?`))
-                              deleteMut.mutate(rule.id);
+                            if (confirm(`Delete rule "${rule.name}"?`)) deleteMut.mutate(rule.id);
                           }}
                           disabled={deleteMut.isPending}
                           className="p-1.5 rounded hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
@@ -990,10 +1059,12 @@ function AlertsPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-200">
-        {([
-          { key: "ops",   label: "Operations Center", icon: Siren },
-          { key: "rules", label: "Alert Rules",        icon: Zap },
-        ] as const).map(({ key, label, icon: Icon }) => (
+        {(
+          [
+            { key: "ops", label: "Operations Center", icon: Siren },
+            { key: "rules", label: "Alert Rules", icon: Zap },
+          ] as const
+        ).map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -1001,7 +1072,7 @@ function AlertsPage() {
               "flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors",
               tab === key
                 ? "border-gray-900 text-gray-900"
-                : "border-transparent text-gray-500 hover:text-gray-700"
+                : "border-transparent text-gray-500 hover:text-gray-700",
             )}
           >
             <Icon className="w-3.5 h-3.5" />

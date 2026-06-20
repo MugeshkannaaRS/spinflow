@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  backend:
+    name: Backend — lint + typecheck + tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Ruff lint (auto-fixable subset)
+        run: |
+          pip install ruff
+          ruff check app/ --select E,F,W --ignore E501 || true
+
+      - name: Mypy typecheck
+        run: |
+          pip install mypy
+          mypy app/ --ignore-missing-imports --no-error-summary || true
+
+      - name: Run tests
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+          SECRET_KEY: ci-secret-key
+          ENVIRONMENT: test
+        run: |
+          pip install pytest pytest-asyncio pytest-cov aiosqlite httpx
+          pytest tests/ -x -q --tb=short 2>&1
+
+  frontend:
+    name: Frontend — typecheck + lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript typecheck
+        run: npx tsc --noEmit
+
+      - name: ESLint
+        run: npx eslint "src/**/*.{ts,tsx}" --max-warnings 50 || true
+
+      - name: Prettier format check
+        run: npx prettier --check "src/**/*.{ts,tsx}"

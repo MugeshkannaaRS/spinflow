@@ -42,7 +42,9 @@ function formatCell(col: ExportColumn, row: any): string {
 
 function todayStr() {
   return new Date().toLocaleDateString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 }
 
@@ -107,7 +109,8 @@ async function loadAutoTable(): Promise<void> {
   if ((window as any).jspdf?.jsPDF?.API?.autoTable) return;
   return new Promise((resolve, reject) => {
     const s = document.createElement("script");
-    s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js";
+    s.src =
+      "https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js";
     s.onload = () => resolve();
     s.onerror = reject;
     document.head.appendChild(s);
@@ -169,10 +172,7 @@ export async function exportToPdf(opts: ExportOptions): Promise<void> {
 
 export type ExportFormat = "excel" | "pdf";
 
-export async function exportData(
-  format: ExportFormat,
-  opts: ExportOptions,
-): Promise<void> {
+export async function exportData(format: ExportFormat, opts: ExportOptions): Promise<void> {
   if (format === "excel") return exportToExcel(opts);
   if (format === "pdf") return exportToPdf(opts);
 }

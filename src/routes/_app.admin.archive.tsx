@@ -53,7 +53,9 @@ function ArchivePage() {
   });
 
   const companies: any[] = (companiesQ.data ?? []) as any[];
-  const suspendedCompanies = companies.filter((c: any) => c.status === "suspended" || (c.status !== "archived" && c.is_active === false));
+  const suspendedCompanies = companies.filter(
+    (c: any) => c.status === "suspended" || (c.status !== "archived" && c.is_active === false),
+  );
   const archivedCompanies = companies.filter((c: any) => c.status === "archived");
 
   const handleReactivate = async (company: any) => {
@@ -90,7 +92,11 @@ function ArchivePage() {
   };
 
   const columns: ColDef[] = [
-    { key: "name", label: "Company Name", render: (c: any) => <span className="font-medium">{c.name}</span> },
+    {
+      key: "name",
+      label: "Company Name",
+      render: (c: any) => <span className="font-medium">{c.name}</span>,
+    },
     { key: "code", label: "Code" },
     { key: "gstin", label: "GSTIN" },
     { key: "plan", label: "Plan" },
@@ -121,7 +127,9 @@ function ArchivePage() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Archive</h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage suspended and archived companies</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Manage suspended and archived companies
+        </p>
       </div>
 
       <div className="flex gap-1 border-b">
@@ -144,36 +152,38 @@ function ArchivePage() {
       {activeTab === "suspended" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Suspended Companies ({suspendedCompanies.length})</CardTitle>
+            <CardTitle className="text-base">
+              Suspended Companies ({suspendedCompanies.length})
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ErrorBoundary inline label="Suspended Companies">
-            <DataTable
-              columns={columns}
-              data={suspendedCompanies}
-              rowKey={(c: any) => c.id}
-              emptyMessage="No suspended companies found."
-              actions={(item: any) => (
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-green-600 hover:bg-green-50 border-green-200"
-                    onClick={() => setReactivateTarget(item)}
-                  >
-                    <CheckCircle className="size-3.5 mr-1" /> Reactivate
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-red-600 hover:bg-red-50 border-red-200"
-                    onClick={() => setDeleteTarget(item)}
-                  >
-                    <Trash2 className="size-3.5 mr-1" /> Delete
-                  </Button>
-                </div>
-              )}
-            />
+              <DataTable
+                columns={columns}
+                data={suspendedCompanies}
+                rowKey={(c: any) => c.id}
+                emptyMessage="No suspended companies found."
+                actions={(item: any) => (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-green-600 hover:bg-green-50 border-green-200"
+                      onClick={() => setReactivateTarget(item)}
+                    >
+                      <CheckCircle className="size-3.5 mr-1" /> Reactivate
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 hover:bg-red-50 border-red-200"
+                      onClick={() => setDeleteTarget(item)}
+                    >
+                      <Trash2 className="size-3.5 mr-1" /> Delete
+                    </Button>
+                  </div>
+                )}
+              />
             </ErrorBoundary>
           </CardContent>
         </Card>
@@ -182,45 +192,47 @@ function ArchivePage() {
       {activeTab === "archived" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Archived Companies ({archivedCompanies.length})</CardTitle>
+            <CardTitle className="text-base">
+              Archived Companies ({archivedCompanies.length})
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ErrorBoundary inline label="Archived Companies">
-            <DataTable
-              columns={columns}
-              data={archivedCompanies}
-              rowKey={(c: any) => c.id}
-              emptyMessage="No archived companies found."
-              actions={(item: any) => (
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-orange-600 hover:bg-orange-50 border-orange-200"
-                    onClick={async () => {
-                      try {
-                        await adminApi.restoreCompany(item.id);
-                        toast.success(`${item.name} restored to suspended`);
-                        qc.invalidateQueries({ queryKey: ["masters"] });
-                        qc.invalidateQueries({ queryKey: ["admin-summary"] });
-                      } catch {
-                        toast.error("Failed to restore company");
-                      }
-                    }}
-                  >
-                    <Undo className="size-3.5 mr-1" /> Restore
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-red-600 hover:bg-red-50 border-red-200"
-                    onClick={() => setDeleteTarget(item)}
-                  >
-                    <Trash2 className="size-3.5 mr-1" /> Delete
-                  </Button>
-                </div>
-              )}
-            />
+              <DataTable
+                columns={columns}
+                data={archivedCompanies}
+                rowKey={(c: any) => c.id}
+                emptyMessage="No archived companies found."
+                actions={(item: any) => (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-orange-600 hover:bg-orange-50 border-orange-200"
+                      onClick={async () => {
+                        try {
+                          await adminApi.restoreCompany(item.id);
+                          toast.success(`${item.name} restored to suspended`);
+                          qc.invalidateQueries({ queryKey: ["masters"] });
+                          qc.invalidateQueries({ queryKey: ["admin-summary"] });
+                        } catch {
+                          toast.error("Failed to restore company");
+                        }
+                      }}
+                    >
+                      <Undo className="size-3.5 mr-1" /> Restore
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 hover:bg-red-50 border-red-200"
+                      onClick={() => setDeleteTarget(item)}
+                    >
+                      <Trash2 className="size-3.5 mr-1" /> Delete
+                    </Button>
+                  </div>
+                )}
+              />
             </ErrorBoundary>
           </CardContent>
         </Card>
@@ -236,21 +248,33 @@ function ArchivePage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => reactivateTarget && handleReactivate(reactivateTarget)}>
+            <AlertDialogAction
+              onClick={() => reactivateTarget && handleReactivate(reactivateTarget)}
+            >
               Yes, Reactivate
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setConfirmCode(""); } }}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setConfirmCode("");
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-red-600">Permanently Delete {deleteTarget?.name}?</DialogTitle>
+            <DialogTitle className="text-red-600">
+              Permanently Delete {deleteTarget?.name}?
+            </DialogTitle>
             <DialogDescription className="space-y-3 pt-2">
               <p>
-                This action <strong>cannot be undone</strong>. All data for this company including mills, users,
-                employees, and records will be permanently removed.
+                This action <strong>cannot be undone</strong>. All data for this company including
+                mills, users, employees, and records will be permanently removed.
               </p>
               <p>
                 Type <strong>{deleteTarget?.code}</strong> to confirm:
@@ -264,7 +288,13 @@ function ArchivePage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setDeleteTarget(null); setConfirmCode(""); }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteTarget(null);
+                setConfirmCode("");
+              }}
+            >
               Cancel
             </Button>
             <Button
