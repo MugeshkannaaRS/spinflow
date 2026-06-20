@@ -26,6 +26,7 @@ interface ImportModuleConfig {
   desc: string;
   tableName: string;
   endpoint: string;
+  ready: boolean;
 }
 
 const IMPORT_MODULES: ImportModuleConfig[] = [
@@ -34,16 +35,45 @@ const IMPORT_MODULES: ImportModuleConfig[] = [
     label: "Employees",
     icon: Users,
     desc: "Import your workforce with employee details, departments, and designations.",
-    tableName: "employees",
-    endpoint: "/hr/employees/import",
+    tableName: "hr_employees",
+    endpoint: "/hr/employees/bulk",
+    ready: true,
   },
   {
     key: "machines",
     label: "Machines",
     icon: Factory,
     desc: "Register machines with types, specifications, and mill assignment.",
-    tableName: "machines",
-    endpoint: "/masters/machines/import",
+    tableName: "masters_machines",
+    endpoint: "/masters/machines/bulk",
+    ready: true,
+  },
+  {
+    key: "customers",
+    label: "Customers",
+    icon: Truck,
+    desc: "Import customer records for dispatch and sales order processing.",
+    tableName: "masters_customers",
+    endpoint: "/masters/customers/bulk",
+    ready: true,
+  },
+  {
+    key: "departments",
+    label: "Departments",
+    icon: Settings2,
+    desc: "Import department master data for organizational structure.",
+    tableName: "masters_departments",
+    endpoint: "/masters/departments/bulk",
+    ready: false,
+  },
+  {
+    key: "suppliers",
+    label: "Suppliers",
+    icon: Warehouse,
+    desc: "Import supplier records for purchase order processing.",
+    tableName: "masters_suppliers",
+    endpoint: "/masters/suppliers/bulk",
+    ready: false,
   },
   {
     key: "inventory_items",
@@ -51,47 +81,26 @@ const IMPORT_MODULES: ImportModuleConfig[] = [
     icon: Package,
     desc: "Import inventory items with stock levels and minimum thresholds.",
     tableName: "inventory_items",
-    endpoint: "/inventory/items/import",
-  },
-  {
-    key: "customers",
-    label: "Customers",
-    icon: Truck,
-    desc: "Import customer records for dispatch and sales order processing.",
-    tableName: "customers",
-    endpoint: "/masters/customers/import",
-  },
-  {
-    key: "suppliers",
-    label: "Suppliers",
-    icon: Warehouse,
-    desc: "Import supplier records for purchase order processing.",
-    tableName: "suppliers",
-    endpoint: "/purchase/suppliers/import",
-  },
-  {
-    key: "departments",
-    label: "Departments",
-    icon: Settings2,
-    desc: "Import department master data for organizational structure.",
-    tableName: "departments",
-    endpoint: "/masters/departments/import",
+    endpoint: "/inventory/items/bulk",
+    ready: false,
   },
   {
     key: "cotton_purchases",
     label: "Cotton Purchases",
     icon: ClipboardList,
     desc: "Import cotton purchase records with bale details.",
-    tableName: "cotton_purchases",
-    endpoint: "/purchase/cotton/import",
+    tableName: "purchase_cotton",
+    endpoint: "/purchase/cotton/bulk",
+    ready: false,
   },
   {
     key: "yarn_counts",
     label: "Yarn Counts",
     icon: Settings2,
     desc: "Import master data: yarn counts and reference data.",
-    tableName: "yarn_counts",
-    endpoint: "/masters/yarn-counts/import",
+    tableName: "masters_yarn_counts",
+    endpoint: "/masters/yarn-counts/bulk",
+    ready: false,
   },
 ];
 
@@ -126,24 +135,38 @@ function ImportHubPage() {
         {IMPORT_MODULES.map((m) => {
           const Icon = m.icon;
           return (
-            <Card key={m.key} className="hover:shadow-sm transition-shadow">
+            <Card key={m.key} className={`transition-shadow ${m.ready ? "hover:shadow-sm" : "opacity-60"}`}>
               <CardHeader className="pb-2">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
                     <Icon className="w-4 h-4 text-blue-600" />
                   </div>
-                  <CardTitle className="text-sm font-semibold">{m.label}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-sm font-semibold">{m.label}</CardTitle>
+                    {!m.ready && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                        Soon
+                      </span>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-xs text-muted-foreground">{m.desc}</p>
-                <button
-                  onClick={() => setActiveModule(m)}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  Import
-                </button>
+                {m.ready ? (
+                  <button
+                    onClick={() => setActiveModule(m)}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    Import
+                  </button>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md bg-gray-100 text-gray-400 cursor-not-allowed">
+                    <Upload className="w-3.5 h-3.5" />
+                    Import
+                  </span>
+                )}
               </CardContent>
             </Card>
           );

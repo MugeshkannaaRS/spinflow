@@ -1,5 +1,5 @@
 const PING_INTERVAL = 90 * 1000;
-const PING_URL = "https://spinflow.onrender.com/api/health";
+const PING_URL = `${import.meta.env.VITE_API_BASE_URL ?? ""}/api/health`;
 
 function ping() {
   fetch(PING_URL, { method: "GET", cache: "no-store" }).catch(() => {});
