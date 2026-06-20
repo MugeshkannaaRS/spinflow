@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 class AttendanceImportRequest(BaseModel):
     items: List[Dict[str, Any]]
 
+import uuid as _uuid
 from app.db.session import get_db
 from app.core.deps import get_current_user, require_module, log_audit, get_mill_scope
 from app.models.user import User
@@ -597,10 +598,14 @@ async def bulk_create_employees(
         if employees_to_add:
             rows = []
             for emp in employees_to_add:
-                row: Dict[str, Any] = {"id": emp.id, "code": emp.code}
+                # emp.id is None until SQLAlchemy flushes — generate it explicitly
+                emp_id = emp.id or str(_uuid.uuid4())
+                row: Dict[str, Any] = {"id": emp_id, "code": emp.code}
                 for f in UPSERT_FIELDS:
                     row[f] = getattr(emp, f, None)
                 rows.append(row)
+                # store so emp_id_map can be built from returned rows
+                emp._bulk_id = emp_id
 
             stmt = pg_insert(Employee).values(rows)
             update_dict = {f: stmt.excluded[f] for f in UPSERT_FIELDS}

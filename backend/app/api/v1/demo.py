@@ -212,11 +212,14 @@ async def get_nudges(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    company_id = str(current_user.company_id or "")
-    if not company_id:
+    try:
+        company_id = str(current_user.company_id or "")
+        if not company_id:
+            return []
+        svc = NudgeService(db)
+        return await svc.get_active_nudges(company_id)
+    except Exception:
         return []
-    svc = NudgeService(db)
-    return await svc.get_active_nudges(company_id)
 
 
 @router.post("/nudges/{nudge_id}/dismiss")
