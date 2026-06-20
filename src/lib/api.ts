@@ -2,12 +2,14 @@ import axios from "axios";
 import { useAuth } from "@/stores/auth";
 import { toast } from "sonner";
 
+const API_BASE: string =
+  import.meta.env.VITE_API_BASE_URL ?? "https://spinflow.onrender.com";
+
 if (!import.meta.env.VITE_API_BASE_URL) {
-  throw new Error(
-    "VITE_API_BASE_URL is not set. Set it in .env or the environment before starting.",
+  console.warn(
+    "VITE_API_BASE_URL is not set — falling back to https://spinflow.onrender.com",
   );
 }
-const API_BASE = import.meta.env.VITE_API_BASE_URL;
 export { API_BASE };
 
 export const api = axios.create({
