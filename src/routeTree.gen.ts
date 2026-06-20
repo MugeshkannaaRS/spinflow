@@ -42,6 +42,7 @@ import { Route as AppAuditRouteImport } from './routes/_app.audit'
 import { Route as AppAlertsRouteImport } from './routes/_app.alerts'
 import { Route as AppAdminRouteImport } from './routes/_app.admin'
 import { Route as AppAccountsRouteImport } from './routes/_app.accounts'
+import { Route as AppDashboardOwnerRouteImport } from './routes/_app.dashboard.owner'
 import { Route as AppCompanyBillingRouteImport } from './routes/_app.company.billing'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
 import { Route as AppAdminSalesRouteImport } from './routes/_app.admin.sales'
@@ -78,14 +79,14 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ChangePasswordRoute = ChangePasswordRouteImport.update({
-  id: '/change-password',
-  path: '/change-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChangePasswordRoute = ChangePasswordRouteImport.update({
+  id: '/change-password',
+  path: '/change-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -236,6 +237,11 @@ const AppAccountsRoute = AppAccountsRouteImport.update({
   id: '/accounts',
   path: '/accounts',
   getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardOwnerRoute = AppDashboardOwnerRouteImport.update({
+  id: '/owner',
+  path: '/owner',
+  getParentRoute: () => AppDashboardRoute,
 } as any)
 const AppCompanyBillingRoute = AppCompanyBillingRouteImport.update({
   id: '/company/billing',
@@ -403,7 +409,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AppAdminRouteWithChildren
   '/alerts': typeof AppAlertsRoute
   '/audit': typeof AppAuditRoute
-  '/dashboard': typeof AppDashboardRoute
+  '/dashboard': typeof AppDashboardRouteWithChildren
   '/dispatch': typeof AppDispatchRoute
   '/executive-dashboard': typeof AppExecutiveDashboardRoute
   '/help-center': typeof AppHelpCenterRoute
@@ -448,6 +454,7 @@ export interface FileRoutesByFullPath {
   '/admin/sales': typeof AppAdminSalesRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/company/billing': typeof AppCompanyBillingRoute
+  '/dashboard/owner': typeof AppDashboardOwnerRoute
   '/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
   '/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
   '/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
@@ -467,7 +474,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AppAdminRouteWithChildren
   '/alerts': typeof AppAlertsRoute
   '/audit': typeof AppAuditRoute
-  '/dashboard': typeof AppDashboardRoute
+  '/dashboard': typeof AppDashboardRouteWithChildren
   '/dispatch': typeof AppDispatchRoute
   '/executive-dashboard': typeof AppExecutiveDashboardRoute
   '/help-center': typeof AppHelpCenterRoute
@@ -512,6 +519,7 @@ export interface FileRoutesByTo {
   '/admin/sales': typeof AppAdminSalesRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/company/billing': typeof AppCompanyBillingRoute
+  '/dashboard/owner': typeof AppDashboardOwnerRoute
   '/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
   '/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
   '/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
@@ -533,7 +541,7 @@ export interface FileRoutesById {
   '/_app/admin': typeof AppAdminRouteWithChildren
   '/_app/alerts': typeof AppAlertsRoute
   '/_app/audit': typeof AppAuditRoute
-  '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/dashboard': typeof AppDashboardRouteWithChildren
   '/_app/dispatch': typeof AppDispatchRoute
   '/_app/executive-dashboard': typeof AppExecutiveDashboardRoute
   '/_app/help-center': typeof AppHelpCenterRoute
@@ -578,6 +586,7 @@ export interface FileRoutesById {
   '/_app/admin/sales': typeof AppAdminSalesRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/company/billing': typeof AppCompanyBillingRoute
+  '/_app/dashboard/owner': typeof AppDashboardOwnerRoute
   '/_app/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
   '/_app/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
   '/_app/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
@@ -644,6 +653,7 @@ export interface FileRouteTypes {
     | '/admin/sales'
     | '/admin/users'
     | '/company/billing'
+    | '/dashboard/owner'
     | '/admin/billing/analytics'
     | '/admin/billing/command-center'
     | '/admin/billing/invoices'
@@ -708,6 +718,7 @@ export interface FileRouteTypes {
     | '/admin/sales'
     | '/admin/users'
     | '/company/billing'
+    | '/dashboard/owner'
     | '/admin/billing/analytics'
     | '/admin/billing/command-center'
     | '/admin/billing/invoices'
@@ -773,6 +784,7 @@ export interface FileRouteTypes {
     | '/_app/admin/sales'
     | '/_app/admin/users'
     | '/_app/company/billing'
+    | '/_app/dashboard/owner'
     | '/_app/admin/billing/analytics'
     | '/_app/admin/billing/command-center'
     | '/_app/admin/billing/invoices'
@@ -801,18 +813,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/change-password': {
-      id: '/change-password'
-      path: '/change-password'
-      fullPath: '/change-password'
-      preLoaderRoute: typeof ChangePasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/forgot-password': {
       id: '/forgot-password'
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/change-password': {
+      id: '/change-password'
+      path: '/change-password'
+      fullPath: '/change-password'
+      preLoaderRoute: typeof ChangePasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -1024,6 +1036,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/accounts'
       preLoaderRoute: typeof AppAccountsRouteImport
       parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard/owner': {
+      id: '/_app/dashboard/owner'
+      path: '/owner'
+      fullPath: '/dashboard/owner'
+      preLoaderRoute: typeof AppDashboardOwnerRouteImport
+      parentRoute: typeof AppDashboardRoute
     }
     '/_app/company/billing': {
       id: '/_app/company/billing'
@@ -1325,12 +1344,24 @@ const AppAdminRouteWithChildren = AppAdminRoute._addFileChildren(
   AppAdminRouteChildren,
 )
 
+interface AppDashboardRouteChildren {
+  AppDashboardOwnerRoute: typeof AppDashboardOwnerRoute
+}
+
+const AppDashboardRouteChildren: AppDashboardRouteChildren = {
+  AppDashboardOwnerRoute: AppDashboardOwnerRoute,
+}
+
+const AppDashboardRouteWithChildren = AppDashboardRoute._addFileChildren(
+  AppDashboardRouteChildren,
+)
+
 interface AppRouteChildren {
   AppAccountsRoute: typeof AppAccountsRoute
   AppAdminRoute: typeof AppAdminRouteWithChildren
   AppAlertsRoute: typeof AppAlertsRoute
   AppAuditRoute: typeof AppAuditRoute
-  AppDashboardRoute: typeof AppDashboardRoute
+  AppDashboardRoute: typeof AppDashboardRouteWithChildren
   AppDispatchRoute: typeof AppDispatchRoute
   AppExecutiveDashboardRoute: typeof AppExecutiveDashboardRoute
   AppHelpCenterRoute: typeof AppHelpCenterRoute
@@ -1362,7 +1393,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminRoute: AppAdminRouteWithChildren,
   AppAlertsRoute: AppAlertsRoute,
   AppAuditRoute: AppAuditRoute,
-  AppDashboardRoute: AppDashboardRoute,
+  AppDashboardRoute: AppDashboardRouteWithChildren,
   AppDispatchRoute: AppDispatchRoute,
   AppExecutiveDashboardRoute: AppExecutiveDashboardRoute,
   AppHelpCenterRoute: AppHelpCenterRoute,

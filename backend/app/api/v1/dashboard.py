@@ -17,6 +17,8 @@ from app.models.hr import Employee, Attendance, Leave, MonthlyPayroll
 from app.models.masters import Department, Customer, Mill, Company
 from app.models.lotrac import Trip
 from app.models.inventory import Lot
+from app.schemas.dashboard import OwnerDashboardResponse
+from app.services.owner_dashboard_service import OwnerDashboardService
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -1228,3 +1230,33 @@ async def get_dashboard_summary(
         logger.warning(f"dashboard compat fields error: {e}", exc_info=True)
 
     return out
+
+
+@router.get("/dashboard/owner-summary", response_model=OwnerDashboardResponse)
+async def get_owner_dashboard_summary(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("dashboard")),
+):
+    """Multi-mill aggregated dashboard for MILL_OWNER.
+
+    Returns per-mill KPIs plus company-wide totals in a single response.
+    All per-mill metrics are fetched via GROUP BY — never loops over mills.
+    """
+    scope = await get_mill_scope(current_user, db)
+    company_id = scope.get("company_id")
+    if not company_id:
+        return OwnerDashboardResponse(
+            mills=[],
+            total_production_kg_today=0,
+            avg_efficiency_pct=0,
+            total_active_machines=0,
+            total_machines=0,
+            total_employees=0,
+            total_present_today=0,
+            total_balance_kg=0,
+            total_dispatch_kg_today=0,
+            total_open_alerts=0,
+        )
+    service = OwnerDashboardService(db)
+    result = await service.owner_summary(company_id)
+    return OwnerDashboardResponse(**result)

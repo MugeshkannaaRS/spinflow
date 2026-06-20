@@ -590,20 +590,30 @@ function OpsCenter() {
     refetchOnWindowFocus: false,
   });
 
+  const invalidateAlerts = () => {
+    qc.invalidateQueries({ queryKey: ["alerts-feed"] });
+    qc.invalidateQueries({ queryKey: ["alerts-ops-center"] });
+    qc.invalidateQueries({ queryKey: ["alert-summary"] });
+  };
+
   const ackMut = useMutation({
     mutationFn: ({ id, notes }: { id: string; notes?: string }) => alertsApi.acknowledge(id, notes),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["alerts-feed"] });
-      qc.invalidateQueries({ queryKey: ["alerts-ops-center"] });
-    },
+    onSuccess: invalidateAlerts,
   });
 
   const resolveMut = useMutation({
     mutationFn: ({ id, notes }: { id: string; notes?: string }) => alertsApi.resolve(id, notes),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["alerts-feed"] });
-      qc.invalidateQueries({ queryKey: ["alerts-ops-center"] });
-    },
+    onSuccess: invalidateAlerts,
+  });
+
+  const dismissMut = useMutation({
+    mutationFn: (id: string) => alertsApi.dismiss(id),
+    onSuccess: invalidateAlerts,
+  });
+
+  const ackAllMut = useMutation({
+    mutationFn: () => alertsApi.acknowledgeAll(),
+    onSuccess: invalidateAlerts,
   });
 
   const alerts: AlertEvent[] = alertsData?.data ?? alertsData ?? [];
@@ -668,9 +678,38 @@ function OpsCenter() {
         />
       </div>
 
-      {/* Filters + refresh */}
+      {/* Severity tabs */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* Status chips */}
+        {[
+          { label: "All", value: "" },
+          { label: "Critical", value: "CRITICAL" },
+          { label: "High", value: "WARNING" },
+          { label: "Medium", value: "INFO" },
+          { label: "Low", value: "EMERGENCY" },
+        ].map((s) => (
+          <button
+            key={s.value}
+            onClick={() => setSeverityFilter((v) => (v === s.value ? "" : s.value))}
+            className={cn(
+              "px-3 py-1 text-xs font-medium rounded-full border transition-colors",
+              severityFilter === s.value
+                ? s.value === "CRITICAL"
+                  ? "bg-red-600 border-red-600 text-white"
+                  : s.value === "WARNING"
+                    ? "bg-amber-600 border-amber-600 text-white"
+                    : s.value === "INFO"
+                      ? "bg-blue-600 border-blue-600 text-white"
+                      : "bg-gray-900 border-gray-900 text-white"
+                : "border-gray-200 text-gray-600 hover:bg-gray-50",
+            )}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Status chips */}
+      <div className="flex flex-wrap items-center gap-2">
         {[
           { label: "Active", value: "OPEN,ESCALATED" },
           { label: "Open", value: "OPEN" },
@@ -729,14 +768,26 @@ function OpsCenter() {
       {/* Alert feed */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-semibold">
-            Live Alert Feed
-            {alerts.length > 0 && (
-              <span className="ml-2 text-xs text-muted-foreground font-normal">
-                {alerts.length} alerts
-              </span>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold">
+              Live Alert Feed
+              {alerts.length > 0 && (
+                <span className="ml-2 text-xs text-muted-foreground font-normal">
+                  {alerts.length} alerts
+                </span>
+              )}
+            </CardTitle>
+            {alerts.filter((a: AlertEvent) => a.status === "OPEN" || a.status === "ESCALATED").length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => ackAllMut.mutate()}
+                disabled={ackAllMut.isPending}
+              >
+                <Check className="w-3.5 h-3.5 mr-1" /> Acknowledge All
+              </Button>
             )}
-          </CardTitle>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {alertsLoading ? (
@@ -796,7 +847,7 @@ function OpsCenter() {
 
                     {/* Quick actions */}
                     <div
-                      className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0"
                       onClick={(e) => e.stopPropagation()}
                     >
                       {(a.status === "OPEN" || a.status === "ESCALATED") && (
@@ -810,12 +861,12 @@ function OpsCenter() {
                             <Check className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            title="Resolve"
-                            onClick={() => resolveMut.mutate({ id: a.id })}
-                            disabled={resolveMut.isPending}
+                            title="Dismiss"
+                            onClick={() => dismissMut.mutate(a.id)}
+                            disabled={dismissMut.isPending}
                             className="p-1.5 rounded hover:bg-green-50 text-gray-400 hover:text-green-600 transition-colors"
                           >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <X className="w-3.5 h-3.5" />
                           </button>
                         </>
                       )}

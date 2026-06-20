@@ -579,11 +579,12 @@ function DashboardPage() {
 
         {/* ── Low stock table ───────────────────────────────────────────────── */}
         {!isDashboardOnly && has("inventory") && (inv?.low_stock_items?.length ?? 0) > 0 && (
-          <div className="bg-white border border-[#e2e8f0] rounded-lg overflow-hidden">
+          <div className="bg-white border border-[#e2e8f0] rounded-lg">
             <div className="px-5 py-4 border-b border-[#e2e8f0] flex items-center gap-2">
               <Package className="w-4 h-4 text-amber-600" />
               <h3 className="text-sm font-semibold text-[#0f172a]">Low Stock Alert</h3>
             </div>
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-[#f1f5f9] border-b border-[#e2e8f0]">
@@ -619,6 +620,7 @@ function DashboardPage() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 

@@ -47,6 +47,8 @@ import {
   UserPlus,
   TrendingUp as TrendUpIcon,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "@tanstack/react-router";
@@ -197,6 +199,18 @@ function SidebarContent({
   const isOnAdminRoute = pathname.startsWith("/admin");
   const [adminOpen, setAdminOpen] = useState(isOnAdminRoute);
 
+  // Alert summary for sidebar badge (poll every 3 minutes)
+  const { data: alertSummary } = useQuery({
+    queryKey: ["alert-summary"],
+    queryFn: () => api.get("/alerts/summary").then((r) => r.data),
+    refetchInterval: 3 * 60 * 1000,
+    staleTime: 3 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    enabled: !!(user && moduleCanAccess("alerts")),
+  });
+  const activeAlertCount = alertSummary?.active ?? 0;
+  const hasCriticalAlerts = (alertSummary?.critical ?? 0) > 0;
+
   if (!user) return null;
 
   const isActive = (to: string, exact = false) => {
@@ -253,6 +267,7 @@ function SidebarContent({
 
   // SUPER_ADMIN uses /admin/billing (Settings > Billing); only MILL_OWNER gets the Company Billing section
   const showBilling = user.role === "MILL_OWNER" && !isDashboardOnly();
+  const showOwnerDashboard = user.role === "MILL_OWNER" && !isDashboardOnly();
 
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#0f172a" }}>
@@ -325,21 +340,44 @@ function SidebarContent({
                         }
                   }
                 >
-                  <Icon
-                    className={cn(
-                      "shrink-0",
-                      collapsed ? "w-5 h-5" : "w-[18px] h-[18px] mr-3",
-                      active ? "text-white" : "text-[#94a3b8]",
-                    )}
-                  />
-                  {!collapsed && (
-                    <span
+                  <div className="relative shrink-0">
+                    <Icon
                       className={cn(
-                        "text-[14px] font-medium truncate",
+                        collapsed ? "w-5 h-5" : "w-[18px] h-[18px] mr-3",
                         active ? "text-white" : "text-[#94a3b8]",
                       )}
-                    >
-                      {item.label}
+                    />
+                    {item.to === "/alerts" && activeAlertCount > 0 && collapsed && (
+                      <span
+                        className={cn(
+                          "absolute -top-1 -right-0.5 w-2 h-2 rounded-full",
+                          hasCriticalAlerts ? "bg-red-500" : "bg-amber-500",
+                        )}
+                      />
+                    )}
+                  </div>
+                  {!collapsed && (
+                    <span className="flex-1 flex items-center gap-2 min-w-0">
+                      <span
+                        className={cn(
+                          "text-[14px] font-medium truncate",
+                          active ? "text-white" : "text-[#94a3b8]",
+                        )}
+                      >
+                        {item.label}
+                      </span>
+                      {item.to === "/alerts" && activeAlertCount > 0 && (
+                        <span
+                          className={cn(
+                            "shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                            hasCriticalAlerts
+                              ? "bg-red-500 text-white"
+                              : "bg-amber-500 text-white",
+                          )}
+                        >
+                          {activeAlertCount > 99 ? "99+" : activeAlertCount}
+                        </span>
+                      )}
                     </span>
                   )}
                 </Link>
@@ -359,6 +397,9 @@ function SidebarContent({
                         }}
                       >
                         {item.label}
+                        {item.to === "/alerts" && activeAlertCount > 0 && (
+                          <> ({activeAlertCount})</>
+                        )}
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -368,6 +409,87 @@ function SidebarContent({
             })}
           </div>
         ))}
+
+        {/* ── Group Dashboard (MILL_OWNER only) ─────────────────── */}
+        {showOwnerDashboard && (
+          <div className="mb-1">
+            {!collapsed && (
+              <div
+                className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em]"
+                style={{ color: "#475569" }}
+              >
+                Multi-Unit
+              </div>
+            )}
+            {(() => {
+              const active = isActive("/dashboard/owner");
+              const link = (
+                <Link
+                  to="/dashboard/owner"
+                  onClick={onNavClick}
+                  className={cn(
+                    "flex items-center rounded-md transition-all duration-150 mb-0.5 cursor-pointer min-h-[40px]",
+                    collapsed ? "justify-center px-2" : "px-3",
+                  )}
+                  style={active ? { backgroundColor: "#3b82f6" } : undefined}
+                  onMouseEnter={
+                    active
+                      ? undefined
+                      : (e) => {
+                          (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
+                        }
+                  }
+                  onMouseLeave={
+                    active
+                      ? undefined
+                      : (e) => {
+                          (e.currentTarget as HTMLElement).style.backgroundColor = "";
+                        }
+                  }
+                >
+                  <Building2
+                    className={cn(
+                      "shrink-0",
+                      collapsed ? "w-5 h-5" : "w-[18px] h-[18px] mr-3",
+                      active ? "text-white" : "text-[#94a3b8]",
+                    )}
+                  />
+                  {!collapsed && (
+                    <span
+                      className={cn(
+                        "text-[14px] font-medium truncate",
+                        active ? "text-white" : "text-[#94a3b8]",
+                      )}
+                    >
+                      Group Dashboard
+                    </span>
+                  )}
+                </Link>
+              );
+              if (collapsed) {
+                return (
+                  <TooltipProvider key="owner-dashboard">
+                    <Tooltip>
+                      <TooltipTrigger asChild>{link}</TooltipTrigger>
+                      <TooltipContent
+                        side="right"
+                        className="text-xs"
+                        style={{
+                          backgroundColor: "#0f172a",
+                          color: "white",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                        }}
+                      >
+                        Group Dashboard
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              }
+              return link;
+            })()}
+          </div>
+        )}
 
         {/* ── Admin collapsible group (SUPER_ADMIN only) ───────────── */}
         {isSuperAdmin && !isDashboardOnly() && (

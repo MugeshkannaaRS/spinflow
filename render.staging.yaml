@@ -1,0 +1,54 @@
+# =============================================================================
+# SpinFlow ERP — Staging Environment Render Blueprint
+# =============================================================================
+# Deploy with:
+#   render blueprint launch
+#
+# Or manually create:
+#   1. Supabase project (free tier) for staging
+#   2. Render Web Service (backend) from this yaml
+#   3. Render Static Site (frontend) from this yaml
+# =============================================================================
+
+services:
+  # ── Backend API (staging) ──────────────────────────────────────────────
+  - type: web
+    name: spinflow-backend-staging
+    env: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --loop asyncio
+    healthCheckPath: /api/health
+    envVars:
+      - key: ENVIRONMENT
+        value: staging
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_SYNC_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: REFRESH_SECRET_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: QR_SECRET_KEY
+        sync: false
+      - key: DEBUG
+        value: "false"
+      - key: CORS_ORIGINS
+        value: "https://spinflow-frontend-staging.onrender.com,http://localhost:5173"
+      - key: CORS_ORIGIN_REGEX
+        value: "^https://.*\\.ngrok(?:-free)?\\.dev$"
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+
+  # ── Frontend Static Site (staging) ─────────────────────────────────────
+  - type: static_site
+    name: spinflow-frontend-staging
+    plan: free
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://spinflow-backend-staging.onrender.com

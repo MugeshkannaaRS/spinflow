@@ -15,7 +15,7 @@ Endpoints:
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc, and_, extract
+from sqlalchemy import select, func, desc, and_, extract, case
 from typing import Optional, List
 from pydantic import BaseModel
 from datetime import datetime, timedelta
@@ -46,7 +46,9 @@ class AlertEventResponse(BaseModel):
     source_type: Optional[str] = None
     source_id: Optional[str] = None
     escalation_level: int
+    acknowledged_by: Optional[str] = None
     acknowledged_at: Optional[str] = None
+    resolved_by: Optional[str] = None
     resolved_at: Optional[str] = None
     created_at: str
 
@@ -87,7 +89,9 @@ def _event_to_resp(e: AlertEvent) -> AlertEventResponse:
         source_type=e.source_type,
         source_id=e.source_id,
         escalation_level=e.escalation_level,
+        acknowledged_by=e.acknowledged_by,
         acknowledged_at=e.acknowledged_at.isoformat() if e.acknowledged_at else None,
+        resolved_by=e.resolved_by,
         resolved_at=e.resolved_at.isoformat() if e.resolved_at else None,
         created_at=e.created_at.isoformat() if e.created_at else "",
     )
@@ -134,7 +138,10 @@ async def list_alerts(
         select(func.count()).select_from(query.subquery())
     )).scalar() or 0
 
-    query = query.order_by(desc(AlertEvent.created_at)).offset((page - 1) * page_size).limit(page_size)
+    query = query.order_by(
+        case((AlertEvent.status.in_(["OPEN", "ESCALATED"]), 0), else_=1),
+        desc(AlertEvent.created_at),
+    ).offset((page - 1) * page_size).limit(page_size)
     events = (await db.execute(query)).scalars().all()
 
     return {
@@ -143,6 +150,85 @@ async def list_alerts(
         "page_size": page_size,
         "data": [_event_to_resp(e) for e in events],
     }
+
+
+# ---------------------------------------------------------------------------
+# GET /alerts/summary  — lightweight counts for sidebar badge (W4B Phase 4D)
+# Single query, no joins. Must precede /alerts/{alert_id} paths.
+# ---------------------------------------------------------------------------
+
+class AlertSummaryResponse(BaseModel):
+    active: int
+    critical: int
+    high: int
+    medium: int
+    low: int
+
+
+@router.get("/alerts/summary", response_model=AlertSummaryResponse)
+async def alert_summary(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    scope = await get_mill_scope(current_user, db)
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+
+    company_id = scope.get("company_id") or str(current_user.company_id or "")
+    # SUPER_ADMIN sees all — no company filter
+    if role_code == "SUPER_ADMIN":
+        company_filter = []
+    elif company_id:
+        company_filter = [AlertEvent.company_id == company_id]
+    else:
+        return AlertSummaryResponse(active=0, critical=0, high=0, medium=0, low=0)
+
+    if scope.get("mill_id"):
+        mill_filter = [AlertEvent.mill_id == scope["mill_id"]]
+    else:
+        mill_filter = []
+
+    base = select(AlertEvent).where(*company_filter, *mill_filter)
+
+    active_res = await db.execute(
+        select(func.count()).select_from(base.where(
+            AlertEvent.status.notin_(["RESOLVED"])
+        ).subquery())
+    )
+    active = active_res.scalar() or 0
+
+    critical_res = await db.execute(
+        select(func.count()).select_from(base.where(
+            AlertEvent.severity == "CRITICAL",
+            AlertEvent.status.notin_(["RESOLVED"]),
+        ).subquery())
+    )
+    critical = critical_res.scalar() or 0
+
+    high_res = await db.execute(
+        select(func.count()).select_from(base.where(
+            AlertEvent.severity == "WARNING",
+            AlertEvent.status.notin_(["RESOLVED"]),
+        ).subquery())
+    )
+    high = high_res.scalar() or 0
+
+    medium_res = await db.execute(
+        select(func.count()).select_from(base.where(
+            AlertEvent.severity == "INFO",
+            AlertEvent.status.notin_(["RESOLVED"]),
+        ).subquery())
+    )
+    medium = medium_res.scalar() or 0
+
+    low_res = await db.execute(
+        select(func.count()).select_from(base.where(
+            AlertEvent.severity == "EMERGENCY",
+            AlertEvent.status.notin_(["RESOLVED"]),
+        ).subquery())
+    )
+    low = low_res.scalar() or 0
+
+    return AlertSummaryResponse(active=active, critical=critical, high=high, medium=medium, low=low)
 
 
 # ---------------------------------------------------------------------------
@@ -399,6 +485,86 @@ async def resolve(
         alert_event_id=alert_id,
         user_id=str(current_user.id),
         notes=body.notes,
+    )
+    if not ok:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    await db.commit()
+    return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# POST /alerts/acknowledge-all  — bulk acknowledge (W4B Phase 4D)
+# ---------------------------------------------------------------------------
+
+@router.post("/alerts/acknowledge-all")
+async def acknowledge_all(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Acknowledge all active (OPEN / ESCALATED) alerts in the caller's scope."""
+    scope = await get_mill_scope(current_user, db)
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+
+    company_id = scope.get("company_id") or str(current_user.company_id or "")
+    if role_code == "SUPER_ADMIN":
+        filter_clause = []
+    elif company_id:
+        filter_clause = [AlertEvent.company_id == company_id]
+    else:
+        return {"acknowledged": 0}
+
+    if scope.get("mill_id"):
+        filter_clause.append(AlertEvent.mill_id == scope["mill_id"])
+
+    active_events = await db.execute(
+        select(AlertEvent).where(
+            AlertEvent.status.in_(["OPEN", "ESCALATED"]),
+            *filter_clause,
+        )
+    )
+    events = active_events.scalars().all()
+    now = datetime.utcnow()
+
+    for event in events:
+        event.status = AlertStatus.ACKNOWLEDGED
+        event.acknowledged_by = str(current_user.id)
+        event.acknowledged_at = now
+        event.next_escalation_at = None
+        db.add(AlertAcknowledgement(
+            alert_event_id=event.id,
+            user_id=str(current_user.id),
+            action="ACKNOWLEDGED",
+            notes="Bulk acknowledge (Alert Center)",
+        ))
+
+    await db.commit()
+    return {"acknowledged": len(events)}
+
+
+# ---------------------------------------------------------------------------
+# PATCH /alerts/{id}/dismiss  — dismiss without resolving (W4B Phase 4D)
+# ---------------------------------------------------------------------------
+
+@router.patch("/alerts/{alert_id}/dismiss")
+async def dismiss_alert(
+    alert_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Dismiss an alert (marks as RESOLVED)."""
+    event = await db.get(AlertEvent, alert_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        caller_company = str(current_user.company_id or "")
+        if not caller_company or event.company_id != caller_company:
+            raise HTTPException(status_code=403, detail="Not authorised to dismiss this alert")
+    from app.services.alert_service import resolve_alert
+    ok = await resolve_alert(
+        db,
+        alert_event_id=alert_id,
+        user_id=str(current_user.id),
     )
     if not ok:
         raise HTTPException(status_code=404, detail="Alert not found")

@@ -1080,7 +1080,7 @@ function EmployeeDetailSheet({
           <div className="space-y-4 py-4">
             {p ? (
               <>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <Field label={empColConfig.getLabel("days_of_month")} value={p.days_of_month} />
                   <Field label={empColConfig.getLabel("calculate_days")} value={p.calculate_days} />
                   <Field
@@ -1104,7 +1104,7 @@ function EmployeeDetailSheet({
                   />
                 </div>
                 <Separator />
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <Field label={empColConfig.getLabel("ot_hours")} value={p.ot_hours} />
                   <Field
                     label={empColConfig.getLabel("ot_amount")}
@@ -1429,7 +1429,7 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
                   <Input value={form.age} readOnly className="bg-muted" />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label>{empColConfig.getLabel("gender")}</Label>
                   <Select
@@ -1901,7 +1901,7 @@ function EditEmployeeSheet({
                   <Input value={form.age} readOnly className="bg-muted" />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label>{empColConfig.getLabel("gender")}</Label>
                   <Select

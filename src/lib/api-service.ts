@@ -828,8 +828,14 @@ export const alertsApi = {
 
   getOpsCenterSummary: () => api.get("/alerts/ops-center").then((r) => r.data),
 
+  getSummary: () => api.get("/alerts/summary").then((r) => r.data),
+
   acknowledge: (id: string, notes?: string) =>
     api.post(`/alerts/${id}/acknowledge`, { notes }).then((r) => r.data),
+
+  acknowledgeAll: () => api.post("/alerts/acknowledge-all").then((r) => r.data),
+
+  dismiss: (id: string) => api.patch(`/alerts/${id}/dismiss`).then((r) => r.data),
 
   resolve: (id: string, notes?: string) =>
     api.post(`/alerts/${id}/resolve`, { notes }).then((r) => r.data),

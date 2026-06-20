@@ -72,3 +72,18 @@ jobs:
 
       - name: Prettier format check
         run: npx prettier --check "src/**/*.{ts,tsx}"
+
+  deploy-staging:
+    name: Deploy to staging
+    needs: [backend, frontend]
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render deploy hook
+        # Requires RENDER_STAGING_DEPLOY_HOOK secret in GitHub repo settings.
+        # Get the deploy hook URL from Render Dashboard:
+        #   Backend staging service → Settings → Deploy Hook → Copy URL
+        # Then add it as a repository secret named RENDER_STAGING_DEPLOY_HOOK.
+        run: |
+          curl -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
