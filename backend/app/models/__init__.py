@@ -74,3 +74,27 @@ from app.models.production_v2 import (
     MixingChangeFibreRow,
     PackingShiftEntry,
 )
+
+# Quality forms (86 forms from AAYML reference mill)
+from app.models.quality_forms import (
+    QmCardingWasteStudy, QmCardingCvRecord, QmCardingWrapping,
+    QmCardingDfkPressure, QmCardingCfdCheck, QmCardingSpeedRecord,
+    QmCardingFlatsCleaning, QmDailyWastage, QmDrawingCheck,
+    QmCotRollerChange, QmSliverWrapping, QmDrawingCvRecord,
+    QmAPctCheck, QmDrawMonitorCheck, QmDrawingStopOccurrences,
+    QmDrawingSpeedCheck, QmCanRandomisationCheck, QmSimplexCheck,
+    QmSimplexHankTest, QmSimplexBobbinWeight, QmSimplexBreakageStudy,
+    QmSimplexStretchPct, QmSimplexSpeedCheck, QmSimplexNozzleCheck,
+    QmRfSnapStudy, QmRfTraverseCheck, QmRfQcChecklist, QmRfCleaningCheck,
+    QmRfKneeBreakCheck, QmRfMonitorSettings, QmRfCspReport,
+    QmRfBreakageStudy, QmRfDoffBreakage, QmRfRestartBreakage,
+    QmRfCountTest, QmRfSpindleSlippage, QmRfTravellerLoading,
+    QmRfSpacerCheck, QmYarnFaultsUster, QmClassimatResults,
+    QmBagFaults, QmDailyRejectCone, QmConeRejectionReport,
+    QmShadeCone, QmJMarkCones, QmWaxPickup, QmSpliceStrength,
+    QmSpliceAppearance, QmTailEndCheck, QmDrumBreakCradleLifting,
+    QmWaxRotatingCheck, QmDrumAdapterCleaning, QmUsterClearerCheck,
+    QmLotRunout, QmFinishingBreaksStudy, QmUvLightAudit,
+    QmPwseCheck, QmBlendTest,
+    QmBagWeightCheck, QmPaperConeCheck,
+)

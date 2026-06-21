@@ -418,11 +418,13 @@ function QualityPage() {
                 />
                 <QmFormsTab
                   title="Waste Study"
-                  endpoint="/quality/v2/carding/waste-study"
+                  endpoint="/quality-forms/waste-study"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Machine" },
+                    { key: "shift_code", label: "Shift" },
                     { key: "lot_no", label: "Lot No" },
+                    { key: "delivery_hank", label: "Delivery Hank" },
                     { key: "total_production_kg", label: "Production (kg)" },
                     { key: "total_wastage_pct", label: "Wastage %" },
                     {
@@ -436,7 +438,7 @@ function QualityPage() {
                 />
                 <QmFormsTab
                   title="Sliver Wrapping"
-                  endpoint="/quality/v2/carding/wrapping"
+                  endpoint="/quality-forms/carding-wrapping"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Machine" },
@@ -511,12 +513,14 @@ function QualityPage() {
                 />
                 <QmFormsTab
                   title="Sliver Wrapping (BD/FD)"
-                  endpoint="/quality/v2/drawing/sliver-wrapping"
+                  endpoint="/quality-forms/sliver-wrapping"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Machine" },
                     { key: "shift_code", label: "Shift" },
+                    { key: "lot_no", label: "Lot No" },
                     { key: "process", label: "Process" },
+                    { key: "std_hank", label: "Std Hank" },
                     { key: "actual_hank", label: "Actual Hank" },
                     { key: "hank_cv_pct", label: "CV%" },
                     {
@@ -535,7 +539,7 @@ function QualityPage() {
               <div className="space-y-4">
                 <QmFormsTab
                   title="Hank Test"
-                  endpoint="/quality/v2/simplex/hank-test"
+                  endpoint="/quality-forms/simplex-hank"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Machine" },
@@ -620,7 +624,7 @@ function QualityPage() {
               <div className="space-y-4">
                 <QmFormsTab
                   title="CSP Reports"
-                  endpoint="/quality/v2/ring-frame/csp-report"
+                  endpoint="/quality-forms/csp-strength"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Machine" },
@@ -823,6 +827,49 @@ function QualityPage() {
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "shift_code", label: "Shift" },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+                <QmFormsTab
+                  title="Bag Weight Check"
+                  endpoint="/quality-forms/bag-weight"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "shift_code", label: "Shift" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "count_ne", label: "Count Ne" },
+                    { key: "cone_tip_type", label: "Cone Tip" },
+                    { key: "total_samples", label: "Samples" },
+                    { key: "avg_net_weight", label: "Avg Wt (g)" },
+                    { key: "underweight_count", label: "Under" },
+                    { key: "overweight_count", label: "Over" },
+                    { key: "pass_pct", label: "Pass %" },
+                    {
+                      key: "status",
+                      label: "Status",
+                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
+                    },
+                  ]}
+                  millId={millId}
+                  canEdit={canEdit}
+                />
+                <QmFormsTab
+                  title="Paper Cone Check"
+                  endpoint="/quality-forms/paper-cone"
+                  columns={[
+                    { key: "date", label: "Date" },
+                    { key: "supplier_name", label: "Supplier" },
+                    { key: "batch_no", label: "Batch No" },
+                    { key: "total_samples", label: "Samples" },
+                    { key: "avg_cone_weight", label: "Avg Wt (g)" },
+                    { key: "acceptance_pct", label: "Accept %" },
+                    { key: "rejection_pct", label: "Reject %" },
                     {
                       key: "status",
                       label: "Status",

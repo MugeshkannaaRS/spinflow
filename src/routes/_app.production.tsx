@@ -64,6 +64,8 @@ import {
   X,
 } from "lucide-react";
 import { ExportMenu } from "@/components/ui/ExportMenu";
+import { DraftBanner } from "@/components/ui/DraftBanner";
+import { useDraft, isDraftEmpty } from "@/hooks/useDraft";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { useMillMasters, useMillMasterCategory } from "@/hooks/useMillConfig";
@@ -263,6 +265,14 @@ function ShiftGrid() {
   );
   const [rows, setRows] = useState<GridRow[]>(() => buildRows(machines));
 
+  // Draft persistence
+  const shiftDraftKey = `sf_shift::${date}::${shift}::${department}::${selectedGroupIds.join(",")}`;
+  const shiftDraft = useDraft<GridRow[]>(shiftDraftKey);
+  useEffect(() => {
+    shiftDraft.saveDraft(rows, isDraftEmpty(rows));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, shiftDraftKey]);
+
   useEffect(() => {
     setRows(buildRows(machines).map((r) => ({ ...r, operator: operatorName })));
   }, [machinesQ.data]);
@@ -397,6 +407,7 @@ function ShiftGrid() {
       qc.invalidateQueries({ queryKey: ["shifts"] });
       setRows(buildRows(machines));
       if (isBlowroom) setCardingRows(buildCardingRows(cardingMachines));
+      shiftDraft.discardDraft();
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -805,6 +816,21 @@ function ShiftGrid() {
           </div>
         </div>
       </div>
+
+      {shiftDraft.hasDraft && (
+        <DraftBanner
+          message="You have unsaved shift entry data. Restore it?"
+          onRestore={() => {
+            const saved = shiftDraft.restoreDraft();
+            if (saved) { setRows(saved); toast.success("Draft restored"); }
+            shiftDraft.discardDraft();
+          }}
+          onDiscard={() => {
+            shiftDraft.discardDraft();
+            setRows(buildRows(machines));
+          }}
+        />
+      )}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between py-3">
@@ -2845,20 +2871,72 @@ function ManpowerGrid() {
       : (categoriesQ.data?.data ?? [])
   ) as { id: string; category: string; label: string }[];
 
+  // ── Draft persistence ─────────────────────────────────────────────────────
+  // Key includes date+shift+mode+group/range so switching any of these is a
+  // separate draft slot, not an overwrite.
+  const draftKey = useMemo(
+    () =>
+      `sf_mp_draft::${date}::${shift}::${department}::${manpowerMode}::${
+        manpowerMode === "group" ? selectedGroupId : `${selectedMachineFrom}~${selectedMachineTo}`
+      }`,
+    [date, shift, department, manpowerMode, selectedGroupId, selectedMachineFrom, selectedMachineTo],
+  );
+  const [hasDraft, setHasDraft] = useState(false);
+
+  // Check if a draft exists for the current key whenever it changes
+  useEffect(() => {
+    try {
+      setHasDraft(!!sessionStorage.getItem(draftKey));
+    } catch {
+      setHasDraft(false);
+    }
+  }, [draftKey]);
+
   const [rows, setRows] = useState<ManpowerRow[]>(() => buildManpowerRows(RF_DEFAULT_CATEGORIES));
 
-  // Rebuild rows when dept categories change
+  // Persist rows to sessionStorage as a draft on every change (debounced via setTimeout)
+  useEffect(() => {
+    // Don't persist empty/fresh rows — only when something was actually typed
+    const hasData = rows.some(
+      (r) => r.headcount !== "" || r.machinesPerPerson !== "" || r.supervisor !== "" || r.assignments.length > 0,
+    );
+    try {
+      if (hasData) {
+        sessionStorage.setItem(draftKey, JSON.stringify(rows));
+        setHasDraft(true);
+      }
+    } catch {
+      /* quota exceeded */
+    }
+  }, [rows, draftKey]);
+
+  function restoreDraft() {
+    try {
+      const raw = sessionStorage.getItem(draftKey);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as ManpowerRow[];
+      setRows(saved);
+      setHasDraft(false);
+      toast.success("Draft restored");
+    } catch {
+      toast.error("Could not restore draft");
+    }
+  }
+
+  function discardDraft() {
+    try {
+      sessionStorage.removeItem(draftKey);
+    } catch {/* */}
+    setHasDraft(false);
+    setRows(buildManpowerRows(deptCategories));
+  }
+
+  // Rebuild rows when dept categories change (but keep draft logic intact)
   const deptCatKey = deptCategories.map((c) => c.category).join(",");
   useEffect(() => {
     setRows(buildManpowerRows(deptCategories));
+    setHasDraft(false);
   }, [deptCatKey]);
-
-  const updateRow = (idx: number, field: keyof ManpowerRow, value: string) =>
-    setRows((prev) => {
-      const next = [...prev];
-      next[idx] = { ...next[idx], [field]: value };
-      return next;
-    });
 
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const toggleExpanded = (idx: number) =>
@@ -2866,6 +2944,20 @@ function ManpowerGrid() {
       const s = new Set(prev);
       s.has(idx) ? s.delete(idx) : s.add(idx);
       return s;
+    });
+
+  // Clear rows when machine group / range / mode changes — old data shouldn't bleed in
+  useEffect(() => {
+    setRows(buildManpowerRows(deptCategories));
+    setExpandedRows(new Set());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedGroupId, selectedMachineFrom, selectedMachineTo, manpowerMode]);
+
+  const updateRow = (idx: number, field: keyof ManpowerRow, value: string) =>
+    setRows((prev) => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: value };
+      return next;
     });
 
   const updateAssignment = (rowIdx: number, aIdx: number, field: keyof ManpowerAssignment, value: string) =>
@@ -3038,6 +3130,9 @@ function ManpowerGrid() {
       toast.success(label);
       if (errs.length > 0) toast.warning(`${errs.length} error(s) — some rows may not have saved`);
       qc.invalidateQueries({ queryKey: ["rf-manpower"] });
+      // Clear draft after successful save
+      try { sessionStorage.removeItem(draftKey); } catch {/* */}
+      setHasDraft(false);
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -3334,6 +3429,32 @@ function ManpowerGrid() {
         </CardContent>
       </Card>
 
+      {/* ── Draft recovery banner ── */}
+      {hasDraft && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm">
+          <div className="flex items-center gap-2 text-amber-800">
+            <span className="text-base">📋</span>
+            <span>You have unsaved draft data for this shift. Restore it?</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={restoreDraft}
+              className="px-3 py-1 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium"
+            >
+              Restore
+            </button>
+            <button
+              type="button"
+              onClick={discardDraft}
+              className="px-3 py-1 rounded-md border border-amber-300 hover:bg-amber-100 text-amber-700 text-xs font-medium"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Category table — always visible once dept selected ── */}
       <Card>
         <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
@@ -3517,9 +3638,49 @@ function ManpowerGrid() {
                         {/* ── Expandable assignments panel ── */}
                         {expandedRows.has(idx) && (
                           <div className="mt-2 space-y-1.5 pl-1 border-l-2 border-blue-200">
-                            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
-                              Individual assignments
-                            </p>
+                            <div className="flex items-center justify-between pr-1">
+                              <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
+                                Individual assignments
+                              </p>
+                              {/* Auto-distribute button — only when ratio + machines known */}
+                              {mpp > 0 && mpMachines.length > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    // Slice machines relevant to this range
+                                    const fi = selectedMachineFrom
+                                      ? mpMachines.findIndex((m: any) => m.code === selectedMachineFrom)
+                                      : 0;
+                                    const ti = selectedMachineTo
+                                      ? mpMachines.findIndex((m: any) => m.code === selectedMachineTo)
+                                      : mpMachines.length - 1;
+                                    const rangeMcs: any[] =
+                                      fi >= 0 && ti >= fi
+                                        ? mpMachines.slice(fi, ti + 1)
+                                        : mpMachines;
+                                    // Split into chunks of mpp
+                                    const chunks: any[][] = [];
+                                    for (let i = 0; i < rangeMcs.length; i += mpp) {
+                                      chunks.push(rangeMcs.slice(i, i + mpp));
+                                    }
+                                    const newAssignments = chunks.map((chunk, ci) => ({
+                                      name: row.assignments[ci]?.name ?? "",
+                                      emp_id: row.assignments[ci]?.emp_id ?? "",
+                                      mc_from: chunk[0]?.code ?? "",
+                                      mc_to: chunk[chunk.length - 1]?.code ?? "",
+                                    }));
+                                    setRows((prev) => {
+                                      const next = [...prev];
+                                      next[idx] = { ...next[idx], assignments: newAssignments };
+                                      return next;
+                                    });
+                                  }}
+                                  className="text-[10px] text-blue-600 hover:underline flex items-center gap-0.5"
+                                >
+                                  ⚡ Auto-distribute
+                                </button>
+                              )}
+                            </div>
                             {row.assignments.map((a, aIdx) => (
                               <div key={aIdx} className="flex items-center gap-1.5">
                                 <span className="text-[10px] text-muted-foreground w-4 shrink-0 text-right">
@@ -3531,19 +3692,36 @@ function ManpowerGrid() {
                                   placeholder="Name / ID"
                                   className="h-7 text-xs flex-1 min-w-0"
                                 />
-                                <Input
+                                {/* From dropdown */}
+                                <select
                                   value={a.mc_from ?? ""}
                                   onChange={(e) => updateAssignment(idx, aIdx, "mc_from", e.target.value)}
-                                  placeholder="From"
-                                  className="h-7 text-xs w-20 font-mono"
-                                />
-                                <span className="text-[10px] text-muted-foreground">→</span>
-                                <Input
+                                  className="h-7 text-xs w-24 font-mono border border-input rounded-md px-1.5 bg-background"
+                                >
+                                  <option value="">From</option>
+                                  {mpMachines.map((m: any) => (
+                                    <option key={m.code} value={m.code}>{m.code}</option>
+                                  ))}
+                                </select>
+                                <span className="text-[10px] text-muted-foreground shrink-0">→</span>
+                                {/* To dropdown */}
+                                <select
                                   value={a.mc_to ?? ""}
                                   onChange={(e) => updateAssignment(idx, aIdx, "mc_to", e.target.value)}
-                                  placeholder="To"
-                                  className="h-7 text-xs w-20 font-mono"
-                                />
+                                  className="h-7 text-xs w-24 font-mono border border-input rounded-md px-1.5 bg-background"
+                                >
+                                  <option value="">To</option>
+                                  {mpMachines
+                                    .filter((m: any) => {
+                                      if (!a.mc_from) return true;
+                                      const fi2 = mpMachines.findIndex((x: any) => x.code === a.mc_from);
+                                      const mi2 = mpMachines.findIndex((x: any) => x.code === m.code);
+                                      return mi2 >= fi2;
+                                    })
+                                    .map((m: any) => (
+                                      <option key={m.code} value={m.code}>{m.code}</option>
+                                    ))}
+                                </select>
                                 <button
                                   type="button"
                                   onClick={() => removeAssignment(idx, aIdx)}

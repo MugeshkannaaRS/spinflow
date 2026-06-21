@@ -41,6 +41,8 @@ import {
   Users2,
   Clock,
   Layers,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { exportApi } from "@/lib/api-service";
 import { useState, useMemo } from "react";
@@ -483,6 +485,13 @@ function ProductionRecordsTab() {
   const [department, setDepartment] = useState<string>("");
   const [machineGroupId, setMachineGroupId] = useState<string>("");
   const [machineCode, setMachineCode] = useState<string>("");
+  const [expandedManpowerRows, setExpandedManpowerRows] = useState<Set<number>>(new Set());
+  const toggleManpowerRow = (idx: number) =>
+    setExpandedManpowerRows((prev) => {
+      const s = new Set(prev);
+      s.has(idx) ? s.delete(idx) : s.add(idx);
+      return s;
+    });
 
   // Dept options from mill masters
   const { data: millMasters } = useMillMasters();
@@ -822,15 +831,57 @@ function ProductionRecordsTab() {
               </span>
             )}
           </CardTitle>
-          {activeRows.length > 0 && cols.length > 0 && (
-            <ExportMenu
-              filename={`${recordType}_report_${dateFrom}_${dateTo}`}
-              title={`${RECORD_TYPES.find((r) => r.value === recordType)?.label} Report`}
-              subtitle={`${dateFrom} to ${dateTo}${shift !== "_all" ? `  Shift: ${shift}` : ""}${department ? `  Dept: ${department}` : ""}`}
-              columns={cols}
-              rows={activeRows}
-            />
-          )}
+          {activeRows.length > 0 && cols.length > 0 && (() => {
+            // For manpower export: flatten assignments so each person = 1 row
+            const exportCols = recordType === "manpower"
+              ? [
+                  { key: "date", label: "Date" },
+                  { key: "shift", label: "Shift" },
+                  { key: "category", label: "Category" },
+                  { key: "mc_id_from", label: "MC From" },
+                  { key: "mc_id_to", label: "MC To" },
+                  { key: "total_machines", label: "Machines" },
+                  { key: "headcount", label: "Headcount" },
+                  { key: "machines_per_person", label: "Mc/Person" },
+                  { key: "supervisor", label: "Supervisor" },
+                  { key: "person_no", label: "Person #" },
+                  { key: "person_name", label: "Person Name" },
+                  { key: "emp_id", label: "Emp ID" },
+                  { key: "person_mc_from", label: "Person MC From" },
+                  { key: "person_mc_to", label: "Person MC To" },
+                ]
+              : cols;
+            const exportRows = recordType === "manpower"
+              ? activeRows.flatMap((row: any): any[] => {
+                  const assignments: any[] = Array.isArray(row.assignments) ? row.assignments : [];
+                  const base = {
+                    date: row.date, shift: row.shift, category: row.category,
+                    mc_id_from: row.mc_id_from, mc_id_to: row.mc_id_to,
+                    total_machines: row.total_machines, headcount: row.headcount,
+                    machines_per_person: row.machines_per_person ?? "",
+                    supervisor: row.supervisor ?? "",
+                  };
+                  if (assignments.length === 0) {
+                    return [{ ...base, person_no: "", person_name: "", emp_id: "", person_mc_from: "", person_mc_to: "" }];
+                  }
+                  return assignments.map((a: any, ai: number) => ({
+                    ...base,
+                    person_no: ai + 1, person_name: a.name ?? "",
+                    emp_id: a.emp_id ?? "", person_mc_from: a.mc_from ?? "",
+                    person_mc_to: a.mc_to ?? "",
+                  }));
+                })
+              : activeRows;
+            return (
+              <ExportMenu
+                filename={`${recordType}_report_${dateFrom}_${dateTo}`}
+                title={`${RECORD_TYPES.find((r) => r.value === recordType)?.label} Report`}
+                subtitle={`${dateFrom} to ${dateTo}${shift !== "_all" ? `  Shift: ${shift}` : ""}${department ? `  Dept: ${department}` : ""}`}
+                columns={exportCols}
+                rows={exportRows}
+              />
+            );
+          })()}
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
@@ -851,18 +902,77 @@ function ProductionRecordsTab() {
                         {c.label}
                       </TableHead>
                     ))}
+                    {recordType === "manpower" && (
+                      <TableHead className="px-3 py-2 whitespace-nowrap">People</TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {activeRows.map((row: any, i: number) => (
-                    <TableRow key={row.id ?? i}>
-                      {cols.map((c) => (
-                        <TableCell key={c.key} className="px-3 py-1.5 whitespace-nowrap">
-                          {row[c.key] != null && row[c.key] !== "" ? String(row[c.key]) : "—"}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
+                  {activeRows.map((row: any, i: number) => {
+                    const assignments: any[] = recordType === "manpower" && Array.isArray(row.assignments)
+                      ? row.assignments
+                      : [];
+                    const isExpanded = expandedManpowerRows.has(i);
+                    return (
+                      <>
+                        <TableRow key={row.id ?? i} className={isExpanded ? "bg-blue-50/40" : undefined}>
+                          {cols.map((c) => (
+                            <TableCell key={c.key} className="px-3 py-1.5 whitespace-nowrap">
+                              {row[c.key] != null && row[c.key] !== "" ? String(row[c.key]) : "—"}
+                            </TableCell>
+                          ))}
+                          {recordType === "manpower" && (
+                            <TableCell className="px-3 py-1.5">
+                              {assignments.length > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleManpowerRow(i)}
+                                  className="flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors font-medium"
+                                >
+                                  {isExpanded
+                                    ? <ChevronDown className="size-3" />
+                                    : <ChevronRight className="size-3" />}
+                                  {assignments.length} {assignments.length === 1 ? "person" : "people"}
+                                </button>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                          )}
+                        </TableRow>
+                        {recordType === "manpower" && isExpanded && assignments.length > 0 && (
+                          <TableRow key={`${row.id ?? i}-expanded`} className="bg-blue-50/60">
+                            <TableCell colSpan={cols.length + 1} className="px-4 py-2">
+                              <div className="rounded-md border border-blue-200 overflow-hidden">
+                                <table className="text-[11px] w-full">
+                                  <thead>
+                                    <tr className="bg-blue-100 text-blue-800">
+                                      <th className="px-3 py-1.5 text-left font-medium w-8">#</th>
+                                      <th className="px-3 py-1.5 text-left font-medium">Name</th>
+                                      <th className="px-3 py-1.5 text-left font-medium">Emp ID</th>
+                                      <th className="px-3 py-1.5 text-left font-medium">MC From</th>
+                                      <th className="px-3 py-1.5 text-left font-medium">MC To</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {assignments.map((a: any, ai: number) => (
+                                      <tr key={ai} className={ai % 2 === 0 ? "bg-white" : "bg-blue-50/30"}>
+                                        <td className="px-3 py-1 text-muted-foreground">{ai + 1}</td>
+                                        <td className="px-3 py-1 font-medium">{a.name || "—"}</td>
+                                        <td className="px-3 py-1 font-mono text-muted-foreground">{a.emp_id || "—"}</td>
+                                        <td className="px-3 py-1 font-mono text-blue-700">{a.mc_from || "—"}</td>
+                                        <td className="px-3 py-1 font-mono text-blue-700">{a.mc_to || "—"}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

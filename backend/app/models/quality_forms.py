@@ -1359,3 +1359,70 @@ class QmBlendTest(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(20), default="draft")
 
     __table_args__ = (Index("ix_qm_blend_test_lot_date", "mill_id", "lot_no", "date"),)
+
+
+# ---------------------------------------------------------------------------
+# 8. Bag Weight Check
+# ---------------------------------------------------------------------------
+
+class QmBagWeightCheck(TimestampMixin, Base):
+    """Packed cone bag weight verification — gross/tare/net per sample."""
+    __tablename__ = "qm_bag_weight_check"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
+    company_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("companies.id"), nullable=True, index=True)
+    date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    shift_code: Mapped[str] = mapped_column(String(5), nullable=False)
+    count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    cone_tip_type: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    inspector: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    samples_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    total_samples: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    avg_net_weight: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    min_net_weight: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    max_net_weight: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    std_deviation: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    target_weight: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    deviation_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    underweight_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    overweight_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    pass_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    pass_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+    remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (Index("ix_qm_bag_weight_date", "mill_id", "lot_no", "date"),)
+
+
+# ---------------------------------------------------------------------------
+# 9. Paper Cone Check
+# ---------------------------------------------------------------------------
+
+class QmPaperConeCheck(TimestampMixin, Base):
+    """Paper cone / packing material quality inspection with supplier tracking."""
+    __tablename__ = "qm_paper_cone_check"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
+    company_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("companies.id"), nullable=True, index=True)
+    date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    supplier_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("suppliers.id"), nullable=True, index=True)
+    supplier_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    batch_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    inspector: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    samples_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    total_samples: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    avg_cone_weight: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    min_cone_weight: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    max_cone_weight: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    avg_diameter: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    avg_length: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    avg_hardness: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    acceptance_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    rejection_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+    remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (Index("ix_qm_paper_cone_date", "mill_id", "supplier_id", "date"),)

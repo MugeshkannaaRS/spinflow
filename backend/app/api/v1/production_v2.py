@@ -508,6 +508,8 @@ async def delete_manpower_category(
 async def list_rf_manpower(
     mill_id: Optional[str] = Query(None),
     date: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
     shift: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
@@ -516,6 +518,12 @@ async def list_rf_manpower(
     q = select(RFManpowerPlan).where(RFManpowerPlan.mill_id == effective_mill_id)
     if date:
         q = q.where(RFManpowerPlan.date == date)
+    elif date_from and date_to:
+        q = q.where(RFManpowerPlan.date >= date_from, RFManpowerPlan.date <= date_to)
+    elif date_from:
+        q = q.where(RFManpowerPlan.date >= date_from)
+    elif date_to:
+        q = q.where(RFManpowerPlan.date <= date_to)
     if shift:
         q = q.where(RFManpowerPlan.shift == shift)
     q = q.order_by(RFManpowerPlan.date.desc(), RFManpowerPlan.shift, RFManpowerPlan.category)

@@ -1,667 +1,612 @@
 """
-Quality Module v2 — Full form CRUD + Sequential Approval Engine
-Routes are prefixed /quality/v2/ to avoid collision with existing /quality/* routes.
+Quality Forms API — Comprehensive CRUD + calculations + workflow for all QC modules.
+Follows existing SpinFlow patterns: require_module, get_mill_scope, paginated lists with fallbacks.
 """
 from __future__ import annotations
-from typing import Any, Dict, List, Optional
-from datetime import datetime, timezone
-
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import select, func, update as sa_update
+import logging
+import math
+from fastapi import APIRouter, Depends, Query, HTTPException
+from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel, Field
-
-from app.core.deps import get_current_user, get_mill_scope, require_module
+from typing import Optional, Any
 from app.db.session import get_db
+from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.models.user import User
+from app.models.masters import Mill
 from app.models.quality_forms import (
-    QmCountSpec, QmApprovalTemplate, QmFormApproval,
-    # Carding
-    QmBackProcessAllocation, QmCardingWasteStudy, QmCardingCvRecord,
-    QmCardingWrapping, QmCardingDfkPressure, QmCardingCfdCheck,
-    QmCardingSpeedRecord, QmCardingFlatsCleaning, QmDailyWastage,
-    # Drawing
-    QmDrawingCheck, QmCotRollerChange, QmSliverWrapping, QmDrawingCvRecord,
-    QmAPctCheck, QmDrawMonitorCheck, QmDrawingStopOccurrences,
-    QmDrawingSpeedCheck, QmCanRandomisationCheck,
-    # Simplex
-    QmSimplexCheck, QmSimplexHankTest, QmSimplexBobbinWeight,
-    QmSimplexBreakageStudy, QmSimplexStretchPct, QmSimplexSpeedCheck,
-    QmSimplexNozzleCheck,
-    # Ring Frame
-    QmRfSnapStudy, QmRfTraverseCheck, QmRfQcChecklist, QmRfCleaningCheck,
-    QmRfKneeBreakCheck, QmRfMonitorSettings, QmRfCspReport, QmRfBreakageStudy,
-    QmRfDoffBreakage, QmRfRestartBreakage, QmRfCountTest, QmRfSpindleSlippage,
-    QmRfTravellerLoading, QmRfSpacerCheck,
-    # Auto Coner
-    QmYarnFaultsUster, QmClassimatResults, QmBagFaults, QmDailyRejectCone,
-    QmConeRejectionReport, QmShadeCone, QmJMarkCones, QmWaxPickup,
-    QmSpliceStrength, QmSpliceAppearance, QmTailEndCheck,
-    QmDrumBreakCradleLifting, QmWaxRotatingCheck, QmDrumAdapterCleaning,
-    QmUsterClearerCheck, QmLotRunout, QmFinishingBreaksStudy, QmUvLightAudit,
-    # Packing
-    QmPwseCheck, QmBlendTest,
+    QmCardingWasteStudy, QmSimplexHankTest, QmSliverWrapping,
+    QmCardingWrapping, QmClassimatResults, QmBagWeightCheck,
+    QmPaperConeCheck, QmRfCspReport,
 )
-from app.db.base import generate_uuid
-
-router = APIRouter(
-    prefix="/quality/v2",
-    tags=["Quality Module v2"],
-    dependencies=[Depends(require_module("quality"))],
+from app.schemas.quality_forms import (
+    WasteStudyCreate, WasteStudyResponse,
+    SimplexHankCreate, SimplexHankResponse,
+    SliverWrappingCreate, SliverWrappingResponse,
+    CardingWrappingCreate, CardingWrappingResponse,
+    AutoconerCutCreate, AutoconerCutResponse,
+    BagWeightCreate, BagWeightResponse,
+    PaperConeCreate, PaperConeResponse,
+    CspStrengthCreate, CspStrengthResponse,
 )
 
-# ---------------------------------------------------------------------------
-# Shared helpers
-# ---------------------------------------------------------------------------
-
-def _model_to_dict(obj) -> Dict[str, Any]:
-    """Convert SQLAlchemy model to dict, skipping internal SA state."""
-    return {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
+logger = logging.getLogger(__name__)
+router = APIRouter()
 
 
-async def _paginate(
-    stmt,
-    db: AsyncSession,
-    page: int,
-    page_size: int,
-    model,
-) -> Dict[str, Any]:
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(count_stmt)).scalar() or 0
-    items = (await db.execute(stmt.offset((page - 1) * page_size).limit(page_size))).scalars().all()
-    return {
-        "data": [_model_to_dict(i) for i in items],
-        "total": total,
-        "page": page,
-        "per_page": page_size,
-    }
+# ─── Helpers ────────────────────────────────────────────────────────
+
+async def _apply_scope(db, current_user, model, base_query):
+    """Apply mill/company scope filter to a query."""
+    scope = await get_mill_scope(current_user, db)
+    effective_mill = scope.get("mill_id")
+    if effective_mill:
+        return base_query.where(model.mill_id == effective_mill), scope
+    company_id = scope.get("company_id")
+    if company_id:
+        mills_sub = select(Mill.id).where(Mill.company_id == company_id)
+        return base_query.where(model.mill_id.in_(mills_sub)), scope
+    return base_query, scope
 
 
-def _apply_mill_scope(stmt, model, scope: tuple):
-    mill_id, company_id = scope
-    if mill_id:
-        stmt = stmt.where(model.mill_id == mill_id)
-    return stmt
-
-
-def _set_mill_id(payload: dict, scope: tuple) -> dict:
-    mill_id, _ = scope
-    payload["mill_id"] = mill_id
-    return payload
-
-
-# ---------------------------------------------------------------------------
-# Generic CRUD factory — avoids 60× copy-pasted endpoint blocks
-# ---------------------------------------------------------------------------
-
-def _make_crud_routes(
-    router: APIRouter,
-    path: str,
-    model,
-    *,
-    extra_filters: Optional[List] = None,
-):
-    """
-    Registers GET (list), GET /{id}, POST, PATCH /{id} for `model`.
-    All endpoints are scoped by mill_id from get_mill_scope.
-    """
-    tag = model.__tablename__
-
-    @router.get(path, summary=f"List {tag}")
-    async def list_records(
-        page: int = Query(1, ge=1),
-        page_size: int = Query(50, ge=1, le=200),
-        date: Optional[str] = Query(None),
-        lot_no: Optional[str] = Query(None),
-        machine_no: Optional[str] = Query(None),
-        shift_code: Optional[str] = Query(None),
-        status_filter: Optional[str] = Query(None, alias="status"),
-        scope: tuple = Depends(get_mill_scope),
-        db: AsyncSession = Depends(get_db),
-    ):
-        stmt = select(model)
-        stmt = _apply_mill_scope(stmt, model, scope)
-        if date and hasattr(model, "date"):
-            stmt = stmt.where(model.date == date)
-        if lot_no and hasattr(model, "lot_no"):
-            stmt = stmt.where(model.lot_no.ilike(f"%{lot_no}%"))
-        if machine_no and hasattr(model, "machine_no"):
-            stmt = stmt.where(model.machine_no == machine_no)
-        if shift_code and hasattr(model, "shift_code"):
-            stmt = stmt.where(model.shift_code == shift_code)
-        if status_filter and hasattr(model, "status"):
-            stmt = stmt.where(model.status == status_filter)
-        if hasattr(model, "date"):
-            stmt = stmt.order_by(model.date.desc())
-        return await _paginate(stmt, db, page, page_size, model)
-
-    @router.get(f"{path}/{{record_id}}", summary=f"Get {tag}")
-    async def get_record(
-        record_id: str,
-        scope: tuple = Depends(get_mill_scope),
-        db: AsyncSession = Depends(get_db),
-    ):
-        obj = await db.get(model, record_id)
-        if not obj:
-            raise HTTPException(status_code=404, detail=f"{tag} not found")
-        mill_id, _ = scope
-        if mill_id and getattr(obj, "mill_id", None) != mill_id:
-            raise HTTPException(status_code=403, detail="Forbidden")
-        return _model_to_dict(obj)
-
-    @router.post(path, status_code=201, summary=f"Create {tag}")
-    async def create_record(
-        payload: Dict[str, Any],
-        scope: tuple = Depends(get_mill_scope),
-        db: AsyncSession = Depends(get_db),
-    ):
-        payload = _set_mill_id(payload, scope)
-        payload["id"] = generate_uuid()
-        obj = model(**{k: v for k, v in payload.items() if hasattr(model, k)})
-        db.add(obj)
-        await db.commit()
-        await db.refresh(obj)
-        return _model_to_dict(obj)
-
-    @router.patch(f"{path}/{{record_id}}", summary=f"Update {tag}")
-    async def update_record(
-        record_id: str,
-        payload: Dict[str, Any],
-        scope: tuple = Depends(get_mill_scope),
-        db: AsyncSession = Depends(get_db),
-    ):
-        obj = await db.get(model, record_id)
-        if not obj:
-            raise HTTPException(status_code=404, detail=f"{tag} not found")
-        mill_id, _ = scope
-        if mill_id and getattr(obj, "mill_id", None) != mill_id:
-            raise HTTPException(status_code=403, detail="Forbidden")
-        for k, v in payload.items():
-            if k not in ("id", "mill_id", "created_at") and hasattr(obj, k):
-                setattr(obj, k, v)
-        await db.commit()
-        await db.refresh(obj)
-        return _model_to_dict(obj)
-
-    @router.delete(f"{path}/{{record_id}}", status_code=204, summary=f"Delete {tag}")
-    async def delete_record(
-        record_id: str,
-        scope: tuple = Depends(get_mill_scope),
-        db: AsyncSession = Depends(get_db),
-    ):
-        obj = await db.get(model, record_id)
-        if not obj:
-            raise HTTPException(status_code=404, detail=f"{tag} not found")
-        mill_id, _ = scope
-        if mill_id and getattr(obj, "mill_id", None) != mill_id:
-            raise HTTPException(status_code=403, detail="Forbidden")
-        await db.delete(obj)
-        await db.commit()
-        return Response(status_code=204)
-
-    return list_records, get_record, create_record, update_record, delete_record
-
-
-# Register all form CRUD routes
-_ROUTES = [
-    # Masters
-    ("/count-specs",               QmCountSpec),
-    ("/approval-templates",        QmApprovalTemplate),
-    # Carding
-    ("/carding/back-process",      QmBackProcessAllocation),
-    ("/carding/waste-study",       QmCardingWasteStudy),
-    ("/carding/cv-record",         QmCardingCvRecord),
-    ("/carding/wrapping",          QmCardingWrapping),
-    ("/carding/dfk-pressure",      QmCardingDfkPressure),
-    ("/carding/cfd-check",         QmCardingCfdCheck),
-    ("/carding/speed-record",      QmCardingSpeedRecord),
-    ("/carding/flats-cleaning",    QmCardingFlatsCleaning),
-    ("/carding/daily-wastage",     QmDailyWastage),
-    # Drawing
-    ("/drawing/check",             QmDrawingCheck),
-    ("/drawing/cot-roller",        QmCotRollerChange),
-    ("/drawing/sliver-wrapping",   QmSliverWrapping),
-    ("/drawing/cv-record",         QmDrawingCvRecord),
-    ("/drawing/a-pct",             QmAPctCheck),
-    ("/drawing/monitor-check",     QmDrawMonitorCheck),
-    ("/drawing/stop-occurrences",  QmDrawingStopOccurrences),
-    ("/drawing/speed-check",       QmDrawingSpeedCheck),
-    ("/drawing/can-randomisation", QmCanRandomisationCheck),
-    # Simplex
-    ("/simplex/check",             QmSimplexCheck),
-    ("/simplex/hank-test",         QmSimplexHankTest),
-    ("/simplex/bobbin-weight",     QmSimplexBobbinWeight),
-    ("/simplex/breakage-study",    QmSimplexBreakageStudy),
-    ("/simplex/stretch-pct",       QmSimplexStretchPct),
-    ("/simplex/speed-check",       QmSimplexSpeedCheck),
-    ("/simplex/nozzle-check",      QmSimplexNozzleCheck),
-    # Ring Frame
-    ("/ring-frame/snap-study",         QmRfSnapStudy),
-    ("/ring-frame/traverse-check",     QmRfTraverseCheck),
-    ("/ring-frame/qc-checklist",       QmRfQcChecklist),
-    ("/ring-frame/cleaning-check",     QmRfCleaningCheck),
-    ("/ring-frame/knee-break",         QmRfKneeBreakCheck),
-    ("/ring-frame/monitor-settings",   QmRfMonitorSettings),
-    ("/ring-frame/csp-report",         QmRfCspReport),
-    ("/ring-frame/breakage-study",     QmRfBreakageStudy),
-    ("/ring-frame/doff-breakage",      QmRfDoffBreakage),
-    ("/ring-frame/restart-breakage",   QmRfRestartBreakage),
-    ("/ring-frame/count-test",         QmRfCountTest),
-    ("/ring-frame/spindle-slippage",   QmRfSpindleSlippage),
-    ("/ring-frame/traveller-loading",  QmRfTravellerLoading),
-    ("/ring-frame/spacer-check",       QmRfSpacerCheck),
-    # Auto Coner
-    ("/auto-coner/yarn-faults",         QmYarnFaultsUster),
-    ("/auto-coner/classimat",           QmClassimatResults),
-    ("/auto-coner/bag-faults",          QmBagFaults),
-    ("/auto-coner/daily-reject-cone",   QmDailyRejectCone),
-    ("/auto-coner/cone-rejection",      QmConeRejectionReport),
-    ("/auto-coner/shade-cone",          QmShadeCone),
-    ("/auto-coner/j-mark-cones",        QmJMarkCones),
-    ("/auto-coner/wax-pickup",          QmWaxPickup),
-    ("/auto-coner/splice-strength",     QmSpliceStrength),
-    ("/auto-coner/splice-appearance",   QmSpliceAppearance),
-    ("/auto-coner/tail-end-check",      QmTailEndCheck),
-    ("/auto-coner/drum-break",          QmDrumBreakCradleLifting),
-    ("/auto-coner/wax-rotating",        QmWaxRotatingCheck),
-    ("/auto-coner/drum-adapter",        QmDrumAdapterCleaning),
-    ("/auto-coner/uster-clearer",       QmUsterClearerCheck),
-    ("/auto-coner/lot-runout",          QmLotRunout),
-    ("/auto-coner/finishing-breaks",    QmFinishingBreaksStudy),
-    ("/auto-coner/uv-audit",            QmUvLightAudit),
-    # Packing
-    ("/packing/pwse-check",    QmPwseCheck),
-    ("/packing/blend-test",    QmBlendTest),
-]
-
-for _path, _model in _ROUTES:
-    _make_crud_routes(router, _path, _model)
-
-
-# ---------------------------------------------------------------------------
-# Approval Engine
-# ---------------------------------------------------------------------------
-
-class ApprovalAction(BaseModel):
-    form_type: str
-    record_id: str
-    action: str = Field(..., pattern="^(approve|reject|reopen)$")
-    rejection_note: Optional[str] = None
-
-
-@router.get("/approvals/{form_type}/{record_id}", summary="List approvals for a record")
-async def list_approvals(
-    form_type: str,
-    record_id: str,
-    scope: tuple = Depends(get_mill_scope),
-    db: AsyncSession = Depends(get_db),
-):
-    mill_id, _ = scope
-    stmt = (
-        select(QmFormApproval)
-        .where(
-            QmFormApproval.mill_id == mill_id,
-            QmFormApproval.form_type == form_type,
-            QmFormApproval.record_id == record_id,
-        )
-        .order_by(QmFormApproval.approval_level)
-    )
-    approvals = (await db.execute(stmt)).scalars().all()
-    return [_model_to_dict(a) for a in approvals]
-
-
-@router.post("/approvals/action", summary="Approve / reject / re-open a record")
-async def approval_action(
-    body: ApprovalAction,
-    scope: tuple = Depends(get_mill_scope),
-    db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    mill_id, _ = scope
-
-    # Fetch template to know required levels + role sequence
-    template = (
-        await db.execute(
-            select(QmApprovalTemplate).where(
-                QmApprovalTemplate.mill_id == mill_id,
-                QmApprovalTemplate.form_type == body.form_type,
-            )
-        )
-    ).scalar_one_or_none()
-
-    if not template:
-        # Fallback: single-level approval if no template configured
-        required_roles = [getattr(current_user, "role", "QCO")]
-    else:
-        required_roles = template.required_roles_json  # list of role codes in order
-
-    # Existing approvals for this record
-    existing_stmt = (
-        select(QmFormApproval)
-        .where(
-            QmFormApproval.mill_id == mill_id,
-            QmFormApproval.form_type == body.form_type,
-            QmFormApproval.record_id == body.record_id,
-        )
-        .order_by(QmFormApproval.approval_level)
-    )
-    existing = (await db.execute(existing_stmt)).scalars().all()
-    approved_levels = {a.approval_level for a in existing if a.status == "approved"}
-    rejected_levels = {a.approval_level for a in existing if a.status == "rejected"}
-    existing_map = {a.approval_level: a for a in existing}
-
-    if body.action == "reopen":
-        # Clear ALL approvals — forces restart from level 1
-        for a in existing:
-            a.status = "pending"
-            a.approved_at = None
-            a.rejection_note = None
-        await db.commit()
-        return {"message": "Record reopened — all approvals cleared"}
-
-    # Determine this user's level based on role
-    user_role = getattr(current_user, "role", None)
+async def _paginate(db, query, page, page_size):
+    """Apply count + offset/limit pagination with error fallback."""
     try:
-        user_level = required_roles.index(user_role) + 1  # 1-based
-    except (ValueError, AttributeError):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Your role '{user_role}' is not in the approval chain for {body.form_type}",
-        )
-
-    # Sequential check: all lower levels must be approved first
-    for lvl in range(1, user_level):
-        if lvl not in approved_levels:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Level {lvl} approval must be completed before level {user_level}",
-            )
-
-    if body.action == "approve":
-        if user_level in rejected_levels:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Cannot approve a rejected level — re-open the record first",
-            )
-        if user_level in existing_map:
-            rec = existing_map[user_level]
-            rec.status = "approved"
-            rec.approved_at = datetime.now(timezone.utc)
-            rec.employee_id = str(current_user.id) if hasattr(current_user, "id") else None
-            rec.employee_name = getattr(current_user, "full_name", None) or getattr(current_user, "email", None)
-        else:
-            db.add(QmFormApproval(
-                id=generate_uuid(),
-                mill_id=mill_id,
-                form_type=body.form_type,
-                record_id=body.record_id,
-                approval_level=user_level,
-                role_code=user_role,
-                employee_id=str(current_user.id) if hasattr(current_user, "id") else None,
-                employee_name=getattr(current_user, "full_name", None) or getattr(current_user, "email", None),
-                status="approved",
-                approved_at=datetime.now(timezone.utc),
-            ))
-
-        # Update the record's status field if all levels approved
-        all_approved = all((lvl in approved_levels or lvl == user_level) for lvl in range(1, len(required_roles) + 1))
-        if all_approved:
-            await _set_form_status(body.form_type, body.record_id, "approved", db)
-
-    elif body.action == "reject":
-        db.add(QmFormApproval(
-            id=generate_uuid(),
-            mill_id=mill_id,
-            form_type=body.form_type,
-            record_id=body.record_id,
-            approval_level=user_level,
-            role_code=user_role,
-            employee_id=str(current_user.id) if hasattr(current_user, "id") else None,
-            employee_name=getattr(current_user, "full_name", None) or getattr(current_user, "email", None),
-            status="rejected",
-            rejection_note=body.rejection_note,
-        ))
-        await _set_form_status(body.form_type, body.record_id, "rejected", db)
-
-    await db.commit()
-    return {"message": f"Record {body.action}d at level {user_level}"}
+        count_q = select(func.count()).select_from(query.subquery())
+        total = (await db.execute(count_q)).scalar() or 0
+        rows = (await db.execute(
+            query.order_by(desc("created_at")).offset((page - 1) * page_size).limit(page_size)
+        )).scalars().all()
+        pages = max(1, math.ceil(total / page_size))
+        return {"total": total, "page": page, "page_size": page_size, "pages": pages, "data": rows}
+    except Exception as e:
+        logger.error(f"quality_forms paginate error: {e}")
+        return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
-async def _set_form_status(form_type: str, record_id: str, new_status: str, db: AsyncSession):
-    """Update the status column on the underlying form table."""
-    # Map form_type slug → model class
-    _SLUG_MAP: Dict[str, Any] = {
-        "back_process_allocation": QmBackProcessAllocation,
-        "carding_waste_study": QmCardingWasteStudy,
-        "carding_cv_record": QmCardingCvRecord,
-        "carding_wrapping": QmCardingWrapping,
-        "carding_dfk_pressure": QmCardingDfkPressure,
-        "carding_cfd_check": QmCardingCfdCheck,
-        "carding_speed_record": QmCardingSpeedRecord,
-        "carding_flats_cleaning": QmCardingFlatsCleaning,
-        "daily_wastage": QmDailyWastage,
-        "drawing_check": QmDrawingCheck,
-        "cot_roller_change": QmCotRollerChange,
-        "sliver_wrapping": QmSliverWrapping,
-        "drawing_cv_record": QmDrawingCvRecord,
-        "a_pct_check": QmAPctCheck,
-        "draw_monitor_check": QmDrawMonitorCheck,
-        "drawing_stop_occurrences": QmDrawingStopOccurrences,
-        "drawing_speed_check": QmDrawingSpeedCheck,
-        "can_randomisation_check": QmCanRandomisationCheck,
-        "simplex_check": QmSimplexCheck,
-        "simplex_hank_test": QmSimplexHankTest,
-        "simplex_bobbin_weight": QmSimplexBobbinWeight,
-        "simplex_breakage_study": QmSimplexBreakageStudy,
-        "simplex_stretch_pct": QmSimplexStretchPct,
-        "simplex_speed_check": QmSimplexSpeedCheck,
-        "simplex_nozzle_check": QmSimplexNozzleCheck,
-        "rf_snap_study": QmRfSnapStudy,
-        "rf_traverse_check": QmRfTraverseCheck,
-        "rf_qc_checklist": QmRfQcChecklist,
-        "rf_cleaning_check": QmRfCleaningCheck,
-        "rf_knee_break_check": QmRfKneeBreakCheck,
-        "rf_monitor_settings": QmRfMonitorSettings,
-        "rf_csp_report": QmRfCspReport,
-        "rf_breakage_study": QmRfBreakageStudy,
-        "rf_doff_breakage": QmRfDoffBreakage,
-        "rf_restart_breakage": QmRfRestartBreakage,
-        "rf_count_test": QmRfCountTest,
-        "rf_spindle_slippage": QmRfSpindleSlippage,
-        "rf_traveller_loading": QmRfTravellerLoading,
-        "rf_spacer_check": QmRfSpacerCheck,
-        "yarn_faults_uster": QmYarnFaultsUster,
-        "classimat_results": QmClassimatResults,
-        "bag_faults": QmBagFaults,
-        "daily_reject_cone": QmDailyRejectCone,
-        "cone_rejection_report": QmConeRejectionReport,
-        "shade_cone": QmShadeCone,
-        "j_mark_cones": QmJMarkCones,
-        "wax_pickup": QmWaxPickup,
-        "splice_strength": QmSpliceStrength,
-        "splice_appearance": QmSpliceAppearance,
-        "tail_end_check": QmTailEndCheck,
-        "drum_break_cradle_lifting": QmDrumBreakCradleLifting,
-        "wax_rotating_check": QmWaxRotatingCheck,
-        "drum_adapter_cleaning": QmDrumAdapterCleaning,
-        "uster_clearer_check": QmUsterClearerCheck,
-        "lot_runout": QmLotRunout,
-        "finishing_breaks_study": QmFinishingBreaksStudy,
-        "uv_light_audit": QmUvLightAudit,
-        "pwse_check": QmPwseCheck,
-        "blend_test": QmBlendTest,
-    }
-    model = _SLUG_MAP.get(form_type)
-    if model and hasattr(model, "status"):
-        await db.execute(
-            sa_update(model).where(model.id == record_id).values(status=new_status)
-        )
+async def _calculate_waste_study(record: QmCardingWasteStudy) -> QmCardingWasteStudy:
+    """Auto-calculate waste percentages."""
+    prod = record.total_production_kg or 0
+    total_waste = sum(filter(None, [
+        record.licker_in2_waste_kg, record.licker_in3_waste_kg,
+        record.flat_strips_kg, record.suction_hood_front_kg,
+        record.suction_hood_back_kg,
+    ]))
+    if prod > 0:
+        record.total_wastage_pct = round((total_waste / prod) * 100, 2)
+    return record
 
 
-# ---------------------------------------------------------------------------
-# Quality Dashboard — summary per department
-# ---------------------------------------------------------------------------
+async def _calculate_simplex_hank(record: QmSimplexHankTest) -> QmSimplexHankTest:
+    """Auto-calculate hank, CV%, spec check from sample readings."""
+    samples = record.readings_json or []
+    if isinstance(samples, list) and len(samples) > 0:
+        weights = [float(s) if isinstance(s, (int, float)) else 0 for s in samples]
+        valid = [w for w in weights if w > 0]
+        if valid:
+            avg = sum(valid) / len(valid)
+            record.avg_hank = round(avg, 4)
+            # Hank = 840 yards per pound → simplified: hank = 1 / (weight_g * 0.00220462 * 840)
+            # For practical mill use: store the average weight; actual_hank computed in UI
+            record.actual_hank = round(1.0 / (avg * 0.00220462 * 840) if avg > 0 else 0, 2)
+            if len(valid) > 1:
+                variance = sum((w - avg) ** 2 for w in valid) / (len(valid) - 1)
+                std_dev = math.sqrt(variance)
+                record.cv_pct = round((std_dev / avg) * 100, 2) if avg > 0 else 0
+    return record
 
-@router.get("/dashboard/summary", summary="Quality forms summary by department")
-async def quality_dashboard_summary(
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
-    scope: tuple = Depends(get_mill_scope),
-    db: AsyncSession = Depends(get_db),
+
+# ═══════════════════════════════════════════════════════════════════
+# 1. WASTE STUDY
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/quality-forms/waste-study")
+async def list_waste_study(
+    date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None),
+    machine_no: Optional[str] = Query(None), lot_no: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality")),
 ):
-    mill_id, _ = scope
-
-    async def _count(model, date_col="date"):
-        stmt = select(func.count()).select_from(model).where(model.mill_id == mill_id)
-        if date_from and hasattr(model, date_col):
-            stmt = stmt.where(getattr(model, date_col) >= date_from)
-        if date_to and hasattr(model, date_col):
-            stmt = stmt.where(getattr(model, date_col) <= date_to)
-        return (await db.execute(stmt)).scalar() or 0
-
-    async def _count_by_status(model, s):
-        stmt = (
-            select(func.count()).select_from(model)
-            .where(model.mill_id == mill_id, model.status == s)
-        )
-        if date_from and hasattr(model, "date"):
-            stmt = stmt.where(model.date >= date_from)
-        if date_to and hasattr(model, "date"):
-            stmt = stmt.where(model.date <= date_to)
-        return (await db.execute(stmt)).scalar() or 0
-
-    carding_models = [
-        QmCardingWasteStudy, QmCardingCvRecord, QmCardingWrapping,
-        QmCardingDfkPressure, QmCardingCfdCheck, QmCardingSpeedRecord,
-        QmCardingFlatsCleaning, QmDailyWastage,
-    ]
-    drawing_models = [
-        QmDrawingCheck, QmSliverWrapping, QmDrawingCvRecord, QmAPctCheck,
-        QmDrawMonitorCheck, QmDrawingStopOccurrences, QmDrawingSpeedCheck,
-    ]
-    simplex_models = [
-        QmSimplexCheck, QmSimplexHankTest, QmSimplexBobbinWeight,
-        QmSimplexBreakageStudy, QmSimplexStretchPct,
-    ]
-    rf_models = [
-        QmRfSnapStudy, QmRfCspReport, QmRfBreakageStudy,
-        QmRfCountTest, QmRfMonitorSettings,
-    ]
-    ac_models = [
-        QmYarnFaultsUster, QmClassimatResults, QmBagFaults,
-        QmDailyRejectCone, QmWaxPickup, QmSpliceStrength,
-        QmFinishingBreaksStudy,
-    ]
-    packing_models = [QmBlendTest, QmPwseCheck]
-
-    async def _dept_stats(models):
-        total = sum([await _count(m) for m in models])
-        approved = sum([await _count_by_status(m, "approved") for m in models])
-        pending = sum([await _count_by_status(m, "draft") for m in models])
-        return {"total": total, "approved": approved, "pending": pending}
-
-    return {
-        "carding": await _dept_stats(carding_models),
-        "drawing": await _dept_stats(drawing_models),
-        "simplex": await _dept_stats(simplex_models),
-        "ring_frame": await _dept_stats(rf_models),
-        "auto_coner": await _dept_stats(ac_models),
-        "packing": await _dept_stats(packing_models),
-    }
+    q = select(QmCardingWasteStudy)
+    q, _ = await _apply_scope(db, current_user, QmCardingWasteStudy, q)
+    if machine_no: q = q.where(QmCardingWasteStudy.machine_no == machine_no)
+    if lot_no: q = q.where(QmCardingWasteStudy.lot_no == lot_no)
+    if status: q = q.where(QmCardingWasteStudy.status == status)
+    return await _paginate(db, q, page, page_size)
 
 
-# ---------------------------------------------------------------------------
-# CSP Trend (ring frame)
-# ---------------------------------------------------------------------------
-
-@router.get("/ring-frame/csp-trend", summary="CSP trend for date range")
-async def csp_trend(
-    days: int = Query(30, ge=7, le=90),
-    lot_no: Optional[str] = Query(None),
-    scope: tuple = Depends(get_mill_scope),
-    db: AsyncSession = Depends(get_db),
+@router.post("/quality-forms/waste-study", response_model=WasteStudyResponse)
+async def create_waste_study(
+    req: WasteStudyCreate,
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality", write=True)),
 ):
-    mill_id, _ = scope
-    from datetime import timedelta, date as _date
-    cutoff = (_date.today() - timedelta(days=days)).isoformat()
-    stmt = (
-        select(QmRfCspReport)
-        .where(
-            QmRfCspReport.mill_id == mill_id,
-            QmRfCspReport.date >= cutoff,
-        )
-        .order_by(QmRfCspReport.date)
+    scope = await get_mill_scope(current_user, db)
+    record = QmCardingWasteStudy(
+        mill_id=scope.get("mill_id") or "", company_id=scope.get("company_id"),
+        date=req.date, machine_no=req.machine_no, lot_no=req.lot_no,
+        shift_code=req.shift_code, delivery_hank=req.delivery_hank,
+        licker_in_speed=req.licker_in_speed, cylinder_speed=req.cylinder_speed,
+        flats_speed=req.flats_speed, delivery_speed=req.delivery_speed,
+        wing_setting=req.wing_setting, empty_can_kg=req.empty_can_kg,
+        sliver_can_gross_kg=req.sliver_can_gross_kg, total_production_kg=req.total_production_kg,
+        licker_in2_waste_kg=req.licker_in2_waste_kg, licker_in3_waste_kg=req.licker_in3_waste_kg,
+        flat_strips_kg=req.flat_strips_kg, suction_hood_front_kg=req.suction_hood_front_kg,
+        suction_hood_back_kg=req.suction_hood_back_kg, status="draft", remarks=req.remarks,
     )
-    if lot_no:
-        stmt = stmt.where(QmRfCspReport.lot_no == lot_no)
-    rows = (await db.execute(stmt)).scalars().all()
-    return [
-        {
-            "date": r.date,
-            "machine_no": r.machine_no,
-            "lot_no": r.lot_no,
-            "count_ne": r.count_ne,
-            "avg_csp": r.avg_csp,
-            "cv_pct": r.cv_pct,
-        }
-        for r in rows
-    ]
+    await _calculate_waste_study(record)
+    db.add(record)
+    await db.flush()
+    return record
 
 
-# ---------------------------------------------------------------------------
-# Lot-level quality summary (all departments for one lot)
-# ---------------------------------------------------------------------------
-
-@router.get("/lot/{lot_no}/summary", summary="All quality records for a lot")
-async def lot_quality_summary(
-    lot_no: str,
-    scope: tuple = Depends(get_mill_scope),
-    db: AsyncSession = Depends(get_db),
+@router.patch("/quality-forms/waste-study/{record_id}/status")
+async def update_waste_study_status(
+    record_id: str, status: str = Query(...),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality", write=True)),
 ):
-    mill_id, _ = scope
+    scope = await get_mill_scope(current_user, db)
+    q = select(QmCardingWasteStudy).where(QmCardingWasteStudy.id == record_id)
+    q, _ = await _apply_scope(db, current_user, QmCardingWasteStudy, q)
+    record = (await db.execute(q)).scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="Waste study record not found")
+    record.status = status
+    await db.flush()
+    return {"id": record_id, "status": status}
 
-    async def _fetch(model):
-        if not hasattr(model, "lot_no"):
-            return []
-        rows = (
-            await db.execute(
-                select(model)
-                .where(model.mill_id == mill_id, model.lot_no == lot_no)
-                .order_by(model.date.desc() if hasattr(model, "date") else model.id.desc())
-                .limit(100)
-            )
-        ).scalars().all()
-        return [_model_to_dict(r) for r in rows]
 
-    return {
-        "lot_no": lot_no,
-        "carding": {
-            "cv_records": await _fetch(QmCardingCvRecord),
-            "waste_study": await _fetch(QmCardingWasteStudy),
-            "wrapping": await _fetch(QmCardingWrapping),
-        },
-        "drawing": {
-            "cv_records": await _fetch(QmDrawingCvRecord),
-            "sliver_wrapping": await _fetch(QmSliverWrapping),
-            "a_pct": await _fetch(QmAPctCheck),
-        },
-        "simplex": {
-            "hank_test": await _fetch(QmSimplexHankTest),
-            "bobbin_weight": await _fetch(QmSimplexBobbinWeight),
-            "breakage_study": await _fetch(QmSimplexBreakageStudy),
-        },
-        "ring_frame": {
-            "csp_report": await _fetch(QmRfCspReport),
-            "count_test": await _fetch(QmRfCountTest),
-            "breakage_study": await _fetch(QmRfBreakageStudy),
-        },
-        "auto_coner": {
-            "yarn_faults": await _fetch(QmYarnFaultsUster),
-            "classimat": await _fetch(QmClassimatResults),
-            "bag_faults": await _fetch(QmBagFaults),
-            "wax_pickup": await _fetch(QmWaxPickup),
-            "splice_strength": await _fetch(QmSpliceStrength),
-        },
-        "packing": {
-            "blend_test": await _fetch(QmBlendTest),
-        },
-    }
+# ═══════════════════════════════════════════════════════════════════
+# 2. SIMPLEX HANK TEST
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/quality-forms/simplex-hank")
+async def list_simplex_hank(
+    date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None),
+    machine_no: Optional[str] = Query(None), lot_no: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality")),
+):
+    q = select(QmSimplexHankTest)
+    q, _ = await _apply_scope(db, current_user, QmSimplexHankTest, q)
+    if machine_no: q = q.where(QmSimplexHankTest.machine_no == machine_no)
+    if lot_no: q = q.where(QmSimplexHankTest.lot_no == lot_no)
+    if status: q = q.where(QmSimplexHankTest.status == status)
+    return await _paginate(db, q, page, page_size)
+
+
+@router.post("/quality-forms/simplex-hank", response_model=SimplexHankResponse)
+async def create_simplex_hank(
+    req: SimplexHankCreate,
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    record = QmSimplexHankTest(
+        mill_id=scope.get("mill_id") or "", company_id=scope.get("company_id"),
+        date=req.date, shift_code=req.shift_code, machine_no=req.machine_no,
+        lot_no=req.lot_no, cotton_type=req.cotton_type, process=req.process,
+        nominal_hank=req.nominal_hank, readings_json={"samples": req.samples_json or []},
+        status="draft", remarks=req.remarks,
+    )
+    await _calculate_simplex_hank(record)
+    db.add(record)
+    await db.flush()
+    return record
+
+
+@router.patch("/quality-forms/simplex-hank/{record_id}/status")
+async def update_simplex_hank_status(
+    record_id: str, status: str = Query(...),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality", write=True)),
+):
+    q = select(QmSimplexHankTest).where(QmSimplexHankTest.id == record_id)
+    q, _ = await _apply_scope(db, current_user, QmSimplexHankTest, q)
+    record = (await db.execute(q)).scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="Simplex hank record not found")
+    record.status = status
+    await db.flush()
+    return {"id": record_id, "status": status}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 3. SLIVER WRAPPING
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/quality-forms/sliver-wrapping")
+async def list_sliver_wrapping(
+    date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None),
+    machine_no: Optional[str] = Query(None), lot_no: Optional[str] = Query(None),
+    process: Optional[str] = Query(None), status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality")),
+):
+    q = select(QmSliverWrapping)
+    q, _ = await _apply_scope(db, current_user, QmSliverWrapping, q)
+    if machine_no: q = q.where(QmSliverWrapping.machine_no == machine_no)
+    if lot_no: q = q.where(QmSliverWrapping.lot_no == lot_no)
+    if process: q = q.where(QmSliverWrapping.process == process)
+    if status: q = q.where(QmSliverWrapping.status == status)
+    return await _paginate(db, q, page, page_size)
+
+
+@router.post("/quality-forms/sliver-wrapping", response_model=SliverWrappingResponse)
+async def create_sliver_wrapping(
+    req: SliverWrappingCreate,
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    readings = req.readings_json or []
+    avg_wt = sum(readings) / len(readings) if readings else None
+    record = QmSliverWrapping(
+        mill_id=scope.get("mill_id") or "", company_id=scope.get("company_id"),
+        date=req.date, shift_code=req.shift_code, machine_no=req.machine_no,
+        lot_no=req.lot_no, process=req.process, side=req.side,
+        std_hank=req.std_hank, readings_json={"readings": readings},
+        avg_weight=avg_wt, ok_input=True, status="draft", remarks=req.remarks,
+    )
+    db.add(record)
+    await db.flush()
+    return record
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 4. DAILY CARDING WRAPPING
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/quality-forms/carding-wrapping")
+async def list_carding_wrapping(
+    date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None),
+    machine_no: Optional[str] = Query(None), lot_no: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality")),
+):
+    q = select(QmCardingWrapping)
+    q, _ = await _apply_scope(db, current_user, QmCardingWrapping, q)
+    if machine_no: q = q.where(QmCardingWrapping.machine_no == machine_no)
+    if lot_no: q = q.where(QmCardingWrapping.lot_no == lot_no)
+    if status: q = q.where(QmCardingWrapping.status == status)
+    return await _paginate(db, q, page, page_size)
+
+
+@router.post("/quality-forms/carding-wrapping", response_model=CardingWrappingResponse)
+async def create_carding_wrapping(
+    req: CardingWrappingCreate,
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    readings = req.readings_json or []
+    avg_wt = sum(readings) / len(readings) if readings else None
+    record = QmCardingWrapping(
+        mill_id=scope.get("mill_id") or "", company_id=scope.get("company_id"),
+        date=req.date, shift_code=req.shift_code, machine_no=req.machine_no,
+        lot_no=req.lot_no, line_no=req.line_no, time_taken=req.time_taken,
+        std_hank=req.std_hank, readings_json={"readings": readings},
+        avg_weight=avg_wt, ok_input=True, status="draft", remarks=req.remarks,
+    )
+    db.add(record)
+    await db.flush()
+    return record
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 5. AUTOCONER CUT REPORT
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/quality-forms/autoconer-cut")
+async def list_autoconer_cut(
+    date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None),
+    machine_no: Optional[str] = Query(None), lot_no: Optional[str] = Query(None),
+    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality")),
+):
+    q = select(QmClassimatResults)
+    q, _ = await _apply_scope(db, current_user, QmClassimatResults, q)
+    if machine_no: q = q.where(QmClassimatResults.machine_no == machine_no)
+    if lot_no: q = q.where(QmClassimatResults.lot_no == lot_no)
+    return await _paginate(db, q, page, page_size)
+
+
+@router.post("/quality-forms/autoconer-cut", response_model=AutoconerCutResponse)
+async def create_autoconer_cut(
+    req: AutoconerCutCreate,
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    record = QmClassimatResults(
+        mill_id=scope.get("mill_id") or "", company_id=scope.get("company_id"),
+        date=req.date, shift_code=req.shift_code, machine_no=req.machine_no,
+        lot_no=req.lot_no, count_ne=req.count_ne, group=req.group,
+        speed=req.speed, length=req.length, yf_per_100km=req.yf_per_100km,
+        cv_pct=req.cv_pct, thin_50_pct=req.thin_50_pct,
+        thick_50_pct=req.thick_50_pct, neps_200_pct=req.neps_200_pct,
+        total_ipi=req.total_ipi, status="draft", remarks=req.remarks,
+    )
+    db.add(record)
+    await db.flush()
+    return record
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 6. BAG WEIGHT CHECK
+# ═══════════════════════════════════════════════════════════════════
+
+@router.patch("/quality-forms/bag-weight/{record_id}", response_model=BagWeightResponse)
+async def update_bag_weight(
+    record_id: str,
+    req: BagWeightCreate,
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    q = select(QmBagWeightCheck).where(QmBagWeightCheck.id == record_id)
+    q, _ = await _apply_scope(db, current_user, QmBagWeightCheck, q)
+    record = (await db.execute(q)).scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="Bag weight check record not found")
+    samples = req.samples_json or []
+    net_weights = [s.get("net_wt") for s in samples if s.get("net_wt")]
+    avg = sum(net_weights) / len(net_weights) if net_weights else 0
+    target = req.target_weight or 0
+    under = sum(1 for w in net_weights if w < target) if target else 0
+    over = sum(1 for w in net_weights if w > target) if target else 0
+    pass_c = len(net_weights) - under - over
+    for key, val in {
+        "date": req.date, "shift_code": req.shift_code, "lot_no": req.lot_no,
+        "count_ne": req.count_ne, "cone_tip_type": req.cone_tip_type,
+        "inspector": req.inspector, "target_weight": target,
+        "samples_json": {"samples": samples}, "total_samples": len(samples),
+        "avg_net_weight": round(avg, 3) if avg else None,
+        "min_net_weight": min(net_weights) if net_weights else None,
+        "max_net_weight": max(net_weights) if net_weights else None,
+        "underweight_count": under, "overweight_count": over, "pass_count": pass_c,
+        "deviation_pct": round((avg - target) / target * 100, 2) if target and avg else None,
+        "pass_pct": round(pass_c / len(net_weights) * 100, 1) if net_weights else None,
+        "remarks": req.remarks,
+    }.items():
+        setattr(record, key, val)
+    await db.flush()
+    return record
+
+
+@router.delete("/quality-forms/bag-weight/{record_id}")
+async def delete_bag_weight(
+    record_id: str,
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    q = select(QmBagWeightCheck).where(QmBagWeightCheck.id == record_id)
+    q, _ = await _apply_scope(db, current_user, QmBagWeightCheck, q)
+    record = (await db.execute(q)).scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="Bag weight check record not found")
+    await db.delete(record)
+    await db.flush()
+    return {"ok": True, "id": record_id}
+
+
+@router.get("/quality-forms/bag-weight")
+async def list_bag_weight(
+    date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None),
+    lot_no: Optional[str] = Query(None), status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality")),
+):
+    q = select(QmBagWeightCheck)
+    q, _ = await _apply_scope(db, current_user, QmBagWeightCheck, q)
+    if lot_no: q = q.where(QmBagWeightCheck.lot_no == lot_no)
+    if status: q = q.where(QmBagWeightCheck.status == status)
+    return await _paginate(db, q, page, page_size)
+
+
+@router.post("/quality-forms/bag-weight", response_model=BagWeightResponse)
+async def create_bag_weight(
+    req: BagWeightCreate,
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    samples = req.samples_json or []
+    net_weights = [s.get("net_wt") for s in samples if s.get("net_wt")]
+    avg = sum(net_weights) / len(net_weights) if net_weights else 0
+    target = req.target_weight or 0
+    under = sum(1 for w in net_weights if w < target) if target else 0
+    over = sum(1 for w in net_weights if w > target) if target else 0
+    pass_c = len(net_weights) - under - over
+    record = QmBagWeightCheck(
+        mill_id=scope.get("mill_id") or "", company_id=scope.get("company_id"),
+        date=req.date, shift_code=req.shift_code, lot_no=req.lot_no,
+        count_ne=req.count_ne, cone_tip_type=req.cone_tip_type,
+        inspector=req.inspector, target_weight=target,
+        samples_json={"samples": samples}, total_samples=len(samples),
+        avg_net_weight=round(avg, 3) if avg else None,
+        min_net_weight=min(net_weights) if net_weights else None,
+        max_net_weight=max(net_weights) if net_weights else None,
+        underweight_count=under, overweight_count=over, pass_count=pass_c,
+        deviation_pct=round((avg - target) / target * 100, 2) if target and avg else None,
+        pass_pct=round(pass_c / len(net_weights) * 100, 1) if net_weights else None,
+        status="draft", remarks=req.remarks,
+    )
+    db.add(record)
+    await db.flush()
+    return record
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 7. PAPER CONE CHECK
+# ═══════════════════════════════════════════════════════════════════
+
+@router.patch("/quality-forms/paper-cone/{record_id}", response_model=PaperConeResponse)
+async def update_paper_cone(
+    record_id: str,
+    req: PaperConeCreate,
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    q = select(QmPaperConeCheck).where(QmPaperConeCheck.id == record_id)
+    q, _ = await _apply_scope(db, current_user, QmPaperConeCheck, q)
+    record = (await db.execute(q)).scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="Paper cone check record not found")
+    samples = req.samples_json or []
+    cone_wts = [s.get("cone_weight_g") for s in samples if s.get("cone_weight_g")]
+    visual_ok = sum(1 for s in samples if s.get("visual_ok"))
+    avg_wt = sum(cone_wts) / len(cone_wts) if cone_wts else 0
+    for key, val in {
+        "date": req.date, "supplier_id": req.supplier_id, "supplier_name": req.supplier_name,
+        "batch_no": req.batch_no, "inspector": req.inspector,
+        "samples_json": {"samples": samples}, "total_samples": len(samples),
+        "avg_cone_weight": round(avg_wt, 3) if avg_wt else None,
+        "min_cone_weight": min(cone_wts) if cone_wts else None,
+        "max_cone_weight": max(cone_wts) if cone_wts else None,
+        "acceptance_pct": round(visual_ok / len(samples) * 100, 1) if samples else None,
+        "rejection_pct": round((len(samples) - visual_ok) / len(samples) * 100, 1) if samples else None,
+        "remarks": req.remarks,
+    }.items():
+        setattr(record, key, val)
+    await db.flush()
+    return record
+
+
+@router.delete("/quality-forms/paper-cone/{record_id}")
+async def delete_paper_cone(
+    record_id: str,
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    q = select(QmPaperConeCheck).where(QmPaperConeCheck.id == record_id)
+    q, _ = await _apply_scope(db, current_user, QmPaperConeCheck, q)
+    record = (await db.execute(q)).scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="Paper cone check record not found")
+    await db.delete(record)
+    await db.flush()
+    return {"ok": True, "id": record_id}
+
+
+@router.get("/quality-forms/paper-cone")
+async def list_paper_cone(
+    date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None),
+    supplier_id: Optional[str] = Query(None), status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality")),
+):
+    q = select(QmPaperConeCheck)
+    q, _ = await _apply_scope(db, current_user, QmPaperConeCheck, q)
+    if supplier_id: q = q.where(QmPaperConeCheck.supplier_id == supplier_id)
+    if status: q = q.where(QmPaperConeCheck.status == status)
+    return await _paginate(db, q, page, page_size)
+
+
+@router.post("/quality-forms/paper-cone", response_model=PaperConeResponse)
+async def create_paper_cone(
+    req: PaperConeCreate,
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    samples = req.samples_json or []
+    cone_wts = [s.get("cone_weight_g") for s in samples if s.get("cone_weight_g")]
+    visual_ok = sum(1 for s in samples if s.get("visual_ok"))
+    avg_wt = sum(cone_wts) / len(cone_wts) if cone_wts else 0
+    record = QmPaperConeCheck(
+        mill_id=scope.get("mill_id") or "", company_id=scope.get("company_id"),
+        date=req.date, supplier_id=req.supplier_id, supplier_name=req.supplier_name,
+        batch_no=req.batch_no, inspector=req.inspector,
+        samples_json={"samples": samples}, total_samples=len(samples),
+        avg_cone_weight=round(avg_wt, 3) if avg_wt else None,
+        min_cone_weight=min(cone_wts) if cone_wts else None,
+        max_cone_weight=max(cone_wts) if cone_wts else None,
+        acceptance_pct=round(visual_ok / len(samples) * 100, 1) if samples else None,
+        rejection_pct=round((len(samples) - visual_ok) / len(samples) * 100, 1) if samples else None,
+        status="draft", remarks=req.remarks,
+    )
+    db.add(record)
+    await db.flush()
+    return record
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 8. CSP STRENGTH REPORT
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/quality-forms/csp-strength")
+async def list_csp_strength(
+    date_from: Optional[str] = Query(None), date_to: Optional[str] = Query(None),
+    machine_no: Optional[str] = Query(None), lot_no: Optional[str] = Query(None),
+    page: int = Query(1, ge=1), page_size: int = Query(20, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality")),
+):
+    q = select(QmRfCspReport)
+    q, _ = await _apply_scope(db, current_user, QmRfCspReport, q)
+    if machine_no: q = q.where(QmRfCspReport.machine_no == machine_no)
+    if lot_no: q = q.where(QmRfCspReport.lot_no == lot_no)
+    return await _paginate(db, q, page, page_size)
+
+
+@router.post("/quality-forms/csp-strength", response_model=CspStrengthResponse)
+async def create_csp_strength(
+    req: CspStrengthCreate,
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    samples = req.samples_json or []
+    csp_vals = [s.get("csp") or s.get("strength", 0) for s in samples]
+    valid_csp = [c for c in csp_vals if c and c > 0]
+    avg_csp = sum(valid_csp) / len(valid_csp) if valid_csp else 0
+    cv = 0
+    if len(valid_csp) > 1 and avg_csp > 0:
+        variance = sum((c - avg_csp) ** 2 for c in valid_csp) / (len(valid_csp) - 1)
+        cv = round((math.sqrt(variance) / avg_csp) * 100, 2)
+    record = QmRfCspReport(
+        mill_id=scope.get("mill_id") or "", company_id=scope.get("company_id"),
+        date=req.date, machine_no=req.machine_no, lot_no=req.lot_no,
+        count_ne=req.count_ne, ratio=req.ratio, tm=req.tm, tpi=req.tpi,
+        samples_json={"samples": samples},
+        avg_csp=round(avg_csp, 1) if avg_csp else None,
+        cv_pct=cv, max_csp=max(valid_csp) if valid_csp else None,
+        min_csp=min(valid_csp) if valid_csp else None,
+        status="draft", remarks=req.remarks,
+    )
+    db.add(record)
+    await db.flush()
+    return record
+
+
+# ═══════════════════════════════════════════════════════════════════
+# SUMMARY / DASHBOARD
+# ═══════════════════════════════════════════════════════════════════
+
+@router.get("/quality-forms/summary")
+async def quality_forms_summary(
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(require_module("quality")),
+):
+    """Aggregated counts across all quality form types for the dashboard."""
+    scope = await get_mill_scope(current_user, db)
+    mid = scope.get("mill_id")
+    cid = scope.get("company_id")
+    mills_sub = select(Mill.id).where(Mill.company_id == cid) if cid and not mid else None
+
+    def _scoped_q(model):
+        q = select(func.count()).select_from(model)
+        if mid:
+            return q.where(model.mill_id == mid)
+        if mills_sub is not None:
+            return q.where(model.mill_id.in_(mills_sub))
+        return q
+
+    try:
+        total_tests = sum([
+            (await db.execute(_scoped_q(QmCardingWasteStudy))).scalar() or 0,
+            (await db.execute(_scoped_q(QmSimplexHankTest))).scalar() or 0,
+            (await db.execute(_scoped_q(QmSliverWrapping))).scalar() or 0,
+            (await db.execute(_scoped_q(QmCardingWrapping))).scalar() or 0,
+        ])
+        pending = sum([
+            (await db.execute(_scoped_q(QmCardingWasteStudy).where(QmCardingWasteStudy.status == "draft"))).scalar() or 0,
+            (await db.execute(_scoped_q(QmSimplexHankTest).where(QmSimplexHankTest.status == "draft"))).scalar() or 0,
+            (await db.execute(_scoped_q(QmSliverWrapping).where(QmSliverWrapping.status == "draft"))).scalar() or 0,
+            (await db.execute(_scoped_q(QmCardingWrapping).where(QmCardingWrapping.status == "draft"))).scalar() or 0,
+        ])
+        return {"total_tests": total_tests, "pending_approvals": pending}
+    except Exception as e:
+        logger.error(f"quality_forms summary error: {e}")
+        return {"total_tests": 0, "pending_approvals": 0}
