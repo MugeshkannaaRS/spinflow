@@ -467,42 +467,15 @@ function QualityPage() {
                 <QmFormsTab
                   title="Daily Carding Wrapping Report"
                   endpoint="/quality/v2/carding/wrapping"
-                  columns={[
-                    { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Mc No" },
-                    { key: "shift_code", label: "Shift" },
-                    { key: "lot_no", label: "Lot No" },
-                    { key: "line_no", label: "Line No" },
-                    { key: "time_taken", label: "Time" },
-                    { key: "std_hank", label: "Std Hank" },
-                    { key: "r1", label: "R1 (g)" },
-                    { key: "r2", label: "R2 (g)" },
-                    { key: "r3", label: "R3 (g)" },
-                    { key: "r4", label: "R4 (g)" },
-                    { key: "r5", label: "R5 (g)" },
-                    { key: "avg_weight", label: "Avg Weight (g)" },
-                    { key: "actual_hank", label: "Actual Hank" },
-                    { key: "cv_pct", label: "CV %" },
-                    {
-                      key: "ok_input",
-                      label: "OK/Input",
-                      render: (r: any) =>
-                        r.ok_input ? (
-                          <Badge variant="outline" className="text-green-600">OK</Badge>
-                        ) : (
-                          <Badge variant="destructive">Input</Badge>
-                        ),
-                    },
-                    { key: "remarks", label: "Remarks" },
-                    {
-                      key: "status",
-                      label: "Status",
-                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
-                    },
-                  ]}
+                  columns={[]}
                   millId={millId}
                   canEdit={canEdit}
-                  layout="reading"
+                  layout="sheet"
+                  hasSide={false}
+                  hasProcess={false}
+                  hasTime={true}
+                  hankField="std_hank"
+                  readingLabel="g"
                 />
               </div>
             </TabsContent>
@@ -594,43 +567,15 @@ function QualityPage() {
                 <QmFormsTab
                   title="Daily Sliver Wrapping Report (BD/FD)"
                   endpoint="/quality/v2/drawing/sliver-wrapping"
-                  columns={[
-                    { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Mc No" },
-                    { key: "shift_code", label: "Shift" },
-                    { key: "lot_no", label: "Lot No" },
-                    { key: "process", label: "Process (BD/FD)" },
-                    { key: "side", label: "Side (L/R)" },
-                    { key: "time_taken", label: "Time" },
-                    { key: "std_hank", label: "Std Hank" },
-                    { key: "r1", label: "R1 (g)" },
-                    { key: "r2", label: "R2 (g)" },
-                    { key: "r3", label: "R3 (g)" },
-                    { key: "r4", label: "R4 (g)" },
-                    { key: "r5", label: "R5 (g)" },
-                    { key: "avg_weight", label: "Avg Wt (g)" },
-                    { key: "actual_hank", label: "Actual Hank" },
-                    { key: "hank_cv_pct", label: "Hank CV%" },
-                    {
-                      key: "ok_input",
-                      label: "OK/Input",
-                      render: (r: any) =>
-                        r.ok_input ? (
-                          <Badge variant="outline" className="text-green-600">OK</Badge>
-                        ) : (
-                          <Badge variant="destructive">Input</Badge>
-                        ),
-                    },
-                    { key: "remarks", label: "Remarks" },
-                    {
-                      key: "status",
-                      label: "Status",
-                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
-                    },
-                  ]}
+                  columns={[]}
                   millId={millId}
                   canEdit={canEdit}
-                  layout="reading"
+                  layout="sheet"
+                  hasSide={true}
+                  hasProcess={true}
+                  hasTime={true}
+                  hankField="std_hank"
+                  readingLabel="g"
                 />
               </div>
             </TabsContent>
@@ -641,31 +586,15 @@ function QualityPage() {
                 <QmFormsTab
                   title="Simplex Hank Test"
                   endpoint="/quality/v2/simplex/hank-test"
-                  columns={[
-                    { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Simplex No" },
-                    { key: "shift_code", label: "Shift" },
-                    { key: "lot_no", label: "Lot No" },
-                    { key: "cotton_type", label: "Cotton" },
-                    { key: "process", label: "Process" },
-                    { key: "nominal_hank", label: "Nominal Hank" },
-                    { key: "r1", label: "R1 (g)" },
-                    { key: "r2", label: "R2 (g)" },
-                    { key: "r3", label: "R3 (g)" },
-                    { key: "r4", label: "R4 (g)" },
-                    { key: "r5", label: "R5 (g)" },
-                    { key: "actual_hank", label: "Actual Hank" },
-                    { key: "cv_pct", label: "CV%" },
-                    { key: "remarks", label: "Remarks" },
-                    {
-                      key: "status",
-                      label: "Status",
-                      render: (r: any) => <StatusBadge status={r.status} size="sm" />,
-                    },
-                  ]}
+                  columns={[]}
                   millId={millId}
                   canEdit={canEdit}
-                  layout="reading"
+                  layout="sheet"
+                  hasSide={false}
+                  hasProcess={false}
+                  hasTime={true}
+                  hankField="nominal_hank"
+                  readingLabel="g"
                 />
 
                 {/* ── Simplex Breakage Study ── */}
@@ -1448,17 +1377,18 @@ function LotApproveAction({ lotId }: { lotId: string }) {
 // ---------------------------------------------------------------------------
 // Quality Module — Fast data-entry forms
 //
-// Three patterns based on form shape:
-//   "grid"    — inline spreadsheet (one row per machine, all cols across)
-//   "reading" — locked header + N reading cells (wrapping, hank, CSP)
-//   "rows"    — shared header + add-machine rows (breakage, snap)
+// Four patterns, pick by layout prop:
+//   "grid"    — inline spreadsheet, all columns across (CV records, waste study)
+//   "sheet"   — frozen page header + per-machine rows with inline readings + live compute
+//               mirrors paper exactly: carding wrapping, sliver wrapping, simplex hank
+//   "rows"    — shared date/shift/lot header + add-machine rows (breakage, snap)
+//   "reading" — single-record entry with large reading grid (legacy fallback)
 //
-// Pattern is set via the `layout` prop on each QmFormsTab instance.
-// All patterns: Tab/Enter navigation, live computed values, per-row save.
+// All patterns: Tab/Enter keyboard navigation, per-row save, live computed columns.
 // ---------------------------------------------------------------------------
 
 type QmFieldType = "text" | "number" | "date" | "shift" | "status" | "yn";
-type QmLayout = "grid" | "reading" | "rows";
+type QmLayout = "grid" | "sheet" | "rows" | "reading";
 
 interface QmFieldDef {
   key: string;
@@ -1576,6 +1506,506 @@ function CellSelect({
         </option>
       ))}
     </select>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PATTERN "sheet" — Paper-mirrored wrapping / hank-test sheet
+//
+// Mirrors the physical A3 form exactly:
+//   • Frozen page header: Process/Lot, Std Hank, Date, Shift (shared for whole sheet)
+//   • One row per machine — columns: Mc No | Side | Time | R1 R2 R3 R4 R5 | Avg | Hank | CV% | OK | Remarks
+//   • Avg weight, Actual Hank, CV% computed live as readings are typed
+//   • Tab moves R1→R2→...→R5→next row; Enter saves the row
+//   • Saved rows shown in same table (no separate list)
+//   • Distinct background for unsaved entry rows vs saved rows
+//
+// Used for: carding wrapping, sliver wrapping, simplex hank test
+// ═══════════════════════════════════════════════════════════════════════════
+
+interface SheetPageHeader {
+  date: string;
+  shift_code: string;
+  lot_no: string;
+  process?: string;
+  std_hank?: string;
+  nominal_hank?: string;
+  cotton_type?: string;
+  [key: string]: string | undefined;
+}
+
+/** Compute live values for a wrapping/hank row */
+function computeRow(row: Record<string, any>, stdHankNum: number | null): {
+  avg: number | null; hank: number | null; cv: number | null;
+} {
+  const readings = ["r1","r2","r3","r4","r5"]
+    .map((k) => (row[k] !== "" && row[k] != null ? parseFloat(row[k]) : null))
+    .filter((v): v is number => v != null && !isNaN(v));
+  if (readings.length === 0) return { avg: null, hank: null, cv: null };
+  const avg = readings.reduce((a, b) => a + b, 0) / readings.length;
+  // Actual hank = (Std Hank × Std Weight) / Avg Weight
+  // Std Weight for wrapping = 453.59237 / std_hank (hanks from gram weight)
+  const hank = stdHankNum && avg > 0 ? (stdHankNum * 453.59237) / avg : null;
+  let cv: number | null = null;
+  if (readings.length >= 2) {
+    const mean = avg;
+    const variance = readings.reduce((s, v) => s + (v - mean) ** 2, 0) / readings.length;
+    cv = (Math.sqrt(variance) / mean) * 100;
+  }
+  return { avg, hank, cv };
+}
+
+function QmSheetEntry({
+  title,
+  endpoint,
+  columns,
+  millId,
+  canEdit,
+  hasSide = false,
+  hasProcess = false,
+  hasTime = true,
+  hankField = "std_hank",
+  readingLabel = "g",
+}: {
+  title: string;
+  endpoint: string;
+  columns: any[];
+  millId: string | null | undefined;
+  canEdit: boolean;
+  hasSide?: boolean;
+  hasProcess?: boolean;
+  hasTime?: boolean;
+  hankField?: "std_hank" | "nominal_hank";
+  readingLabel?: string;
+}) {
+  const qc = useQueryClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Page-level header (shared for all rows on this sheet)
+  const [hdr, setHdr] = useState<SheetPageHeader>({
+    date: today,
+    shift_code: "R/A",
+    lot_no: "",
+    process: "",
+    [hankField]: "",
+    cotton_type: "",
+  });
+  const setH = (k: string, v: string) => setHdr((p) => ({ ...p, [k]: v }));
+
+  const stdHankNum = parseFloat(hdr[hankField] ?? "") || null;
+
+  // Extra per-row header fields (not shared)
+  const makeBlankRow = useCallback(() => ({
+    _id: crypto.randomUUID(),
+    _saved: false,
+    machine_no: "",
+    side: "",
+    time_taken: "",
+    r1: "", r2: "", r3: "", r4: "", r5: "",
+    ok_input: "",
+    remarks: "",
+  }), []);
+
+  const [rows, setRows] = useState<Record<string, any>[]>(() => [makeBlankRow()]);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const { data: existing, isLoading } = useQuery({
+    queryKey: ["qm-sheet", endpoint, millId, hdr.date],
+    queryFn: async () => {
+      const p = new URLSearchParams({ page_size: "200", date: hdr.date });
+      const res = await api.get(`/api/v1${endpoint}?${p}`);
+      return (res.data?.data ?? res.data) as any[];
+    },
+    enabled: !!millId,
+    staleTime: 30_000,
+  });
+
+  const setRowField = (id: string, k: string, v: string) =>
+    setRows((prev) => prev.map((r) => (r._id === id ? { ...r, [k]: v } : r)));
+
+  const saveRow = async (row: Record<string, any>) => {
+    setSavingId(row._id);
+    try {
+      const { avg, hank, cv } = computeRow(row, stdHankNum);
+      const payload: Record<string, any> = {
+        ...hdr,
+        machine_no: row.machine_no,
+        time_taken: row.time_taken || null,
+        r1: row.r1 !== "" ? parseFloat(row.r1) : null,
+        r2: row.r2 !== "" ? parseFloat(row.r2) : null,
+        r3: row.r3 !== "" ? parseFloat(row.r3) : null,
+        r4: row.r4 !== "" ? parseFloat(row.r4) : null,
+        r5: row.r5 !== "" ? parseFloat(row.r5) : null,
+        avg_weight: avg != null ? parseFloat(avg.toFixed(3)) : null,
+        actual_hank: hank != null ? parseFloat(hank.toFixed(4)) : null,
+        [hankField === "std_hank" ? "cv_pct" : "cv_pct"]: cv != null ? parseFloat(cv.toFixed(3)) : null,
+        ok_input: row.ok_input === "true" ? true : row.ok_input === "false" ? false : null,
+        remarks: row.remarks || null,
+      };
+      if (hasSide) payload["side"] = row.side || null;
+      if (hasProcess) payload["process"] = hdr.process || null;
+      if (row._saved && row.id) {
+        await api.patch(`/api/v1${endpoint}/${row.id}`, payload);
+        toast.success("Updated");
+      } else {
+        await api.post(`/api/v1${endpoint}`, payload);
+        toast.success("Saved");
+        setRows((prev) => {
+          const filtered = prev.filter((r) => r._id !== row._id);
+          return [...filtered, makeBlankRow()];
+        });
+      }
+      qc.invalidateQueries({ queryKey: ["qm-sheet", endpoint] });
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? "Save failed");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const deleteRow = async (row: Record<string, any>) => {
+    if (!row._saved) { setRows((prev) => prev.filter((r) => r._id !== row._id)); return; }
+    try {
+      await api.delete(`/api/v1${endpoint}/${row.id}`);
+      toast.success("Deleted");
+      qc.invalidateQueries({ queryKey: ["qm-sheet", endpoint] });
+    } catch { toast.error("Delete failed"); }
+  };
+
+  // Flat list: saved rows first, then entry rows
+  const allRows = useMemo(() => {
+    const saved = (existing ?? []).map((r: any) => ({ ...r, _saved: true, _id: r.id }));
+    return [...saved, ...rows];
+  }, [existing, rows]);
+
+  // Keyboard nav: Tab→next cell, Enter on r5 = save
+  const READING_KEYS = ["r1","r2","r3","r4","r5"];
+  const handleKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    rowIdx: number,
+    colKey: string,
+    row: Record<string, any>,
+  ) => {
+    const rIdx = READING_KEYS.indexOf(colKey);
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (rIdx === READING_KEYS.length - 1) {
+        // last reading → save
+        saveRow(row);
+      } else if (rIdx >= 0) {
+        tableRef.current?.querySelector<HTMLInputElement>(`[data-cell="${rowIdx}-${rIdx + 1}"]`)?.focus();
+      }
+    }
+    if (e.key === "Tab" && !e.shiftKey && rIdx >= 0 && rIdx < READING_KEYS.length - 1) {
+      e.preventDefault();
+      tableRef.current?.querySelector<HTMLInputElement>(`[data-cell="${rowIdx}-${rIdx + 1}"]`)?.focus();
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      tableRef.current?.querySelector<HTMLInputElement>(`[data-cell="${rowIdx + 1}-${rIdx}"]`)?.focus();
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      tableRef.current?.querySelector<HTMLInputElement>(`[data-cell="${rowIdx - 1}-${rIdx}"]`)?.focus();
+    }
+  };
+
+  return (
+    <Card>
+      {/* ── Page header (mirrors top of physical form) ── */}
+      <CardHeader className="pb-2 pt-3 px-4 border-b border-border/40">
+        <div className="flex items-center gap-2 flex-wrap">
+          <CardTitle className="text-sm font-medium mr-2 shrink-0">{title}</CardTitle>
+
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">Date</span>
+            <input type="date" value={hdr.date}
+              onChange={(e) => setH("date", e.target.value)}
+              className="h-7 text-xs border border-border rounded px-2 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">Shift</span>
+            <select value={hdr.shift_code} onChange={(e) => setH("shift_code", e.target.value)}
+              className="h-7 text-xs border border-border rounded px-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+              {SHIFT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">Process/Lot</span>
+            <input value={hdr.lot_no} onChange={(e) => setH("lot_no", e.target.value)}
+              placeholder="e.g. CR-80/20"
+              className="h-7 text-xs border border-border rounded px-2 w-28 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
+          </div>
+          {hasProcess && (
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-muted-foreground">Process</span>
+              <select value={hdr.process ?? ""} onChange={(e) => setH("process", e.target.value)}
+                className="h-7 text-xs border border-border rounded px-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary">
+                <option value="">—</option>
+                <option value="BD">BD</option>
+                <option value="FD">FD</option>
+              </select>
+            </div>
+          )}
+          <div className="flex items-center gap-1">
+            <span className="text-[10px] text-muted-foreground">{hankField === "nominal_hank" ? "Nominal Hank" : "Std Hank"}</span>
+            <input type="number" step="0.0001" value={hdr[hankField] ?? ""}
+              onChange={(e) => setH(hankField, e.target.value)}
+              placeholder="0.1000"
+              className="h-7 text-xs border border-border rounded px-2 w-20 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
+          </div>
+          {stdHankNum && (
+            <span className="text-[10px] text-muted-foreground ml-1">
+              Range: ({(stdHankNum - stdHankNum * 0.005).toFixed(4)} – {(stdHankNum + stdHankNum * 0.005).toFixed(4)})
+            </span>
+          )}
+          {canEdit && (
+            <button onClick={() => setRows((p) => [...p, makeBlankRow()])}
+              className="ml-auto flex items-center gap-1 h-7 px-2 text-xs border border-border rounded hover:bg-muted text-foreground shrink-0">
+              <Plus className="size-3" /> Add row
+            </button>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-0">
+        <div ref={tableRef} className="overflow-x-auto">
+          {isLoading ? (
+            <div className="p-4 text-xs text-muted-foreground">Loading…</div>
+          ) : (
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-muted/50 border-b border-border">
+                  <th className="text-[10px] font-medium text-muted-foreground px-2 py-1.5 text-left w-6">#</th>
+                  <th className="text-[10px] font-medium text-muted-foreground px-1 py-1.5 text-left whitespace-nowrap">Mc No</th>
+                  {hasSide && <th className="text-[10px] font-medium text-muted-foreground px-1 py-1.5 text-left">Side</th>}
+                  {hasTime && <th className="text-[10px] font-medium text-muted-foreground px-1 py-1.5 text-left">Time</th>}
+                  {["1","2","3","4","5"].map((n) => (
+                    <th key={n} className="text-[10px] font-medium text-muted-foreground px-1 py-1.5 text-center w-16">
+                      {n} <span className="text-muted-foreground/50">({readingLabel})</span>
+                    </th>
+                  ))}
+                  <th className="text-[10px] font-medium text-muted-foreground px-1 py-1.5 text-center w-16 bg-emerald-50 dark:bg-emerald-950/20">Avg Wt</th>
+                  <th className="text-[10px] font-medium text-muted-foreground px-1 py-1.5 text-center w-16 bg-emerald-50 dark:bg-emerald-950/20">Hank</th>
+                  <th className="text-[10px] font-medium text-muted-foreground px-1 py-1.5 text-center w-14 bg-emerald-50 dark:bg-emerald-950/20">CV%</th>
+                  <th className="text-[10px] font-medium text-muted-foreground px-1 py-1.5 text-center w-14">OK/In</th>
+                  <th className="text-[10px] font-medium text-muted-foreground px-2 py-1.5 text-left">Remarks</th>
+                  {canEdit && <th className="w-14"></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {allRows.length === 0 && (
+                  <tr><td colSpan={20} className="text-center text-muted-foreground py-6 text-xs">
+                    Click "Add row" to start entry
+                  </td></tr>
+                )}
+                {allRows.map((row, rowIdx) => {
+                  const { avg, hank, cv } = row._saved
+                    ? { avg: row.avg_weight, hank: row.actual_hank, cv: row.cv_pct ?? row.hank_cv_pct }
+                    : computeRow(row, stdHankNum);
+                  const cvOk = cv == null ? null : cv <= 2.0;
+
+                  return (
+                    <tr key={row._id ?? row.id}
+                      className={["border-b border-border/50 transition-colors",
+                        !row._saved ? "bg-primary/[0.04] hover:bg-primary/[0.07]" : "hover:bg-muted/30",
+                      ].join(" ")}>
+                      <td className="px-2 py-0.5 text-[10px] text-muted-foreground">{rowIdx + 1}</td>
+
+                      {/* Mc No */}
+                      <td className="px-1 py-0.5">
+                        {row._saved ? (
+                          <span className="text-xs font-medium px-1">{row.machine_no}</span>
+                        ) : (
+                          <input value={row.machine_no}
+                            onChange={(e) => setRowField(row._id, "machine_no", e.target.value)}
+                            placeholder="Mc"
+                            className="h-7 w-14 text-xs border border-border rounded px-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary" />
+                        )}
+                      </td>
+
+                      {/* Side (L/R) */}
+                      {hasSide && (
+                        <td className="px-1 py-0.5">
+                          {row._saved ? (
+                            <span className="text-xs px-1">{row.side ?? "—"}</span>
+                          ) : (
+                            <select value={row.side ?? ""}
+                              onChange={(e) => setRowField(row._id, "side", e.target.value)}
+                              className="h-7 text-xs border border-border rounded px-1 bg-background focus:outline-none focus:ring-1 focus:ring-primary">
+                              <option value="">—</option>
+                              <option value="L">L</option>
+                              <option value="R">R</option>
+                            </select>
+                          )}
+                        </td>
+                      )}
+
+                      {/* Time */}
+                      {hasTime && (
+                        <td className="px-1 py-0.5">
+                          {row._saved ? (
+                            <span className="text-xs px-1">{row.time_taken ?? "—"}</span>
+                          ) : (
+                            <input value={row.time_taken ?? ""}
+                              onChange={(e) => setRowField(row._id, "time_taken", e.target.value)}
+                              placeholder="2:30"
+                              className="h-7 w-14 text-xs border border-border rounded px-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary" />
+                          )}
+                        </td>
+                      )}
+
+                      {/* R1–R5 reading cells */}
+                      {READING_KEYS.map((rk, rIdx) => (
+                        <td key={rk} className="px-0.5 py-0.5">
+                          {row._saved ? (
+                            <span className="text-xs text-center block w-full px-1">
+                              {row[rk] != null ? Number(row[rk]).toFixed(2) : <span className="text-muted-foreground/40">—</span>}
+                            </span>
+                          ) : (
+                            <input
+                              type="number" step="0.01"
+                              value={row[rk] ?? ""}
+                              onChange={(e) => setRowField(row._id, rk, e.target.value)}
+                              onKeyDown={(e) => handleKeyDown(e, rowIdx, rk, row)}
+                              ref={(el) => { if (el) el.setAttribute("data-cell", `${rowIdx}-${rIdx}`); }}
+                              className="h-7 w-16 text-xs text-center border border-border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary font-mono" />
+                          )}
+                        </td>
+                      ))}
+
+                      {/* Live-computed avg */}
+                      <td className="px-1 py-0.5 bg-emerald-50/60 dark:bg-emerald-950/10">
+                        <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 block text-center">
+                          {avg != null ? avg.toFixed(2) : <span className="text-muted-foreground/40">—</span>}
+                        </span>
+                      </td>
+
+                      {/* Hank */}
+                      <td className="px-1 py-0.5 bg-emerald-50/60 dark:bg-emerald-950/10">
+                        <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 block text-center">
+                          {hank != null ? hank.toFixed(4) : <span className="text-muted-foreground/40">—</span>}
+                        </span>
+                      </td>
+
+                      {/* CV% */}
+                      <td className="px-1 py-0.5 bg-emerald-50/60 dark:bg-emerald-950/10">
+                        <span className={["text-xs font-medium block text-center",
+                          cvOk === true ? "text-emerald-700 dark:text-emerald-400" :
+                          cvOk === false ? "text-red-600" : "text-muted-foreground/40"
+                        ].join(" ")}>
+                          {cv != null ? cv.toFixed(2) + "%" : "—"}
+                        </span>
+                      </td>
+
+                      {/* OK/Input */}
+                      <td className="px-1 py-0.5">
+                        {row._saved ? (
+                          row.ok_input === true ? (
+                            <span className="text-[10px] font-medium text-emerald-700 px-1">OK</span>
+                          ) : row.ok_input === false ? (
+                            <span className="text-[10px] font-medium text-amber-600 px-1">Input</span>
+                          ) : <span className="text-muted-foreground/40 text-xs px-1">—</span>
+                        ) : (
+                          <select value={row.ok_input ?? ""}
+                            onChange={(e) => setRowField(row._id, "ok_input", e.target.value)}
+                            className="h-7 text-xs border border-border rounded px-1 bg-background focus:outline-none focus:ring-1 focus:ring-primary">
+                            <option value="">—</option>
+                            <option value="true">OK</option>
+                            <option value="false">Input</option>
+                          </select>
+                        )}
+                      </td>
+
+                      {/* Remarks */}
+                      <td className="px-1 py-0.5">
+                        {row._saved ? (
+                          <span className="text-xs px-1 text-muted-foreground">{row.remarks ?? ""}</span>
+                        ) : (
+                          <input value={row.remarks ?? ""}
+                            onChange={(e) => setRowField(row._id, "remarks", e.target.value)}
+                            placeholder="—"
+                            className="h-7 w-24 text-xs border border-border rounded px-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary" />
+                        )}
+                      </td>
+
+                      {/* Actions */}
+                      {canEdit && (
+                        <td className="px-1 py-0.5">
+                          <div className="flex gap-1">
+                            {!row._saved && (
+                              <button onClick={() => saveRow(row)} disabled={savingId === row._id}
+                                className="h-6 px-2 text-[10px] font-medium rounded border border-emerald-400 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 disabled:opacity-50">
+                                {savingId === row._id ? "…" : "Save"}
+                              </button>
+                            )}
+                            {row._saved && (
+                              <button onClick={() => saveRow(row)} disabled={savingId === row._id}
+                                className="h-6 px-1.5 rounded border border-border text-muted-foreground hover:bg-muted disabled:opacity-50">
+                                <Save className="size-3" />
+                              </button>
+                            )}
+                            <button onClick={() => deleteRow(row)}
+                              className="h-6 px-1.5 rounded border border-border text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40">
+                              <Trash2 className="size-3" />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+              {/* Footer: totals row */}
+              {allRows.length > 0 && (
+                <tfoot>
+                  <tr className="bg-muted/30 border-t border-border">
+                    <td colSpan={hasSide ? (hasTime ? 4 : 3) : (hasTime ? 3 : 2)} className="px-2 py-1 text-[10px] text-muted-foreground font-medium">
+                      {allRows.length} rows
+                    </td>
+                    <td colSpan={5} />
+                    <td className="px-1 py-1 text-center bg-emerald-50/60 dark:bg-emerald-950/10">
+                      {(() => {
+                        const avgs = allRows
+                          .map((r) => r._saved ? r.avg_weight : computeRow(r, stdHankNum).avg)
+                          .filter((v): v is number => v != null && !isNaN(v));
+                        return avgs.length > 0
+                          ? <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">{(avgs.reduce((a,b)=>a+b,0)/avgs.length).toFixed(2)}</span>
+                          : null;
+                      })()}
+                    </td>
+                    <td className="px-1 py-1 bg-emerald-50/60 dark:bg-emerald-950/10" />
+                    <td className="px-1 py-1 bg-emerald-50/60 dark:bg-emerald-950/10">
+                      {(() => {
+                        const cvs = allRows
+                          .map((r) => r._saved ? (r.cv_pct ?? r.hank_cv_pct) : computeRow(r, stdHankNum).cv)
+                          .filter((v): v is number => v != null && !isNaN(v));
+                        const avgCv = cvs.length > 0 ? cvs.reduce((a,b)=>a+b,0)/cvs.length : null;
+                        return avgCv != null
+                          ? <span className={["text-[10px] font-medium", avgCv > 2 ? "text-red-600" : "text-emerald-700 dark:text-emerald-400"].join(" ")}>
+                              {avgCv.toFixed(2)}%
+                            </span>
+                          : null;
+                      })()}
+                    </td>
+                    <td colSpan={99} />
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          )}
+        </div>
+        <div className="flex gap-4 px-3 py-1 border-t border-border/40 bg-muted/20">
+          <span className="text-[10px] text-muted-foreground">
+            <kbd className="text-[9px] bg-muted border border-border rounded px-1">Tab</kbd>/<kbd className="text-[9px] bg-muted border border-border rounded px-1">Enter</kbd> next reading &nbsp;
+            <kbd className="text-[9px] bg-muted border border-border rounded px-1">Enter</kbd> on R5 = save row &nbsp;
+            <kbd className="text-[9px] bg-muted border border-border rounded px-1">↓↑</kbd> move rows &nbsp;
+            <span className="text-muted-foreground/60">Green columns are auto-computed</span>
+          </span>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -2507,10 +2937,28 @@ interface QmFormsTabProps {
   millId: string | null | undefined;
   canEdit: boolean;
   layout?: QmLayout;
+  // sheet-specific
+  hasSide?: boolean;
+  hasProcess?: boolean;
+  hasTime?: boolean;
+  hankField?: "std_hank" | "nominal_hank";
+  readingLabel?: string;
 }
 
-function QmFormsTab({ title, endpoint, columns, millId, canEdit, layout = "grid" }: QmFormsTabProps) {
+function QmFormsTab({
+  title, endpoint, columns, millId, canEdit, layout = "grid",
+  hasSide, hasProcess, hasTime, hankField, readingLabel,
+}: QmFormsTabProps) {
   const props = { title, endpoint, columns, millId, canEdit };
+  if (layout === "sheet") return (
+    <QmSheetEntry {...props}
+      hasSide={hasSide}
+      hasProcess={hasProcess}
+      hasTime={hasTime ?? true}
+      hankField={hankField ?? "std_hank"}
+      readingLabel={readingLabel ?? "g"}
+    />
+  );
   if (layout === "reading") return <QmReadingEntry {...props} />;
   if (layout === "rows") return <QmRowsEntry {...props} />;
   return <QmGridEntry {...props} />;
