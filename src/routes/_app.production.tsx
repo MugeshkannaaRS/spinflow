@@ -1114,6 +1114,14 @@ function WasteGrid() {
     setRows(buildWasteRows(machines));
   }, [machinesQ.data]);
 
+  // Draft persistence
+  const wasteDraftKey = `sf_waste::${date}::${shift}::${department}::${selectedGroupId}`;
+  const wasteDraft = useDraft<WasteRow[]>(wasteDraftKey);
+  useEffect(() => {
+    wasteDraft.saveDraft(rows, isDraftEmpty(rows));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, wasteDraftKey]);
+
   const updateWasteRow = (idx: number, field: keyof WasteRow, value: string) => {
     setRows((prev) => {
       const next = [...prev];
@@ -1207,6 +1215,7 @@ function WasteGrid() {
         setGroupWasteKg("");
         setGroupRemarks("");
       }
+      wasteDraft.discardDraft();
       qc.invalidateQueries({ queryKey: ["waste-entries"] });
     },
     onError: (err: Error) => toast.error(err.message),
@@ -1394,6 +1403,21 @@ function WasteGrid() {
             </div>
           </div>
         </div>
+      )}
+
+      {wasteDraft.hasDraft && wasteMode === "individual" && (
+        <DraftBanner
+          message="You have unsaved waste entry data. Restore it?"
+          onRestore={() => {
+            const saved = wasteDraft.restoreDraft();
+            if (saved) { setRows(saved); toast.success("Draft restored"); }
+            wasteDraft.discardDraft();
+          }}
+          onDiscard={() => {
+            wasteDraft.discardDraft();
+            setRows(buildWasteRows(machines));
+          }}
+        />
       )}
 
       <Card>
@@ -1735,6 +1759,15 @@ function StoppageForm() {
   // Multi-row state
   const [rows, setRows] = useState<StopRow[]>([makeStopRow()]);
 
+  // Draft persistence — strip ephemeral UI fields before saving
+  const stopDraftKey = `sf_stoppage::${date}::${shift}::${department}::${selectedMachine}`;
+  const stopDraft = useDraft<Omit<StopRow, "showDropdown" | "dropdownPos" | "codeSearch">[]>(stopDraftKey);
+  useEffect(() => {
+    const saveable = rows.map(({ showDropdown: _sd, dropdownPos: _dp, codeSearch: _cs, ...r }) => r);
+    stopDraft.saveDraft(saveable, isDraftEmpty(saveable.map(r => ({ stop_from: r.stop_from, stop_to: r.stop_to, datalog_code: r.datalog_code }))));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, stopDraftKey]);
+
   const setRowField = (id: string, field: keyof StopRow, value: any) =>
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
   const addRow = () => setRows((prev) => [...prev, makeStopRow()]);
@@ -1890,6 +1923,7 @@ function StoppageForm() {
         );
       }
       setRows([makeStopRow()]);
+      stopDraft.discardDraft();
       qc.invalidateQueries({ queryKey: ["downtime"] });
     },
     onError: (err: any) => {
@@ -1901,6 +1935,20 @@ function StoppageForm() {
 
   return (
     <div className="space-y-4">
+      {stopDraft.hasDraft && (
+        <DraftBanner
+          message="You have unsaved stoppage data. Restore it?"
+          onRestore={() => {
+            const saved = stopDraft.restoreDraft();
+            if (saved) {
+              setRows(saved.map((r) => ({ ...makeStopRow(), ...r })));
+              toast.success("Draft restored");
+            }
+            stopDraft.discardDraft();
+          }}
+          onDiscard={() => { stopDraft.discardDraft(); setRows([makeStopRow()]); }}
+        />
+      )}
       <Card>
         <CardHeader className="py-3 flex flex-row items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -2871,71 +2919,32 @@ function ManpowerGrid() {
       : (categoriesQ.data?.data ?? [])
   ) as { id: string; category: string; label: string }[];
 
-  // ── Draft persistence ─────────────────────────────────────────────────────
-  // Key includes date+shift+mode+group/range so switching any of these is a
-  // separate draft slot, not an overwrite.
-  const draftKey = useMemo(
+  // ── Draft persistence via useDraft hook ──────────────────────────────────
+  const mpDraftKey = useMemo(
     () =>
-      `sf_mp_draft::${date}::${shift}::${department}::${manpowerMode}::${
+      `sf_mp::${date}::${shift}::${department}::${manpowerMode}::${
         manpowerMode === "group" ? selectedGroupId : `${selectedMachineFrom}~${selectedMachineTo}`
       }`,
     [date, shift, department, manpowerMode, selectedGroupId, selectedMachineFrom, selectedMachineTo],
   );
-  const [hasDraft, setHasDraft] = useState(false);
-
-  // Check if a draft exists for the current key whenever it changes
-  useEffect(() => {
-    try {
-      setHasDraft(!!sessionStorage.getItem(draftKey));
-    } catch {
-      setHasDraft(false);
-    }
-  }, [draftKey]);
+  const mpDraft = useDraft<ManpowerRow[]>(mpDraftKey);
 
   const [rows, setRows] = useState<ManpowerRow[]>(() => buildManpowerRows(RF_DEFAULT_CATEGORIES));
 
-  // Persist rows to sessionStorage as a draft on every change (debounced via setTimeout)
   useEffect(() => {
-    // Don't persist empty/fresh rows — only when something was actually typed
-    const hasData = rows.some(
+    const isEmpty = !rows.some(
       (r) => r.headcount !== "" || r.machinesPerPerson !== "" || r.supervisor !== "" || r.assignments.length > 0,
     );
-    try {
-      if (hasData) {
-        sessionStorage.setItem(draftKey, JSON.stringify(rows));
-        setHasDraft(true);
-      }
-    } catch {
-      /* quota exceeded */
-    }
-  }, [rows, draftKey]);
+    mpDraft.saveDraft(rows, isEmpty);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, mpDraftKey]);
 
-  function restoreDraft() {
-    try {
-      const raw = sessionStorage.getItem(draftKey);
-      if (!raw) return;
-      const saved = JSON.parse(raw) as ManpowerRow[];
-      setRows(saved);
-      setHasDraft(false);
-      toast.success("Draft restored");
-    } catch {
-      toast.error("Could not restore draft");
-    }
-  }
-
-  function discardDraft() {
-    try {
-      sessionStorage.removeItem(draftKey);
-    } catch {/* */}
-    setHasDraft(false);
-    setRows(buildManpowerRows(deptCategories));
-  }
-
-  // Rebuild rows when dept categories change (but keep draft logic intact)
+  // Rebuild rows when dept categories change
   const deptCatKey = deptCategories.map((c) => c.category).join(",");
   useEffect(() => {
     setRows(buildManpowerRows(deptCategories));
-    setHasDraft(false);
+    mpDraft.discardDraft();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deptCatKey]);
 
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
@@ -3130,9 +3139,7 @@ function ManpowerGrid() {
       toast.success(label);
       if (errs.length > 0) toast.warning(`${errs.length} error(s) — some rows may not have saved`);
       qc.invalidateQueries({ queryKey: ["rf-manpower"] });
-      // Clear draft after successful save
-      try { sessionStorage.removeItem(draftKey); } catch {/* */}
-      setHasDraft(false);
+      mpDraft.discardDraft();
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -3430,29 +3437,19 @@ function ManpowerGrid() {
       </Card>
 
       {/* ── Draft recovery banner ── */}
-      {hasDraft && (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm">
-          <div className="flex items-center gap-2 text-amber-800">
-            <span className="text-base">📋</span>
-            <span>You have unsaved draft data for this shift. Restore it?</span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={restoreDraft}
-              className="px-3 py-1 rounded-md bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium"
-            >
-              Restore
-            </button>
-            <button
-              type="button"
-              onClick={discardDraft}
-              className="px-3 py-1 rounded-md border border-amber-300 hover:bg-amber-100 text-amber-700 text-xs font-medium"
-            >
-              Discard
-            </button>
-          </div>
-        </div>
+      {mpDraft.hasDraft && (
+        <DraftBanner
+          message="You have unsaved manpower data for this shift. Restore it?"
+          onRestore={() => {
+            const saved = mpDraft.restoreDraft();
+            if (saved) { setRows(saved); toast.success("Draft restored"); }
+            mpDraft.discardDraft();
+          }}
+          onDiscard={() => {
+            mpDraft.discardDraft();
+            setRows(buildManpowerRows(deptCategories));
+          }}
+        />
       )}
 
       {/* ── Category table — always visible once dept selected ── */}
@@ -4254,6 +4251,15 @@ function PackingGrid() {
   const [saving, setSaving] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
+  // Draft persistence — only unsaved rows (no id) are worth restoring
+  const packingDraftKey = `sf_packing::${date}::${shift}`;
+  const packingDraft = useDraft<PackingRow[]>(packingDraftKey);
+  useEffect(() => {
+    const unsaved = rows.filter((r) => !r.id);
+    packingDraft.saveDraft(unsaved, isDraftEmpty(unsaved.map(r => ({ lot_no: r.lot_no, bag_from: r.bag_from }))));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, packingDraftKey]);
+
   // Fetch existing entries for the selected date+shift
   const entriesQ = useQuery({
     queryKey: ["packing-entries", millId, date, shift],
@@ -4423,6 +4429,7 @@ function PackingGrid() {
       }
 
       toast.success("Packing entries saved");
+      packingDraft.discardDraft();
       qc.invalidateQueries({ queryKey: ["packing-entries", millId, date, shift] });
     } catch (e: any) {
       toast.error(e?.response?.data?.detail ?? "Save failed");
@@ -4444,7 +4451,23 @@ function PackingGrid() {
   const totalBags = rows.reduce((s, r) => s + (parseInt(r.total_bags, 10) || 0), 0);
 
   return (
-    <Card className="mt-4">
+    <div className="space-y-3 mt-4">
+      {packingDraft.hasDraft && (
+        <DraftBanner
+          message="You have unsaved packing entry data. Restore it?"
+          onRestore={() => {
+            const saved = packingDraft.restoreDraft();
+            if (saved) {
+              // Merge: keep existing saved rows + restore unsaved ones
+              setRows((prev) => [...prev.filter((r) => !!r.id), ...saved]);
+              toast.success("Draft restored");
+            }
+            packingDraft.discardDraft();
+          }}
+          onDiscard={() => { packingDraft.discardDraft(); }}
+        />
+      )}
+    <Card>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <CardTitle className="text-base">Packing Shift Entry</CardTitle>
@@ -4642,6 +4665,7 @@ function PackingGrid() {
         title="Import Packing Entries"
       />
     </Card>
+    </div>
   );
 }
 
