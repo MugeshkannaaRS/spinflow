@@ -2526,6 +2526,8 @@ type ManpowerRow = {
   totalMachines: string;
   headcount: string;
   supervisor: string;
+  // coverage ratio: how many machines does 1 person cover (e.g. 6 for Robo Doffer)
+  machinesPerPerson: string;
 };
 
 function buildManpowerRows(categories: { category: string; label: string }[]): ManpowerRow[] {
@@ -2537,7 +2539,14 @@ function buildManpowerRows(categories: { category: string; label: string }[]): M
     totalMachines: "",
     headcount: "",
     supervisor: "",
+    machinesPerPerson: "",
   }));
+}
+
+/** Auto-calculate headcount from total machines ÷ machines-per-person ratio */
+function calcHeadcount(totalMachines: number, machinesPerPerson: number): number {
+  if (!machinesPerPerson || machinesPerPerson <= 0) return 0;
+  return Math.ceil(totalMachines / machinesPerPerson);
 }
 
 // ── ManpowerCategoryEditor — inline add/edit/delete categories per dept ──────
@@ -2761,9 +2770,10 @@ function ManpowerGrid() {
   const [department, setDepartment] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
 
-  // Mode: individual machine OR machine group
+  // Mode: individual machine/range OR machine group
   const [manpowerMode, setManpowerMode] = useState<"individual" | "group">("individual");
-  const [selectedMachine, setSelectedMachine] = useState<string>("");
+  const [selectedMachineFrom, setSelectedMachineFrom] = useState<string>("");
+  const [selectedMachineTo, setSelectedMachineTo] = useState<string>("");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
 
   const { data: millMasters } = useMillMasters();
@@ -2840,10 +2850,18 @@ function ManpowerGrid() {
       return next;
     });
 
-  const totalHeadcount = useMemo(
-    () => rows.reduce((s, r) => s + (Number(r.headcount) || 0), 0),
-    [rows],
-  );
+  const totalHeadcount = useMemo(() => {
+    const fi = manpowerMode === "individual" && selectedMachineFrom
+      ? mpMachines.findIndex((m: any) => m.code === selectedMachineFrom) : -1;
+    const ti = manpowerMode === "individual" && selectedMachineTo
+      ? mpMachines.findIndex((m: any) => m.code === selectedMachineTo) : fi;
+    const totalMc = fi >= 0 ? (ti >= fi ? ti - fi + 1 : 1) : mpMachines.length;
+    return rows.reduce((s, r) => {
+      const mpp = Number(r.machinesPerPerson);
+      const hc = mpp > 0 && totalMc > 0 ? calcHeadcount(totalMc, mpp) : Number(r.headcount);
+      return s + (hc || 0);
+    }, 0);
+  }, [rows, mpMachines, manpowerMode, selectedMachineFrom, selectedMachineTo]);
 
   // Load existing plan
   const existingQ = useQuery({
@@ -2853,7 +2871,7 @@ function ManpowerGrid() {
       shift,
       millId,
       department,
-      manpowerMode === "individual" ? selectedMachine : selectedGroupId,
+      manpowerMode === "individual" ? selectedMachineFrom : selectedGroupId,
     ],
     queryFn: () => productionApi.getRFManpower({ date, shift, mill_id: millId }),
     staleTime: 30_000,
@@ -2863,7 +2881,7 @@ function ManpowerGrid() {
   useEffect(() => {
     const existing = (existingQ.data?.data ?? []) as any[];
     if (!existing.length) return;
-    const filterKey = manpowerMode === "individual" ? selectedMachine : undefined;
+    const filterKey = manpowerMode === "individual" ? selectedMachineFrom : undefined;
     setRows((prev) =>
       prev.map((row) => {
         const match = existing.find(
@@ -2877,10 +2895,11 @@ function ManpowerGrid() {
           totalMachines: String(match.total_machines ?? ""),
           headcount: String(match.headcount ?? ""),
           supervisor: match.supervisor ?? "",
+          machinesPerPerson: match.machines_per_person ? String(match.machines_per_person) : "",
         };
       }),
     );
-  }, [existingQ.data, manpowerMode, selectedMachine]);
+  }, [existingQ.data, manpowerMode, selectedMachineFrom]);
 
   const bulkMutation = useMutation({
     mutationFn: async () => {
@@ -2889,64 +2908,81 @@ function ManpowerGrid() {
       if (filled.length === 0) throw new Error("Enter headcount for at least one category");
 
       if (manpowerMode === "individual") {
-        if (!selectedMachine) throw new Error("Select a machine first");
+        if (!selectedMachineFrom) throw new Error("Select a machine first");
+        // Work out which machines are in the range from→to
+        const fromIdx = mpMachines.findIndex((m: any) => m.code === selectedMachineFrom);
+        const toIdx = selectedMachineTo
+          ? mpMachines.findIndex((m: any) => m.code === selectedMachineTo)
+          : fromIdx;
+        const rangeStart = Math.min(fromIdx, toIdx);
+        const rangeEnd = Math.max(fromIdx, toIdx);
+        const rangeMachines =
+          rangeStart >= 0 && rangeEnd >= 0
+            ? mpMachines.slice(rangeStart, rangeEnd + 1)
+            : [mpMachines[fromIdx]].filter(Boolean);
+        const totalInRange = rangeMachines.length || 1;
+
         const res = await productionApi.upsertRFManpowerBulk(
           {
             date,
             shift,
-            rows: filled.map((r) => ({
-              category: r.category,
-              mc_id_from: selectedMachine,
-              mc_id_to: row_mcTo(r, mpMachines, selectedMachine),
-              total_machines: r.totalMachines ? Number(r.totalMachines) : 1,
-              headcount: Number(r.headcount),
-              supervisor: r.supervisor || undefined,
-            })),
+            rows: filled.map((r) => {
+              const mpp = Number(r.machinesPerPerson) || 0;
+              const computedHc = mpp > 0 ? calcHeadcount(totalInRange, mpp) : Number(r.headcount);
+              return {
+                category: r.category,
+                mc_id_from: selectedMachineFrom,
+                mc_id_to: selectedMachineTo || undefined,
+                total_machines: totalInRange,
+                headcount: computedHc,
+                supervisor: r.supervisor || undefined,
+                machines_per_person: mpp || undefined,
+              };
+            }),
+          },
+          millId ?? "",
+        );
+        const rangeLabel =
+          selectedMachineTo && selectedMachineTo !== selectedMachineFrom
+            ? `${selectedMachineFrom}–${selectedMachineTo} (${totalInRange} machines)`
+            : selectedMachineFrom;
+        return {
+          upserted: res.upserted,
+          errors: res.errors ?? [],
+          machines: totalInRange,
+          label: `Saved for ${rangeLabel}`,
+        };
+      } else {
+        if (!selectedGroupId) throw new Error("Select a machine group first");
+        const groupMachines = mpMachines;
+        if (groupMachines.length === 0) throw new Error("No machines in selected group");
+        const totalInGroup = groupMachines.length;
+        // For group mode: one single bulk call with the group summary (not per-machine)
+        const res = await productionApi.upsertRFManpowerBulk(
+          {
+            date,
+            shift,
+            rows: filled.map((r) => {
+              const mpp = Number(r.machinesPerPerson) || 0;
+              const computedHc = mpp > 0 ? calcHeadcount(totalInGroup, mpp) : Number(r.headcount);
+              return {
+                category: r.category,
+                mc_id_from: groupMachines[0]?.code ?? "",
+                mc_id_to: groupMachines[groupMachines.length - 1]?.code ?? undefined,
+                total_machines: totalInGroup,
+                headcount: computedHc,
+                supervisor: r.supervisor || undefined,
+                machines_per_person: mpp || undefined,
+              };
+            }),
           },
           millId ?? "",
         );
         return {
           upserted: res.upserted,
           errors: res.errors ?? [],
-          machines: 1,
-          label: `Saved for ${selectedMachine}`,
-        };
-      } else {
-        if (!selectedGroupId) throw new Error("Select a machine group first");
-        const groupMachines = mpMachines;
-        if (groupMachines.length === 0) throw new Error("No machines in selected group");
-        const codes = groupMachines.map((m: any) => m.code).filter(Boolean);
-        const calls = codes.map((mc: string) =>
-          productionApi.upsertRFManpowerBulk(
-            {
-              date,
-              shift,
-              rows: filled.map((r) => ({
-                category: r.category,
-                mc_id_from: mc,
-                mc_id_to: undefined,
-                total_machines: 1,
-                headcount: Number(r.headcount),
-                supervisor: r.supervisor || undefined,
-              })),
-            },
-            millId ?? "",
-          ),
-        );
-        const results = await Promise.allSettled(calls);
-        const succeeded = results.filter((r) => r.status === "fulfilled").length;
-        const failed = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
-        if (succeeded === 0)
-          throw new Error(failed[0]?.reason?.response?.data?.detail || "All machines failed");
-        const total = results.reduce(
-          (s, r) => s + (r.status === "fulfilled" ? (r.value as any).upserted : 0),
-          0,
-        );
-        return {
-          upserted: total,
-          errors: failed.map((f) => f.reason?.message ?? "error"),
-          machines: codes.length,
-          label: `Saved ${total} rows across ${codes.length} machines`,
+          machines: totalInGroup,
+          label: `Saved for group (${totalInGroup} machines)`,
         };
       }
     },
@@ -2965,7 +3001,7 @@ function ManpowerGrid() {
 
   const [showCatEditor, setShowCatEditor] = useState(false);
 
-  const readyToFill = manpowerMode === "individual" ? !!selectedMachine : !!selectedGroupId;
+  const readyToFill = manpowerMode === "individual" ? !!selectedMachineFrom : !!selectedGroupId;
   const saveLabel = bulkMutation.isPending
     ? "Saving…"
     : manpowerMode === "group" && selectedGroupId && mpMachines.length > 0
@@ -2995,7 +3031,8 @@ function ManpowerGrid() {
               onClick={() => {
                 setManpowerMode("individual");
                 setSelectedGroupId("");
-                setSelectedMachine("");
+                setSelectedMachineFrom("");
+                setSelectedMachineTo("");
               }}
             >
               Individual
@@ -3004,7 +3041,8 @@ function ManpowerGrid() {
               className={`px-3 py-1.5 font-medium transition-colors border-l ${manpowerMode === "group" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
               onClick={() => {
                 setManpowerMode("group");
-                setSelectedMachine("");
+                setSelectedMachineFrom("");
+                setSelectedMachineTo("");
                 setSelectedGroupId("");
               }}
             >
@@ -3044,7 +3082,8 @@ function ManpowerGrid() {
                 onValueChange={(v) => {
                   setDepartment(v);
                   setSelectedGroupId("");
-                  setSelectedMachine("");
+                  setSelectedMachineFrom("");
+                  setSelectedMachineTo("");
                   const d = deptOptions.find(
                     (x: any) => (typeof x === "string" ? x : x.name) === v,
                   );
@@ -3078,6 +3117,7 @@ function ManpowerGrid() {
           {/* Machine / Group selector */}
           {manpowerMode === "individual" ? (
             <div className="space-y-3">
+              {/* Optional group filter */}
               {machineGroups.length > 0 && (
                 <div className="flex items-center gap-2">
                   <Layers className="size-4 text-muted-foreground shrink-0" />
@@ -3089,7 +3129,8 @@ function ManpowerGrid() {
                       value={selectedGroupId || "_all"}
                       onValueChange={(v) => {
                         setSelectedGroupId(v === "_all" ? "" : v);
-                        setSelectedMachine("");
+                        setSelectedMachineFrom("");
+                        setSelectedMachineTo("");
                       }}
                     >
                       <SelectTrigger className="h-8 text-sm">
@@ -3107,36 +3148,92 @@ function ManpowerGrid() {
                   </div>
                 </div>
               )}
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">
-                  Machine <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={selectedMachine}
-                  onValueChange={setSelectedMachine}
-                  disabled={!department}
-                >
-                  <SelectTrigger className="h-9 text-sm border-primary/50 font-medium">
-                    <SelectValue
-                      placeholder={department ? "Select a machine…" : "Select department first"}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mpMachines.length === 0 ? (
-                      <SelectItem value="_none" disabled>
-                        {mpMachinesQ.isLoading ? "Loading…" : "No machines found"}
-                      </SelectItem>
-                    ) : (
-                      mpMachines.map((m: any) => (
-                        <SelectItem key={m.code} value={m.code}>
-                          {m.code}
-                          {m.name ? ` — ${m.name}` : ""}
+              {/* From → To machine range */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">
+                    From Machine <span className="text-destructive">*</span>
+                  </Label>
+                  <Select
+                    value={selectedMachineFrom}
+                    onValueChange={(v) => {
+                      setSelectedMachineFrom(v);
+                      // if To is before From, reset it
+                      const fi = mpMachines.findIndex((m: any) => m.code === v);
+                      const ti = mpMachines.findIndex((m: any) => m.code === selectedMachineTo);
+                      if (ti >= 0 && ti < fi) setSelectedMachineTo("");
+                    }}
+                    disabled={!department}
+                  >
+                    <SelectTrigger className="h-9 text-sm border-primary/50 font-medium">
+                      <SelectValue placeholder={department ? "From…" : "Select dept first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mpMachines.length === 0 ? (
+                        <SelectItem value="_none" disabled>
+                          {mpMachinesQ.isLoading ? "Loading…" : "No machines found"}
                         </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                      ) : (
+                        mpMachines.map((m: any) => (
+                          <SelectItem key={m.code} value={m.code}>
+                            {m.code}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-muted-foreground">
+                    To Machine{" "}
+                    <span className="font-normal text-[10px]">(optional — for range)</span>
+                  </Label>
+                  <Select
+                    value={selectedMachineTo || "_same"}
+                    onValueChange={(v) => setSelectedMachineTo(v === "_same" ? "" : v)}
+                    disabled={!selectedMachineFrom}
+                  >
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="Same machine" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_same">— Same as From —</SelectItem>
+                      {mpMachines
+                        .filter((m: any) => {
+                          const fi = mpMachines.findIndex(
+                            (x: any) => x.code === selectedMachineFrom,
+                          );
+                          const mi = mpMachines.findIndex((x: any) => x.code === m.code);
+                          return mi > fi;
+                        })
+                        .map((m: any) => (
+                          <SelectItem key={m.code} value={m.code}>
+                            {m.code}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+              {/* Range summary pill */}
+              {selectedMachineFrom && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  {(() => {
+                    const fi = mpMachines.findIndex((m: any) => m.code === selectedMachineFrom);
+                    const ti = selectedMachineTo
+                      ? mpMachines.findIndex((m: any) => m.code === selectedMachineTo)
+                      : fi;
+                    const count = ti >= fi ? ti - fi + 1 : 1;
+                    return (
+                      <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-3 py-0.5 font-medium">
+                        {count === 1
+                          ? `1 machine: ${selectedMachineFrom}`
+                          : `${count} machines: ${selectedMachineFrom} → ${selectedMachineTo}`}
+                      </span>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-2">
@@ -3200,7 +3297,17 @@ function ManpowerGrid() {
             {readyToFill && (
               <span className="text-xs font-normal text-muted-foreground ml-2">
                 ·{" "}
-                {manpowerMode === "individual" ? selectedMachine : `${mpMachines.length} machines`}
+                {manpowerMode === "individual"
+                  ? selectedMachineTo && selectedMachineTo !== selectedMachineFrom
+                    ? (() => {
+                        const fi = mpMachines.findIndex(
+                          (m: any) => m.code === selectedMachineFrom,
+                        );
+                        const ti = mpMachines.findIndex((m: any) => m.code === selectedMachineTo);
+                        return `${selectedMachineFrom}–${selectedMachineTo} (${ti - fi + 1} machines)`;
+                      })()
+                    : selectedMachineFrom
+                  : `${mpMachines.length} machines`}
               </span>
             )}
           </CardTitle>
@@ -3241,29 +3348,79 @@ function ManpowerGrid() {
               <Table className="text-sm min-w-[480px]">
                 <TableHeader>
                   <TableRow className="bg-muted/40">
-                    <TableHead className="pl-4 w-56">Category</TableHead>
-                    <TableHead className="w-32 text-right pr-4">Headcount</TableHead>
+                    <TableHead className="pl-4 w-48">Category</TableHead>
+                    <TableHead className="w-28 text-center">
+                      <span title="How many machines does 1 person cover? Leave blank for fixed headcount.">
+                        Mc / Person
+                      </span>
+                    </TableHead>
+                    <TableHead className="w-28 text-center">Headcount</TableHead>
                     <TableHead>Supervisor / Incharge</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((row, idx) => (
+                  {rows.map((row, idx) => {
+                    // Auto-calculate headcount from ratio if machines known
+                    const totalMcInRange = (() => {
+                      if (manpowerMode === "individual" && selectedMachineFrom) {
+                        const fi = mpMachines.findIndex(
+                          (m: any) => m.code === selectedMachineFrom,
+                        );
+                        const ti = selectedMachineTo
+                          ? mpMachines.findIndex((m: any) => m.code === selectedMachineTo)
+                          : fi;
+                        return ti >= fi ? ti - fi + 1 : 1;
+                      }
+                      return mpMachines.length || 0;
+                    })();
+                    const mpp = Number(row.machinesPerPerson);
+                    const autoHc = mpp > 0 && totalMcInRange > 0 ? calcHeadcount(totalMcInRange, mpp) : null;
+                    const displayHc = autoHc !== null ? String(autoHc) : row.headcount;
+                    return (
                     <TableRow
                       key={row.category}
-                      className={Number(row.headcount) > 0 ? "bg-primary/5" : ""}
+                      className={Number(displayHc) > 0 ? "bg-primary/5" : ""}
                     >
                       <TableCell className="pl-4 font-medium text-sm">
                         {row.categoryLabel}
                       </TableCell>
-                      <TableCell className="pr-4">
+                      {/* Machines per person — coverage ratio */}
+                      <TableCell className="text-center px-2">
                         <Input
                           type="number"
-                          min={0}
-                          value={row.headcount}
-                          onChange={(e) => updateRow(idx, "headcount", e.target.value)}
-                          placeholder="0"
-                          className="h-8 text-sm w-full text-right font-medium"
+                          min={1}
+                          value={row.machinesPerPerson}
+                          onChange={(e) => updateRow(idx, "machinesPerPerson", e.target.value)}
+                          placeholder="—"
+                          className="h-8 text-sm w-full text-center text-muted-foreground"
+                          title="Machines per person (e.g. 6 = 1 Doffer covers 6 machines)"
                         />
+                      </TableCell>
+                      {/* Headcount — auto-computed if ratio set, manual otherwise */}
+                      <TableCell className="px-2">
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            min={0}
+                            value={displayHc}
+                            onChange={(e) => {
+                              if (autoHc === null) updateRow(idx, "headcount", e.target.value);
+                            }}
+                            readOnly={autoHc !== null}
+                            placeholder="0"
+                            className={`h-8 text-sm w-full text-center font-medium ${autoHc !== null ? "bg-blue-50 text-blue-700 cursor-default" : ""}`}
+                            title={
+                              autoHc !== null
+                                ? `Auto: ${totalMcInRange} machines ÷ ${mpp} = ${autoHc}`
+                                : "Enter headcount manually"
+                            }
+                          />
+                          {autoHc !== null && (
+                            <span className="absolute -top-1.5 right-1 text-[9px] text-blue-500 font-medium">
+                              auto
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Input
@@ -3274,12 +3431,23 @@ function ManpowerGrid() {
                         />
                       </TableCell>
                     </TableRow>
-                  ))}
+                  );
+                  })}
                   {/* Total row */}
                   <TableRow className="bg-muted/60 font-semibold">
                     <TableCell className="pl-4 text-sm">Total</TableCell>
-                    <TableCell className="pr-4 text-right text-sm font-bold">
-                      {totalHeadcount}
+                    <TableCell className="text-center text-sm text-muted-foreground">—</TableCell>
+                    <TableCell className="text-center text-sm font-bold">
+                      {rows.reduce((s, r) => {
+                        const mpp = Number(r.machinesPerPerson);
+                        const fi = manpowerMode === "individual" && selectedMachineFrom
+                          ? mpMachines.findIndex((m: any) => m.code === selectedMachineFrom) : -1;
+                        const ti = manpowerMode === "individual" && selectedMachineTo
+                          ? mpMachines.findIndex((m: any) => m.code === selectedMachineTo) : fi;
+                        const totalMc = fi >= 0 ? (ti >= fi ? ti - fi + 1 : 1) : mpMachines.length;
+                        const hc = mpp > 0 && totalMc > 0 ? calcHeadcount(totalMc, mpp) : Number(r.headcount);
+                        return s + (hc || 0);
+                      }, 0)}
                     </TableCell>
                     <TableCell />
                   </TableRow>
