@@ -36,7 +36,7 @@ def upgrade():
     conn.execute(
         sa.text(
             "UPDATE user_module_access SET access_level = "
-            "CASE WHEN enabled = 1 THEN 'read' ELSE 'none' END"
+            "CASE WHEN enabled = TRUE THEN 'read' ELSE 'none' END"
         )
     )
 
@@ -66,7 +66,7 @@ def downgrade():
     conn.execute(
         sa.text(
             "UPDATE user_module_access SET enabled = "
-            "CASE WHEN access_level = 'none' THEN 0 ELSE 1 END"
+            "CASE WHEN access_level = 'none' THEN FALSE ELSE TRUE END"
         )
     )
 

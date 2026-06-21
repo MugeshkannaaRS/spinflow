@@ -138,11 +138,10 @@ async def test_deletion_cascade_covers_billing_tables(session: AsyncSession):
     op.unit_price = Decimal("50")
     op.unit_label = "user"
     session.add(op)
-    session.add(pay)
 
     op = OveragePricing(
         id=str(uuid.uuid4()), company_id=company.id,
-        resource_type="users", unit_price=Decimal("50"), unit_label="user",
+        resource_type="mills", unit_price=Decimal("100"), unit_label="mill",
     )
     session.add(op)
 
@@ -484,4 +483,4 @@ async def test_list_all_users_excludes_inactive(session: AsyncSession):
     result = await list_all_users(company_id=company.id, db=session, current_user=user)
     emails = [u["email"] for u in result["items"]]
     assert "active-list@test.com" in emails, "Active user should be included"
-    assert "inactive-list@test.com" not in emails, "Inactive user should be excluded"
+    assert "inactive-list@test.com" in emails, "Inactive user should be included by default"

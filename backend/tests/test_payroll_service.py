@@ -2,6 +2,7 @@ import uuid
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
+from decimal import Decimal
 from sqlalchemy import select, and_
 from app.models.hr import Employee, Attendance
 from app.models.payroll import PayrollMonth, PayslipEntry
@@ -256,7 +257,7 @@ async def test_process_payroll_calculates_esic(
     )
     entry = (await payroll_service.db.execute(stmt)).scalar_one_or_none()
     assert entry is not None
-    assert entry.esic_employee == pytest.approx(106.88, rel=0.01), f"Expected ~106.88, got {entry.esic_employee}"
+    assert entry.esic_employee == Decimal("106.88"), f"Expected 106.88, got {entry.esic_employee}"
 
 
 @pytest.mark.asyncio

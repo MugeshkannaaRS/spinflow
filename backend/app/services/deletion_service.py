@@ -37,14 +37,42 @@ class CompanyDeletionService:
         "companies", "mills", "master_departments", "employees", "machines",
         "lots", "warehouses", "customers", "suppliers", "sales_orders",
         "invoices", "company_modules", "user_modules", "billing_invoices",
-        "company_subscriptions", "production_entries", "dispatch",
+        "billing_payments", "overage_pricing", "deletion_logs",
+        "company_subscriptions", "subscription_change_requests",
+        "production_entries", "dispatch", "dispatches",
         "dispatch_items", "inventory_bags", "stock_ledger", "stock_balance",
-        "stock_transfers", "attendance", "leaves", "payslip_entries",
-        "payroll_months", "spares", "spare_issues", "maintenance_logs",
-        "quality_tests", "grn_entries", "bale_stock", "cotton_bales",
+        "stock_transfers", "stock_movements",
+        "attendance", "leaves", "payslip_entries",
+        "payroll_months", "monthly_payroll",
+        "spares", "spare_issues", "maintenance_logs", "maintenance_schedule",
+        "machine_parameters",
+        "quality_tests", "lab_reports", "quality_approvals",
+        "grn_entries", "bale_stock", "cotton_bales",
         "cotton_purchases", "suppliers", "mixing_recipes", "mixing_layers",
         "bale_consumption_logs", "user_sessions",
+        "trips", "trip_items", "trip_scan_logs",
+        "sales_order_lines", "sales_orders",
+        "payments", "gst_entries",
+        "employee_custom_values", "employee_shifts",
+        "master_vehicles", "master_routes", "yarn_counts",
+        "mill_settings", "shifts", "mill_masters",
+        "mill_custom_fields", "mill_record_values",
+        "downtime_logs",
+        "column_configs", "column_dropdown_options", "import_mappings",
+        "employee_custom_fields", "audit_logs", "qr_scans",
+        "document_attachments", "users",
     })
+
+    @staticmethod
+    def _expand_any_mill_ids(where: str, params: dict) -> tuple:
+        if ":mill_ids" not in where or not isinstance(params.get("mill_ids"), list):
+            return where, params
+        mill_ids = params.pop("mill_ids")
+        placeholders = ", ".join(f":mid_{i}" for i in range(len(mill_ids)))
+        where = where.replace("= ANY(:mill_ids)", f"IN ({placeholders})")
+        for i, mid in enumerate(mill_ids):
+            params[f"mid_{i}"] = mid
+        return where, params
 
     async def _table_count(self, table: str, where: str, param: Any) -> int:
         if table not in self.ALLOWED_TABLES:
@@ -67,6 +95,7 @@ class CompanyDeletionService:
             params["p"] = param
         if extra_params:
             params.update(extra_params)
+        where, params = self._expand_any_mill_ids(where, params)
         sp_id = len(table) % 10000
         try:
             await self.db.execute(text(f"SAVEPOINT sp_del_{sp_id}"))
@@ -119,7 +148,12 @@ class CompanyDeletionService:
             counts["mills"] = 0
         else:
             counts["mills"] = len(mill_ids)
-            params = {"mill_ids": mill_ids}
+
+            async def _cq(sql: str) -> int:
+                p = {"mill_ids": mill_ids}
+                sql, p = self._expand_any_mill_ids(sql, p)
+                q = await self.db.execute(text(sql), p)
+                return q.scalar() or 0
 
             for table, col in [
                 ("master_departments", "mill_id"),
@@ -154,8 +188,7 @@ class CompanyDeletionService:
                 ("column_dropdown_options", "mill_id"),
                 ("import_mappings", "mill_id"),
             ]:
-                q = await self.db.execute(text(f"SELECT COUNT(*) FROM {table} WHERE {col} = ANY(:mill_ids)"), params)
-                cnt = q.scalar() or 0
+                cnt = await _cq(f"SELECT COUNT(*) FROM {table} WHERE {col} = ANY(:mill_ids)")
                 if cnt:
                     counts[table] = cnt
 
@@ -165,10 +198,7 @@ class CompanyDeletionService:
                 ("employee_shifts", "employee_id", "employees"),
                 ("employee_custom_values", "employee_id", "employees"),
             ]:
-                q = await self.db.execute(text(
-                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM {parent_table} e WHERE e.id = t.{parent_col} AND e.mill_id = ANY(:mill_ids))"
-                ), params)
-                cnt = q.scalar() or 0
+                cnt = await _cq(f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM {parent_table} e WHERE e.id = t.{parent_col} AND e.mill_id = ANY(:mill_ids))")
                 if cnt:
                     counts[table] = cnt
 
@@ -178,74 +208,47 @@ class CompanyDeletionService:
                 ("sales_order_lines", "so_id", "sales_orders", "mill_id"),
                 ("stock_movements", "lot_id", "lots", "mill_id"),
             ]:
-                q = await self.db.execute(text(
-                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM {parent_table} p WHERE p.id = t.{parent_col} AND p.{parent_fk} = ANY(:mill_ids))"
-                ), params)
-                cnt = q.scalar() or 0
+                cnt = await _cq(f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM {parent_table} p WHERE p.id = t.{parent_col} AND p.{parent_fk} = ANY(:mill_ids))")
                 if cnt:
                     counts[table] = cnt
 
             for table in ["bale_stock", "grn_entries"]:
-                q = await self.db.execute(text(
-                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM cotton_purchases c WHERE c.id = t.purchase_id AND c.mill_id = ANY(:mill_ids))"
-                ), params)
-                cnt = q.scalar() or 0
+                cnt = await _cq(f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM cotton_purchases c WHERE c.id = t.purchase_id AND c.mill_id = ANY(:mill_ids))")
                 if cnt:
                     counts[table] = cnt
 
             for table in ["payments", "gst_entries"]:
-                q = await self.db.execute(text(
-                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM invoices i WHERE i.id = t.invoice_id AND i.mill_id = ANY(:mill_ids))"
-                ), params)
-                cnt = q.scalar() or 0
+                cnt = await _cq(f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM invoices i WHERE i.id = t.invoice_id AND i.mill_id = ANY(:mill_ids))")
                 if cnt:
                     counts[table] = cnt
 
             for table in ["production_entries", "downtime_logs"]:
                 for col in ["machine_code"]:
-                    q = await self.db.execute(text(
-                        f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM machines m WHERE m.code = t.{col} AND m.mill_id = ANY(:mill_ids))"
-                    ), params)
-                    cnt = q.scalar() or 0
+                    cnt = await _cq(f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM machines m WHERE m.code = t.{col} AND m.mill_id = ANY(:mill_ids))")
                     if cnt:
                         key = f"{table}_via_{col}"
                         counts[key] = counts.get(key, 0) + cnt
 
             for table in ["quality_tests", "lab_reports", "quality_approvals"]:
-                q = await self.db.execute(text(
-                    f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM lots l WHERE l.id = t.lot_id AND l.mill_id = ANY(:mill_ids))"
-                ), params)
-                cnt = q.scalar() or 0
+                cnt = await _cq(f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM lots l WHERE l.id = t.lot_id AND l.mill_id = ANY(:mill_ids))")
                 if cnt:
                     counts[table] = cnt
 
             for table in ["maintenance_logs", "maintenance_schedule", "machine_parameters"]:
                 for col in ["machine_code"]:
-                    q = await self.db.execute(text(
-                        f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM machines m WHERE m.code = t.{col} AND m.mill_id = ANY(:mill_ids))"
-                    ), params)
-                    cnt = q.scalar() or 0
+                    cnt = await _cq(f"SELECT COUNT(*) FROM {table} t WHERE EXISTS (SELECT 1 FROM machines m WHERE m.code = t.{col} AND m.mill_id = ANY(:mill_ids))")
                     if cnt:
                         key = f"{table}_via_{col}"
                         counts[key] = counts.get(key, 0) + cnt
 
-            dispatches_q = await self.db.execute(text(
-                f"SELECT COUNT(*) FROM dispatches d WHERE EXISTS (SELECT 1 FROM lots l WHERE l.id = d.lot_id AND l.mill_id = ANY(:mill_ids))"
-            ), params)
-            dc = dispatches_q.scalar() or 0
+            dc = await _cq(f"SELECT COUNT(*) FROM dispatches d WHERE EXISTS (SELECT 1 FROM lots l WHERE l.id = d.lot_id AND l.mill_id = ANY(:mill_ids))")
             if dc:
                 counts["dispatches"] = dc
-                di_q = await self.db.execute(text(
-                    f"SELECT COUNT(*) FROM dispatch_items di WHERE EXISTS (SELECT 1 FROM dispatches d WHERE d.id = di.dispatch_id AND EXISTS (SELECT 1 FROM lots l WHERE l.id = d.lot_id AND l.mill_id = ANY(:mill_ids)))"
-                ), params)
-                dic = di_q.scalar() or 0
+                dic = await _cq(f"SELECT COUNT(*) FROM dispatch_items di WHERE EXISTS (SELECT 1 FROM dispatches d WHERE d.id = di.dispatch_id AND EXISTS (SELECT 1 FROM lots l WHERE l.id = d.lot_id AND l.mill_id = ANY(:mill_ids)))")
                 if dic:
                     counts["dispatch_items"] = dic
 
-            bale_stock_q = await self.db.execute(text(
-                f"SELECT COUNT(*) FROM cotton_bales b WHERE EXISTS (SELECT 1 FROM bale_stock bs WHERE bs.bale_no = b.bale_number AND EXISTS (SELECT 1 FROM cotton_purchases c WHERE c.id = bs.purchase_id AND c.mill_id = ANY(:mill_ids)))"
-            ), params)
-            bc = bale_stock_q.scalar() or 0
+            bc = await _cq(f"SELECT COUNT(*) FROM cotton_bales b WHERE EXISTS (SELECT 1 FROM bale_stock bs WHERE bs.bale_no = b.bale_number AND EXISTS (SELECT 1 FROM cotton_purchases c WHERE c.id = bs.purchase_id AND c.mill_id = ANY(:mill_ids)))")
             if bc:
                 counts["cotton_bales"] = bc
 
@@ -317,7 +320,6 @@ class CompanyDeletionService:
                     logger.warning(f"Backup table {t}: {e}")
 
             if mill_ids:
-                bparams = {"mill_ids": mill_ids}
                 for table, col in [
                     ("master_departments", "mill_id"), ("employees", "mill_id"),
                     ("machines", "mill_id"), ("lots", "mill_id"),
@@ -326,7 +328,10 @@ class CompanyDeletionService:
                     ("invoices", "mill_id"),
                 ]:
                     try:
-                        rows = (await self.db.execute(text(f"SELECT * FROM {table} WHERE {col} = ANY(:mill_ids)"), bparams)).fetchall()
+                        _bp = {"mill_ids": mill_ids}
+                        _bsql = f"SELECT * FROM {table} WHERE {col} = ANY(:mill_ids)"
+                        _bsql, _bp = self._expand_any_mill_ids(_bsql, _bp)
+                        rows = (await self.db.execute(text(_bsql), _bp)).fetchall()
                         if rows:
                             zf.writestr(f"{table}.json", json.dumps([dict(r._mapping) for r in rows], default=str))
                     except Exception as e:
@@ -380,9 +385,10 @@ class CompanyDeletionService:
             if mill_ids:
                 try:
                     await self.db.execute(text("SAVEPOINT sp_cotton_bales"))
-                    cnt_cb = await self.db.execute(text(
-                        "DELETE FROM cotton_bales WHERE bale_number IN (SELECT bs.bale_no FROM bale_stock bs WHERE bs.purchase_id IN (SELECT id FROM cotton_purchases WHERE mill_id = ANY(:mill_ids)))"
-                    ), mill_params)
+                    _cb_p = {"mill_ids": mill_ids}
+                    _cb_sql = "DELETE FROM cotton_bales WHERE bale_number IN (SELECT bs.bale_no FROM bale_stock bs WHERE bs.purchase_id IN (SELECT id FROM cotton_purchases WHERE mill_id = ANY(:mill_ids)))"
+                    _cb_sql, _cb_p = self._expand_any_mill_ids(_cb_sql, _cb_p)
+                    cnt_cb = await self.db.execute(text(_cb_sql), _cb_p)
                     await self.db.execute(text("RELEASE SAVEPOINT sp_cotton_bales"))
                     cb_cnt = cnt_cb.rowcount
                     if cb_cnt:

@@ -8,6 +8,7 @@ Wave 5 Remediation Sprint. All critical paths are covered.
 """
 
 import pytest
+from sqlalchemy import text
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -119,7 +120,7 @@ async def test_approval_cross_company_blocked(method, path, client, db_session):
     # Find two different companies with approval data
     workflows = (
         await db_session.execute(
-            "SELECT DISTINCT company_id FROM approval_workflows LIMIT 2"
+            text("SELECT DISTINCT company_id FROM approval_workflows LIMIT 2")
         )
     ).fetchall()
     if len(workflows) < 2:
@@ -128,7 +129,8 @@ async def test_approval_cross_company_blocked(method, path, client, db_session):
     company_a, company_b = workflows[0][0], workflows[1][0]
     req = (
         await db_session.execute(
-            f"SELECT id FROM approval_requests WHERE company_id = '{company_b}' LIMIT 1"
+            text("SELECT id FROM approval_requests WHERE company_id = :company_id LIMIT 1"),
+            {"company_id": company_b},
         )
     ).fetchone()
     if not req:
@@ -138,7 +140,8 @@ async def test_approval_cross_company_blocked(method, path, client, db_session):
     from app.models.user import User
     user_a = (
         await db_session.execute(
-            f"SELECT * FROM users WHERE company_id = '{company_a}' AND role_id != (SELECT id FROM roles WHERE code = 'SUPER_ADMIN') LIMIT 1"
+            text("SELECT * FROM users WHERE company_id = :company_id AND role_id != (SELECT id FROM roles WHERE code = 'SUPER_ADMIN') LIMIT 1"),
+            {"company_id": company_a},
         )
     ).fetchone()
     if not user_a:
@@ -164,7 +167,7 @@ async def test_backup_restore_returns_501(client, db_session):
     from app.models.user import User
     admin = (
         await db_session.execute(
-            "SELECT u.* FROM users u JOIN roles r ON u.role_id = r.id WHERE r.code = 'SUPER_ADMIN' LIMIT 1"
+            text("SELECT u.* FROM users u JOIN roles r ON u.role_id = r.id WHERE r.code = 'SUPER_ADMIN' LIMIT 1")
         )
     ).fetchone()
     if not admin:

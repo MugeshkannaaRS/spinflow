@@ -33,7 +33,7 @@ class TestSendEmail:
             text_body="hi",
         )
 
-        mock_smtp.assert_called_once_with("smtp.gmail.com", 587)
+        mock_smtp.assert_called_once_with("smtp.gmail.com", 587, timeout=10)
         mock_instance.starttls.assert_called_once()
         mock_instance.login.assert_called_once_with("user@test.com", "pass")
         mock_instance.send_message.assert_called_once()

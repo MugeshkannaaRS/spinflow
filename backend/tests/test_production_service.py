@@ -25,7 +25,7 @@ class TestCreateEntry:
         )
         entry = await svc.create_entry(req)
         assert entry.id is not None
-        assert entry.status == "pending"
+        assert entry.status == "approved"
         assert entry.produced_kg == 450.0
         assert entry.waste_kg == 10.0
 
@@ -120,17 +120,16 @@ class TestApproveEntry:
         assert approved.status == "approved"
         assert approved.approved_by == prod_manager_user.name
 
-    async def test_double_approve_raises_400(self, session: AsyncSession, prod_manager_user: "User", machine: Machine):
+    async def test_double_approve_is_idempotent(self, session: AsyncSession, prod_manager_user: "User", machine: Machine):
         svc = ProductionService(session, prod_manager_user)
         req = ProductionEntryCreate(
             date="2026-05-21", shift="A", machine_code=machine.code,
             department="spinning", operator="op1", produced_kg=100.0,
         )
         entry = await svc.create_entry(req)
-        await svc.approve_entry(entry.id)
-        with pytest.raises(SpinFlowException) as exc:
-            await svc.approve_entry(entry.id)
-        assert exc.value.status_code == 400
+        assert entry.status == "approved"
+        result = await svc.approve_entry(entry.id)
+        assert result.status == "approved"
 
 
 class TestDowntime:

@@ -1,8 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { useAuth } from "@/stores/auth";
+
+const { mockApiGet } = vi.hoisted(() => ({
+  mockApiGet: vi.fn(() => Promise.resolve({ data: { active: 0, critical: 0 } })),
+}));
+
+vi.mock("@/lib/api", () => ({
+  api: { get: mockApiGet },
+}));
+
 vi.mock("@/stores/auth", () => ({
   useAuth: vi.fn(() => ({
     user: {
@@ -34,7 +44,7 @@ vi.mock("@/hooks/useRBAC", () => ({
     const isSuperAdmin = role === "SUPER_ADMIN";
     return {
       canAccess: (module: string) => {
-        if (isSuperAdmin) return ["admin", "dashboard", "column_config"].includes(module);
+        if (isSuperAdmin) return ["admin", "dashboard", "column_config", "alerts"].includes(module);
         return !["admin", "column_config"].includes(module);
       },
       isSuperAdmin,
@@ -188,8 +198,10 @@ describe("Sidebar - SUPER_ADMIN visibility", () => {
     expect(screen.getByText("Admin Panel")).toBeTruthy();
   });
 
-  it("SUPER_ADMIN sees Column Config link", () => {
+  it("SUPER_ADMIN sees Column Config link", async () => {
     renderWithQuery(<Sidebar />);
+    await screen.findByText("Admin Panel");
+    await userEvent.click(screen.getByText("Admin Panel"));
     expect(screen.getByText("Column Config")).toBeTruthy();
   });
 });

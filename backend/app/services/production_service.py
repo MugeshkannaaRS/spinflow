@@ -106,6 +106,8 @@ class ProductionService(BaseService):
             count=req.count,
             status="approved",
             entered_by=self.current_user.name,
+            approved_by=self.current_user.name,
+            approved_at=datetime.now(timezone.utc),
         )
         self.db.add(entry)
         await self.db.flush()

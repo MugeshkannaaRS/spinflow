@@ -211,11 +211,11 @@ class TestRecordMove:
         )
 
         snapshot = await stock_service.stock_snapshot(mill_id="m1", fg_state="SELLABLE")
-        assert len(snapshot) == 1
-        assert snapshot[0]["lot_no"] == "LOT-SNAP-2"
+        assert snapshot["total"] == 1, f"Expected 1 SELLABLE, got {snapshot['total']}"
+        assert snapshot["data"][0]["lot_no"] == "LOT-SNAP-2"
 
         snapshot_all = await stock_service.stock_snapshot(mill_id="m1")
-        assert len(snapshot_all) == 2
+        assert snapshot_all["total"] == 2, f"Expected 2 total, got {snapshot_all['total']}"
 
     async def test_get_available_returns_zero_for_no_balance(
         self, stock_service: StockLedgerService,

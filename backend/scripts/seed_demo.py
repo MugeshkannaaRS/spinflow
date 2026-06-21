@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, date
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import AsyncSessionLocal
+from app.db.session import async_session_factory as AsyncSessionLocal
 from app.models.masters import Company, Mill, Department, Customer
 from app.models.hr import Employee
 from app.models.production import ProductionEntry
