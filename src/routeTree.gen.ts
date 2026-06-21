@@ -43,6 +43,7 @@ import { Route as AppAlertsRouteImport } from './routes/_app.alerts'
 import { Route as AppAdminRouteImport } from './routes/_app.admin'
 import { Route as AppAccountsRouteImport } from './routes/_app.accounts'
 import { Route as AppDashboardOwnerRouteImport } from './routes/_app.dashboard.owner'
+import { Route as AppCompanySettingsRouteImport } from './routes/_app.company.settings'
 import { Route as AppCompanyBillingRouteImport } from './routes/_app.company.billing'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
 import { Route as AppAdminSalesRouteImport } from './routes/_app.admin.sales'
@@ -242,6 +243,11 @@ const AppDashboardOwnerRoute = AppDashboardOwnerRouteImport.update({
   id: '/owner',
   path: '/owner',
   getParentRoute: () => AppDashboardRoute,
+} as any)
+const AppCompanySettingsRoute = AppCompanySettingsRouteImport.update({
+  id: '/company/settings',
+  path: '/company/settings',
+  getParentRoute: () => AppRoute,
 } as any)
 const AppCompanyBillingRoute = AppCompanyBillingRouteImport.update({
   id: '/company/billing',
@@ -454,6 +460,7 @@ export interface FileRoutesByFullPath {
   '/admin/sales': typeof AppAdminSalesRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/company/billing': typeof AppCompanyBillingRoute
+  '/company/settings': typeof AppCompanySettingsRoute
   '/dashboard/owner': typeof AppDashboardOwnerRoute
   '/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
   '/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
@@ -519,6 +526,7 @@ export interface FileRoutesByTo {
   '/admin/sales': typeof AppAdminSalesRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/company/billing': typeof AppCompanyBillingRoute
+  '/company/settings': typeof AppCompanySettingsRoute
   '/dashboard/owner': typeof AppDashboardOwnerRoute
   '/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
   '/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
@@ -586,6 +594,7 @@ export interface FileRoutesById {
   '/_app/admin/sales': typeof AppAdminSalesRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/company/billing': typeof AppCompanyBillingRoute
+  '/_app/company/settings': typeof AppCompanySettingsRoute
   '/_app/dashboard/owner': typeof AppDashboardOwnerRoute
   '/_app/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
   '/_app/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
@@ -653,6 +662,7 @@ export interface FileRouteTypes {
     | '/admin/sales'
     | '/admin/users'
     | '/company/billing'
+    | '/company/settings'
     | '/dashboard/owner'
     | '/admin/billing/analytics'
     | '/admin/billing/command-center'
@@ -718,6 +728,7 @@ export interface FileRouteTypes {
     | '/admin/sales'
     | '/admin/users'
     | '/company/billing'
+    | '/company/settings'
     | '/dashboard/owner'
     | '/admin/billing/analytics'
     | '/admin/billing/command-center'
@@ -784,6 +795,7 @@ export interface FileRouteTypes {
     | '/_app/admin/sales'
     | '/_app/admin/users'
     | '/_app/company/billing'
+    | '/_app/company/settings'
     | '/_app/dashboard/owner'
     | '/_app/admin/billing/analytics'
     | '/_app/admin/billing/command-center'
@@ -1043,6 +1055,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/owner'
       preLoaderRoute: typeof AppDashboardOwnerRouteImport
       parentRoute: typeof AppDashboardRoute
+    }
+    '/_app/company/settings': {
+      id: '/_app/company/settings'
+      path: '/company/settings'
+      fullPath: '/company/settings'
+      preLoaderRoute: typeof AppCompanySettingsRouteImport
+      parentRoute: typeof AppRoute
     }
     '/_app/company/billing': {
       id: '/_app/company/billing'
@@ -1386,6 +1405,7 @@ interface AppRouteChildren {
   AppStoresRoute: typeof AppStoresRoute
   AppUsersRoute: typeof AppUsersRoute
   AppCompanyBillingRoute: typeof AppCompanyBillingRoute
+  AppCompanySettingsRoute: typeof AppCompanySettingsRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -1418,6 +1438,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppStoresRoute: AppStoresRoute,
   AppUsersRoute: AppUsersRoute,
   AppCompanyBillingRoute: AppCompanyBillingRoute,
+  AppCompanySettingsRoute: AppCompanySettingsRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

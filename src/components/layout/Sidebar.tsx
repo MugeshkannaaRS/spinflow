@@ -710,6 +710,74 @@ function SidebarContent({
               }
               return link;
             })()}
+            {/* Company Settings link */}
+            {(() => {
+              const active = isActive("/company/settings");
+              const link = (
+                <Link
+                  to="/company/settings"
+                  onClick={onNavClick}
+                  className={cn(
+                    "flex items-center rounded-md transition-all duration-150 mb-0.5 cursor-pointer min-h-[40px]",
+                    collapsed ? "justify-center px-2" : "px-3",
+                  )}
+                  style={active ? { backgroundColor: "#3b82f6" } : undefined}
+                  onMouseEnter={
+                    active
+                      ? undefined
+                      : (e) => {
+                          (e.currentTarget as HTMLElement).style.backgroundColor = "#1e293b";
+                        }
+                  }
+                  onMouseLeave={
+                    active
+                      ? undefined
+                      : (e) => {
+                          (e.currentTarget as HTMLElement).style.backgroundColor = "";
+                        }
+                  }
+                >
+                  <Settings2
+                    className={cn(
+                      "shrink-0",
+                      collapsed ? "w-5 h-5" : "w-[18px] h-[18px] mr-3",
+                      active ? "text-white" : "text-[#94a3b8]",
+                    )}
+                  />
+                  {!collapsed && (
+                    <span
+                      className={cn(
+                        "text-[14px] font-medium truncate",
+                        active ? "text-white" : "text-[#94a3b8]",
+                      )}
+                    >
+                      Settings
+                    </span>
+                  )}
+                </Link>
+              );
+              if (collapsed) {
+                return (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>{link}</TooltipTrigger>
+                      <TooltipContent
+                        side="right"
+                        className="text-xs"
+                        style={{
+                          backgroundColor: "#0f172a",
+                          color: "white",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                        }}
+                      >
+                        Settings
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                );
+              }
+              return link;
+            })()}
           </div>
         )}
       </nav>

@@ -1295,7 +1295,7 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
     mutationFn: () =>
       hrApi.createEmployee({
         mill_id: millId,
-        employee_code: form.employee_code || `EMP-${Date.now()}`,
+        employee_code: form.employee_code || null,  // backend auto-generates if blank
         full_name: form.full_name,
         sl_no: form.sl_no,
         employee_id: form.employee_id || null,
@@ -1396,10 +1396,14 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel("employee_id")}</Label>
+                  <Label>
+                    {empColConfig.getLabel("employee_id")}
+                    <span className="ml-1 text-xs text-muted-foreground font-normal">(auto if blank)</span>
+                  </Label>
                   <Input
                     value={form.employee_code}
                     onChange={(e) => setForm({ ...form, employee_code: e.target.value })}
+                    placeholder="Auto-generated"
                   />
                 </div>
               </div>
@@ -1868,10 +1872,14 @@ function EditEmployeeSheet({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{empColConfig.getLabel("employee_id")}</Label>
+                  <Label>
+                    {empColConfig.getLabel("employee_id")}
+                    <span className="ml-1 text-xs text-muted-foreground font-normal">(auto if blank)</span>
+                  </Label>
                   <Input
                     value={form.employee_code}
                     onChange={(e) => setForm({ ...form, employee_code: e.target.value })}
+                    placeholder="Auto-generated"
                   />
                 </div>
               </div>

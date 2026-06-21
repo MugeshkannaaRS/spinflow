@@ -792,6 +792,13 @@ async def get_mill_settings(
                 "production_target_kg": 0,
                 "currency": "INR",
                 "timezone": "Asia/Kolkata",
+                "emp_code_prefix": "EMP",
+                "emp_code_last_seq": 0,
+                "emp_code_digits": 4,
+                "dept_names": [],
+                "shift_names": [],
+                "quality_cv_limit": None,
+                "quality_csp_min": None,
             }
         return {
             "working_hours_per_day": settings.working_hours_per_day,
@@ -799,6 +806,13 @@ async def get_mill_settings(
             "production_target_kg": settings.production_target_kg,
             "currency": settings.currency,
             "timezone": settings.timezone,
+            "emp_code_prefix": settings.emp_code_prefix or "EMP",
+            "emp_code_last_seq": settings.emp_code_last_seq or 0,
+            "emp_code_digits": settings.emp_code_digits or 4,
+            "dept_names": settings.dept_names or [],
+            "shift_names": settings.shift_names or [],
+            "quality_cv_limit": settings.quality_cv_limit,
+            "quality_csp_min": settings.quality_csp_min,
         }
     except HTTPException:
         raise
@@ -815,8 +829,15 @@ async def update_mill_settings(
     current_user: User = Depends(get_current_user),
 ):
     role_code = current_user.role_rel.code if current_user.role_rel else ""
-    if role_code != "SUPER_ADMIN":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can modify mill settings")
+    if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN or MILL_OWNER can modify mill settings")
+    # MILL_OWNER can only update their own mill's settings
+    if role_code == "MILL_OWNER":
+        scope = await get_mill_scope(current_user, db)
+        company_id = scope.get("company_id")
+        mill_check = await db.get(Mill, mill_id)
+        if not mill_check or str(mill_check.company_id) != str(company_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this mill")
     try:
         result = await db.execute(
             select(MillSettings).where(MillSettings.mill_id == mill_id)
@@ -833,6 +854,25 @@ async def update_mill_settings(
                 settings.currency = body["currency"]
             if "timezone" in body:
                 settings.timezone = body["timezone"]
+            # Emp code config — MILL_OWNER can change prefix/digits but NOT last_seq
+            if "emp_code_prefix" in body:
+                settings.emp_code_prefix = str(body["emp_code_prefix"]).upper().strip() or "EMP"
+            if "emp_code_digits" in body:
+                digits = int(body["emp_code_digits"])
+                settings.emp_code_digits = max(1, min(digits, 10))
+            # Customisation fields
+            if "dept_names" in body:
+                names = body["dept_names"]
+                settings.dept_names = [str(n).strip() for n in names if str(n).strip()] if isinstance(names, list) else None
+            if "shift_names" in body:
+                names = body["shift_names"]
+                settings.shift_names = [str(n).strip() for n in names if str(n).strip()] if isinstance(names, list) else None
+            if "quality_cv_limit" in body:
+                v = body["quality_cv_limit"]
+                settings.quality_cv_limit = float(v) if v is not None else None
+            if "quality_csp_min" in body:
+                v = body["quality_csp_min"]
+                settings.quality_csp_min = int(v) if v is not None else None
         else:
             settings = MillSettings(
                 mill_id=mill_id,
@@ -841,6 +881,13 @@ async def update_mill_settings(
                 production_target_kg=body.get("production_target_kg", 0),
                 currency=body.get("currency", "INR"),
                 timezone=body.get("timezone", "Asia/Kolkata"),
+                emp_code_prefix=str(body.get("emp_code_prefix", "EMP")).upper().strip() or "EMP",
+                emp_code_digits=max(1, min(int(body.get("emp_code_digits", 4)), 10)),
+                emp_code_last_seq=0,
+                dept_names=body.get("dept_names") or [],
+                shift_names=body.get("shift_names") or [],
+                quality_cv_limit=body.get("quality_cv_limit"),
+                quality_csp_min=body.get("quality_csp_min"),
             )
             db.add(settings)
         await db.flush()

@@ -260,5 +260,10 @@ class MillSettings(Base):
     emp_code_prefix: Mapped[str] = mapped_column(String(20), default="EMP")
     emp_code_last_seq: Mapped[int] = mapped_column(Integer, default=0)
     emp_code_digits: Mapped[int] = mapped_column(Integer, default=4)
+    # Mill customisation — department/shift names, quality spec limits
+    dept_names: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    shift_names: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    quality_cv_limit: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    quality_csp_min: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
