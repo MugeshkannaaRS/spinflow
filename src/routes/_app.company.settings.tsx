@@ -3,7 +3,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import {
   Settings2, Save, RefreshCw, Plus, X, Building2, Users, ShieldCheck, Tag,
+  Sliders, Trash2, ChevronDown,
 } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/stores/auth";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -367,6 +371,9 @@ function CompanySettingsPage() {
         </CardContent>
       </Card>
 
+      {/* ── 5. Custom Fields ──────────────────────────────────────────── */}
+      <CustomFieldsCard millId={millId ?? ""} />
+
       {/* Info box */}
       <Card className="border-blue-100 bg-blue-50/50">
         <CardContent className="pt-4">
@@ -378,5 +385,241 @@ function CompanySettingsPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ── Custom Fields Card ────────────────────────────────────────────────────────
+const MODULES = [
+  { value: "employees", label: "Employees" },
+  { value: "machines", label: "Machines" },
+  { value: "quality", label: "Quality Forms" },
+];
+
+const FIELD_TYPES = [
+  { value: "text", label: "Text" },
+  { value: "number", label: "Number" },
+  { value: "date", label: "Date" },
+  { value: "dropdown", label: "Dropdown" },
+];
+
+interface CustomField {
+  field_key: string;
+  field_label: string;
+  field_type: string;
+  dropdown_values: string[];
+  is_required: boolean;
+  sequence: number;
+}
+
+function CustomFieldsCard({ millId }: { millId: string }) {
+  const queryClient = useQueryClient();
+  const [module, setModule] = useState("employees");
+  const [newLabel, setNewLabel] = useState("");
+  const [newType, setNewType] = useState("text");
+  const [newRequired, setNewRequired] = useState(false);
+  const [newDropdownInput, setNewDropdownInput] = useState("");
+  const [newDropdownValues, setNewDropdownValues] = useState<string[]>([]);
+  const [addError, setAddError] = useState("");
+
+  const { data: fields = [], isLoading } = useQuery<CustomField[]>({
+    queryKey: ["custom-fields", millId, module],
+    queryFn: async () => {
+      const res = await api.get(`/api/v1/mill-config/custom-fields?module=${module}`);
+      return Array.isArray(res.data) ? res.data : [];
+    },
+    enabled: !!millId,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      if (!newLabel.trim()) throw new Error("Field label is required");
+      await api.post("/api/v1/mill-config/custom-fields", {
+        module,
+        field_label: newLabel.trim(),
+        field_type: newType,
+        dropdown_values: newType === "dropdown" ? newDropdownValues : [],
+        is_required: newRequired,
+        sequence: fields.length,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["custom-fields", millId, module] });
+      setNewLabel("");
+      setNewType("text");
+      setNewRequired(false);
+      setNewDropdownValues([]);
+      setNewDropdownInput("");
+      setAddError("");
+    },
+    onError: (e: any) => setAddError(e.message ?? "Failed to add"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (key: string) =>
+      api.delete(`/api/v1/mill-config/custom-fields/${key}?module=${module}`),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["custom-fields", millId, module] }),
+  });
+
+  function addDropdownValue() {
+    const v = newDropdownInput.trim();
+    if (!v || newDropdownValues.includes(v)) return;
+    setNewDropdownValues((prev) => [...prev, v]);
+    setNewDropdownInput("");
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center gap-2">
+          <Sliders className="w-4 h-4 text-muted-foreground" />
+          <CardTitle className="text-base">Custom Fields</CardTitle>
+        </div>
+        <CardDescription>
+          Add extra fields per module. They appear automatically in forms and exports.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Module selector */}
+        <div className="flex items-center gap-3">
+          <Label className="shrink-0">Module</Label>
+          <Select value={module} onValueChange={setModule}>
+            <SelectTrigger className="w-48">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {MODULES.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Existing fields */}
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading…
+          </div>
+        ) : fields.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-2">
+            No custom fields yet for this module.
+          </p>
+        ) : (
+          <div className="divide-y rounded-md border overflow-hidden">
+            {fields.map((f) => (
+              <div key={f.field_key} className="flex items-center px-3 py-2.5 gap-3 text-sm bg-background">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{f.field_label}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {FIELD_TYPES.find((t) => t.value === f.field_type)?.label ?? f.field_type}
+                    {f.is_required && " · Required"}
+                    {f.field_type === "dropdown" && f.dropdown_values?.length > 0 && (
+                      <> · {f.dropdown_values.join(", ")}</>
+                    )}
+                  </p>
+                </div>
+                <button
+                  onClick={() => deleteMutation.mutate(f.field_key)}
+                  disabled={deleteMutation.isPending}
+                  className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add new field */}
+        <div className="border rounded-md p-3 space-y-3 bg-muted/30">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Add field</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Label</Label>
+              <Input
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                placeholder="e.g. Blood Group"
+                onKeyDown={(e) => e.key === "Enter" && createMutation.mutate()}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Type</Label>
+              <Select value={newType} onValueChange={setNewType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FIELD_TYPES.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {newType === "dropdown" && (
+            <div className="space-y-2">
+              <Label className="text-xs">Dropdown options</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={newDropdownInput}
+                  onChange={(e) => setNewDropdownInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addDropdownValue(); } }}
+                  placeholder="Add option…"
+                  className="max-w-xs"
+                />
+                <Button variant="outline" size="sm" onClick={addDropdownValue} className="gap-1">
+                  <Plus className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+              {newDropdownValues.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {newDropdownValues.map((v, i) => (
+                    <Badge key={i} variant="secondary" className="gap-1 pr-1">
+                      {v}
+                      <button
+                        onClick={() => setNewDropdownValues((prev) => prev.filter((_, j) => j !== i))}
+                        className="rounded hover:bg-destructive/20 p-0.5"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newRequired}
+                onChange={(e) => setNewRequired(e.target.checked)}
+                className="rounded"
+              />
+              Required field
+            </label>
+            <Button
+              size="sm"
+              onClick={() => createMutation.mutate()}
+              disabled={createMutation.isPending || !newLabel.trim()}
+              className="gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              {createMutation.isPending ? "Adding…" : "Add Field"}
+            </Button>
+            {addError && <p className="text-xs text-destructive">{addError}</p>}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

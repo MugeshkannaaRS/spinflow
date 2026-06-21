@@ -6,7 +6,7 @@ Modules:
   Help article seed (default articles)
 """
 import logging
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +15,6 @@ from app.models.user import User
 from app.models.masters import Mill, Department
 from app.models.hr import Employee
 from app.models.production import Machine, Shift
-from app.models.inventory import InventoryItem
 from app.models.quality import QualityTest
 
 logger = logging.getLogger(__name__)
@@ -52,9 +51,11 @@ class OnboardingProgressService:
         )).scalar() or 0
         steps["mill_setup"] = mills > 0
 
-        # departments — at least 1 department
+        # departments — at least 1 department (Department has mill_id, not company_id)
         depts = (await self.db.execute(
-            select(func.count(Department.id)).where(Department.company_id == company_id)
+            select(func.count(Department.id))
+            .join(Mill, Mill.id == Department.mill_id)
+            .where(Mill.company_id == company_id)
         )).scalar() or 0
         steps["departments"] = depts > 0
 
@@ -74,9 +75,11 @@ class OnboardingProgressService:
         )).scalar() or 0
         steps["machines"] = machs > 0
 
-        # shifts — at least 1 shift
+        # shifts — at least 1 shift (Shift has mill_id, not company_id)
         shifts = (await self.db.execute(
-            select(func.count(Shift.id)).where(Shift.company_id == company_id)
+            select(func.count(Shift.id))
+            .join(Mill, Mill.id == Shift.mill_id)
+            .where(Mill.company_id == company_id)
         )).scalar() or 0
         steps["shifts"] = shifts > 0
 
@@ -186,9 +189,11 @@ class RecommendationService:
                 "action_link": "/users",
             })
 
-        # 3. No shifts configured
+        # 3. No shifts configured (Shift has mill_id, not company_id)
         shifts = (await self.db.execute(
-            select(func.count(Shift.id)).where(Shift.company_id == company_id)
+            select(func.count(Shift.id))
+            .join(Mill, Mill.id == Shift.mill_id)
+            .where(Mill.company_id == company_id)
         )).scalar() or 0
         if shifts == 0 and len(machines) > 0:
             recs.append({
@@ -197,31 +202,14 @@ class RecommendationService:
                 "title": "No shifts configured",
                 "description": "Create shifts to track production hours and attendance.",
                 "action_label": "Create Shifts",
-                "action_link": "/masters/shifts",
+                "action_link": "/masters",
             })
 
-        # 4. Low stock items
-        low = (await self.db.execute(
-            select(func.count(InventoryItem.id)).where(
-                InventoryItem.current_stock <= InventoryItem.minimum_stock,
-                InventoryItem.company_id == company_id,
-            )
-        )).scalar() or 0
-        if low > 0:
-            recs.append({
-                "type": "low_stock",
-                "severity": "warning",
-                "title": f"{low} item(s) below minimum stock level",
-                "description": "Reorder low-stock items to avoid production delays.",
-                "action_label": "View Inventory",
-                "action_link": "/inventory",
-            })
-
-        # 5. Pending quality tests
+        # 4. Pending quality tests (status is lowercase "pending" in model)
         pending_qc = (await self.db.execute(
             select(func.count(QualityTest.id)).where(
                 QualityTest.company_id == company_id,
-                QualityTest.status == "PENDING",
+                QualityTest.status == "pending",
             )
         )).scalar() or 0
         if pending_qc > 0:
@@ -234,7 +222,7 @@ class RecommendationService:
                 "action_link": "/quality",
             })
 
-        # 6. No employees imported
+        # 5. No employees imported
         emps = (await self.db.execute(
             select(func.count(Employee.id))
             .join(Mill, Mill.id == Employee.mill_id)

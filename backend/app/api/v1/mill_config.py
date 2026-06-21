@@ -250,6 +250,104 @@ async def get_custom_fields(
     ]
 
 
+# ─── POST /mill-config/custom-fields ─────────────────────────────────────────
+
+class CustomFieldCreate(BaseModel):
+    module: str
+    field_label: str
+    field_type: str = "text"          # text | number | date | dropdown
+    dropdown_values: list = []
+    is_required: bool = False
+    sequence: int = 0
+
+
+@router.post("/mill-config/custom-fields")
+async def create_custom_field(
+    body: CustomFieldCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(403, "Only MILL_OWNER can manage custom fields")
+
+    scope = await get_mill_scope(current_user, db)
+    mill_id = await _resolve_mill(current_user, scope, db)
+    company_id = scope.get("company_id") or str(current_user.company_id or "")
+
+    # Derive a safe field_key from the label
+    import re
+    field_key = re.sub(r"[^a-z0-9_]", "_", body.field_label.lower().strip())
+    field_key = re.sub(r"_+", "_", field_key).strip("_") or "field"
+
+    # Ensure unique key per mill+module
+    existing_keys = (await db.execute(
+        select(MillCustomField.field_key)
+        .where(MillCustomField.mill_id == mill_id, MillCustomField.module == body.module)
+    )).scalars().all()
+    base = field_key
+    suffix = 1
+    while field_key in existing_keys:
+        field_key = f"{base}_{suffix}"
+        suffix += 1
+
+    cf = MillCustomField(
+        mill_id=mill_id,
+        company_id=company_id,
+        module=body.module,
+        field_key=field_key,
+        field_label=body.field_label.strip(),
+        field_type=body.field_type,
+        dropdown_values=body.dropdown_values or [],
+        is_required=body.is_required,
+        sequence=body.sequence,
+        source="manual",
+    )
+    db.add(cf)
+    await db.commit()
+    await db.refresh(cf)
+    return {
+        "id": cf.id,
+        "field_key": cf.field_key,
+        "field_label": cf.field_label,
+        "field_type": cf.field_type,
+        "dropdown_values": cf.dropdown_values or [],
+        "is_required": cf.is_required,
+        "sequence": cf.sequence,
+    }
+
+
+# ─── DELETE /mill-config/custom-fields/{field_key}?module=... ─────────────────
+
+@router.delete("/mill-config/custom-fields/{field_key}")
+async def delete_custom_field(
+    field_key: str,
+    module: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(403, "Only MILL_OWNER can manage custom fields")
+
+    scope = await get_mill_scope(current_user, db)
+    mill_id = await _resolve_mill(current_user, scope, db)
+
+    result = await db.execute(
+        select(MillCustomField).where(
+            MillCustomField.mill_id == mill_id,
+            MillCustomField.module == module,
+            MillCustomField.field_key == field_key,
+        )
+    )
+    cf = result.scalar_one_or_none()
+    if not cf:
+        raise HTTPException(404, "Custom field not found")
+    await db.delete(cf)
+    await db.commit()
+    return {"ok": True}
+
+
 # ─── GET /mill-config/subscription ────────────────────────────────────────────
 
 @router.get("/mill-config/subscription")
