@@ -391,6 +391,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="CV% Records (Carding)"
                   endpoint="/quality/v2/carding/cv-record"
+                  department="carding"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Card Mc No" },
@@ -431,6 +432,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="Carding Waste % Study"
                   endpoint="/quality/v2/carding/waste-study"
+                  department="carding"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Card Mc No" },
@@ -467,6 +469,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="Daily Carding Wrapping Report"
                   endpoint="/quality/v2/carding/wrapping"
+                  department="carding"
                   columns={[]}
                   millId={millId}
                   canEdit={canEdit}
@@ -486,6 +489,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="Drawing CV Records"
                   endpoint="/quality/v2/drawing/cv-record"
+                  department="drawing"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Mc No" },
@@ -517,6 +521,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="A% Check (Auto-Leveller)"
                   endpoint="/quality/v2/drawing/a-pct"
+                  department="drawing"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Mc No" },
@@ -567,6 +572,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="Daily Sliver Wrapping Report (BD/FD)"
                   endpoint="/quality/v2/drawing/sliver-wrapping"
+                  department="drawing"
                   columns={[]}
                   millId={millId}
                   canEdit={canEdit}
@@ -586,6 +592,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="Simplex Hank Test"
                   endpoint="/quality/v2/simplex/hank-test"
+                  department="simplex"
                   columns={[]}
                   millId={millId}
                   canEdit={canEdit}
@@ -601,6 +608,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="Simplex Breakage Study"
                   endpoint="/quality/v2/simplex/breakage-study"
+                  department="simplex"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Simplex No" },
@@ -640,6 +648,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="Simplex Stretch %"
                   endpoint="/quality/v2/simplex/stretch-pct"
+                  department="simplex"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Simplex No" },
@@ -675,6 +684,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="CSP Strength Report"
                   endpoint="/quality/v2/ring-frame/csp-report"
+                  department="ring frame"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Mc No" },
@@ -753,6 +763,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="RF Spinning Breakage Study"
                   endpoint="/quality/v2/ring-frame/breakage-study"
+                  department="ring frame"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "lot_no", label: "Lot No" },
@@ -783,6 +794,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="RF Snap Study & Idle Spindle Check"
                   endpoint="/quality/v2/ring-frame/snap-study"
+                  department="ring frame"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Mc No" },
@@ -817,6 +829,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="Yarn Faults Report (Uster QQ4)"
                   endpoint="/quality/v2/auto-coner/yarn-faults"
+                  department="auto coner"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Mc No" },
@@ -859,6 +872,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="Splice Strength Report"
                   endpoint="/quality/v2/auto-coner/splice-strength"
+                  department="auto coner"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Mc No" },
@@ -892,6 +906,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="Wax Pickup Study"
                   endpoint="/quality/v2/auto-coner/wax-pickup"
+                  department="auto coner"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Mc No" },
@@ -918,6 +933,7 @@ function QualityPage() {
                 <QmFormsTab
                   title="Bag Faults Checking Report"
                   endpoint="/quality/v2/auto-coner/bag-faults"
+                  department="auto coner"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "shift_code", label: "Shift" },
@@ -1401,6 +1417,64 @@ interface QmFieldDef {
 const SHIFT_OPTIONS = ["A", "B", "C", "R/A", "R/B", "R/C"];
 const STATUS_OPTIONS = ["draft", "approved", "rejected"];
 
+// ── Machine autocomplete ─────────────────────────────────────────────────────
+/** Fetch machines for this mill, optionally filtered by department string */
+function useMachines(millId: string | null | undefined, department?: string) {
+  return useQuery({
+    queryKey: ["qm-machines", millId, department ?? "all"],
+    queryFn: async () => {
+      const p = new URLSearchParams({ page_size: "500" });
+      if (department) p.set("department", department);
+      const res = await api.get(`/api/v1/production/machines?${p}`);
+      const items: any[] = res.data?.data ?? res.data ?? [];
+      return items;
+    },
+    enabled: !!millId,
+    staleTime: 5 * 60_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/** Inline machine-number input with datalist dropdown from uploaded machines */
+function MachineComboInput({
+  value,
+  onChange,
+  machines,
+  placeholder = "Mc No",
+  className = "",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  machines: any[];
+  placeholder?: string;
+  className?: string;
+}) {
+  const listId = useMemo(() => `mc-list-${Math.random().toString(36).slice(2)}`, []);
+  return (
+    <>
+      <datalist id={listId}>
+        {machines.map((m) => (
+          <option key={m.id} value={m.code}>
+            {m.code}{m.name ? ` — ${m.name}` : ""}
+          </option>
+        ))}
+      </datalist>
+      <input
+        list={listId}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={[
+          "h-7 text-xs border border-border rounded px-1.5 bg-background",
+          "text-foreground focus:outline-none focus:ring-1 focus:ring-primary",
+          className,
+        ].join(" ")}
+      />
+    </>
+  );
+}
+
 // Header fields: always locked at top, not repeated per row
 const HEADER_KEYS = new Set(["date", "shift_code", "lot_no"]);
 
@@ -1561,6 +1635,7 @@ function QmSheetEntry({
   columns,
   millId,
   canEdit,
+  department,
   hasSide = false,
   hasProcess = false,
   hasTime = true,
@@ -1572,12 +1647,14 @@ function QmSheetEntry({
   columns: any[];
   millId: string | null | undefined;
   canEdit: boolean;
+  department?: string;
   hasSide?: boolean;
   hasProcess?: boolean;
   hasTime?: boolean;
   hankField?: "std_hank" | "nominal_hank";
   readingLabel?: string;
 }) {
+  const { data: machines = [] } = useMachines(millId, department);
   const qc = useQueryClient();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -1818,10 +1895,13 @@ function QmSheetEntry({
                         {row._saved ? (
                           <span className="text-xs font-medium px-1">{row.machine_no}</span>
                         ) : (
-                          <input value={row.machine_no}
-                            onChange={(e) => setRowField(row._id, "machine_no", e.target.value)}
+                          <MachineComboInput
+                            value={row.machine_no}
+                            onChange={(v) => setRowField(row._id, "machine_no", v)}
+                            machines={machines}
                             placeholder="Mc"
-                            className="h-7 w-14 text-xs border border-border rounded px-1.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary" />
+                            className="w-20"
+                          />
                         )}
                       </td>
 
@@ -2021,13 +2101,16 @@ function QmGridEntry({
   columns,
   millId,
   canEdit,
+  department,
 }: {
   title: string;
   endpoint: string;
   columns: any[];
   millId: string | null | undefined;
   canEdit: boolean;
+  department?: string;
 }) {
+  const { data: machines = [] } = useMachines(millId, department);
   const qc = useQueryClient();
   const today = new Date().toISOString().slice(0, 10);
   const [filterDate, setFilterDate] = useState(today);
@@ -2242,6 +2325,18 @@ function QmGridEntry({
         <span className="text-xs px-1">
           {v == null || v === "" ? <span className="text-muted-foreground">—</span> : String(v)}
         </span>
+      );
+    }
+    // Machine number → autocomplete from uploaded machines
+    if (field.key === "machine_no" || field.key === "machine") {
+      return (
+        <MachineComboInput
+          value={row[field.key] ?? ""}
+          onChange={(v) => setRowField(row._id, field.key, v)}
+          machines={machines}
+          placeholder="Mc No"
+          className="w-20"
+        />
       );
     }
     return (
@@ -2697,15 +2792,18 @@ function QmRowsEntry({
   columns,
   millId,
   canEdit,
+  department,
 }: {
   title: string;
   endpoint: string;
   columns: any[];
   millId: string | null | undefined;
   canEdit: boolean;
+  department?: string;
 }) {
   const qc = useQueryClient();
   const today = new Date().toISOString().slice(0, 10);
+  const { data: machines = [] } = useMachines(millId, department);
 
   const formFields = useMemo<QmFieldDef[]>(() => {
     const base = columns
@@ -2864,17 +2962,31 @@ function QmRowsEntry({
                     <td className="px-2 py-1 text-[10px] text-muted-foreground">{rowIdx + 1}</td>
                     {rowFields.map((field, colIdx) => (
                       <td key={field.key} className="px-1 py-1">
-                        {field.type === "shift" ? (
+                        {row._saved ? (
+                          <span className="text-xs px-1">
+                            {row[field.key] == null || row[field.key] === ""
+                              ? <span className="text-muted-foreground">—</span>
+                              : String(row[field.key])}
+                          </span>
+                        ) : field.type === "shift" ? (
                           <CellSelect
                             value={String(row[field.key] ?? "A")}
-                            onChange={(v) => row._saved ? null : setRowField(row._id, field.key, v)}
+                            onChange={(v) => setRowField(row._id, field.key, v)}
                             options={SHIFT_OPTIONS.map((o) => ({ value: o, label: o }))}
                           />
                         ) : field.type === "yn" ? (
                           <CellSelect
                             value={row[field.key] === true || row[field.key] === "true" ? "true" : row[field.key] === false || row[field.key] === "false" ? "false" : ""}
-                            onChange={(v) => row._saved ? null : setRowField(row._id, field.key, v)}
+                            onChange={(v) => setRowField(row._id, field.key, v)}
                             options={[{ value: "", label: "—" }, { value: "true", label: "OK" }, { value: "false", label: "NG" }]}
+                          />
+                        ) : (field.key === "machine_no" || field.key === "machine") ? (
+                          <MachineComboInput
+                            value={row[field.key] ?? ""}
+                            onChange={(v) => setRowField(row._id, field.key, v)}
+                            machines={machines}
+                            placeholder="Mc No"
+                            className="w-20"
                           />
                         ) : (
                           <CellInput
@@ -2937,6 +3049,7 @@ interface QmFormsTabProps {
   millId: string | null | undefined;
   canEdit: boolean;
   layout?: QmLayout;
+  department?: string; // used to filter machine autocomplete
   // sheet-specific
   hasSide?: boolean;
   hasProcess?: boolean;
@@ -2947,9 +3060,9 @@ interface QmFormsTabProps {
 
 function QmFormsTab({
   title, endpoint, columns, millId, canEdit, layout = "grid",
-  hasSide, hasProcess, hasTime, hankField, readingLabel,
+  department, hasSide, hasProcess, hasTime, hankField, readingLabel,
 }: QmFormsTabProps) {
-  const props = { title, endpoint, columns, millId, canEdit };
+  const props = { title, endpoint, columns, millId, canEdit, department };
   if (layout === "sheet") return (
     <QmSheetEntry {...props}
       hasSide={hasSide}
