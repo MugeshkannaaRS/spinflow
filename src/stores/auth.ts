@@ -117,8 +117,15 @@ export const useAuth = create<AuthState>()(
         };
       },
       version: 4, // bumped: removes token from localStorage
-      onRehydrateStorage: () => () => {
-        useAuth.setState({ _hasHydrated: true });
+      onRehydrateStorage: () => (_state, error) => {
+        // Always mark hydrated — even if rehydration errored (e.g. migration
+        // failure, storage unavailable). Prevents infinite loading screen.
+        if (error) {
+          console.warn("[auth] Rehydration error — resetting to initial state", error);
+          useAuth.setState({ ...initialState, _hasHydrated: true });
+        } else {
+          useAuth.setState({ _hasHydrated: true });
+        }
       },
     },
   ),

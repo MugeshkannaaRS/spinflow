@@ -22,9 +22,21 @@ function KeepAlive({ children }: { children: React.ReactNode }) {
 }
 
 /** Guards against Zustand persist rehydration race — route beforeLoad
- *  must not fire before auth state has been restored from localStorage. */
+ *  must not fire before auth state has been restored from localStorage.
+ *  Safety timeout: if onRehydrateStorage never fires (e.g. migration error
+ *  or storage unavailable), force-unblock after 1.5s so the app doesn't
+ *  hang on the loading screen forever. */
 function HydrationGate({ children }: { children: React.ReactNode }) {
   const hydrated = useAuth((s) => s._hasHydrated);
+
+  useEffect(() => {
+    if (hydrated) return;
+    const t = setTimeout(() => {
+      useAuth.setState({ _hasHydrated: true });
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [hydrated]);
+
   if (!hydrated) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
