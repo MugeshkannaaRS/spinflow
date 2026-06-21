@@ -13,6 +13,7 @@ from app.db.session import get_db
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.masters import Mill
+from app.models.production import Machine
 from app.models.quality_forms import (
     QmCardingWasteStudy, QmSimplexHankTest, QmSliverWrapping,
     QmCardingWrapping, QmClassimatResults, QmBagWeightCheck,
@@ -37,6 +38,41 @@ from app.schemas.quality_forms import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+# ─── Machine lookup (for quality form autocomplete) ──────────────────────────
+
+@router.get("/quality/machines")
+async def list_quality_machines(
+    department: Optional[str] = Query(None),
+    page_size: int = Query(500, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("quality")),
+):
+    """Return machines scoped to this mill — used for Mc No autocomplete in quality forms."""
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id")
+    company_id = scope.get("company_id")
+
+    stmt = select(Machine.id, Machine.code, Machine.name, Machine.department, Machine.machine_type)
+    if mill_id:
+        stmt = stmt.where(Machine.mill_id == mill_id)
+    elif company_id:
+        mills_sub = select(Mill.id).where(Mill.company_id == company_id)
+        stmt = stmt.where(Machine.mill_id.in_(mills_sub))
+
+    if department:
+        stmt = stmt.where(Machine.department.ilike(f"%{department}%"))
+
+    stmt = stmt.order_by(Machine.code).limit(page_size)
+    rows = (await db.execute(stmt)).all()
+    return {
+        "data": [
+            {"id": r.id, "code": r.code, "name": r.name,
+             "department": r.department, "machine_type": r.machine_type}
+            for r in rows
+        ]
+    }
 
 
 # ─── Helpers ────────────────────────────────────────────────────────

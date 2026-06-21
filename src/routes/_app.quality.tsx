@@ -429,29 +429,31 @@ function QualityPage() {
                 />
 
                 {/* ── Carding Waste % Study ── */}
+                {/* Paper form: header section (date/lot/delivery hank/speeds) at top,
+                    then per-machine rows (mc_no, empty can, gross, waste weights, total%) */}
                 <QmFormsTab
                   title="Carding Waste % Study"
                   endpoint="/quality/v2/carding/waste-study"
                   department="carding"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Card Mc No" },
                     { key: "shift_code", label: "Shift" },
                     { key: "lot_no", label: "Process/Lot" },
-                    { key: "delivery_hank", label: "Delivery Hank" },
-                    { key: "licker_in_speed", label: "Licker-in Speed" },
-                    { key: "cylinder_speed", label: "Cylinder Speed" },
-                    { key: "flats_speed", label: "Flats Speed" },
+                    { key: "delivery_hank", label: "Del. Hank" },
+                    { key: "licker_in_speed", label: "Licker-in Spd" },
+                    { key: "cylinder_speed", label: "Cylinder Spd" },
+                    { key: "flats_speed", label: "Flats Spd" },
                     { key: "delivery_speed", label: "Del. Speed (mpm)" },
                     { key: "wing_setting", label: "Wing Setting" },
+                    { key: "machine_no", label: "Card Mc No" },
                     { key: "empty_can_kg", label: "Empty Can (kg)" },
-                    { key: "sliver_can_gross_kg", label: "Sliver Can Gross (kg)" },
-                    { key: "total_production_kg", label: "Total Production (kg)" },
-                    { key: "licker_in2_waste_kg", label: "Licker-in II Waste (kg)" },
-                    { key: "licker_in3_waste_kg", label: "Licker-in III Waste (kg)" },
+                    { key: "sliver_can_gross_kg", label: "Sliver Gross (kg)" },
+                    { key: "total_production_kg", label: "Total Prod (kg)" },
+                    { key: "licker_in2_waste_kg", label: "Licker-II (kg)" },
+                    { key: "licker_in3_waste_kg", label: "Licker-III (kg)" },
                     { key: "flat_strips_kg", label: "Flat Strips (kg)" },
-                    { key: "suction_hood_back_kg", label: "Suction Hood Back (kg)" },
-                    { key: "suction_hood_front_kg", label: "Suction Hood Front (kg)" },
+                    { key: "suction_hood_back_kg", label: "Suction Back (kg)" },
+                    { key: "suction_hood_front_kg", label: "Suction Front (kg)" },
                     { key: "total_wastage_pct", label: "Total Wastage %" },
                     { key: "remarks", label: "Remarks" },
                     {
@@ -462,7 +464,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
-                  layout="grid"
+                  layout="rows"
                 />
 
                 {/* ── Daily Carding Wrapping Report ── */}
@@ -1425,7 +1427,7 @@ function useMachines(millId: string | null | undefined, department?: string) {
     queryFn: async () => {
       const p = new URLSearchParams({ page_size: "500" });
       if (department) p.set("department", department);
-      const res = await api.get(`/api/v1/production/machines?${p}`);
+      const res = await api.get(`/api/v1/quality/machines?${p}`);
       const items: any[] = res.data?.data ?? res.data ?? [];
       return items;
     },
@@ -2814,8 +2816,11 @@ function QmRowsEntry({
   }, [columns]);
 
   // Split: shared header vs per-row fields
+  // Waste study: delivery_hank, speeds, wing_setting are shared (same for all machines in a run)
   const SHARED_KEYS = new Set(["date", "shift_code", "lot_no", "count_ne", "ratio", "tm", "rh",
-    "duration_hrs", "cotton_type", "process"]);
+    "duration_hrs", "cotton_type", "process",
+    "delivery_hank", "licker_in_speed", "cylinder_speed", "flats_speed",
+    "delivery_speed", "wing_setting"]);
   const headerFields = formFields.filter((f) => SHARED_KEYS.has(f.key));
   const rowFields = formFields.filter((f) => !SHARED_KEYS.has(f.key) && f.key !== "status");
 
@@ -2865,6 +2870,19 @@ function QmRowsEntry({
     try {
       const payload: Record<string, any> = { ...header };
       rowFields.forEach((f) => { payload[f.key] = parseVal(row[f.key], f.type); });
+      // Live-compute total_wastage_pct for waste study
+      if ("empty_can_kg" in row || "sliver_can_gross_kg" in row) {
+        const gross = parseFloat(row.sliver_can_gross_kg) || 0;
+        const empty = parseFloat(row.empty_can_kg) || 0;
+        const prod = gross - empty;
+        if (prod > 0) {
+          payload.total_production_kg = parseFloat(prod.toFixed(3));
+          const waste = ["licker_in2_waste_kg","licker_in3_waste_kg","flat_strips_kg",
+            "suction_hood_back_kg","suction_hood_front_kg"]
+            .reduce((s, k) => s + (parseFloat(row[k]) || 0), 0);
+          payload.total_wastage_pct = parseFloat((waste / prod * 100).toFixed(2));
+        }
+      }
       if (row._saved && row.id) {
         await api.patch(`/api/v1${endpoint}/${row.id}`, payload);
       } else {
@@ -2960,9 +2978,27 @@ function QmRowsEntry({
                 {allRows.map((row, rowIdx) => (
                   <tr key={row._id ?? row.id} className={["border-b border-border/60", !row._saved ? "bg-primary/5" : "hover:bg-muted/30"].join(" ")}>
                     <td className="px-2 py-1 text-[10px] text-muted-foreground">{rowIdx + 1}</td>
-                    {rowFields.map((field, colIdx) => (
-                      <td key={field.key} className="px-1 py-1">
-                        {row._saved ? (
+                    {rowFields.map((field, colIdx) => {
+                      // Live computed for waste study
+                      const isComputed = field.key === "total_production_kg" || field.key === "total_wastage_pct";
+                      let computedVal: string | null = null;
+                      if (isComputed && !row._saved) {
+                        const gross = parseFloat(row.sliver_can_gross_kg) || 0;
+                        const empty = parseFloat(row.empty_can_kg) || 0;
+                        const prod = gross - empty;
+                        if (field.key === "total_production_kg" && prod > 0) computedVal = prod.toFixed(3);
+                        if (field.key === "total_wastage_pct" && prod > 0) {
+                          const waste = ["licker_in2_waste_kg","licker_in3_waste_kg","flat_strips_kg",
+                            "suction_hood_back_kg","suction_hood_front_kg"]
+                            .reduce((s, k) => s + (parseFloat(row[k]) || 0), 0);
+                          computedVal = (waste / prod * 100).toFixed(2) + "%";
+                        }
+                      }
+                      return (
+                      <td key={field.key} className={["px-1 py-1", isComputed ? "bg-emerald-50/60 dark:bg-emerald-950/10" : ""].join(" ")}>
+                        {computedVal !== null ? (
+                          <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 px-1">{computedVal}</span>
+                        ) : row._saved ? (
                           <span className="text-xs px-1">
                             {row[field.key] == null || row[field.key] === ""
                               ? <span className="text-muted-foreground">—</span>
@@ -2999,7 +3035,8 @@ function QmRowsEntry({
                           />
                         )}
                       </td>
-                    ))}
+                      );
+                    })}
                     {canEdit && (
                       <td className="px-1 py-1">
                         <div className="flex gap-1">
