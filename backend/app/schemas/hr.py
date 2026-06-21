@@ -4,7 +4,7 @@ from datetime import date, datetime
 
 
 class EmployeeCreate(BaseModel):
-    employee_code: str
+    employee_code: Optional[str] = None  # auto-generated if blank
     full_name: str
     sl_no: Optional[int] = None
     employee_id: Optional[str] = None

@@ -19,7 +19,7 @@ from app.db.session import get_db
 from app.core.deps import get_current_user, require_module, log_audit, get_mill_scope
 from app.models.user import User
 from app.models.hr import Employee, Attendance, Leave, MonthlyPayroll, EmployeeCustomField, EmployeeCustomValue
-from app.models.masters import Mill, Department, Company
+from app.models.masters import Mill, Department, Company, MillSettings
 from app.schemas.hr import (
     EmployeeCreate, EmployeeOut, EmployeeUpdate,
     AttendanceCreate, AttendanceOut, AttendanceBulkCreate, AttendanceSummary,
@@ -32,6 +32,38 @@ from app.schemas.hr import (
 )
 
 router = APIRouter()
+
+
+async def _next_emp_code(mill_id: str, db: AsyncSession) -> str:
+    """Generate next sequential employee code for the mill.
+    Gets or creates MillSettings row, increments seq atomically, returns formatted code.
+    """
+    # Lock the settings row for this mill to prevent race conditions
+    stmt = (
+        select(MillSettings)
+        .where(MillSettings.mill_id == mill_id)
+        .with_for_update()
+    )
+    result = await db.execute(stmt)
+    settings = result.scalar_one_or_none()
+
+    if settings is None:
+        # Create default settings row if it doesn't exist yet
+        settings = MillSettings(
+            mill_id=mill_id,
+            emp_code_prefix="EMP",
+            emp_code_last_seq=0,
+            emp_code_digits=4,
+        )
+        db.add(settings)
+        await db.flush()
+
+    settings.emp_code_last_seq = (settings.emp_code_last_seq or 0) + 1
+    seq = settings.emp_code_last_seq
+    digits = settings.emp_code_digits or 4
+    prefix = settings.emp_code_prefix or "EMP"
+
+    return f"{prefix}-{str(seq).zfill(digits)}"
 
 
 # ── Employees ──────────────────────────────────────────────────────────────
@@ -246,8 +278,13 @@ async def create_employee(
         if not ok:
             raise HTTPException(status_code=403, detail=msg)
 
+    # Auto-generate employee code if not provided
+    emp_code = (req.employee_code or "").strip()
+    if not emp_code:
+        emp_code = await _next_emp_code(mill_id, db)
+
     emp = Employee(
-        code=req.employee_code,
+        code=emp_code,
         name=req.full_name,
         sl_no=req.sl_no,
         employee_id=req.employee_id,

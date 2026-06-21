@@ -256,5 +256,9 @@ class MillSettings(Base):
     production_target_kg: Mapped[float] = mapped_column(Float, default=0)
     currency: Mapped[str] = mapped_column(String(10), default="INR")
     timezone: Mapped[str] = mapped_column(String(50), default="Asia/Kolkata")
+    # Employee code auto-generation
+    emp_code_prefix: Mapped[str] = mapped_column(String(20), default="EMP")
+    emp_code_last_seq: Mapped[int] = mapped_column(Integer, default=0)
+    emp_code_digits: Mapped[int] = mapped_column(Integer, default=4)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
