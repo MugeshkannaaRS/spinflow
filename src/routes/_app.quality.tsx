@@ -1427,7 +1427,7 @@ function useMachines(millId: string | null | undefined, department?: string) {
     queryFn: async () => {
       const p = new URLSearchParams({ page_size: "500" });
       if (department) p.set("department", department);
-      const res = await api.get(`/api/v1/quality/machines?${p}`);
+      const res = await api.get(`/quality/machines?${p}`);
       const items: any[] = res.data?.data ?? res.data ?? [];
       return items;
     },
@@ -1767,10 +1767,10 @@ function QmGridDialog({
         if (wastePct != null) payload.total_wastage_pct = parseFloat(wastePct.toFixed(2));
       }
       if (editRecord?.id) {
-        await api.patch(`/api/v1${endpoint}/${editRecord.id}`, payload);
+        await api.patch(`${endpoint}/${editRecord.id}`, payload);
         toast.success("Updated");
       } else {
-        await api.post(`/api/v1${endpoint}`, payload);
+        await api.post(`${endpoint}`, payload);
         toast.success("Saved");
       }
       qc.invalidateQueries({ queryKey: ["qm-tab", endpoint] });
@@ -1901,10 +1901,10 @@ function QmSheetDialog({
       if (hasSide) payload.side = form.side || null;
       if (hasProcess) payload.process = form.process || null;
       if (editRecord?.id) {
-        await api.patch(`/api/v1${endpoint}/${editRecord.id}`, payload);
+        await api.patch(`${endpoint}/${editRecord.id}`, payload);
         toast.success("Updated");
       } else {
-        await api.post(`/api/v1${endpoint}`, payload);
+        await api.post(`${endpoint}`, payload);
         toast.success("Saved");
       }
       qc.invalidateQueries({ queryKey: ["qm-tab", endpoint] });
@@ -2098,7 +2098,7 @@ function QmFormsTab({
     queryKey: ["qm-tab", endpoint, millId, filterDate],
     queryFn: async () => {
       const p = new URLSearchParams({ page_size: "200", date: filterDate });
-      const res = await api.get(`/api/v1${endpoint}?${p}`);
+      const res = await api.get(`${endpoint}?${p}`);
       return (res.data?.data ?? res.data ?? []) as any[];
     },
     enabled: !!millId,
@@ -2111,7 +2111,7 @@ function QmFormsTab({
 
   const handleDelete = async (row: any) => {
     try {
-      await api.delete(`/api/v1${endpoint}/${row.id}`);
+      await api.delete(`${endpoint}/${row.id}`);
       toast.success("Deleted");
       qc.invalidateQueries({ queryKey: ["qm-tab", endpoint] });
     } catch { toast.error("Delete failed"); }
