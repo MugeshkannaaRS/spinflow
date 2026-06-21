@@ -5,7 +5,7 @@ import {
   Settings2, Save, RefreshCw, Plus, X, Building2, Users, ShieldCheck, Tag,
 } from "lucide-react";
 import { useAuth } from "@/stores/auth";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
