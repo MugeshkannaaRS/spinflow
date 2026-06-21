@@ -2518,6 +2518,13 @@ const RF_DEFAULT_CATEGORIES = [
   { id: "maintenance_assi", category: "maintenance_assi", label: "Maintenance Assistant" },
 ];
 
+type ManpowerAssignment = {
+  name: string;
+  emp_id?: string;
+  mc_from?: string;
+  mc_to?: string;
+};
+
 type ManpowerRow = {
   category: string;
   categoryLabel: string;
@@ -2528,6 +2535,8 @@ type ManpowerRow = {
   supervisor: string;
   // coverage ratio: how many machines does 1 person cover (e.g. 6 for Robo Doffer)
   machinesPerPerson: string;
+  // per-person assignments (expanded panel)
+  assignments: ManpowerAssignment[];
 };
 
 function buildManpowerRows(categories: { category: string; label: string }[]): ManpowerRow[] {
@@ -2540,6 +2549,7 @@ function buildManpowerRows(categories: { category: string; label: string }[]): M
     headcount: "",
     supervisor: "",
     machinesPerPerson: "",
+    assignments: [],
   }));
 }
 
@@ -2850,6 +2860,41 @@ function ManpowerGrid() {
       return next;
     });
 
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const toggleExpanded = (idx: number) =>
+    setExpandedRows((prev) => {
+      const s = new Set(prev);
+      s.has(idx) ? s.delete(idx) : s.add(idx);
+      return s;
+    });
+
+  const updateAssignment = (rowIdx: number, aIdx: number, field: keyof ManpowerAssignment, value: string) =>
+    setRows((prev) => {
+      const next = [...prev];
+      const assignments = [...next[rowIdx].assignments];
+      assignments[aIdx] = { ...assignments[aIdx], [field]: value };
+      next[rowIdx] = { ...next[rowIdx], assignments };
+      return next;
+    });
+
+  const addAssignment = (rowIdx: number) =>
+    setRows((prev) => {
+      const next = [...prev];
+      next[rowIdx] = {
+        ...next[rowIdx],
+        assignments: [...next[rowIdx].assignments, { name: "", emp_id: "", mc_from: "", mc_to: "" }],
+      };
+      return next;
+    });
+
+  const removeAssignment = (rowIdx: number, aIdx: number) =>
+    setRows((prev) => {
+      const next = [...prev];
+      const assignments = next[rowIdx].assignments.filter((_, i) => i !== aIdx);
+      next[rowIdx] = { ...next[rowIdx], assignments };
+      return next;
+    });
+
   const totalHeadcount = useMemo(() => {
     const fi = manpowerMode === "individual" && selectedMachineFrom
       ? mpMachines.findIndex((m: any) => m.code === selectedMachineFrom) : -1;
@@ -2896,6 +2941,7 @@ function ManpowerGrid() {
           headcount: String(match.headcount ?? ""),
           supervisor: match.supervisor ?? "",
           machinesPerPerson: match.machines_per_person ? String(match.machines_per_person) : "",
+          assignments: Array.isArray(match.assignments) ? match.assignments : [],
         };
       }),
     );
@@ -2937,6 +2983,7 @@ function ManpowerGrid() {
                 headcount: computedHc,
                 supervisor: r.supervisor || undefined,
                 machines_per_person: mpp || undefined,
+                assignments: r.assignments.length > 0 ? r.assignments : undefined,
               };
             }),
           },
@@ -2973,6 +3020,7 @@ function ManpowerGrid() {
                 headcount: computedHc,
                 supervisor: r.supervisor || undefined,
                 machines_per_person: mpp || undefined,
+                assignments: r.assignments.length > 0 ? r.assignments : undefined,
               };
             }),
           },
@@ -3422,13 +3470,98 @@ function ManpowerGrid() {
                           )}
                         </div>
                       </TableCell>
+                      {/* Supervisor / expand toggle */}
                       <TableCell>
-                        <Input
-                          value={row.supervisor}
-                          onChange={(e) => updateRow(idx, "supervisor", e.target.value)}
-                          placeholder="Name (optional)"
-                          className="h-8 text-sm w-full"
-                        />
+                        <div className="flex items-center gap-2">
+                          <Input
+                            value={row.supervisor}
+                            onChange={(e) => updateRow(idx, "supervisor", e.target.value)}
+                            placeholder="Incharge name"
+                            className="h-8 text-sm flex-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!expandedRows.has(idx) && row.assignments.length === 0) {
+                                // pre-populate N slots matching headcount
+                                const hc = autoHc ?? Number(row.headcount) ?? 0;
+                                setRows((prev) => {
+                                  const next = [...prev];
+                                  next[idx] = {
+                                    ...next[idx],
+                                    assignments: Array.from({ length: hc }, () => ({
+                                      name: "",
+                                      emp_id: "",
+                                      mc_from: "",
+                                      mc_to: "",
+                                    })),
+                                  };
+                                  return next;
+                                });
+                              }
+                              toggleExpanded(idx);
+                            }}
+                            className={`shrink-0 flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${
+                              expandedRows.has(idx)
+                                ? "bg-blue-50 border-blue-300 text-blue-700"
+                                : "border-border text-muted-foreground hover:bg-muted"
+                            }`}
+                            title="Assign individual workers"
+                          >
+                            <Users2 className="size-3" />
+                            {row.assignments.filter((a) => a.name.trim()).length > 0
+                              ? row.assignments.filter((a) => a.name.trim()).length
+                              : "+"}
+                          </button>
+                        </div>
+                        {/* ── Expandable assignments panel ── */}
+                        {expandedRows.has(idx) && (
+                          <div className="mt-2 space-y-1.5 pl-1 border-l-2 border-blue-200">
+                            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">
+                              Individual assignments
+                            </p>
+                            {row.assignments.map((a, aIdx) => (
+                              <div key={aIdx} className="flex items-center gap-1.5">
+                                <span className="text-[10px] text-muted-foreground w-4 shrink-0 text-right">
+                                  {aIdx + 1}.
+                                </span>
+                                <Input
+                                  value={a.name}
+                                  onChange={(e) => updateAssignment(idx, aIdx, "name", e.target.value)}
+                                  placeholder="Name / ID"
+                                  className="h-7 text-xs flex-1 min-w-0"
+                                />
+                                <Input
+                                  value={a.mc_from ?? ""}
+                                  onChange={(e) => updateAssignment(idx, aIdx, "mc_from", e.target.value)}
+                                  placeholder="From"
+                                  className="h-7 text-xs w-20 font-mono"
+                                />
+                                <span className="text-[10px] text-muted-foreground">→</span>
+                                <Input
+                                  value={a.mc_to ?? ""}
+                                  onChange={(e) => updateAssignment(idx, aIdx, "mc_to", e.target.value)}
+                                  placeholder="To"
+                                  className="h-7 text-xs w-20 font-mono"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removeAssignment(idx, aIdx)}
+                                  className="text-muted-foreground hover:text-destructive shrink-0"
+                                >
+                                  <X className="size-3" />
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              type="button"
+                              onClick={() => addAssignment(idx)}
+                              className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1"
+                            >
+                              <Plus className="size-3" /> Add person
+                            </button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

@@ -119,6 +119,14 @@ RF_CATEGORY_LABELS: Dict[str, str] = {
 }
 
 
+class ManpowerAssignment(BaseModel):
+    """One person's assignment within a manpower category row."""
+    name: str
+    emp_id: Optional[str] = None
+    mc_from: Optional[str] = None
+    mc_to: Optional[str] = None
+
+
 class RFManpowerCreate(BaseModel):
     # date/shift optional here — inherited from parent RFManpowerBulkCreate
     date: Optional[str] = None
@@ -130,6 +138,8 @@ class RFManpowerCreate(BaseModel):
     headcount: int = Field(..., ge=0)
     supervisor: Optional[str] = None
     remarks: Optional[str] = None
+    machines_per_person: Optional[int] = None
+    assignments: Optional[List[ManpowerAssignment]] = None
 
 
 class RFManpowerBulkCreate(BaseModel):
@@ -150,6 +160,8 @@ class RFManpowerOut(BaseModel):
     headcount: int
     supervisor: Optional[str] = None
     remarks: Optional[str] = None
+    machines_per_person: Optional[int] = None
+    assignments: Optional[List[dict]] = None
     created_at: Optional[datetime] = None
 
     class Config:

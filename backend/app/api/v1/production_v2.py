@@ -563,11 +563,17 @@ async def upsert_rf_manpower_bulk(
                 )
             ).scalar_one_or_none()
 
+            assignments_data = (
+                [a.model_dump() for a in row.assignments] if row.assignments else None
+            )
             if existing:
                 existing.headcount = row.headcount
                 existing.total_machines = row.total_machines
                 existing.mc_id_to = row.mc_id_to
                 existing.supervisor = row.supervisor
+                existing.machines_per_person = row.machines_per_person
+                if assignments_data is not None:
+                    existing.assignments = assignments_data
             else:
                 db.add(RFManpowerPlan(
                     id=generate_uuid(),
@@ -581,6 +587,8 @@ async def upsert_rf_manpower_bulk(
                     headcount=row.headcount,
                     supervisor=row.supervisor,
                     remarks=row.remarks,
+                    machines_per_person=row.machines_per_person,
+                    assignments=assignments_data or [],
                 ))
             upserted += 1
         except Exception as e:

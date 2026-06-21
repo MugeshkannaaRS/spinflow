@@ -70,6 +70,10 @@ class RFManpowerPlan(Base):
     headcount: Mapped[int] = mapped_column(Integer, default=0)
     supervisor: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Coverage ratio: how many machines does 1 person cover (e.g. 6 for Robo Doffer)
+    machines_per_person: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Per-person assignments: [{name, emp_id, mc_from, mc_to}]
+    assignments: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
