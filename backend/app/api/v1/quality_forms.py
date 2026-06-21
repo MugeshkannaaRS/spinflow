@@ -17,6 +17,12 @@ from app.models.quality_forms import (
     QmCardingWasteStudy, QmSimplexHankTest, QmSliverWrapping,
     QmCardingWrapping, QmClassimatResults, QmBagWeightCheck,
     QmPaperConeCheck, QmRfCspReport,
+    # v2 generic models
+    QmCardingCvRecord, QmDrawingCvRecord, QmAPctCheck,
+    QmSimplexBreakageStudy, QmSimplexStretchPct,
+    QmRfBreakageStudy, QmRfSnapStudy,
+    QmYarnFaultsUster, QmSpliceStrength, QmWaxPickup,
+    QmBagFaults, QmBlendTest, QmPwseCheck,
 )
 from app.schemas.quality_forms import (
     WasteStudyCreate, WasteStudyResponse,
@@ -610,3 +616,162 @@ async def quality_forms_summary(
     except Exception as e:
         logger.error(f"quality_forms summary error: {e}")
         return {"total_tests": 0, "pending_approvals": 0}
+
+
+# ═══════════════════════════════════════════════════════════════════
+# GENERIC v2 ENDPOINTS
+# ─────────────────────────────────────────────────────────────────
+# These serve the QmFormsTab generic React component which POSTs an
+# arbitrary dict of field keys/values.  We accept Any payload, set
+# mill_id/company_id from scope, and persist via SQLAlchemy's
+# __table__.columns inspection so we don't need a typed Pydantic
+# schema per form.
+# ═══════════════════════════════════════════════════════════════════
+
+from typing import Dict, Type
+from sqlalchemy.orm import DeclarativeBase
+
+# Route slug → SQLAlchemy model
+_V2_MODEL_MAP: Dict[str, Any] = {
+    "carding/cv-record":         QmCardingCvRecord,
+    "drawing/cv-record":         QmDrawingCvRecord,
+    "drawing/a-pct":             QmAPctCheck,
+    "simplex/breakage-study":    QmSimplexBreakageStudy,
+    "simplex/stretch-pct":       QmSimplexStretchPct,
+    "ring-frame/breakage-study": QmRfBreakageStudy,
+    "ring-frame/snap-study":     QmRfSnapStudy,
+    "auto-coner/yarn-faults":    QmYarnFaultsUster,
+    "auto-coner/splice-strength":QmSpliceStrength,
+    "auto-coner/wax-pickup":     QmWaxPickup,
+    "auto-coner/bag-faults":     QmBagFaults,
+    "packing/blend-test":        QmBlendTest,
+    "packing/pwse-check":        QmPwseCheck,
+}
+
+
+def _model_cols(model) -> set:
+    """Return the set of column names on a model (excluding id/mill_id/company_id/timestamps)."""
+    reserved = {"id", "mill_id", "company_id", "created_at", "updated_at"}
+    return {c.key for c in model.__table__.columns if c.key not in reserved}
+
+
+async def _v2_list(slug: str, db: AsyncSession, current_user: User,
+                   date: Optional[str], lot_no: Optional[str],
+                   machine_no: Optional[str], page: int, page_size: int):
+    model = _V2_MODEL_MAP[slug]
+    q = select(model)
+    q, _ = await _apply_scope(db, current_user, model, q)
+    cols = _model_cols(model)
+    if date and "date" in cols:
+        q = q.where(model.date == date)
+    if lot_no and "lot_no" in cols:
+        q = q.where(model.lot_no == lot_no)
+    if machine_no and "machine_no" in cols:
+        q = q.where(model.machine_no == machine_no)
+    return await _paginate(db, q, page, page_size)
+
+
+async def _v2_create(slug: str, payload: Dict[str, Any],
+                     db: AsyncSession, current_user: User):
+    model = _V2_MODEL_MAP[slug]
+    scope = await get_mill_scope(current_user, db)
+    allowed = _model_cols(model)
+    kwargs = {k: v for k, v in payload.items() if k in allowed}
+    kwargs["mill_id"] = scope.get("mill_id") or ""
+    if scope.get("company_id"):
+        kwargs["company_id"] = scope["company_id"]
+    kwargs.setdefault("status", "draft")
+    record = model(**kwargs)
+    db.add(record)
+    await db.flush()
+    await db.refresh(record)
+    return record
+
+
+async def _v2_update(slug: str, record_id: str, payload: Dict[str, Any],
+                     db: AsyncSession, current_user: User):
+    model = _V2_MODEL_MAP[slug]
+    q = select(model).where(model.id == record_id)
+    q, _ = await _apply_scope(db, current_user, model, q)
+    record = (await db.execute(q)).scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found")
+    allowed = _model_cols(model)
+    for k, v in payload.items():
+        if k in allowed:
+            setattr(record, k, v)
+    await db.flush()
+    await db.refresh(record)
+    return record
+
+
+async def _v2_delete(slug: str, record_id: str,
+                     db: AsyncSession, current_user: User):
+    model = _V2_MODEL_MAP[slug]
+    q = select(model).where(model.id == record_id)
+    q, _ = await _apply_scope(db, current_user, model, q)
+    record = (await db.execute(q)).scalar_one_or_none()
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found")
+    await db.delete(record)
+    return {"deleted": record_id}
+
+
+# ── Generate one set of 4 routes per slug ──────────────────────────
+
+for _slug in _V2_MODEL_MAP:
+
+    # capture for closure
+    def _make_list(slug=_slug):
+        @router.get(f"/quality/v2/{slug}", tags=["quality-v2"])
+        async def list_v2(
+            date: Optional[str] = Query(None),
+            lot_no: Optional[str] = Query(None),
+            machine_no: Optional[str] = Query(None),
+            page: int = Query(1, ge=1),
+            page_size: int = Query(20, ge=1, le=1000),
+            db: AsyncSession = Depends(get_db),
+            current_user: User = Depends(require_module("quality")),
+        ):
+            return await _v2_list(slug, db, current_user, date, lot_no, machine_no, page, page_size)
+        list_v2.__name__ = f"list_v2_{slug.replace('/', '_')}"
+        return list_v2
+
+    def _make_create(slug=_slug):
+        @router.post(f"/quality/v2/{slug}", tags=["quality-v2"])
+        async def create_v2(
+            payload: Dict[str, Any],
+            db: AsyncSession = Depends(get_db),
+            current_user: User = Depends(require_module("quality", write=True)),
+        ):
+            return await _v2_create(slug, payload, db, current_user)
+        create_v2.__name__ = f"create_v2_{slug.replace('/', '_')}"
+        return create_v2
+
+    def _make_update(slug=_slug):
+        @router.patch(f"/quality/v2/{slug}/{{record_id}}", tags=["quality-v2"])
+        async def update_v2(
+            record_id: str,
+            payload: Dict[str, Any],
+            db: AsyncSession = Depends(get_db),
+            current_user: User = Depends(require_module("quality", write=True)),
+        ):
+            return await _v2_update(slug, record_id, payload, db, current_user)
+        update_v2.__name__ = f"update_v2_{slug.replace('/', '_')}"
+        return update_v2
+
+    def _make_delete(slug=_slug):
+        @router.delete(f"/quality/v2/{slug}/{{record_id}}", tags=["quality-v2"])
+        async def delete_v2(
+            record_id: str,
+            db: AsyncSession = Depends(get_db),
+            current_user: User = Depends(require_module("quality", write=True)),
+        ):
+            return await _v2_delete(slug, record_id, db, current_user)
+        delete_v2.__name__ = f"delete_v2_{slug.replace('/', '_')}"
+        return delete_v2
+
+    _make_list()
+    _make_create()
+    _make_update()
+    _make_delete()

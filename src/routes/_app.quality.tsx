@@ -384,29 +384,35 @@ function QualityPage() {
             {/* ── Department tabs ── */}
             <TabsContent value="carding">
               <div className="space-y-4">
+                {/* ── Carding CV% Record (Uster multi-length) ── */}
                 <QmFormsTab
-                  title="CV% Records"
+                  title="CV% Records (Carding)"
                   endpoint="/quality/v2/carding/cv-record"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Machine" },
+                    { key: "machine_no", label: "Card Mc No" },
                     { key: "shift_code", label: "Shift" },
-                    { key: "lot_no", label: "Lot No" },
-                    { key: "cv_1m", label: "CV 1m" },
-                    { key: "cv_2m", label: "CV 2m" },
-                    { key: "cv_5m", label: "CV 5m" },
+                    { key: "lot_no", label: "Process/Lot" },
+                    { key: "cotton_type", label: "Cotton" },
+                    { key: "delivery_speed", label: "Del. Speed (mpm)" },
+                    { key: "cv_1m", label: "CV 1m %" },
+                    { key: "cv_2m", label: "CV 2m %" },
+                    { key: "cv_5m", label: "CV 5m %" },
+                    { key: "cv_10m", label: "CV 10m %" },
+                    { key: "cv_20m", label: "CV 20m %" },
+                    { key: "cv_50m", label: "CV 50m %" },
+                    { key: "cv_100m", label: "CV 100m %" },
                     {
                       key: "within_spec",
                       label: "OK?",
                       render: (r: any) =>
                         r.within_spec ? (
-                          <Badge variant="outline" className="text-green-600">
-                            Yes
-                          </Badge>
+                          <Badge variant="outline" className="text-green-600">OK</Badge>
                         ) : (
-                          <Badge variant="destructive">No</Badge>
+                          <Badge variant="destructive">NG</Badge>
                         ),
                     },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -416,17 +422,32 @@ function QualityPage() {
                   millId={millId}
                   canEdit={canEdit}
                 />
+
+                {/* ── Carding Waste % Study ── */}
                 <QmFormsTab
-                  title="Waste Study"
+                  title="Carding Waste % Study"
                   endpoint="/quality-forms/waste-study"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Machine" },
+                    { key: "machine_no", label: "Card Mc No" },
                     { key: "shift_code", label: "Shift" },
-                    { key: "lot_no", label: "Lot No" },
+                    { key: "lot_no", label: "Process/Lot" },
                     { key: "delivery_hank", label: "Delivery Hank" },
-                    { key: "total_production_kg", label: "Production (kg)" },
-                    { key: "total_wastage_pct", label: "Wastage %" },
+                    { key: "licker_in_speed", label: "Licker-in Speed" },
+                    { key: "cylinder_speed", label: "Cylinder Speed" },
+                    { key: "flats_speed", label: "Flats Speed" },
+                    { key: "delivery_speed", label: "Del. Speed (mpm)" },
+                    { key: "wing_setting", label: "Wing Setting" },
+                    { key: "empty_can_kg", label: "Empty Can (kg)" },
+                    { key: "sliver_can_gross_kg", label: "Sliver Can Gross (kg)" },
+                    { key: "total_production_kg", label: "Total Production (kg)" },
+                    { key: "licker_in2_waste_kg", label: "Licker-in II Waste (kg)" },
+                    { key: "licker_in3_waste_kg", label: "Licker-in III Waste (kg)" },
+                    { key: "flat_strips_kg", label: "Flat Strips (kg)" },
+                    { key: "suction_hood_back_kg", label: "Suction Hood Back (kg)" },
+                    { key: "suction_hood_front_kg", label: "Suction Hood Front (kg)" },
+                    { key: "total_wastage_pct", label: "Total Wastage %" },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -436,16 +457,38 @@ function QualityPage() {
                   millId={millId}
                   canEdit={canEdit}
                 />
+
+                {/* ── Daily Carding Wrapping Report ── */}
                 <QmFormsTab
-                  title="Sliver Wrapping"
+                  title="Daily Carding Wrapping Report"
                   endpoint="/quality-forms/carding-wrapping"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Machine" },
+                    { key: "machine_no", label: "Mc No" },
                     { key: "shift_code", label: "Shift" },
+                    { key: "lot_no", label: "Lot No" },
+                    { key: "line_no", label: "Line No" },
+                    { key: "time_taken", label: "Time" },
                     { key: "std_hank", label: "Std Hank" },
+                    { key: "r1", label: "R1 (g)" },
+                    { key: "r2", label: "R2 (g)" },
+                    { key: "r3", label: "R3 (g)" },
+                    { key: "r4", label: "R4 (g)" },
+                    { key: "r5", label: "R5 (g)" },
+                    { key: "avg_weight", label: "Avg Weight (g)" },
                     { key: "actual_hank", label: "Actual Hank" },
-                    { key: "cv_pct", label: "CV%" },
+                    { key: "cv_pct", label: "CV %" },
+                    {
+                      key: "ok_input",
+                      label: "OK/Input",
+                      render: (r: any) =>
+                        r.ok_input ? (
+                          <Badge variant="outline" className="text-green-600">OK</Badge>
+                        ) : (
+                          <Badge variant="destructive">Input</Badge>
+                        ),
+                    },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -460,17 +503,26 @@ function QualityPage() {
 
             <TabsContent value="drawing">
               <div className="space-y-4">
+                {/* ── Drawing CV Record (Uster multi-length) ── */}
                 <QmFormsTab
                   title="Drawing CV Records"
                   endpoint="/quality/v2/drawing/cv-record"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Machine" },
+                    { key: "machine_no", label: "Mc No" },
                     { key: "shift_code", label: "Shift" },
-                    { key: "process", label: "Process" },
                     { key: "lot_no", label: "Lot No" },
+                    { key: "cotton_type", label: "Cotton" },
+                    { key: "process", label: "Process (BD/FD)" },
+                    { key: "side", label: "Side (L/R)" },
+                    { key: "delivery_speed", label: "Del. Speed" },
                     { key: "a_pct", label: "A%" },
                     { key: "cv_pct", label: "CV%" },
+                    { key: "mcv_pct", label: "mCV%" },
+                    { key: "cv_1m", label: "CV 1m" },
+                    { key: "cv_3m", label: "CV 3m" },
+                    { key: "cv_5m", label: "CV 5m" },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -480,28 +532,46 @@ function QualityPage() {
                   millId={millId}
                   canEdit={canEdit}
                 />
+
+                {/* ── A% Check (Auto-Leveller Performance) ── */}
                 <QmFormsTab
                   title="A% Check (Auto-Leveller)"
                   endpoint="/quality/v2/drawing/a-pct"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Machine" },
+                    { key: "machine_no", label: "Mc No" },
                     { key: "lot_no", label: "Lot No" },
+                    { key: "cotton_type", label: "Cotton" },
                     { key: "process", label: "Process" },
+                    { key: "feed_hank", label: "Feed Hank" },
+                    { key: "delivery_hank", label: "Delivery Hank" },
+                    { key: "doubling", label: "Doubling" },
+                    { key: "levelling_action_point", label: "Levelling Action Pt" },
+                    { key: "levelling_intensity", label: "Levelling Intensity" },
+                    { key: "r1", label: "R1" },
+                    { key: "r2", label: "R2" },
+                    { key: "r3", label: "R3" },
+                    { key: "r4", label: "R4" },
+                    { key: "r5", label: "R5" },
+                    { key: "r6", label: "R6" },
+                    { key: "r7", label: "R7" },
+                    { key: "r8", label: "R8" },
+                    { key: "r9", label: "R9" },
+                    { key: "r10", label: "R10" },
+                    { key: "avg_hank", label: "Avg Hank" },
                     { key: "a_pct_n_plus", label: "A% N+" },
                     { key: "a_pct_n_minus", label: "A% N-" },
                     {
                       key: "within_spec",
-                      label: "OK?",
+                      label: "Within Spec?",
                       render: (r: any) =>
                         r.within_spec ? (
-                          <Badge variant="outline" className="text-green-600">
-                            Yes
-                          </Badge>
+                          <Badge variant="outline" className="text-green-600">OK</Badge>
                         ) : (
-                          <Badge variant="destructive">No</Badge>
+                          <Badge variant="destructive">NG</Badge>
                         ),
                     },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -511,18 +581,39 @@ function QualityPage() {
                   millId={millId}
                   canEdit={canEdit}
                 />
+
+                {/* ── Daily Sliver Wrapping Report (Breaker/Finisher Drawing) ── */}
                 <QmFormsTab
-                  title="Sliver Wrapping (BD/FD)"
+                  title="Daily Sliver Wrapping Report (BD/FD)"
                   endpoint="/quality-forms/sliver-wrapping"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Machine" },
+                    { key: "machine_no", label: "Mc No" },
                     { key: "shift_code", label: "Shift" },
                     { key: "lot_no", label: "Lot No" },
-                    { key: "process", label: "Process" },
+                    { key: "process", label: "Process (BD/FD)" },
+                    { key: "side", label: "Side (L/R)" },
+                    { key: "time_taken", label: "Time" },
                     { key: "std_hank", label: "Std Hank" },
+                    { key: "r1", label: "R1 (g)" },
+                    { key: "r2", label: "R2 (g)" },
+                    { key: "r3", label: "R3 (g)" },
+                    { key: "r4", label: "R4 (g)" },
+                    { key: "r5", label: "R5 (g)" },
+                    { key: "avg_weight", label: "Avg Wt (g)" },
                     { key: "actual_hank", label: "Actual Hank" },
-                    { key: "hank_cv_pct", label: "CV%" },
+                    { key: "hank_cv_pct", label: "Hank CV%" },
+                    {
+                      key: "ok_input",
+                      label: "OK/Input",
+                      render: (r: any) =>
+                        r.ok_input ? (
+                          <Badge variant="outline" className="text-green-600">OK</Badge>
+                        ) : (
+                          <Badge variant="destructive">Input</Badge>
+                        ),
+                    },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -537,29 +628,26 @@ function QualityPage() {
 
             <TabsContent value="simplex">
               <div className="space-y-4">
+                {/* ── Simplex Hank Test ── */}
                 <QmFormsTab
-                  title="Hank Test"
+                  title="Simplex Hank Test"
                   endpoint="/quality-forms/simplex-hank"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Machine" },
+                    { key: "machine_no", label: "Simplex No" },
                     { key: "shift_code", label: "Shift" },
                     { key: "lot_no", label: "Lot No" },
+                    { key: "cotton_type", label: "Cotton" },
+                    { key: "process", label: "Process" },
                     { key: "nominal_hank", label: "Nominal Hank" },
+                    { key: "r1", label: "R1 (g)" },
+                    { key: "r2", label: "R2 (g)" },
+                    { key: "r3", label: "R3 (g)" },
+                    { key: "r4", label: "R4 (g)" },
+                    { key: "r5", label: "R5 (g)" },
                     { key: "actual_hank", label: "Actual Hank" },
                     { key: "cv_pct", label: "CV%" },
-                    {
-                      key: "within_spec",
-                      label: "OK?",
-                      render: (r: any) =>
-                        r.within_spec ? (
-                          <Badge variant="outline" className="text-green-600">
-                            Yes
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive">No</Badge>
-                        ),
-                    },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -569,16 +657,35 @@ function QualityPage() {
                   millId={millId}
                   canEdit={canEdit}
                 />
+
+                {/* ── Simplex Breakage Study ── */}
                 <QmFormsTab
-                  title="Breakage Study"
+                  title="Simplex Breakage Study"
                   endpoint="/quality/v2/simplex/breakage-study"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Machine" },
+                    { key: "machine_no", label: "Simplex No" },
                     { key: "lot_no", label: "Lot No" },
+                    { key: "cotton_type", label: "Cotton" },
+                    { key: "process", label: "Process" },
+                    { key: "spl_speed", label: "Spl. Speed" },
+                    { key: "time_start", label: "Time Start" },
+                    { key: "time_end", label: "Time End" },
+                    { key: "duration_hrs", label: "Duration (hrs)" },
+                    { key: "feed_hank", label: "Feed Hank" },
+                    { key: "delivery_hank", label: "Delivery Hank" },
+                    { key: "tpi", label: "TPI" },
+                    { key: "tm", label: "TM" },
+                    { key: "creel_breaks", label: "Creel Breaks" },
+                    { key: "top_roller_lapping", label: "Top Roller Lapping" },
+                    { key: "bottom_roller_lapping", label: "Bottom Roller Lapping" },
+                    { key: "slub_breaks", label: "Slub Breaks" },
+                    { key: "multiple_end_breaks", label: "Multiple End Breaks" },
+                    { key: "other_breaks", label: "Other Breaks" },
                     { key: "total_breaks", label: "Total Breaks" },
                     { key: "active_spindles", label: "Active Spindles" },
                     { key: "breaks_per_100spl_hrs", label: "Breaks/100 Spl-Hr" },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -588,26 +695,27 @@ function QualityPage() {
                   millId={millId}
                   canEdit={canEdit}
                 />
+
+                {/* ── Simplex Stretch % ── */}
                 <QmFormsTab
-                  title="Stretch %"
+                  title="Simplex Stretch %"
                   endpoint="/quality/v2/simplex/stretch-pct"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Machine" },
+                    { key: "machine_no", label: "Simplex No" },
                     { key: "shift_code", label: "Shift" },
                     { key: "avg_stretch_pct", label: "Avg Stretch %" },
                     {
                       key: "within_spec",
-                      label: "OK?",
+                      label: "Within Spec?",
                       render: (r: any) =>
                         r.within_spec ? (
-                          <Badge variant="outline" className="text-green-600">
-                            Yes
-                          </Badge>
+                          <Badge variant="outline" className="text-green-600">OK</Badge>
                         ) : (
-                          <Badge variant="destructive">No</Badge>
+                          <Badge variant="destructive">NG</Badge>
                         ),
                     },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -622,30 +730,73 @@ function QualityPage() {
 
             <TabsContent value="ringframe">
               <div className="space-y-4">
+                {/* ── CSP Strength Report ── */}
                 <QmFormsTab
-                  title="CSP Reports"
+                  title="CSP Strength Report"
                   endpoint="/quality-forms/csp-strength"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Machine" },
+                    { key: "machine_no", label: "Mc No" },
                     { key: "lot_no", label: "Lot No" },
                     { key: "count_ne", label: "Count Ne" },
+                    { key: "ratio", label: "Ratio" },
                     { key: "tm", label: "TM" },
                     { key: "tpi", label: "TPI" },
+                    { key: "s1_strength", label: "S1 Str (gf)" },
+                    { key: "s1_weight", label: "S1 Wt (g)" },
+                    { key: "s1_count", label: "S1 Ne" },
+                    { key: "s1_csp", label: "S1 CSP" },
+                    { key: "s2_strength", label: "S2 Str" },
+                    { key: "s2_weight", label: "S2 Wt" },
+                    { key: "s2_count", label: "S2 Ne" },
+                    { key: "s2_csp", label: "S2 CSP" },
+                    { key: "s3_strength", label: "S3 Str" },
+                    { key: "s3_weight", label: "S3 Wt" },
+                    { key: "s3_count", label: "S3 Ne" },
+                    { key: "s3_csp", label: "S3 CSP" },
+                    { key: "s4_strength", label: "S4 Str" },
+                    { key: "s4_weight", label: "S4 Wt" },
+                    { key: "s4_count", label: "S4 Ne" },
+                    { key: "s4_csp", label: "S4 CSP" },
+                    { key: "s5_strength", label: "S5 Str" },
+                    { key: "s5_weight", label: "S5 Wt" },
+                    { key: "s5_count", label: "S5 Ne" },
+                    { key: "s5_csp", label: "S5 CSP" },
+                    { key: "s6_strength", label: "S6 Str" },
+                    { key: "s6_weight", label: "S6 Wt" },
+                    { key: "s6_count", label: "S6 Ne" },
+                    { key: "s6_csp", label: "S6 CSP" },
+                    { key: "s7_strength", label: "S7 Str" },
+                    { key: "s7_weight", label: "S7 Wt" },
+                    { key: "s7_count", label: "S7 Ne" },
+                    { key: "s7_csp", label: "S7 CSP" },
+                    { key: "s8_strength", label: "S8 Str" },
+                    { key: "s8_weight", label: "S8 Wt" },
+                    { key: "s8_count", label: "S8 Ne" },
+                    { key: "s8_csp", label: "S8 CSP" },
+                    { key: "s9_strength", label: "S9 Str" },
+                    { key: "s9_weight", label: "S9 Wt" },
+                    { key: "s9_count", label: "S9 Ne" },
+                    { key: "s9_csp", label: "S9 CSP" },
+                    { key: "s10_strength", label: "S10 Str" },
+                    { key: "s10_weight", label: "S10 Wt" },
+                    { key: "s10_count", label: "S10 Ne" },
+                    { key: "s10_csp", label: "S10 CSP" },
                     { key: "avg_csp", label: "Avg CSP" },
                     { key: "cv_pct", label: "CV%" },
+                    { key: "max_csp", label: "Max CSP" },
+                    { key: "min_csp", label: "Min CSP" },
                     {
                       key: "within_spec",
-                      label: "OK?",
+                      label: "Within Spec?",
                       render: (r: any) =>
                         r.within_spec ? (
-                          <Badge variant="outline" className="text-green-600">
-                            Yes
-                          </Badge>
+                          <Badge variant="outline" className="text-green-600">OK</Badge>
                         ) : (
-                          <Badge variant="destructive">No</Badge>
+                          <Badge variant="destructive">NG</Badge>
                         ),
                     },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -655,15 +806,26 @@ function QualityPage() {
                   millId={millId}
                   canEdit={canEdit}
                 />
+
+                {/* ── Ring Frame Breakage Study ── */}
                 <QmFormsTab
-                  title="Breakage Study"
+                  title="RF Spinning Breakage Study"
                   endpoint="/quality/v2/ring-frame/breakage-study"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "lot_no", label: "Lot No" },
                     { key: "count_ne", label: "Count Ne" },
+                    { key: "ratio", label: "Ratio" },
+                    { key: "tm", label: "TM" },
+                    { key: "rh", label: "RH (%)" },
+                    { key: "duration_hrs", label: "Duration (hrs)" },
                     { key: "total_breaks", label: "Total Breaks" },
                     { key: "breaks_per_1000spl_hr", label: "Breaks/1000 Spl-Hr" },
+                    { key: "overall_breakage_pct", label: "Overall Breakage %" },
+                    { key: "repeated_2_6", label: "Repeated 2-6" },
+                    { key: "above_6", label: "Above 6" },
+                    { key: "traveller_fly", label: "Traveller Fly" },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -673,16 +835,26 @@ function QualityPage() {
                   millId={millId}
                   canEdit={canEdit}
                 />
+
+                {/* ── Ring Frame Snap Study & Idle Spindle Check ── */}
                 <QmFormsTab
-                  title="Snap Study"
+                  title="RF Snap Study & Idle Spindle Check"
                   endpoint="/quality/v2/ring-frame/snap-study"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Machine" },
+                    { key: "machine_no", label: "Mc No" },
                     { key: "shift_code", label: "Shift" },
                     { key: "lot_no", label: "Lot No" },
+                    { key: "count_ne", label: "Count Ne" },
+                    { key: "rf_type", label: "RF Type" },
+                    { key: "snap_rhs", label: "Snaps RHS" },
+                    { key: "snap_lhs", label: "Snaps LHS" },
                     { key: "snap_total", label: "Total Snaps" },
+                    { key: "roving_exhaust_rhs", label: "Roving Exhaust RHS" },
+                    { key: "roving_exhaust_lhs", label: "Roving Exhaust LHS" },
                     { key: "idle_spindles_total", label: "Idle Spindles" },
+                    { key: "ohtc_status", label: "OHTC Status" },
+                    { key: "reasons", label: "Reasons" },
                     {
                       key: "status",
                       label: "Status",
@@ -697,18 +869,37 @@ function QualityPage() {
 
             <TabsContent value="autoconer">
               <div className="space-y-4">
+                {/* ── Yarn Faults Report (Uster QQ4 / UQC-2 — EYC Setting & Cuts) ── */}
                 <QmFormsTab
-                  title="Yarn Faults (Uster QQ4)"
+                  title="Yarn Faults Report (Uster QQ4)"
                   endpoint="/quality/v2/auto-coner/yarn-faults"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Machine" },
+                    { key: "machine_no", label: "Mc No" },
+                    { key: "drum_no", label: "Drum No" },
                     { key: "shift_code", label: "Shift" },
                     { key: "lot_no", label: "Lot No" },
                     { key: "count_ne", label: "Count Ne" },
+                    { key: "ratio", label: "Mixing Ratio" },
+                    { key: "speed", label: "Speed" },
                     { key: "kms", label: "km Tested" },
-                    { key: "yf", label: "YF" },
-                    { key: "n_neps", label: "N(Neps)" },
+                    { key: "yf", label: "YF (Total)" },
+                    { key: "n_neps", label: "N (Neps)" },
+                    { key: "s_short_thick", label: "S (Short Thick)" },
+                    { key: "l_long_thick", label: "L (Long Thick)" },
+                    { key: "t_thin", label: "T (Thin)" },
+                    { key: "x_extreme", label: "X (Extreme)" },
+                    { key: "pf_periodic", label: "PF (Periodic)" },
+                    { key: "cp", label: "CP+" },
+                    { key: "cm", label: "CM-" },
+                    { key: "ccp", label: "CCP+" },
+                    { key: "ccm", label: "CCM-" },
+                    { key: "dp", label: "DP+" },
+                    { key: "dm", label: "DM-" },
+                    { key: "fl", label: "FL" },
+                    { key: "jp", label: "JP+" },
+                    { key: "jm", label: "JM-" },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -718,28 +909,29 @@ function QualityPage() {
                   millId={millId}
                   canEdit={canEdit}
                 />
+
+                {/* ── Splice Strength Report ── */}
                 <QmFormsTab
-                  title="Splice Strength"
+                  title="Splice Strength Report"
                   endpoint="/quality/v2/auto-coner/splice-strength"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Machine" },
+                    { key: "machine_no", label: "Mc No" },
                     { key: "shift_code", label: "Shift" },
                     { key: "lot_no", label: "Lot No" },
                     { key: "count_ne", label: "Count Ne" },
-                    { key: "splice_pct", label: "Splice %" },
+                    { key: "splice_pct", label: "Splice Strength %" },
                     {
                       key: "within_spec",
                       label: "≥85%?",
                       render: (r: any) =>
                         r.within_spec ? (
-                          <Badge variant="outline" className="text-green-600">
-                            Yes
-                          </Badge>
+                          <Badge variant="outline" className="text-green-600">Pass</Badge>
                         ) : (
-                          <Badge variant="destructive">No</Badge>
+                          <Badge variant="destructive">Fail</Badge>
                         ),
                     },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -749,16 +941,22 @@ function QualityPage() {
                   millId={millId}
                   canEdit={canEdit}
                 />
+
+                {/* ── Wax Pickup Study ── */}
                 <QmFormsTab
-                  title="Wax Pickup"
+                  title="Wax Pickup Study"
                   endpoint="/quality/v2/auto-coner/wax-pickup"
                   columns={[
                     { key: "date", label: "Date" },
-                    { key: "machine_no", label: "Machine" },
+                    { key: "machine_no", label: "Mc No" },
                     { key: "shift_code", label: "Shift" },
                     { key: "lot_no", label: "Lot No" },
                     { key: "count_ne", label: "Count Ne" },
+                    { key: "machine_type", label: "Machine Type" },
+                    { key: "total_wax_consumed", label: "Total Wax Consumed (g)" },
+                    { key: "total_production", label: "Total Production (kg)" },
                     { key: "overall_wax_pickup_pct", label: "Wax Pickup %" },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -768,15 +966,47 @@ function QualityPage() {
                   millId={millId}
                   canEdit={canEdit}
                 />
+
+                {/* ── Bag Faults Checking (24 cones/bag) ── */}
                 <QmFormsTab
-                  title="Bag Fault Check"
+                  title="Bag Faults Checking Report"
                   endpoint="/quality/v2/auto-coner/bag-faults"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "shift_code", label: "Shift" },
                     { key: "lot_no", label: "Lot No" },
                     { key: "count_ne", label: "Count Ne" },
+                    { key: "cone_tip_colour", label: "Cone Tip Colour" },
+                    { key: "bag_gross_weight", label: "Bag Gross Wt (kg)" },
                     { key: "avg_cone_wt", label: "Avg Cone Wt (g)" },
+                    { key: "min_cone_wt", label: "Min Cone Wt (g)" },
+                    { key: "max_cone_wt", label: "Max Cone Wt (g)" },
+                    {
+                      key: "fault_cut_yarn",
+                      label: "Cut Yarn",
+                      render: (r: any) => r.fault_cut_yarn ? <Badge variant="destructive">✗</Badge> : <span className="text-muted-foreground">—</span>,
+                    },
+                    {
+                      key: "fault_out_yarn",
+                      label: "Out Yarn",
+                      render: (r: any) => r.fault_out_yarn ? <Badge variant="destructive">✗</Badge> : <span className="text-muted-foreground">—</span>,
+                    },
+                    {
+                      key: "fault_without_sticker",
+                      label: "No Sticker",
+                      render: (r: any) => r.fault_without_sticker ? <Badge variant="destructive">✗</Badge> : <span className="text-muted-foreground">—</span>,
+                    },
+                    {
+                      key: "fault_contamination",
+                      label: "Contamination",
+                      render: (r: any) => r.fault_contamination ? <Badge variant="destructive">✗</Badge> : <span className="text-muted-foreground">—</span>,
+                    },
+                    {
+                      key: "fault_ribboning",
+                      label: "Ribboning",
+                      render: (r: any) => r.fault_ribboning ? <Badge variant="destructive">✗</Badge> : <span className="text-muted-foreground">—</span>,
+                    },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -791,27 +1021,35 @@ function QualityPage() {
 
             <TabsContent value="packing">
               <div className="space-y-4">
+                {/* ── Blend Test (Cotton/Polyester ratio via solubility) ── */}
                 <QmFormsTab
-                  title="Blend Test"
+                  title="Blend Test Report"
                   endpoint="/quality/v2/packing/blend-test"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "lot_no", label: "Lot No" },
+                    { key: "machine_no", label: "Mc No" },
+                    { key: "line_no", label: "Line No" },
+                    { key: "process", label: "Process" },
                     { key: "nominal_ratio", label: "Nominal Ratio" },
+                    { key: "tested_weight", label: "Tested Wt (g)" },
+                    { key: "result_1", label: "Result 1" },
+                    { key: "result_2", label: "Result 2" },
+                    { key: "result_3", label: "Result 3" },
+                    { key: "avg_weight", label: "Avg Wt" },
                     { key: "cotton_pct", label: "Cotton %" },
                     { key: "polyester_pct", label: "Polyester %" },
                     {
                       key: "within_spec",
-                      label: "OK?",
+                      label: "Within Spec?",
                       render: (r: any) =>
                         r.within_spec ? (
-                          <Badge variant="outline" className="text-green-600">
-                            Yes
-                          </Badge>
+                          <Badge variant="outline" className="text-green-600">OK</Badge>
                         ) : (
-                          <Badge variant="destructive">No</Badge>
+                          <Badge variant="destructive">NG</Badge>
                         ),
                     },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -821,12 +1059,15 @@ function QualityPage() {
                   millId={millId}
                   canEdit={canEdit}
                 />
+
+                {/* ── PWSE Machine Check (Packaging/Weighing) ── */}
                 <QmFormsTab
-                  title="PWSE Check"
+                  title="PWSE Machine Check"
                   endpoint="/quality/v2/packing/pwse-check"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "shift_code", label: "Shift" },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -836,8 +1077,10 @@ function QualityPage() {
                   millId={millId}
                   canEdit={canEdit}
                 />
+
+                {/* ── Bag Weight Check (Packed cone bags — gross/tare/net per sample) ── */}
                 <QmFormsTab
-                  title="Bag Weight Check"
+                  title="Bag Weight Checking"
                   endpoint="/quality-forms/bag-weight"
                   columns={[
                     { key: "date", label: "Date" },
@@ -845,11 +1088,19 @@ function QualityPage() {
                     { key: "lot_no", label: "Lot No" },
                     { key: "count_ne", label: "Count Ne" },
                     { key: "cone_tip_type", label: "Cone Tip" },
-                    { key: "total_samples", label: "Samples" },
-                    { key: "avg_net_weight", label: "Avg Wt (g)" },
+                    { key: "inspector", label: "Inspector" },
+                    { key: "total_samples", label: "No. of Cones" },
+                    { key: "target_weight", label: "Target Wt (g)" },
+                    { key: "avg_net_weight", label: "Avg Net Wt (g)" },
+                    { key: "min_net_weight", label: "Min Wt (g)" },
+                    { key: "max_net_weight", label: "Max Wt (g)" },
+                    { key: "std_deviation", label: "Std Dev" },
+                    { key: "deviation_pct", label: "Dev %" },
                     { key: "underweight_count", label: "Under" },
                     { key: "overweight_count", label: "Over" },
+                    { key: "pass_count", label: "Pass" },
                     { key: "pass_pct", label: "Pass %" },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -859,6 +1110,8 @@ function QualityPage() {
                   millId={millId}
                   canEdit={canEdit}
                 />
+
+                {/* ── Paper Cone Check ── */}
                 <QmFormsTab
                   title="Paper Cone Check"
                   endpoint="/quality-forms/paper-cone"
@@ -866,10 +1119,11 @@ function QualityPage() {
                     { key: "date", label: "Date" },
                     { key: "supplier_name", label: "Supplier" },
                     { key: "batch_no", label: "Batch No" },
-                    { key: "total_samples", label: "Samples" },
+                    { key: "total_samples", label: "No. of Cones" },
                     { key: "avg_cone_weight", label: "Avg Wt (g)" },
-                    { key: "acceptance_pct", label: "Accept %" },
-                    { key: "rejection_pct", label: "Reject %" },
+                    { key: "acceptance_pct", label: "Acceptance %" },
+                    { key: "rejection_pct", label: "Rejection %" },
+                    { key: "remarks", label: "Remarks" },
                     {
                       key: "status",
                       label: "Status",
@@ -1190,12 +1444,17 @@ function colToQmField(key: string, label: string): QmFieldDef {
   if (key === "date") return { key, label, type: "date", required: true };
   if (key === "shift_code") return { key, label, type: "shift" };
   if (key === "status") return { key, label, type: "status" };
-  if (key === "within_spec") return { key, label, type: "yn" };
+  if (key === "within_spec" || key === "ok_input") return { key, label, type: "yn" };
   if (key === "lot_no") return { key, label, type: "text", required: true };
   if (key === "machine_no" || key === "machine")
     return { key, label, type: "text", required: true };
+  // Integer fields — step 1
+  const intRe =
+    /(_count$|_breaks$|_spindles|drum_no$|doubling$|creel_breaks|roller_lapping|slub_breaks|multiple_end|other_breaks|active_spindles|snap_rhs|snap_lhs|snap_total|roving_exhaust|idle_spindles|traveller_fly|repeated_|above_6|lights_|cone_qty|stock_cone|pass_count|under.*_count|over.*_count|total_samples)/;
+  if (intRe.test(key)) return { key, label, type: "number", step: "1" };
+  // Numeric fields
   const numericRe =
-    /(_pct|_kg|_ne|_csp|kms|_min|_max|_total|_count|_breaks|_weight|_hank|_speed|_tm|_tpi|_wt|_grams|_hrs|_psi|_bar|_rpm|_1m|_2m|_5m|_10m|_20m|_50m|_100m|_pct$|_yf$)$|^(cv_|avg_|total_|max_|min_|n_)/;
+    /(_pct|_kg|_ne|_csp|kms|_min|_max|_total|_weight|_hank|_speed|_tm|_tpi|_wt|_grams|_hrs|_psi|_bar|_rpm|_1m|_2m|_3m|_5m|_10m|_20m|_50m|_100m|result_|avg_|splice_pct|wax_pickup|_intensity|_action_point|_deviation|overall_|std_deviation)$|^(cv_|avg_|total_|max_|min_|n_neps|s_short|l_long|t_thin|x_extreme|pf_|cp$|cm$|ccp$|ccm$|dp$|dm$|cdp|cdm|fd$|fl$|pp$|jp$|jm$|yf$)/;
   if (numericRe.test(key)) return { key, label, type: "number", step: "0.01" };
   return { key, label, type: "text" };
 }
