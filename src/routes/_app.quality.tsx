@@ -424,7 +424,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
-                  layout="reading"
+                  layout="grid"
                 />
 
                 {/* ── Carding Waste % Study ── */}
@@ -560,7 +560,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
-                  layout="reading"
+                  layout="grid"
                 />
 
                 {/* ── Daily Sliver Wrapping Report (Breaker/Finisher Drawing) ── */}
@@ -746,7 +746,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
-                  layout="reading"
+                  layout="grid"
                 />
 
                 {/* ── Ring Frame Breakage Study ── */}
