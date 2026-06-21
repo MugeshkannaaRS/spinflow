@@ -3050,7 +3050,11 @@ function ManpowerGrid() {
 
   const bulkMutation = useMutation({
     mutationFn: async () => {
-      const filled = rows.filter((r) => Number(r.headcount) > 0);
+      const filled = rows.filter((r) =>
+        Number(r.headcount) > 0 ||
+        Number(r.machinesPerPerson) > 0 ||
+        r.assignments.length > 0,
+      );
       if (!date || !shift) throw new Error("Date and Shift are required");
       if (filled.length === 0) throw new Error("Enter headcount for at least one category");
 

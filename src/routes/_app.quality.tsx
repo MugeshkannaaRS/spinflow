@@ -39,7 +39,7 @@ import {
   SheetTrigger,
   SheetFooter,
 } from "@/components/ui/sheet";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import {
   Plus,
@@ -50,6 +50,9 @@ import {
   ArrowDown,
   Trash2,
   Pencil,
+  Save,
+  ChevronDown,
+  X,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { QualityTest } from "@/lib/types";
@@ -421,6 +424,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="reading"
                 />
 
                 {/* ── Carding Waste % Study ── */}
@@ -456,6 +460,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="grid"
                 />
 
                 {/* ── Daily Carding Wrapping Report ── */}
@@ -497,6 +502,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="reading"
                 />
               </div>
             </TabsContent>
@@ -531,6 +537,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="grid"
                 />
 
                 {/* ── A% Check (Auto-Leveller Performance) ── */}
@@ -580,6 +587,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="reading"
                 />
 
                 {/* ── Daily Sliver Wrapping Report (Breaker/Finisher Drawing) ── */}
@@ -622,6 +630,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="reading"
                 />
               </div>
             </TabsContent>
@@ -656,6 +665,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="reading"
                 />
 
                 {/* ── Simplex Breakage Study ── */}
@@ -694,6 +704,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="rows"
                 />
 
                 {/* ── Simplex Stretch % ── */}
@@ -724,6 +735,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="grid"
                 />
               </div>
             </TabsContent>
@@ -805,6 +817,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="reading"
                 />
 
                 {/* ── Ring Frame Breakage Study ── */}
@@ -834,6 +847,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="rows"
                 />
 
                 {/* ── Ring Frame Snap Study & Idle Spindle Check ── */}
@@ -863,6 +877,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="rows"
                 />
               </div>
             </TabsContent>
@@ -908,6 +923,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="rows"
                 />
 
                 {/* ── Splice Strength Report ── */}
@@ -940,6 +956,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="grid"
                 />
 
                 {/* ── Wax Pickup Study ── */}
@@ -965,6 +982,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="grid"
                 />
 
                 {/* ── Bag Faults Checking (24 cones/bag) ── */}
@@ -1015,6 +1033,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="grid"
                 />
               </div>
             </TabsContent>
@@ -1058,6 +1077,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="grid"
                 />
 
                 {/* ── PWSE Machine Check (Packaging/Weighing) ── */}
@@ -1076,6 +1096,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="grid"
                 />
 
                 {/* ── Bag Weight Check (Packed cone bags — gross/tare/net per sample) ── */}
@@ -1109,6 +1130,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="grid"
                 />
 
                 {/* ── Paper Cone Check ── */}
@@ -1132,6 +1154,7 @@ function QualityPage() {
                   ]}
                   millId={millId}
                   canEdit={canEdit}
+                  layout="grid"
                 />
               </div>
             </TabsContent>
@@ -1423,11 +1446,19 @@ function LotApproveAction({ lotId }: { lotId: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Generic department tab — fetches from /quality/v2/<endpoint>
-// Full CRUD: + New record, Edit (Sheet), Delete (ConfirmDeleteButton)
+// Quality Module — Fast data-entry forms
+//
+// Three patterns based on form shape:
+//   "grid"    — inline spreadsheet (one row per machine, all cols across)
+//   "reading" — locked header + N reading cells (wrapping, hank, CSP)
+//   "rows"    — shared header + add-machine rows (breakage, snap)
+//
+// Pattern is set via the `layout` prop on each QmFormsTab instance.
+// All patterns: Tab/Enter navigation, live computed values, per-row save.
 // ---------------------------------------------------------------------------
 
 type QmFieldType = "text" | "number" | "date" | "shift" | "status" | "yn";
+type QmLayout = "grid" | "reading" | "rows";
 
 interface QmFieldDef {
   key: string;
@@ -1440,6 +1471,9 @@ interface QmFieldDef {
 const SHIFT_OPTIONS = ["A", "B", "C", "R/A", "R/B", "R/C"];
 const STATUS_OPTIONS = ["draft", "approved", "rejected"];
 
+// Header fields: always locked at top, not repeated per row
+const HEADER_KEYS = new Set(["date", "shift_code", "lot_no"]);
+
 function colToQmField(key: string, label: string): QmFieldDef {
   if (key === "date") return { key, label, type: "date", required: true };
   if (key === "shift_code") return { key, label, type: "shift" };
@@ -1448,16 +1482,1023 @@ function colToQmField(key: string, label: string): QmFieldDef {
   if (key === "lot_no") return { key, label, type: "text", required: true };
   if (key === "machine_no" || key === "machine")
     return { key, label, type: "text", required: true };
-  // Integer fields — step 1
   const intRe =
     /(_count$|_breaks$|_spindles|drum_no$|doubling$|creel_breaks|roller_lapping|slub_breaks|multiple_end|other_breaks|active_spindles|snap_rhs|snap_lhs|snap_total|roving_exhaust|idle_spindles|traveller_fly|repeated_|above_6|lights_|cone_qty|stock_cone|pass_count|under.*_count|over.*_count|total_samples)/;
   if (intRe.test(key)) return { key, label, type: "number", step: "1" };
-  // Numeric fields
   const numericRe =
     /(_pct|_kg|_ne|_csp|kms|_min|_max|_total|_weight|_hank|_speed|_tm|_tpi|_wt|_grams|_hrs|_psi|_bar|_rpm|_1m|_2m|_3m|_5m|_10m|_20m|_50m|_100m|result_|avg_|splice_pct|wax_pickup|_intensity|_action_point|_deviation|overall_|std_deviation)$|^(cv_|avg_|total_|max_|min_|n_neps|s_short|l_long|t_thin|x_extreme|pf_|cp$|cm$|ccp$|ccm$|dp$|dm$|cdp|cdm|fd$|fl$|pp$|jp$|jm$|yf$)/;
   if (numericRe.test(key)) return { key, label, type: "number", step: "0.01" };
   return { key, label, type: "text" };
 }
+
+/** Parse a form value to the right type for the API payload */
+function parseVal(val: any, type: QmFieldType) {
+  if (type === "number") return val === "" || val == null ? null : parseFloat(String(val));
+  if (type === "yn") return val === "true" ? true : val === "false" ? false : null;
+  return val === "" ? null : val;
+}
+
+/** Avg of numeric values in an array (ignoring nulls) */
+function avg(vals: (number | null)[]): number | null {
+  const nums = vals.filter((v): v is number => v != null && !isNaN(v));
+  return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
+}
+
+/** CV% of numeric array */
+function cvPct(vals: (number | null)[]): number | null {
+  const a = avg(vals);
+  if (a == null || a === 0) return null;
+  const nums = vals.filter((v): v is number => v != null && !isNaN(v));
+  if (nums.length < 2) return null;
+  const variance = nums.reduce((s, v) => s + (v - a) ** 2, 0) / nums.length;
+  return (Math.sqrt(variance) / a) * 100;
+}
+
+/** Inline cell input — shared between all patterns */
+function CellInput({
+  value,
+  onChange,
+  type = "text",
+  step,
+  placeholder = "—",
+  className = "",
+  onKeyDown,
+  inputRef,
+}: {
+  value: any;
+  onChange: (v: string) => void;
+  type?: string;
+  step?: string;
+  placeholder?: string;
+  className?: string;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  inputRef?: React.Ref<HTMLInputElement>;
+}) {
+  return (
+    <input
+      ref={inputRef}
+      type={type}
+      step={step}
+      value={value ?? ""}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={onKeyDown}
+      className={[
+        "h-7 w-full min-w-[48px] max-w-[88px] px-1.5 text-xs",
+        "border border-border rounded bg-background text-foreground",
+        "focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary",
+        "placeholder:text-muted-foreground/50",
+        className,
+      ].join(" ")}
+    />
+  );
+}
+
+/** Inline cell select for shift/status/yn */
+function CellSelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <select
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value)}
+      className="h-7 text-xs border border-border rounded bg-background text-foreground px-1 focus:outline-none focus:ring-1 focus:ring-primary min-w-[52px]"
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PATTERN A — Inline spreadsheet ("grid")
+// One row per record. All fields as inline cells. Tab moves between cols.
+// Computed fields (waste%, cv%) update live.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function QmGridEntry({
+  title,
+  endpoint,
+  columns,
+  millId,
+  canEdit,
+}: {
+  title: string;
+  endpoint: string;
+  columns: any[];
+  millId: string | null | undefined;
+  canEdit: boolean;
+}) {
+  const qc = useQueryClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const [filterDate, setFilterDate] = useState(today);
+  const [filterLot, setFilterLot] = useState("");
+  const [filterMc, setFilterMc] = useState("");
+
+  const formFields = useMemo<QmFieldDef[]>(() => {
+    const base = columns
+      .filter((c: any) => !["id", "mill_id", "company_id", "created_at", "updated_at"].includes(c.key))
+      .map((c: any) => colToQmField(c.key, c.label));
+    if (!base.find((f) => f.key === "remarks")) base.push({ key: "remarks", label: "Remarks", type: "text" });
+    return base;
+  }, [columns]);
+
+  const makeBlankRow = useCallback(() => {
+    const r: Record<string, any> = { _id: crypto.randomUUID(), _saved: false };
+    formFields.forEach((f) => {
+      if (f.key === "date") r[f.key] = filterDate || today;
+      else if (f.key === "shift_code") r[f.key] = "A";
+      else if (f.key === "status") r[f.key] = "draft";
+      else r[f.key] = "";
+    });
+    return r;
+  }, [formFields, filterDate, today]);
+
+  const [rows, setRows] = useState<Record<string, any>[]>(() => [makeBlankRow()]);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const { data: existing, isLoading } = useQuery({
+    queryKey: ["qm-forms", endpoint, millId, filterDate, filterLot, filterMc],
+    queryFn: async () => {
+      const p = new URLSearchParams({ page_size: "200" });
+      if (filterDate) p.set("date", filterDate);
+      if (filterLot) p.set("lot_no", filterLot);
+      if (filterMc) p.set("machine_no", filterMc);
+      const res = await api.get(`/api/v1${endpoint}?${p}`);
+      return (res.data?.data ?? res.data) as any[];
+    },
+    enabled: !!millId,
+    staleTime: 30_000,
+  });
+
+  // Add a blank entry row after loaded data
+  const allRows = useMemo(() => {
+    const saved = (existing ?? []).map((r: any) => ({ ...r, _saved: true, _id: r.id }));
+    return [...saved, ...rows];
+  }, [existing, rows]);
+
+  const setRowField = (rowId: string, key: string, val: string) => {
+    setRows((prev) =>
+      prev.map((r) => (r._id === rowId ? { ...r, [key]: val } : r)),
+    );
+  };
+
+  // Live computed: total_wastage_pct for waste study
+  const getComputed = (row: Record<string, any>): Record<string, string> => {
+    const computed: Record<string, string> = {};
+    // Waste study: total_wastage_pct = total_waste / total_production * 100
+    if ("licker_in2_waste_kg" in row || "flat_strips_kg" in row) {
+      const prod = parseFloat(row.total_production_kg) || 0;
+      if (prod > 0) {
+        const waste = [
+          "licker_in2_waste_kg", "licker_in3_waste_kg", "flat_strips_kg",
+          "suction_hood_back_kg", "suction_hood_front_kg",
+        ].reduce((s, k) => s + (parseFloat(row[k]) || 0), 0);
+        computed["total_wastage_pct"] = (waste / prod * 100).toFixed(2) + "%";
+      }
+    }
+    return computed;
+  };
+
+  const saveRow = async (row: Record<string, any>) => {
+    setSavingId(row._id);
+    try {
+      const payload: Record<string, any> = {};
+      formFields.forEach((f) => { payload[f.key] = parseVal(row[f.key], f.type); });
+      if (row._saved && row.id) {
+        await api.patch(`/api/v1${endpoint}/${row.id}`, payload);
+      } else {
+        await api.post(`/api/v1${endpoint}`, payload);
+        // Remove this draft row (will be refetched as saved)
+        setRows((prev) => prev.filter((r) => r._id !== row._id));
+        setRows((prev) => [...prev, makeBlankRow()]);
+      }
+      toast.success("Saved");
+      qc.invalidateQueries({ queryKey: ["qm-forms", endpoint] });
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? "Failed to save");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const deleteRow = async (row: Record<string, any>) => {
+    if (!row._saved) {
+      setRows((prev) => prev.filter((r) => r._id !== row._id));
+      return;
+    }
+    try {
+      await api.delete(`/api/v1${endpoint}/${row.id}`);
+      toast.success("Deleted");
+      qc.invalidateQueries({ queryKey: ["qm-forms", endpoint] });
+    } catch {
+      toast.error("Failed to delete");
+    }
+  };
+
+  const handleKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    rowIdx: number,
+    colIdx: number,
+    row: Record<string, any>,
+  ) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (colIdx === formFields.length - 1) {
+        // Last col + Enter → save
+        saveRow(row);
+      } else {
+        // Move to next cell
+        const nextInput = tableRef.current?.querySelector<HTMLInputElement>(
+          `[data-cell="${rowIdx}-${colIdx + 1}"]`,
+        );
+        nextInput?.focus();
+      }
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const nextInput = tableRef.current?.querySelector<HTMLInputElement>(
+        `[data-cell="${rowIdx + 1}-${colIdx}"]`,
+      );
+      nextInput?.focus();
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prevInput = tableRef.current?.querySelector<HTMLInputElement>(
+        `[data-cell="${rowIdx - 1}-${colIdx}"]`,
+      );
+      prevInput?.focus();
+    }
+  };
+
+  // Render a cell value for saved (read) rows or an input for entry rows
+  const renderCell = (
+    row: Record<string, any>,
+    field: QmFieldDef,
+    rowIdx: number,
+    colIdx: number,
+  ) => {
+    const isEntry = !row._saved;
+    const computed = getComputed(row);
+    // Computed display
+    if (computed[field.key]) {
+      return (
+        <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400 px-1">
+          {computed[field.key]}
+        </span>
+      );
+    }
+    if (!isEntry && !canEdit) {
+      const v = row[field.key];
+      return (
+        <span className="text-xs px-1 text-foreground">
+          {v == null || v === "" ? <span className="text-muted-foreground">—</span> : String(v)}
+        </span>
+      );
+    }
+    if (field.type === "shift") {
+      return (
+        <CellSelect
+          value={String(row[field.key] ?? "A")}
+          onChange={(v) => isEntry ? setRowField(row._id, field.key, v) : null}
+          options={SHIFT_OPTIONS.map((o) => ({ value: o, label: o }))}
+        />
+      );
+    }
+    if (field.type === "status") {
+      return (
+        <CellSelect
+          value={String(row[field.key] ?? "draft")}
+          onChange={(v) => isEntry ? setRowField(row._id, field.key, v) : null}
+          options={STATUS_OPTIONS.map((o) => ({ value: o, label: o.charAt(0).toUpperCase() + o.slice(1) }))}
+        />
+      );
+    }
+    if (field.type === "yn") {
+      const cur =
+        row[field.key] === true || row[field.key] === "true"
+          ? "true"
+          : row[field.key] === false || row[field.key] === "false"
+            ? "false"
+            : "";
+      if (!isEntry) {
+        return cur === "true" ? (
+          <span className="text-xs font-medium text-emerald-700 px-1">OK</span>
+        ) : cur === "false" ? (
+          <span className="text-xs font-medium text-red-600 px-1">NG</span>
+        ) : <span className="text-muted-foreground text-xs px-1">—</span>;
+      }
+      return (
+        <CellSelect
+          value={cur}
+          onChange={(v) => setRowField(row._id, field.key, v)}
+          options={[{ value: "", label: "—" }, { value: "true", label: "OK" }, { value: "false", label: "NG" }]}
+        />
+      );
+    }
+    if (!isEntry) {
+      const v = row[field.key];
+      return (
+        <span className="text-xs px-1">
+          {v == null || v === "" ? <span className="text-muted-foreground">—</span> : String(v)}
+        </span>
+      );
+    }
+    return (
+      <CellInput
+        value={row[field.key]}
+        onChange={(v) => setRowField(row._id, field.key, v)}
+        type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+        step={field.step}
+        onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx, row)}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        inputRef={(el: any) => {
+          if (el) el.setAttribute("data-cell", `${rowIdx}-${colIdx}`);
+        }}
+      />
+    );
+  };
+
+  return (
+    <Card>
+      {/* Header bar */}
+      <CardHeader className="pb-2 pt-3 px-4 flex flex-row items-center gap-2 flex-wrap">
+        <CardTitle className="text-sm font-medium mr-auto">{title}</CardTitle>
+        <input
+          type="date"
+          value={filterDate}
+          onChange={(e) => setFilterDate(e.target.value)}
+          className="h-7 text-xs border border-border rounded px-2 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+        <input
+          placeholder="Lot"
+          value={filterLot}
+          onChange={(e) => setFilterLot(e.target.value)}
+          className="h-7 text-xs border border-border rounded px-2 w-20 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+        <input
+          placeholder="Mc No"
+          value={filterMc}
+          onChange={(e) => setFilterMc(e.target.value)}
+          className="h-7 text-xs border border-border rounded px-2 w-20 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+        {canEdit && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            onClick={() => setRows((prev) => [...prev, makeBlankRow()])}
+          >
+            <Plus className="size-3 mr-1" /> Add row
+          </Button>
+        )}
+      </CardHeader>
+
+      <CardContent className="p-0">
+        <div ref={tableRef} className="overflow-x-auto">
+          {isLoading ? (
+            <div className="p-4 text-xs text-muted-foreground">Loading…</div>
+          ) : (
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-muted/40 border-b border-border">
+                  <th className="text-left text-[10px] font-medium text-muted-foreground px-2 py-1.5 whitespace-nowrap w-6">#</th>
+                  {formFields.map((f) => (
+                    <th
+                      key={f.key}
+                      className="text-left text-[10px] font-medium text-muted-foreground px-1 py-1.5 whitespace-nowrap"
+                    >
+                      {f.label}
+                    </th>
+                  ))}
+                  {canEdit && <th className="w-16"></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {allRows.length === 0 && (
+                  <tr>
+                    <td colSpan={formFields.length + 2} className="text-center text-muted-foreground py-6 text-xs">
+                      No records. Click "Add row" to start.
+                    </td>
+                  </tr>
+                )}
+                {allRows.map((row, rowIdx) => (
+                  <tr
+                    key={row._id ?? row.id}
+                    className={[
+                      "border-b border-border/60",
+                      !row._saved ? "bg-primary/5" : "hover:bg-muted/30",
+                    ].join(" ")}
+                  >
+                    <td className="px-2 py-1 text-[10px] text-muted-foreground text-center">{rowIdx + 1}</td>
+                    {formFields.map((field, colIdx) => (
+                      <td key={field.key} className="px-1 py-1">
+                        {renderCell(row, field, rowIdx, colIdx)}
+                      </td>
+                    ))}
+                    {canEdit && (
+                      <td className="px-1 py-1">
+                        <div className="flex gap-1">
+                          {!row._saved && (
+                            <button
+                              onClick={() => saveRow(row)}
+                              disabled={savingId === row._id}
+                              className="h-6 px-2 text-[10px] font-medium rounded border border-emerald-400 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 disabled:opacity-50"
+                            >
+                              {savingId === row._id ? "…" : "Save"}
+                            </button>
+                          )}
+                          {row._saved && (
+                            <button
+                              onClick={() => saveRow(row)}
+                              disabled={savingId === row._id}
+                              className="h-6 px-1.5 text-[10px] rounded border border-border text-muted-foreground hover:bg-muted disabled:opacity-50"
+                            >
+                              <Save className="size-3" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => deleteRow(row)}
+                            className="h-6 px-1.5 text-[10px] rounded border border-border text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40"
+                          >
+                            <Trash2 className="size-3" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="flex gap-4 px-3 py-1.5 border-t border-border/40 bg-muted/20">
+          <span className="text-[10px] text-muted-foreground">
+            <kbd className="text-[9px] bg-muted border border-border rounded px-1">Tab</kbd> next cell &nbsp;
+            <kbd className="text-[9px] bg-muted border border-border rounded px-1">Enter</kbd> save &nbsp;
+            <kbd className="text-[9px] bg-muted border border-border rounded px-1">↓↑</kbd> move rows
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PATTERN B — Header lock + reading grid ("reading")
+// Fixed header (date/shift/lot/machine), then N reading cells in a grid.
+// Computed avg, cv%, actual_hank update live as user types.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function QmReadingEntry({
+  title,
+  endpoint,
+  columns,
+  millId,
+  canEdit,
+}: {
+  title: string;
+  endpoint: string;
+  columns: any[];
+  millId: string | null | undefined;
+  canEdit: boolean;
+}) {
+  const qc = useQueryClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const formFields = useMemo<QmFieldDef[]>(() => {
+    const base = columns
+      .filter((c: any) => !["id", "mill_id", "company_id", "created_at", "updated_at"].includes(c.key))
+      .map((c: any) => colToQmField(c.key, c.label));
+    if (!base.find((f) => f.key === "remarks")) base.push({ key: "remarks", label: "Remarks", type: "text" });
+    return base;
+  }, [columns]);
+
+  // Split fields into header fields, reading fields (r1-r10, s1_* etc.), and other fields
+  const headerFields = formFields.filter((f) => HEADER_KEYS.has(f.key) || f.key === "machine_no");
+  const readingFields = formFields.filter((f) => /^r\d+$|^s\d+_(strength|weight|count|csp)$/.test(f.key));
+  const otherFields = formFields.filter(
+    (f) => !HEADER_KEYS.has(f.key) && f.key !== "machine_no" && !/^r\d+$|^s\d+_(strength|weight|count|csp)$/.test(f.key),
+  );
+
+  const makeDefault = useCallback(() => {
+    const d: Record<string, any> = {};
+    formFields.forEach((f) => {
+      if (f.key === "date") d[f.key] = today;
+      else if (f.key === "shift_code") d[f.key] = "A";
+      else if (f.key === "status") d[f.key] = "draft";
+      else d[f.key] = "";
+    });
+    return d;
+  }, [formFields, today]);
+
+  const [form, setForm] = useState<Record<string, any>>(makeDefault);
+  const [saving, setSaving] = useState(false);
+  const [filterDate, setFilterDate] = useState(today);
+  const [editId, setEditId] = useState<string | null>(null);
+  const readingRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Live computed values
+  const readingVals = readingFields
+    .filter((f) => /^r\d+$/.test(f.key))
+    .map((f) => (form[f.key] !== "" && form[f.key] != null ? parseFloat(form[f.key]) : null));
+
+  const liveAvgWeight = avg(readingVals);
+  const liveCvPct = cvPct(readingVals);
+  // actual_hank = 1000 / (avg_weight_g * 1.6535) if std_hank context available
+  // For now: actual_hank from std_hank (if user filled std_hank field from nearby field)
+  const stdHank = parseFloat(form["std_hank"] ?? form["nominal_hank"]) || null;
+  const liveActualHank =
+    liveAvgWeight && stdHank
+      ? (stdHank * 453.59237) / liveAvgWeight  // hanks calculated from weight ratio
+      : null;
+
+  const { data: existing, isLoading } = useQuery({
+    queryKey: ["qm-forms", endpoint, millId, filterDate],
+    queryFn: async () => {
+      const p = new URLSearchParams({ page_size: "100", date: filterDate });
+      const res = await api.get(`/api/v1${endpoint}?${p}`);
+      return (res.data?.data ?? res.data) as any[];
+    },
+    enabled: !!millId,
+    staleTime: 30_000,
+  });
+
+  const loadRecord = (r: any) => {
+    const f: Record<string, any> = {};
+    formFields.forEach((fd) => { f[fd.key] = r[fd.key] ?? ""; });
+    setForm(f);
+    setEditId(r.id);
+  };
+
+  const clearForm = () => {
+    setForm(makeDefault());
+    setEditId(null);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload: Record<string, any> = {};
+      formFields.forEach((f) => { payload[f.key] = parseVal(form[f.key], f.type); });
+      // Inject computed
+      if (liveAvgWeight != null) payload["avg_weight"] = parseFloat(liveAvgWeight.toFixed(3));
+      if (liveCvPct != null) payload["cv_pct"] = parseFloat(liveCvPct.toFixed(3));
+      if (liveActualHank != null) payload["actual_hank"] = parseFloat(liveActualHank.toFixed(4));
+      if (editId) {
+        await api.patch(`/api/v1${endpoint}/${editId}`, payload);
+        toast.success("Updated");
+      } else {
+        await api.post(`/api/v1${endpoint}`, payload);
+        toast.success("Saved");
+        clearForm();
+      }
+      qc.invalidateQueries({ queryKey: ["qm-forms", endpoint] });
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const setField = (key: string, val: string) => setForm((p) => ({ ...p, [key]: val }));
+
+  const readingKeyDown = (e: React.KeyboardEvent, idx: number) => {
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      const next = readingRefs.current[idx + 1];
+      if (next) next.focus();
+      else handleSave();
+    }
+  };
+
+  return (
+    <Card>
+      {/* Locked header */}
+      <CardHeader className="pb-0 pt-3 px-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <CardTitle className="text-sm font-medium mr-2">{title}</CardTitle>
+          {/* Header fields inline */}
+          {headerFields.map((f) => (
+            <div key={f.key} className="flex items-center gap-1">
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">{f.label}</span>
+              {f.type === "shift" ? (
+                <CellSelect
+                  value={String(form[f.key] ?? "A")}
+                  onChange={(v) => setField(f.key, v)}
+                  options={SHIFT_OPTIONS.map((o) => ({ value: o, label: o }))}
+                />
+              ) : f.type === "date" ? (
+                <input
+                  type="date"
+                  value={form[f.key] ?? today}
+                  onChange={(e) => { setField(f.key, e.target.value); setFilterDate(e.target.value); }}
+                  className="h-7 text-xs border border-border rounded px-2 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              ) : (
+                <input
+                  value={form[f.key] ?? ""}
+                  onChange={(e) => setField(f.key, e.target.value)}
+                  placeholder={f.key === "machine_no" ? "Mc No" : f.key === "lot_no" ? "Lot" : "—"}
+                  className="h-7 text-xs border border-border rounded px-2 w-20 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              )}
+            </div>
+          ))}
+          {editId && (
+            <button onClick={clearForm} className="text-[10px] text-muted-foreground hover:text-foreground ml-1 flex items-center gap-0.5">
+              <X className="size-3" /> Clear
+            </button>
+          )}
+        </div>
+
+        {/* Other fields (speeds, nominal_hank, count_ne etc.) — compact row */}
+        {otherFields.filter((f) => !["status", "remarks", "within_spec", "ok_input",
+          "avg_weight", "actual_hank", "cv_pct", "hank_cv_pct", "total_wastage_pct", "avg_hank",
+          "avg_csp", "max_csp", "min_csp"].includes(f.key)).length > 0 && (
+          <div className="flex gap-3 flex-wrap mt-2 pb-2 border-b border-border/40">
+            {otherFields
+              .filter((f) => !["status", "remarks", "within_spec", "ok_input",
+                "avg_weight", "actual_hank", "cv_pct", "hank_cv_pct", "total_wastage_pct", "avg_hank",
+                "avg_csp", "max_csp", "min_csp"].includes(f.key))
+              .map((f) => (
+                <div key={f.key} className="flex items-center gap-1">
+                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">{f.label}</span>
+                  {f.type === "yn" ? (
+                    <CellSelect
+                      value={form[f.key] === true || form[f.key] === "true" ? "true" : form[f.key] === false || form[f.key] === "false" ? "false" : ""}
+                      onChange={(v) => setField(f.key, v)}
+                      options={[{ value: "", label: "—" }, { value: "true", label: "OK" }, { value: "false", label: "NG" }]}
+                    />
+                  ) : (
+                    <input
+                      type={f.type === "number" ? "number" : "text"}
+                      step={f.step}
+                      value={form[f.key] ?? ""}
+                      onChange={(e) => setField(f.key, e.target.value)}
+                      className="h-7 text-xs border border-border rounded px-2 w-20 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  )}
+                </div>
+              ))}
+          </div>
+        )}
+      </CardHeader>
+
+      <CardContent className="px-4 pt-3 pb-3">
+        {/* Reading grid */}
+        {readingFields.length > 0 && (
+          <>
+            <p className="text-[10px] text-muted-foreground mb-2">
+              Enter readings — Tab or Enter to advance
+            </p>
+            <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(readingFields.length, 5)}, 1fr)` }}>
+              {readingFields.map((f, idx) => (
+                <div key={f.key} className="flex flex-col gap-1">
+                  <span className="text-[10px] text-center text-muted-foreground">{f.label}</span>
+                  <input
+                    ref={(el) => { readingRefs.current[idx] = el; }}
+                    type="number"
+                    step={f.step ?? "0.01"}
+                    value={form[f.key] ?? ""}
+                    onChange={(e) => setField(f.key, e.target.value)}
+                    onKeyDown={(e) => readingKeyDown(e, idx)}
+                    className="h-9 text-sm text-center border border-border rounded bg-background text-foreground font-medium focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary w-full"
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Live computed bar */}
+            {(liveAvgWeight != null || liveCvPct != null) && (
+              <div className="flex gap-4 mt-3 px-3 py-2 rounded-md bg-muted/40 border border-border/40 flex-wrap">
+                {liveAvgWeight != null && (
+                  <span className="text-xs">
+                    <span className="text-muted-foreground">Avg </span>
+                    <span className="font-medium text-emerald-700 dark:text-emerald-400">{liveAvgWeight.toFixed(2)} g</span>
+                  </span>
+                )}
+                {liveCvPct != null && (
+                  <span className="text-xs">
+                    <span className="text-muted-foreground">CV% </span>
+                    <span className={`font-medium ${liveCvPct > 2 ? "text-red-600" : "text-emerald-700 dark:text-emerald-400"}`}>
+                      {liveCvPct.toFixed(2)}%
+                    </span>
+                  </span>
+                )}
+                {liveActualHank != null && (
+                  <span className="text-xs">
+                    <span className="text-muted-foreground">Actual hank </span>
+                    <span className="font-medium text-emerald-700 dark:text-emerald-400">{liveActualHank.toFixed(4)}</span>
+                  </span>
+                )}
+                <span className={`text-xs font-medium ml-auto ${liveCvPct != null && liveCvPct > 2 ? "text-red-600" : "text-emerald-700 dark:text-emerald-400"}`}>
+                  {liveCvPct != null ? (liveCvPct > 2 ? "⚠ High CV" : "✓ Within spec") : ""}
+                </span>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Remarks */}
+        <div className="flex gap-2 mt-3 items-center">
+          <input
+            placeholder="Remarks (optional)"
+            value={form["remarks"] ?? ""}
+            onChange={(e) => setField("remarks", e.target.value)}
+            className="flex-1 h-8 text-xs border border-border rounded px-2 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          {canEdit && (
+            <Button size="sm" className="h-8 text-xs" onClick={handleSave} disabled={saving}>
+              <Save className="size-3 mr-1" />
+              {saving ? "Saving…" : editId ? "Update" : "Save record"}
+            </Button>
+          )}
+        </div>
+
+        {/* Saved records list */}
+        {(existing?.length ?? 0) > 0 && (
+          <div className="mt-4 border-t border-border/40 pt-3">
+            <p className="text-[10px] font-medium text-muted-foreground mb-2">
+              {existing!.length} record{existing!.length !== 1 ? "s" : ""} saved for {filterDate}
+            </p>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {existing!.map((r: any) => (
+                <div
+                  key={r.id}
+                  onClick={() => loadRecord(r)}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded border border-border/40 hover:bg-muted/40 cursor-pointer text-xs"
+                >
+                  <span className="font-medium text-muted-foreground w-12">{r.machine_no ?? "—"}</span>
+                  <span className="text-muted-foreground">{r.shift_code ?? "—"}</span>
+                  {r.avg_weight != null && <span className="text-emerald-700 dark:text-emerald-400">avg {Number(r.avg_weight).toFixed(2)}g</span>}
+                  {r.cv_pct != null && <span className="text-muted-foreground">CV {Number(r.cv_pct).toFixed(2)}%</span>}
+                  {r.avg_csp != null && <span className="text-emerald-700 dark:text-emerald-400">CSP {r.avg_csp}</span>}
+                  <span className="ml-auto text-[10px] text-muted-foreground">click to edit</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PATTERN C — Shared header + per-machine rows ("rows")
+// Date/shift/lot/count_ne locked in header, one row per machine.
+// Used for breakage study, snap study, A% check, yarn faults.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function QmRowsEntry({
+  title,
+  endpoint,
+  columns,
+  millId,
+  canEdit,
+}: {
+  title: string;
+  endpoint: string;
+  columns: any[];
+  millId: string | null | undefined;
+  canEdit: boolean;
+}) {
+  const qc = useQueryClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const formFields = useMemo<QmFieldDef[]>(() => {
+    const base = columns
+      .filter((c: any) => !["id", "mill_id", "company_id", "created_at", "updated_at"].includes(c.key))
+      .map((c: any) => colToQmField(c.key, c.label));
+    if (!base.find((f) => f.key === "remarks")) base.push({ key: "remarks", label: "Remarks", type: "text" });
+    return base;
+  }, [columns]);
+
+  // Split: shared header vs per-row fields
+  const SHARED_KEYS = new Set(["date", "shift_code", "lot_no", "count_ne", "ratio", "tm", "rh",
+    "duration_hrs", "cotton_type", "process"]);
+  const headerFields = formFields.filter((f) => SHARED_KEYS.has(f.key));
+  const rowFields = formFields.filter((f) => !SHARED_KEYS.has(f.key) && f.key !== "status");
+
+  const [header, setHeader] = useState<Record<string, any>>(() => {
+    const h: Record<string, any> = {};
+    headerFields.forEach((f) => {
+      if (f.key === "date") h[f.key] = today;
+      else if (f.key === "shift_code") h[f.key] = "A";
+      else h[f.key] = "";
+    });
+    return h;
+  });
+  const setHeaderField = (key: string, val: string) => setHeader((p) => ({ ...p, [key]: val }));
+
+  const makeBlankRow = useCallback(() => {
+    const r: Record<string, any> = { _id: crypto.randomUUID(), _saved: false };
+    rowFields.forEach((f) => { r[f.key] = ""; });
+    return r;
+  }, [rowFields]);
+
+  const [rows, setRows] = useState<Record<string, any>[]>(() => [makeBlankRow()]);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const { data: existing, isLoading } = useQuery({
+    queryKey: ["qm-forms", endpoint, millId, header.date],
+    queryFn: async () => {
+      const p = new URLSearchParams({ page_size: "200" });
+      if (header.date) p.set("date", header.date);
+      const res = await api.get(`/api/v1${endpoint}?${p}`);
+      return (res.data?.data ?? res.data) as any[];
+    },
+    enabled: !!millId,
+    staleTime: 30_000,
+  });
+
+  const allRows = useMemo(() => {
+    const saved = (existing ?? []).map((r: any) => ({ ...r, _saved: true, _id: r.id }));
+    return [...saved, ...rows];
+  }, [existing, rows]);
+
+  const setRowField = (rowId: string, key: string, val: string) =>
+    setRows((prev) => prev.map((r) => (r._id === rowId ? { ...r, [key]: val } : r)));
+
+  const saveRow = async (row: Record<string, any>) => {
+    setSavingId(row._id);
+    try {
+      const payload: Record<string, any> = { ...header };
+      rowFields.forEach((f) => { payload[f.key] = parseVal(row[f.key], f.type); });
+      if (row._saved && row.id) {
+        await api.patch(`/api/v1${endpoint}/${row.id}`, payload);
+      } else {
+        await api.post(`/api/v1${endpoint}`, payload);
+        setRows((prev) => prev.filter((r) => r._id !== row._id));
+        setRows((prev) => [...prev, makeBlankRow()]);
+      }
+      toast.success("Saved");
+      qc.invalidateQueries({ queryKey: ["qm-forms", endpoint] });
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? "Failed to save");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const deleteRow = async (row: Record<string, any>) => {
+    if (!row._saved) { setRows((prev) => prev.filter((r) => r._id !== row._id)); return; }
+    try {
+      await api.delete(`/api/v1${endpoint}/${row.id}`);
+      toast.success("Deleted");
+      qc.invalidateQueries({ queryKey: ["qm-forms", endpoint] });
+    } catch { toast.error("Failed to delete"); }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowIdx: number, colIdx: number, row: Record<string, any>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (colIdx === rowFields.length - 1) saveRow(row);
+      else tableRef.current?.querySelector<HTMLInputElement>(`[data-cell="${rowIdx}-${colIdx + 1}"]`)?.focus();
+    }
+    if (e.key === "ArrowDown") { e.preventDefault(); tableRef.current?.querySelector<HTMLInputElement>(`[data-cell="${rowIdx + 1}-${colIdx}"]`)?.focus(); }
+    if (e.key === "ArrowUp") { e.preventDefault(); tableRef.current?.querySelector<HTMLInputElement>(`[data-cell="${rowIdx - 1}-${colIdx}"]`)?.focus(); }
+  };
+
+  return (
+    <Card>
+      {/* Shared header — locked fields */}
+      <CardHeader className="pb-2 pt-3 px-4">
+        <div className="flex items-center gap-2 flex-wrap">
+          <CardTitle className="text-sm font-medium mr-2">{title}</CardTitle>
+          {headerFields.map((f) => (
+            <div key={f.key} className="flex items-center gap-1">
+              <span className="text-[10px] text-muted-foreground whitespace-nowrap">{f.label}</span>
+              {f.type === "shift" ? (
+                <CellSelect
+                  value={String(header[f.key] ?? "A")}
+                  onChange={(v) => setHeaderField(f.key, v)}
+                  options={SHIFT_OPTIONS.map((o) => ({ value: o, label: o }))}
+                />
+              ) : (
+                <input
+                  type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"}
+                  step={f.step}
+                  value={header[f.key] ?? ""}
+                  onChange={(e) => setHeaderField(f.key, e.target.value)}
+                  placeholder={f.label}
+                  className="h-7 text-xs border border-border rounded px-2 w-20 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              )}
+            </div>
+          ))}
+          {canEdit && (
+            <button
+              onClick={() => setRows((prev) => [...prev, makeBlankRow()])}
+              className="ml-auto flex items-center gap-1 h-7 px-2 text-xs border border-border rounded hover:bg-muted text-foreground"
+            >
+              <Plus className="size-3" /> Add machine
+            </button>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-0">
+        <div ref={tableRef} className="overflow-x-auto">
+          {isLoading ? (
+            <div className="p-4 text-xs text-muted-foreground">Loading…</div>
+          ) : (
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-muted/40 border-b border-border">
+                  <th className="text-left text-[10px] font-medium text-muted-foreground px-2 py-1.5 w-6">#</th>
+                  {rowFields.map((f) => (
+                    <th key={f.key} className="text-left text-[10px] font-medium text-muted-foreground px-1 py-1.5 whitespace-nowrap">{f.label}</th>
+                  ))}
+                  {canEdit && <th className="w-16"></th>}
+                </tr>
+              </thead>
+              <tbody>
+                {allRows.length === 0 && (
+                  <tr><td colSpan={rowFields.length + 2} className="text-center text-muted-foreground py-6 text-xs">Click "Add machine" to start entry</td></tr>
+                )}
+                {allRows.map((row, rowIdx) => (
+                  <tr key={row._id ?? row.id} className={["border-b border-border/60", !row._saved ? "bg-primary/5" : "hover:bg-muted/30"].join(" ")}>
+                    <td className="px-2 py-1 text-[10px] text-muted-foreground">{rowIdx + 1}</td>
+                    {rowFields.map((field, colIdx) => (
+                      <td key={field.key} className="px-1 py-1">
+                        {field.type === "shift" ? (
+                          <CellSelect
+                            value={String(row[field.key] ?? "A")}
+                            onChange={(v) => row._saved ? null : setRowField(row._id, field.key, v)}
+                            options={SHIFT_OPTIONS.map((o) => ({ value: o, label: o }))}
+                          />
+                        ) : field.type === "yn" ? (
+                          <CellSelect
+                            value={row[field.key] === true || row[field.key] === "true" ? "true" : row[field.key] === false || row[field.key] === "false" ? "false" : ""}
+                            onChange={(v) => row._saved ? null : setRowField(row._id, field.key, v)}
+                            options={[{ value: "", label: "—" }, { value: "true", label: "OK" }, { value: "false", label: "NG" }]}
+                          />
+                        ) : (
+                          <CellInput
+                            value={row[field.key]}
+                            onChange={(v) => setRowField(row._id, field.key, v)}
+                            type={field.type === "number" ? "number" : "text"}
+                            step={field.step}
+                            onKeyDown={(e) => handleKeyDown(e, rowIdx, colIdx, row)}
+                            inputRef={(el: any) => { if (el) el.setAttribute("data-cell", `${rowIdx}-${colIdx}`); }}
+                          />
+                        )}
+                      </td>
+                    ))}
+                    {canEdit && (
+                      <td className="px-1 py-1">
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => saveRow(row)}
+                            disabled={savingId === row._id}
+                            className="h-6 px-1.5 text-[10px] rounded border border-emerald-400 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 disabled:opacity-50"
+                          >
+                            {savingId === row._id ? "…" : <Save className="size-3" />}
+                          </button>
+                          <button
+                            onClick={() => deleteRow(row)}
+                            className="h-6 px-1.5 rounded border border-border text-muted-foreground hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40"
+                          >
+                            <Trash2 className="size-3" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="flex gap-4 px-3 py-1.5 border-t border-border/40 bg-muted/20">
+          <span className="text-[10px] text-muted-foreground">
+            <kbd className="text-[9px] bg-muted border border-border rounded px-1">Tab</kbd> next cell &nbsp;
+            <kbd className="text-[9px] bg-muted border border-border rounded px-1">Enter</kbd> save row &nbsp;
+            <kbd className="text-[9px] bg-muted border border-border rounded px-1">↓↑</kbd> move rows &nbsp;
+            <span className="text-muted-foreground/60">Shared date/shift/lot applies to all rows</span>
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// QmFormsTab — dispatcher: picks the right pattern per layout prop
+// ═══════════════════════════════════════════════════════════════════════════
 
 interface QmFormsTabProps {
   title: string;
@@ -1465,300 +2506,14 @@ interface QmFormsTabProps {
   columns: any[];
   millId: string | null | undefined;
   canEdit: boolean;
+  layout?: QmLayout;
 }
 
-function QmFormsTab({ title, endpoint, columns, millId, canEdit }: QmFormsTabProps) {
-  const qc = useQueryClient();
-  const [date, setDate] = useState("");
-  const [lotNo, setLotNo] = useState("");
-  const [machineNo, setMachineNo] = useState("");
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [editRecord, setEditRecord] = useState<any | null>(null);
-  const effectiveMillId = millId ?? undefined;
-  const today = new Date().toISOString().slice(0, 10);
-
-  // Derive form fields from columns (skip id/mill_id, auto-infer types)
-  const formFields = useMemo<QmFieldDef[]>(() => {
-    const fields = columns
-      .filter((c: any) => !["id", "mill_id"].includes(c.key as string))
-      .map((c: any) => colToQmField(c.key as string, c.label as string));
-    if (!fields.find((f) => f.key === "remarks")) {
-      fields.push({ key: "remarks", label: "Remarks", type: "text" });
-    }
-    return fields;
-  }, [columns]);
-
-  const defaultForm = useMemo(() => {
-    const d: Record<string, any> = {};
-    formFields.forEach((f) => {
-      if (f.key === "date") d[f.key] = today;
-      else if (f.key === "status") d[f.key] = "draft";
-      else if (f.key === "shift_code") d[f.key] = "A";
-      else d[f.key] = "";
-    });
-    return d;
-  }, [formFields, today]);
-
-  const [form, setForm] = useState<Record<string, any>>(defaultForm);
-
-  const openNew = () => {
-    setForm(defaultForm);
-    setEditRecord(null);
-    setSheetOpen(true);
-  };
-  const openEdit = (record: any) => {
-    const f: Record<string, any> = {};
-    formFields.forEach((field) => {
-      f[field.key] = record[field.key] ?? "";
-    });
-    setForm(f);
-    setEditRecord(record);
-    setSheetOpen(true);
-  };
-
-  const { data, isLoading } = useQuery({
-    queryKey: ["qm-forms", endpoint, effectiveMillId, date, lotNo, machineNo],
-    queryFn: async () => {
-      const params = new URLSearchParams({ page_size: "100" });
-      if (date) params.set("date", date);
-      if (lotNo) params.set("lot_no", lotNo);
-      if (machineNo) params.set("machine_no", machineNo);
-      const res = await api.get(`${endpoint}?${params.toString()}`);
-      return (res.data?.data ?? res.data) as any[];
-    },
-    enabled: !!effectiveMillId,
-    staleTime: 60_000,
-    retry: 1,
-  });
-
-  const createMut = useMutation({
-    mutationFn: (payload: any) => api.post(endpoint, payload),
-    onSuccess: () => {
-      toast.success("Record saved");
-      qc.invalidateQueries({ queryKey: ["qm-forms", endpoint] });
-      setSheetOpen(false);
-    },
-    onError: (err: any) => {
-      const detail = err?.response?.data?.detail;
-      toast.error(typeof detail === "string" ? detail : "Failed to save");
-    },
-  });
-
-  const updateMut = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: any }) =>
-      api.patch(`${endpoint}/${id}`, payload),
-    onSuccess: () => {
-      toast.success("Record updated");
-      qc.invalidateQueries({ queryKey: ["qm-forms", endpoint] });
-      setSheetOpen(false);
-    },
-    onError: (err: any) => {
-      const detail = err?.response?.data?.detail;
-      toast.error(typeof detail === "string" ? detail : "Failed to update");
-    },
-  });
-
-  const handleSubmit = () => {
-    const payload: Record<string, any> = {};
-    formFields.forEach((f) => {
-      const val = form[f.key];
-      if (f.type === "number") {
-        payload[f.key] = val === "" || val === undefined ? null : parseFloat(String(val));
-      } else if (f.type === "yn") {
-        payload[f.key] = val === "true" ? true : val === "false" ? false : null;
-      } else {
-        payload[f.key] = val === "" ? null : val;
-      }
-    });
-    if (editRecord) {
-      updateMut.mutate({ id: editRecord.id, payload });
-    } else {
-      createMut.mutate(payload);
-    }
-  };
-
-  const isPending = createMut.isPending || updateMut.isPending;
-
-  return (
-    <>
-      <Card>
-        <CardHeader className="pb-3 flex flex-row items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <CardTitle className="text-sm font-medium">{title}</CardTitle>
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="h-8 w-36 text-xs"
-              />
-              <Input
-                placeholder="Lot No"
-                value={lotNo}
-                onChange={(e) => setLotNo(e.target.value)}
-                className="h-8 w-28 text-xs"
-              />
-              <Input
-                placeholder="Machine No"
-                value={machineNo}
-                onChange={(e) => setMachineNo(e.target.value)}
-                className="h-8 w-28 text-xs"
-              />
-              {(date || lotNo || machineNo) && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-8 text-xs"
-                  onClick={() => {
-                    setDate("");
-                    setLotNo("");
-                    setMachineNo("");
-                  }}
-                >
-                  Clear
-                </Button>
-              )}
-            </div>
-          </div>
-          {canEdit && (
-            <Button size="sm" onClick={openNew} className="mt-1 shrink-0">
-              <Plus className="size-3 mr-1" /> New record
-            </Button>
-          )}
-        </CardHeader>
-        <CardContent className="pt-0">
-          <DataTable
-            tableId={`qm_${endpoint.replace(/\//g, "_")}`}
-            columns={columns}
-            data={data ?? []}
-            loading={isLoading}
-            rowKey={(r: any) => r.id}
-            exportFilename={title.toLowerCase().replace(/\s+/g, "_")}
-            actions={
-              canEdit
-                ? (r: any) => (
-                    <div className="flex gap-1">
-                      <Button size="sm" variant="outline" onClick={() => openEdit(r)}>
-                        <Pencil className="size-3 mr-1" /> Edit
-                      </Button>
-                      <ConfirmDeleteButton
-                        onConfirm={async () => {
-                          await api.delete(`${endpoint}/${r.id}`);
-                          qc.invalidateQueries({ queryKey: ["qm-forms", endpoint] });
-                        }}
-                        label={`Delete this ${title} record? This cannot be undone.`}
-                        successMessage="Record deleted"
-                      />
-                    </div>
-                  )
-                : undefined
-            }
-          />
-        </CardContent>
-      </Card>
-
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>{editRecord ? `Edit ${title}` : `New ${title}`}</SheetTitle>
-          </SheetHeader>
-          <div className="space-y-3 py-4">
-            {formFields.map((f) => (
-              <div key={f.key} className="space-y-1.5">
-                <Label>
-                  {f.label}
-                  {f.required && <span className="text-destructive ml-0.5">*</span>}
-                </Label>
-                {f.type === "date" && (
-                  <Input
-                    type="date"
-                    value={form[f.key] ?? ""}
-                    onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
-                  />
-                )}
-                {f.type === "shift" && (
-                  <Select
-                    value={form[f.key] ?? "A"}
-                    onValueChange={(v) => setForm((p) => ({ ...p, [f.key]: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SHIFT_OPTIONS.map((o) => (
-                        <SelectItem key={o} value={o}>
-                          {o}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {f.type === "status" && (
-                  <Select
-                    value={form[f.key] ?? "draft"}
-                    onValueChange={(v) => setForm((p) => ({ ...p, [f.key]: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((o) => (
-                        <SelectItem key={o} value={o}>
-                          {o.charAt(0).toUpperCase() + o.slice(1)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {f.type === "yn" && (
-                  <Select
-                    value={
-                      form[f.key] === true || form[f.key] === "true"
-                        ? "true"
-                        : form[f.key] === false || form[f.key] === "false"
-                          ? "false"
-                          : ""
-                    }
-                    onValueChange={(v) => setForm((p) => ({ ...p, [f.key]: v }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">Yes</SelectItem>
-                      <SelectItem value="false">No</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-                {f.type === "number" && (
-                  <Input
-                    type="number"
-                    step={f.step ?? "0.01"}
-                    value={form[f.key] ?? ""}
-                    onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
-                  />
-                )}
-                {f.type === "text" && (
-                  <Input
-                    value={form[f.key] ?? ""}
-                    onChange={(e) => setForm((p) => ({ ...p, [f.key]: e.target.value }))}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-          <SheetFooter className="gap-2">
-            <Button variant="outline" onClick={() => setSheetOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit} disabled={isPending}>
-              {isPending ? "Saving…" : editRecord ? "Update" : "Save"}
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-    </>
-  );
+function QmFormsTab({ title, endpoint, columns, millId, canEdit, layout = "grid" }: QmFormsTabProps) {
+  const props = { title, endpoint, columns, millId, canEdit };
+  if (layout === "reading") return <QmReadingEntry {...props} />;
+  if (layout === "rows") return <QmRowsEntry {...props} />;
+  return <QmGridEntry {...props} />;
 }
 
 function LotRejectAction({ lotId }: { lotId: string }) {
