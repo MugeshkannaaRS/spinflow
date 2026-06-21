@@ -633,19 +633,32 @@ from sqlalchemy.orm import DeclarativeBase
 
 # Route slug → SQLAlchemy model
 _V2_MODEL_MAP: Dict[str, Any] = {
+    # Carding
     "carding/cv-record":         QmCardingCvRecord,
+    "carding/waste-study":       QmCardingWasteStudy,
+    "carding/wrapping":          QmCardingWrapping,
+    # Drawing
     "drawing/cv-record":         QmDrawingCvRecord,
     "drawing/a-pct":             QmAPctCheck,
+    "drawing/sliver-wrapping":   QmSliverWrapping,
+    # Simplex
+    "simplex/hank-test":         QmSimplexHankTest,
     "simplex/breakage-study":    QmSimplexBreakageStudy,
     "simplex/stretch-pct":       QmSimplexStretchPct,
+    # Ring Frame
+    "ring-frame/csp-report":     QmRfCspReport,
     "ring-frame/breakage-study": QmRfBreakageStudy,
     "ring-frame/snap-study":     QmRfSnapStudy,
+    # Auto Coner
     "auto-coner/yarn-faults":    QmYarnFaultsUster,
     "auto-coner/splice-strength":QmSpliceStrength,
     "auto-coner/wax-pickup":     QmWaxPickup,
     "auto-coner/bag-faults":     QmBagFaults,
+    # Packing
     "packing/blend-test":        QmBlendTest,
     "packing/pwse-check":        QmPwseCheck,
+    "packing/bag-weight":        QmBagWeightCheck,
+    "packing/paper-cone":        QmPaperConeCheck,
 }
 
 
@@ -677,7 +690,10 @@ async def _v2_create(slug: str, payload: Dict[str, Any],
     scope = await get_mill_scope(current_user, db)
     allowed = _model_cols(model)
     kwargs = {k: v for k, v in payload.items() if k in allowed}
-    kwargs["mill_id"] = scope.get("mill_id") or ""
+    mill_id = scope.get("mill_id")
+    if not mill_id:
+        raise HTTPException(status_code=400, detail="No mill selected. Please select a mill before saving quality records.")
+    kwargs["mill_id"] = mill_id
     if scope.get("company_id"):
         kwargs["company_id"] = scope["company_id"]
     kwargs.setdefault("status", "draft")

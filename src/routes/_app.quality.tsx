@@ -426,7 +426,7 @@ function QualityPage() {
                 {/* ── Carding Waste % Study ── */}
                 <QmFormsTab
                   title="Carding Waste % Study"
-                  endpoint="/quality-forms/waste-study"
+                  endpoint="/quality/v2/carding/waste-study"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Card Mc No" },
@@ -461,7 +461,7 @@ function QualityPage() {
                 {/* ── Daily Carding Wrapping Report ── */}
                 <QmFormsTab
                   title="Daily Carding Wrapping Report"
-                  endpoint="/quality-forms/carding-wrapping"
+                  endpoint="/quality/v2/carding/wrapping"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Mc No" },
@@ -585,7 +585,7 @@ function QualityPage() {
                 {/* ── Daily Sliver Wrapping Report (Breaker/Finisher Drawing) ── */}
                 <QmFormsTab
                   title="Daily Sliver Wrapping Report (BD/FD)"
-                  endpoint="/quality-forms/sliver-wrapping"
+                  endpoint="/quality/v2/drawing/sliver-wrapping"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Mc No" },
@@ -631,7 +631,7 @@ function QualityPage() {
                 {/* ── Simplex Hank Test ── */}
                 <QmFormsTab
                   title="Simplex Hank Test"
-                  endpoint="/quality-forms/simplex-hank"
+                  endpoint="/quality/v2/simplex/hank-test"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Simplex No" },
@@ -733,7 +733,7 @@ function QualityPage() {
                 {/* ── CSP Strength Report ── */}
                 <QmFormsTab
                   title="CSP Strength Report"
-                  endpoint="/quality-forms/csp-strength"
+                  endpoint="/quality/v2/ring-frame/csp-report"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "machine_no", label: "Mc No" },
@@ -1081,7 +1081,7 @@ function QualityPage() {
                 {/* ── Bag Weight Check (Packed cone bags — gross/tare/net per sample) ── */}
                 <QmFormsTab
                   title="Bag Weight Checking"
-                  endpoint="/quality-forms/bag-weight"
+                  endpoint="/quality/v2/packing/bag-weight"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "shift_code", label: "Shift" },
@@ -1114,7 +1114,7 @@ function QualityPage() {
                 {/* ── Paper Cone Check ── */}
                 <QmFormsTab
                   title="Paper Cone Check"
-                  endpoint="/quality-forms/paper-cone"
+                  endpoint="/quality/v2/packing/paper-cone"
                   columns={[
                     { key: "date", label: "Date" },
                     { key: "supplier_name", label: "Supplier" },
