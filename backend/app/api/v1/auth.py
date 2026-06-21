@@ -20,7 +20,7 @@ from app.core.config import settings
 from app.core.error_handler import SpinFlowException, ErrorCode
 from app.core.email import send_otp_email
 from app.core.limiter import limiter
-from app.models.user import User, Role, UserSession
+from app.models.user import User, Role, UserSession, UserModuleAccess
 from app.schemas.auth import (
     LoginRequest, LoginResponse, TokenResponse, RefreshRequest,
     UserResponse, ChangePasswordRequest, ForgotPasswordRequest,
@@ -232,6 +232,15 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
         client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "0.0.0.0").split(",")[0].strip()
         await log_audit(db, user.id, role_code, "login", "auth", user.id, "User logged in", ip_address=client_ip)
         _set_refresh_cookie(response, refresh_token)
+
+        # Build module_restrictions from UserModuleAccess + JSON column
+        module_restrictions = user.get_module_restrictions() or {}
+        uma_rows = (await db.execute(
+            select(UserModuleAccess).where(UserModuleAccess.user_id == user.id)
+        )).scalars().all()
+        for uma in uma_rows:
+            module_restrictions[uma.module] = uma.access_level
+
         return LoginResponse(
             access_token=access_token,
             refresh_token=refresh_token,
@@ -248,6 +257,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
                 is_active=user.is_active,
                 last_login=user.last_login,
                 must_change_password=user.must_change_password,
+                module_restrictions=module_restrictions,
                 enabled_modules=enabled_modules,
             ),
         )
@@ -351,6 +361,14 @@ async def get_me(db: AsyncSession = Depends(get_db), current_user: User = Depend
         else:
             enabled_modules = ["all"]
 
+        # Build module_restrictions from UserModuleAccess + JSON column
+        module_restrictions = current_user.get_module_restrictions() or {}
+        uma_rows = (await db.execute(
+            select(UserModuleAccess).where(UserModuleAccess.user_id == current_user.id)
+        )).scalars().all()
+        for uma in uma_rows:
+            module_restrictions[uma.module] = uma.access_level
+
         return {
             "id": str(current_user.id),
             "name": current_user.name,
@@ -361,7 +379,7 @@ async def get_me(db: AsyncSession = Depends(get_db), current_user: User = Depend
             "mill_name": mill_name,
             "company_mills": company_mills,
             "must_change_password": current_user.must_change_password,
-            "module_restrictions": current_user.get_module_restrictions(),
+            "module_restrictions": module_restrictions,
             "enabled_modules": enabled_modules,
         }
 

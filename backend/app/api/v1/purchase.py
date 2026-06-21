@@ -224,7 +224,10 @@ async def get_bale_stats(
             if mill_check.scalar_one_or_none():
                 effective_mill_id = mill_id
 
-    result = await db.execute(select(CottonBale))
+    stmt = select(CottonBale)
+    if effective_mill_id:
+        stmt = stmt.where(CottonBale.mill_id == effective_mill_id)
+    result = await db.execute(stmt)
     bales = result.scalars().all()
     total = len(bales)
     in_stock = sum(1 for b in bales if b.status == "in-stock")
@@ -378,18 +381,20 @@ async def get_bale_group(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("purchase")),
 ):
+    scope = await get_mill_scope(current_user, db)
+    effective_mill_id = scope.get("mill_id")
     mic_min, mic_max = _YARN_MIC.get(req.yarn_count, (3.8, 4.3))
     st_min, st_max = _YARN_STAPLE.get(req.yarn_count, (28.0, 32.0))
+    stmt = select(CottonBale)
+    if effective_mill_id:
+        stmt = stmt.where(CottonBale.mill_id == effective_mill_id)
     if req.bale_ids:
-        stmt = select(CottonBale).where(CottonBale.id.in_(req.bale_ids))
+        stmt = stmt.where(CottonBale.id.in_(req.bale_ids))
     else:
-        stmt = (
-            select(CottonBale)
-            .where(CottonBale.status == "in-stock")
-            .where(CottonBale.micronaire >= mic_min)
-            .where(CottonBale.micronaire <= mic_max)
-            .order_by(CottonBale.micronaire)
-        )
+        stmt = stmt.where(CottonBale.status == "in-stock")
+        if mic_min: stmt = stmt.where(CottonBale.micronaire >= mic_min)
+        if mic_max: stmt = stmt.where(CottonBale.micronaire <= mic_max)
+        stmt = stmt.order_by(CottonBale.micronaire)
     result = await db.execute(stmt)
     bales = result.scalars().all()
     if not bales:

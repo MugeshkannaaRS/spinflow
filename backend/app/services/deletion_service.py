@@ -492,13 +492,10 @@ class CompanyDeletionService:
                 counts["company_modules"] = cnt
 
             if user_ids:
-                up = ",".join(f"'{u}'" for u in user_ids)
-                for table, cond in [
-                    ("user_sessions", f"user_id IN ({up})"),
-                    ("audit_logs", f"user_id IN ({up})"),
-                    ("qr_scans", f"scanned_by IN ({up})"),
-                ]:
-                    cnt = await self._delete_from(table, cond, None)
+                placeholders = ",".join(f":uid_{i}" for i in range(len(user_ids)))
+                uid_params = {f"uid_{i}": uid for i, uid in enumerate(user_ids)}
+                for table in ["user_sessions", "audit_logs", "qr_scans"]:
+                    cnt = await self._delete_from(table, f"user_id IN ({placeholders})", None, **uid_params)
                     if cnt:
                         counts[table] = cnt
                 cnt = await self._delete_from("users", "company_id = :p", company_id)

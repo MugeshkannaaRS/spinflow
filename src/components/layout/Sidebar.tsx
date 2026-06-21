@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useAuth } from "@/stores/auth";
 import { useRBAC } from "@/hooks/useRBAC";
-import { useModuleAccess } from "@/hooks/useModuleAccess";
 import {
   LayoutDashboard,
   Factory,
@@ -191,7 +190,6 @@ function SidebarContent({
     companyModulesLoaded,
     isDashboardOnly,
   } = useRBAC();
-  const { canAccess: moduleCanAccess } = useModuleAccess();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const navigate = useNavigate();
 
@@ -206,7 +204,7 @@ function SidebarContent({
     refetchInterval: 3 * 60 * 1000,
     staleTime: 3 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    enabled: !!(user && moduleCanAccess("alerts")),
+    enabled: !!(user && rbacCanAccess("alerts")),
   });
   const activeAlertCount = alertSummary?.active ?? 0;
   const hasCriticalAlerts = (alertSummary?.critical ?? 0) > 0;
@@ -261,11 +259,12 @@ function SidebarContent({
       // SUPER_ADMIN: dashboard + users + audit shown flat; admin sub-items in collapsible group
       const SA_MODULES = new Set(["dashboard", "users", "audit"]);
       if (isSuperAdmin) return SA_MODULES.has(item.module);
-      return moduleCanAccess(item.module);
+      return rbacCanAccess(item.module);
     }),
   })).filter((group) => group.items.length > 0);
 
-  // SUPER_ADMIN uses /admin/billing (Settings > Billing); only MILL_OWNER gets the Company Billing section
+  // CATEGORY B: ownership gates — billing and owner dashboard are company-level features,
+  // not module-access decisions. Only the mill owner sees them regardless of module overrides.
   const showBilling = user.role === "MILL_OWNER" && !isDashboardOnly();
   const showOwnerDashboard = user.role === "MILL_OWNER" && !isDashboardOnly();
 

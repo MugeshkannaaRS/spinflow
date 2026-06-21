@@ -39,69 +39,79 @@ ACCESS_MATRIX: dict[str, dict[str, AccessLevel]] = {
     "MILL_OWNER": {m: True for m in MODULES},
 
     "GENERAL_MANAGER": {
-        "dashboard": True, "production": True, "quality": True,
-        "maintenance": True, "stores": True, "inventory": True,
-        "dispatch": True, "purchase": True, "lotrac": True,
-        "reports": True, "stock": True, "sales": True,
-        "uploads": True, "analytics": True, "lc_tracking": True,
-        "hr": "read", "payroll": "read", "accounts": "read",
-        "audit": "read", "masters": "read",
+        "dashboard": True,
+        "production": "read",
+        "quality": "read",
+        "purchase": "read",
+        "payroll": "read",
+        "accounts": "read",
+        "reports": True,
     },
 
     "PRODUCTION_MANAGER": {
         "dashboard": True, "production": True, "maintenance": "read",
         "quality": "read", "inventory": "read", "stock": "read",
         "reports": True, "uploads": True, "analytics": True,
+        "alerts": "read",
     },
 
     "QUALITY_MANAGER": {
         "dashboard": True, "quality": True, "production": "read",
         "inventory": "read", "stock": "read",
         "reports": True, "uploads": True,
+        "alerts": "read",
     },
 
     "DISPATCH_MANAGER": {
         "dashboard": True, "dispatch": True, "lotrac": True,
         "stores": True, "inventory": True, "sales": "read",
         "stock": "read", "reports": True, "uploads": True,
+        "alerts": "read",
     },
 
     "STORE_MANAGER": {
         "dashboard": True, "stores": True, "inventory": True,
         "purchase": "read", "maintenance": "read",
         "reports": True, "stock": True, "uploads": True,
+        "alerts": "read",
     },
 
     "HR_MANAGER": {
         "dashboard": True, "hr": True, "payroll": True,
         "reports": True, "uploads": True,
+        "alerts": "read",
     },
 
     "ACCOUNTANT": {
         "dashboard": True, "accounts": True, "payroll": True,
         "purchase": "read", "dispatch": "read", "sales": "read",
         "reports": True, "lc_tracking": True, "uploads": True,
+        "alerts": "read",
     },
 
     "MAINTENANCE_MANAGER": {
         "dashboard": True, "maintenance": True,
         "stores": "read", "production": "read",
         "reports": True, "uploads": True,
+        "alerts": "read",
     },
 
     "SUPERVISOR": {
         "dashboard": True, "production": True, "reports": True,
+        "alerts": "read",
     },
 
     "MACHINE_OPERATOR": {
         "dashboard": True,
         "production": True,   # can submit shift entries for their machine
+        "alerts": "read",
     },
 
     "SECURITY_GATE": {
         "dashboard": True,
         "dispatch": "read",   # view trips at gate
         "lotrac": True,       # QR scan at gate
+        "alerts": "read",
     },
 
     "AUDITOR": {
@@ -109,6 +119,7 @@ ACCESS_MATRIX: dict[str, dict[str, AccessLevel]] = {
         "hr": "read", "accounts": "read", "reports": True,
         "audit": True, "inventory": "read", "stores": "read",
         "dispatch": "read", "maintenance": "read",
+        "alerts": "read",
     },
 
     # OPERATOR — general factory floor, lighter than SUPERVISOR
@@ -118,6 +129,7 @@ ACCESS_MATRIX: dict[str, dict[str, AccessLevel]] = {
         "quality": "read",
         "stores": "read",
         "reports": "read",
+        "alerts": "read",
     },
 }
 

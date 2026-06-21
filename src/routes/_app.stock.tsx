@@ -4,7 +4,6 @@ import { useAuth } from "@/stores/auth";
 import { stockApi, salesApi, mastersApi } from "@/lib/api-service";
 import { ExcelColumnFilter } from "@/components/ui/excel-column-filter";
 import type { StockSnapshotRow, SalesOrder, SalesOrderLine, Customer } from "@/lib/types";
-import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 
 export const Route = createFileRoute("/_app/stock")({

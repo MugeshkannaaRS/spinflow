@@ -538,6 +538,7 @@ export const mastersApi = {
   deleteRoute: (id: string) => api.delete(`/masters/routes/${id}`).then((r) => r.data),
 };
 
+// ── Export helpers ─────────────────────────────────────────────────────────────
 function downloadBlob(url: string, filename: string) {
   const a = document.createElement("a");
   a.href = url;
@@ -795,6 +796,12 @@ export const adminApi = {
   getBillingPayments: (params?: any) =>
     api.get("/admin/billing/payments", { params }).then((r) => r.data),
   getBillingAnalytics: () => api.get("/admin/billing/analytics").then((r) => r.data),
+
+  // Per-user module access overrides (UserModuleAccess)
+  getUserModuleAccess: (userId: string) =>
+    api.get(`/admin/users/${userId}/module-access`).then((r) => r.data),
+  updateUserModuleAccess: (userId: string, overrides: { module: string; access_level: string }[]) =>
+    api.put(`/admin/users/${userId}/module-access`, overrides).then((r) => r.data),
 };
 
 // ---------------------------------------------------------------------------

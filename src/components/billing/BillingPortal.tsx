@@ -1503,6 +1503,7 @@ export function BillingPortal() {
   const role = user?.role ?? "";
   return (
     <ErrorBoundary>
+      {/* CATEGORY B: ownership gate — SUPER_ADMIN sees platform billing, MILL_OWNER sees company billing. Not a module-access decision. */}
       {role === "SUPER_ADMIN" ? <SuperAdminBillingView /> : <MillOwnerBillingView />}
     </ErrorBoundary>
   );

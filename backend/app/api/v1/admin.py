@@ -3,6 +3,7 @@ import json
 import logging
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -16,7 +17,7 @@ from app.db.session import get_db
 from app.core.deps import get_current_user, get_mill_scope, log_audit
 from app.core.limiter import limiter
 from app.core.module_registry import ALL_MODULE_CODES as ALL_MODULE_KEYS
-from app.models.user import User, Role, UserSession
+from app.models.user import User, Role, UserSession, UserModuleAccess
 from app.models.masters import Company, CompanyModule, Mill, MillSettings, CompanyRoleConfig, RoleModuleAccess
 from app.models.hr import Employee
 from app.models.billing import CompanySubscription, SubscriptionPlan
@@ -982,6 +983,107 @@ async def update_user_restrictions(
         old_value=str(old_value), new_value=str(new_restrictions),
     )
     return {"message": "User module restrictions updated", "module_restrictions": new_restrictions}
+
+
+# ── Per-user module access overrides (UserModuleAccess) ───────────────────────
+
+class ModuleAccessItem(BaseModel):
+    module: str
+    access_level: str  # "none" | "read" | "write"
+
+
+@router.get("/admin/users/{user_id}/module-access")
+async def get_user_module_access(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role = current_user.role_rel.code if current_user.role_rel else ""
+    if role not in ("SUPER_ADMIN",):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super Admin only")
+
+    target_user = await db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    result = await db.execute(
+        select(UserModuleAccess).where(UserModuleAccess.user_id == user_id)
+    )
+    rows = result.scalars().all()
+    return {
+        "user_id": user_id,
+        "overrides": [
+            {"id": r.id, "module": r.module, "access_level": r.access_level, "set_by": r.set_by}
+            for r in rows
+        ],
+    }
+
+
+@router.put("/admin/users/{user_id}/module-access")
+async def update_user_module_access(
+    user_id: str,
+    body: list[ModuleAccessItem],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role = current_user.role_rel.code if current_user.role_rel else ""
+    if role != "SUPER_ADMIN":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super Admin only")
+
+    target_user = await db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    # Fetch existing overrides for this user
+    existing_res = await db.execute(
+        select(UserModuleAccess).where(UserModuleAccess.user_id == user_id)
+    )
+    existing_rows: dict[str, UserModuleAccess] = {uma.module: uma for uma in existing_res.scalars().all()}
+
+    modified_modules: list[str] = []
+    for item in body:
+        existing = existing_rows.get(item.module)
+        if existing:
+            if existing.access_level != item.access_level:
+                existing.access_level = item.access_level
+                modified_modules.append(f"{item.module}={item.access_level}")
+        else:
+            db.add(UserModuleAccess(
+                user_id=user_id,
+                module=item.module,
+                access_level=item.access_level,
+                set_by=current_user.id,
+            ))
+            modified_modules.append(f"{item.module}={item.access_level}")
+
+    # Removing an override (not in request body) means deleting the row so
+    # role-default changes propagate to users who never customized that module.
+    requested_modules = {item.module for item in body}
+    for module, row in existing_rows.items():
+        if module not in requested_modules:
+            await db.delete(row)
+            modified_modules.append(f"{module}=inherit")
+
+    await db.commit()
+    role_code_audit = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+    await log_audit(
+        db, current_user.id, role_code_audit,
+        "update_user_module_access", "user", user_id,
+        f"User module overrides: {', '.join(modified_modules) if modified_modules else 'none'}",
+    )
+
+    # Return current effective state
+    final_res = await db.execute(
+        select(UserModuleAccess).where(UserModuleAccess.user_id == user_id)
+    )
+    final_rows = final_res.scalars().all()
+    return {
+        "user_id": user_id,
+        "overrides": [
+            {"module": r.module, "access_level": r.access_level, "set_by": r.set_by}
+            for r in final_rows
+        ],
+    }
 
 
 # ── Admin Dashboard (Vendor overview) ─────────────────────────────────────────

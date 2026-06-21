@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { alertsApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
+import { useRBAC } from "@/hooks/useRBAC";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -902,6 +903,7 @@ function OpsCenter() {
 function AlertRules() {
   const qc = useQueryClient();
   const { user } = useAuth();
+  const { canAccess } = useRBAC();
   const [createOpen, setCreateOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
 
@@ -928,7 +930,7 @@ function AlertRules() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["alert-rules"] }),
   });
 
-  const canManage = user && ["SUPER_ADMIN", "MILL_OWNER"].includes(user.role);
+  const canManage = canAccess("alerts", true);
 
   const ruleList: AlertRule[] = Array.isArray(rules) ? rules : ((rules as any)?.data ?? []);
 

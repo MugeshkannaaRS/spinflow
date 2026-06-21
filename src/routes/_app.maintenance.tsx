@@ -4,11 +4,11 @@ import { mastersApi, maintenanceApi, productionApi, exportApi } from "@/lib/api-
 import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
-import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRBAC } from "@/hooks/useRBAC";
 import {
   Table,
   TableBody,
@@ -301,7 +301,8 @@ function parseParameterRow(row: any[]): Record<string, string> | null {
 
 function MaintenancePage() {
   const user = useAuth((s) => s.user);
-  const canEdit = canWrite(user?.role ?? "OPERATOR", "maintenance");
+  const { canAccess } = useRBAC();
+  const canEdit = canAccess("maintenance", true);
   const taskColConfig = useColumnConfig("maintenance_tasks");
   const schedColConfig = useColumnConfig("maintenance_schedules");
   const qc = useQueryClient();

@@ -80,26 +80,12 @@ const ACCESS_MATRIX: Record<string, Record<string, AccessLevel>> = {
 
   GENERAL_MANAGER: {
     dashboard: "write",
-    production: "write",
-    quality: "write",
-    maintenance: "write",
-    stores: "write",
-    inventory: "write",
-    dispatch: "write",
-    purchase: "write",
-    lotrac: "write",
-    reports: "write",
-    stock: "write",
-    sales: "write",
-    uploads: "write",
-    analytics: "write",
-    lc_tracking: "write",
-    hr: "read",
+    production: "read",
+    quality: "read",
+    purchase: "read",
     payroll: "read",
     accounts: "read",
-    audit: "read",
-    masters: "read",
-    alerts: "write",
+    reports: "write",
   },
 
   PRODUCTION_MANAGER: {
@@ -241,7 +227,7 @@ const SYSTEM_MODULES = new Set([
 ]);
 
 // Roles restricted to dashboard + profile + auth only
-export const DASHBOARD_ONLY_ROLES = new Set(["MACHINE_OPERATOR", "SECURITY_GATE", "AUDITOR"]);
+export const DASHBOARD_ONLY_ROLES = new Set(["MACHINE_OPERATOR", "SECURITY_GATE"]);
 
 // Map DB module keys to canonical module names
 const MODULE_KEY_MAP: Record<string, string> = {
@@ -257,7 +243,7 @@ export interface AccessContext {
   role: string;
   isSuperAdmin: boolean;
   companyModules: Record<string, boolean> | null;
-  moduleRestrictions: Record<string, boolean> | null;
+  moduleRestrictions: Record<string, string> | null;  // "none" | "read" | "write"
 }
 
 function roleAccessLevel(role: string, module: string): AccessLevel {
@@ -266,6 +252,16 @@ function roleAccessLevel(role: string, module: string): AccessLevel {
 
 /**
  * Three-layer permission check.
+ *
+ * ORDER (matches backend):
+ *   1. UserModuleAccess false override → deny immediately
+ *   2. Company subscription            → hard gate
+ *   3. UserModuleAccess true override  → grant (bypasses role ceiling)
+ *   4. Role capability (ACCESS_MATRIX) → role default
+ *
+ * Layer 3 (UserModuleAccess true) is checked BEFORE Layer 2 (role capability)
+ * so that per-user GRANTS work — a user can be given access to a module
+ * their role doesn't normally have.
  *
  * @param ctx - Access context (role, company modules, restrictions)
  * @param module - Module name to check
@@ -279,17 +275,22 @@ export function finalAccess(
 ): AccessResult {
   const key = normaliseModule(module);
 
-  // ── LAYER 2: Role capability ────────────────────────────────────────────
-  const level = roleAccessLevel(ctx.role, key);
-  if (level === "none") {
-    return { granted: false, reason: `Role ${ctx.role} cannot access "${key}"`, level: "none" };
+  // ── LAYER 3: User module restrictions (checked FIRST so overrides work) ──
+  // Values are 'none', 'read', or 'write' — overrides role default entirely.
+  const restrictions = ctx.moduleRestrictions;
+  const hasOverride = restrictions !== null && key in restrictions;
+  if (hasOverride) {
+    const val = restrictions![key];
+    if (val === "none") {
+      return { granted: false, reason: `Module "${key}" disabled for this user`, level: "none" };
+    }
+    if (val === "read" && write) {
+      return { granted: false, reason: `Write access denied for "${key}"`, level: "read" };
+    }
+    // val is "read" or "write" — skip role ceiling check below
   }
 
-  if (write && level !== "write") {
-    return { granted: false, reason: `Write access denied for "${key}"`, level: "read" };
-  }
-
-  // ── LAYER 1: Company subscription ───────────────────────────────────────
+  // ── LAYER 1: Company subscription (always applies) ──────────────────────
   if (!ctx.isSuperAdmin && !SYSTEM_MODULES.has(key) && ctx.companyModules !== null) {
     if (ctx.companyModules[key] !== true) {
       return {
@@ -300,11 +301,21 @@ export function finalAccess(
     }
   }
 
-  // ── LAYER 3: User module restrictions ───────────────────────────────────
-  if (ctx.moduleRestrictions !== null && key in ctx.moduleRestrictions) {
-    if (!ctx.moduleRestrictions[key]) {
-      return { granted: false, reason: `Module "${key}" restricted for this user`, level: "none" };
+  // ── LAYER 2: Role capability (skipped if user has an override) ──────────
+  let level: AccessLevel = "read";
+  if (!hasOverride) {
+    level = roleAccessLevel(ctx.role, key);
+    if (level === "none") {
+      return { granted: false, reason: `Role ${ctx.role} cannot access "${key}"`, level: "none" };
     }
+  } else {
+    // With an override, the access_level string determines the level directly
+    const val = restrictions![key];
+    level = val === "write" ? "write" : "read";
+  }
+
+  if (write && level !== "write") {
+    return { granted: false, reason: `Write access denied for "${key}"`, level: "read" };
   }
 
   return { granted: true, reason: "ok", level };
@@ -316,7 +327,7 @@ export function finalAccess(
 export function buildAccessContext(
   role: string,
   companyModules: Record<string, boolean> | null,
-  moduleRestrictions: Record<string, boolean> | null,
+  moduleRestrictions: Record<string, string> | null,
 ): AccessContext {
   return {
     role,

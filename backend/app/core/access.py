@@ -1,10 +1,11 @@
-"""Three-layer permission resolver.
+"""Four-layer permission resolver.
 
-LAYER 1 — Company Subscription  (company_modules.is_enabled)
-LAYER 2 — Role Capability       (ACCESS_MATRIX in rbac.py)
-LAYER 3 — User Module Assignment (user_modules.is_enabled)
-
-ACCESS = Layer1 AND Layer2 AND Layer3
+ORDER (highest priority first):
+  1. CompanySubscription  — hard gate; module must be enabled for company
+  2. SUPER_ADMIN          — full bypass
+  3. UserModuleAccess     — per-user override (if row exists, FINAL)
+  4. RoleModuleAccess     — per-company role-level override
+  5. ACCESS_MATRIX        — hardcoded role default
 
 Every API endpoint uses resolve_access() — no exceptions except SUPER_ADMIN.
 """
@@ -13,7 +14,7 @@ from dataclasses import dataclass
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.models.user import User
+from app.models.user import User, UserModuleAccess
 from app.models.masters import CompanyModule, RoleModuleAccess
 from app.core.rbac import (
     can_access as role_can_access,
@@ -42,7 +43,7 @@ async def resolve_access(
     *,
     skip_company_check: bool = False,
 ) -> AccessResult:
-    """Three-layer permission check.
+    """Resolve module access through the priority chain.
 
     Args:
         db: Database session.
@@ -56,27 +57,7 @@ async def resolve_access(
     """
     role_code = user.role_rel.code if user.role_rel else (user.role or "")
 
-    # ── SUPER_ADMIN: bypass everything ──────────────────────────────────────
-    if role_code == "SUPER_ADMIN":
-        return SUPER_ADMIN_BYPASS
-
-    # ── LAYER 2: Role capability ────────────────────────────────────────────
-    if not role_can_access(role_code, module):
-        return AccessResult(
-            granted=False,
-            reason=f"Your role ({role_code}) does not have access to '{module}'.",
-            level="none",
-        )
-
-    access_level = "read" if role_can_write(role_code, module) else "readonly"
-    if write and not role_can_write(role_code, module):
-        return AccessResult(
-            granted=False,
-            reason=f"Write access denied for '{module}'. Your role ({role_code}) has read-only access.",
-            level="readonly",
-        )
-
-    # ── LAYER 1: Company subscription ───────────────────────────────────────
+    # ── LAYER 1: Company subscription (hard gate) ────────────────────────────
     if not skip_company_check and module not in SYSTEM_MODULES and user.company_id:
         stmt = select(CompanyModule).where(
             CompanyModule.company_id == user.company_id,
@@ -92,9 +73,58 @@ async def resolve_access(
                 level="none",
             )
 
-    # ── LAYER 3: Per-company role-module overrides ──────────────────────────
-    # SUPER_ADMIN can grant or revoke module access for a specific role within
-    # a company. A missing row = use system default (already evaluated above).
+    # ── LAYER 2: SUPER_ADMIN bypass ──────────────────────────────────────────
+    if role_code == "SUPER_ADMIN":
+        return SUPER_ADMIN_BYPASS
+
+    # ── LAYER 3: Per-user module override (UserModuleAccess) ─────────────────
+    # If an explicit row exists for this user+module, its access_level is
+    # FINAL — no fall-through to role defaults.
+    #   'write' → read+write, overrides role default completely
+    #   'read'  → read-only, capped even if role would give write
+    #   'none'  → explicitly denied, overrides role grant
+    uma_res = await db.execute(
+        select(UserModuleAccess).where(
+            UserModuleAccess.user_id == user.id,
+            UserModuleAccess.module == module,
+        )
+    )
+    uma = uma_res.scalar_one_or_none()
+    if uma is not None:
+        if uma.access_level == "write":
+            return AccessResult(granted=True, reason="ok", level="write")
+        if uma.access_level == "read":
+            if write:
+                return AccessResult(
+                    granted=False,
+                    reason=f"Write access denied for '{module}'. This user has read-only access.",
+                    level="read",
+                )
+            return AccessResult(granted=True, reason="ok", level="read")
+        # access_level == "none"
+        return AccessResult(
+            granted=False,
+            reason=f"Module '{module}' has been disabled for this user by Super Admin.",
+            level="none",
+        )
+
+    # ── LAYER 4: Role capability (ACCESS_MATRIX) ────────────────────────────
+    if not role_can_access(role_code, module):
+        return AccessResult(
+            granted=False,
+            reason=f"Your role ({role_code}) does not have access to '{module}'.",
+            level="none",
+        )
+
+    access_level = "write" if role_can_write(role_code, module) else "read"
+    if write and access_level != "write":
+        return AccessResult(
+            granted=False,
+            reason=f"Write access denied for '{module}'. Your role ({role_code}) has read-only access.",
+            level="readonly",
+        )
+
+    # ── LAYER 5: Per-company role-module overrides (RoleModuleAccess) ────────
     if not skip_company_check and user.company_id:
         override_res = await db.execute(
             select(RoleModuleAccess).where(
@@ -111,8 +141,6 @@ async def resolve_access(
                     reason=f"Module '{module}' has been restricted for your role by your company admin.",
                     level="none",
                 )
-            # is_allowed=True overrides a role that normally can't access the module
-            # Preserve write access if the role originally had it
             if not write:
                 access_level = "read"
             elif role_can_write(role_code, module):
@@ -120,10 +148,7 @@ async def resolve_access(
             else:
                 access_level = "read"
 
-    # ── LAYER 4: User module restrictions ────────────────────────────────────
-    # User-level module restrictions can only REDUCE access.
-    # If module_restrictions has an explicit entry for this module, respect it.
-    # If no entry exists, role-level access stands.
+    # ── LAYER 6: Legacy module_restrictions JSON column (backward compat) ────
     user_restrictions = user.get_module_restrictions()
     if user_restrictions and not skip_company_check:
         if module in user_restrictions:

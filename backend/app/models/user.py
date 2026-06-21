@@ -1,5 +1,5 @@
 from __future__ import annotations
-from sqlalchemy import String, Boolean, DateTime, ForeignKey, Text, Integer, func
+from sqlalchemy import String, Boolean, DateTime, ForeignKey, Text, Integer, func, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import JSON
 from datetime import datetime
@@ -71,3 +71,31 @@ class UserSession(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user = relationship("User", back_populates="sessions")
+
+
+class UserModuleAccess(Base):
+    """Per-user module access override.
+
+    A row here means the user's access for this module has been
+    explicitly set — it takes priority over the role default and
+    RoleModuleAccess overrides. Removing the row means "inherit
+    from role default".
+
+    access_level:
+        'write' — full access (read + write), overrides role default
+        'read'  — read-only, capped even if role would give write
+        'none'  — explicitly denied, overrides role grant
+    """
+    __tablename__ = "user_module_access"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    module: Mapped[str] = mapped_column(String(50), nullable=False)
+    access_level: Mapped[str] = mapped_column(String(10), nullable=False)
+    set_by: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "module", name="uq_user_module_access"),
+    )

@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.models.user import User, Role
+from app.models.user import User, Role, UserModuleAccess
 from app.models.masters import Company, CompanyModule
 from app.core.access import resolve_access
 from app.core.rbac import ACCESS_MATRIX
@@ -90,10 +90,10 @@ async def test_super_admin_bypasses_all_layers(session: AsyncSession):
 
 
 async def test_role_without_module_denied(session: AsyncSession):
-    """MACHINE_OPERATOR cannot access production."""
+    """MACHINE_OPERATOR cannot access quality (read-only role shows denied for write)."""
     user = await _create_user(session, "MACHINE_OPERATOR")
-    result = await resolve_access(session, user, "production")
-    assert not result.granted, "MACHINE_OPERATOR should not access production"
+    result = await resolve_access(session, user, "quality")
+    assert not result.granted, "MACHINE_OPERATOR should not write quality"
 
 
 async def test_role_with_module_allowed(session: AsyncSession):
@@ -206,3 +206,151 @@ async def test_dashboard_bypasses_company_check(session: AsyncSession):
     user = await _create_user(session, "MILL_OWNER")
     result = await resolve_access(session, user, "dashboard")
     assert result.granted, "Dashboard should bypass company module check"
+
+
+# ── Test 6: UserModuleAccess — 3-state per-user override table ────────────────
+# access_level values: "none" | "read" | "write"
+# A row is FINAL — no fall-through to role defaults.
+
+
+async def test_uma_none_denies_module(session: AsyncSession):
+    """access_level='none' should deny even if role+company allow."""
+    company = Company(id=str(uuid.uuid4()), name="Test Co", code="T-UMA1", is_active=True)
+    session.add(company)
+    await session.flush()
+    await _ensure_company_module(session, company.id, "production", enabled=True)
+    user = await _create_user(session, "PRODUCTION_MANAGER", company_id=company.id)
+    session.add(UserModuleAccess(user_id=user.id, module="production", access_level="none"))
+    await session.flush()
+    result = await resolve_access(session, user, "production")
+    assert not result.granted, "UserModuleAccess 'none' should block"
+
+
+async def test_uma_write_grants_full_access_beyond_role_default(session: AsyncSession):
+    """
+    TEST 2a: access_level='write' on a module the role has ZERO default access to.
+    MACHINE_OPERATOR has no "purchase" — override sets it to write.
+    Backend should grant write=True (NOT capped at read like the old boolean system).
+    """
+    company = Company(id=str(uuid.uuid4()), name="Test Co", code="T-UMA2a", is_active=True)
+    session.add(company)
+    await session.flush()
+    await _ensure_company_module(session, company.id, "purchase", enabled=True)
+
+    user = await _create_user(session, "MACHINE_OPERATOR", company_id=company.id)
+    session.add(
+        UserModuleAccess(user_id=user.id, module="purchase", access_level="write", set_by=user.id)
+    )
+    await session.flush()
+
+    # Read access — GRANTED
+    result_read = await resolve_access(session, user, "purchase", write=False)
+    assert result_read.granted, (
+        f"Should get purchase read. Got: granted={result_read.granted}"
+    )
+
+    # Write access — GRANTED (NEW: write override now gives write even for
+    # roles with zero default access)
+    result_write = await resolve_access(session, user, "purchase", write=True)
+    assert result_write.granted, (
+        f"MACHINE_OPERATOR with access_level='write' SHOULD get write access to purchase. "
+        f"Got: granted={result_write.granted}, reason={result_write.reason}"
+    )
+    assert result_write.level == "write", (
+        f"Should be write level. Got level={result_write.level}"
+    )
+
+
+async def test_uma_read_caps_write_from_role(session: AsyncSession):
+    """
+    TEST 2b: access_level='read' on a module the role normally has WRITE for.
+    PRODUCTION_MANAGER normally has production=write.
+    Override to 'read' should cap at read — write=False.
+    """
+    company = Company(id=str(uuid.uuid4()), name="Test Co", code="T-UMA2b", is_active=True)
+    session.add(company)
+    await session.flush()
+    await _ensure_company_module(session, company.id, "production", enabled=True)
+    user = await _create_user(session, "PRODUCTION_MANAGER", company_id=company.id)
+    session.add(UserModuleAccess(user_id=user.id, module="production", access_level="read"))
+    await session.flush()
+
+    # Read access — GRANTED
+    result_read = await resolve_access(session, user, "production", write=False)
+    assert result_read.granted, f"Read should be granted. Got: {result_read}"
+
+    # Write access — DENIED (override caps at read)
+    result_write = await resolve_access(session, user, "production", write=True)
+    assert not result_write.granted, (
+        f"Write should be denied with read override. Got: granted={result_write.granted}"
+    )
+
+
+async def test_uma_none_overrides_role_grant(session: AsyncSession):
+    """
+    TEST 2c: access_level='none' on a module the role normally has access to.
+    PRODUCTION_MANAGER normally has production=write.
+    Override to 'none' should deny read+write entirely.
+    """
+    company = Company(id=str(uuid.uuid4()), name="Test Co", code="T-UMA2c", is_active=True)
+    session.add(company)
+    await session.flush()
+    await _ensure_company_module(session, company.id, "production", enabled=True)
+    user = await _create_user(session, "PRODUCTION_MANAGER", company_id=company.id)
+    session.add(UserModuleAccess(user_id=user.id, module="production", access_level="none"))
+    await session.flush()
+
+    result_read = await resolve_access(session, user, "production", write=False)
+    assert not result_read.granted, (
+        f"Read should be denied with 'none' override. Got: granted={result_read.granted}"
+    )
+
+    result_write = await resolve_access(session, user, "production", write=True)
+    assert not result_write.granted, (
+        f"Write should be denied with 'none' override. Got: granted={result_write.granted}"
+    )
+
+
+async def test_uma_deleted_restores_role_default(session: AsyncSession):
+    """After deleting a UserModuleAccess row, the role default should apply again.
+
+    This ensures that when an admin removes a per-user override, the user
+    inherits from their role default — critical for allowing role-default
+    changes to propagate.
+    """
+    company = Company(id=str(uuid.uuid4()).replace("-", ""), name="Test Co", code="T-UMA4", is_active=True)
+    session.add(company)
+    await session.flush()
+    await _ensure_company_module(session, company.id, "production", enabled=True)
+    user = await _create_user(session, "PRODUCTION_MANAGER", company_id=company.id)
+
+    # First create an override that blocks production
+    uma = UserModuleAccess(user_id=user.id, module="production", access_level="none")
+    session.add(uma)
+    await session.flush()
+
+    result_denied = await resolve_access(session, user, "production")
+    assert not result_denied.granted, "Should be denied with override in place"
+
+    # Now delete the override
+    await session.delete(uma)
+    await session.flush()
+
+    result_allowed = await resolve_access(session, user, "production")
+    assert result_allowed.granted, "Should be allowed again after override removed"
+
+
+async def test_uma_does_not_affect_other_users(session: AsyncSession):
+    """UserModuleAccess on user A should not affect user B (tenant isolation)."""
+    company = Company(id=str(uuid.uuid4()).replace("-", ""), name="Test Co", code="T-UMA5", is_active=True)
+    session.add(company)
+    await session.flush()
+    await _ensure_company_module(session, company.id, "production", enabled=True)
+    user_a = await _create_user(session, "PRODUCTION_MANAGER", company_id=company.id)
+    user_b = await _create_user(session, "PRODUCTION_MANAGER", company_id=company.id)
+    session.add(UserModuleAccess(user_id=user_a.id, module="production", access_level="none"))
+    await session.flush()
+    result_a = await resolve_access(session, user_a, "production")
+    result_b = await resolve_access(session, user_b, "production")
+    assert not result_a.granted, "User A with deny override should be blocked"
+    assert result_b.granted, "User B without override should still be allowed"

@@ -5,11 +5,11 @@ import { validateForm } from "@/lib/formValidation";
 import { api } from "@/lib/api";
 import { hrApi, uploadApi, exportApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
-import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRBAC } from "@/hooks/useRBAC";
 import {
   Table,
   TableBody,
@@ -261,7 +261,8 @@ const MONTHS = [
 
 function HRPage() {
   const user = useAuth((s) => s.user);
-  const canEdit = canWrite(user?.role ?? "OPERATOR", "hr");
+  const { canAccess } = useRBAC();
+  const canEdit = canAccess("hr", true);
   const { millId } = useActiveMill();
   const { data: millMasters } = useMillMasters();
   // Update module-level DEPARTMENTS so subcomponents pick up dynamic values
@@ -431,6 +432,7 @@ function HRPage() {
                 <PayrollTab
                   employees={employees}
                   canEdit={canEdit}
+                  canFinalizePayroll={canAccess("payroll", true)}
                   millId={millId!}
                   userRole={user.role}
                 />
@@ -2836,11 +2838,13 @@ function ImportAttendanceDialog({
 function PayrollTab({
   employees,
   canEdit,
+  canFinalizePayroll,
   millId,
   userRole,
 }: {
   employees: EmployeeRow[];
   canEdit: boolean;
+  canFinalizePayroll: boolean;
   millId: string;
   userRole: string;
 }) {
@@ -2950,8 +2954,7 @@ function PayrollTab({
     { key: "tax_deduction", label: payrollColConfig.getLabel("tax_deduction") },
   ];
 
-  const canFinalize =
-    userRole === "MILL_OWNER" || userRole === "ACCOUNTANT" || userRole === "SUPER_ADMIN";
+  const canFinalize = canFinalizePayroll;
 
   const displayData = localPayroll.length > 0 ? localPayroll : payroll;
 

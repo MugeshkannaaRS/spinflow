@@ -4,11 +4,11 @@ import { storesApi, uploadApi, exportApi } from "@/lib/api-service";
 import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
-import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRBAC } from "@/hooks/useRBAC";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,7 +51,8 @@ export const Route = createFileRoute("/_app/stores")({
 
 function StoresPage() {
   const user = useAuth((s) => s.user);
-  const canEdit = canWrite(user?.role ?? "OPERATOR", "stores");
+  const { canAccess } = useRBAC();
+  const canEdit = canAccess("stores", true);
   const qc = useQueryClient();
   const { millId } = useActiveMill();
   const itemsQ = useQuery({

@@ -20,7 +20,7 @@ export interface AuthUser {
   allowedModules?: string[];
   mustChangePassword?: boolean;
   companyMills?: CompanyMill[];
-  moduleRestrictions?: Record<string, boolean> | null;
+  moduleRestrictions?: Record<string, string> | null;  // "none" | "read" | "write"
 }
 
 interface AuthState {
@@ -29,6 +29,7 @@ interface AuthState {
   refreshToken: string | null;
   isAuthenticated: boolean;
   activeMill: CompanyMill | null;
+  _hasHydrated: boolean;
   login: (user: AuthUser, token: string, refreshToken?: string) => void;
   setUser: (updates: Partial<AuthUser>) => void;
   setTokens: (token: string, refreshToken: string) => void;
@@ -42,6 +43,7 @@ const initialState = {
   refreshToken: null,
   isAuthenticated: false,
   activeMill: null,
+  _hasHydrated: false,
 };
 
 export const useAuth = create<AuthState>()(
@@ -115,6 +117,9 @@ export const useAuth = create<AuthState>()(
         };
       },
       version: 4, // bumped: removes token from localStorage
+      onRehydrateStorage: () => () => {
+        useAuth.setState({ _hasHydrated: true });
+      },
     },
   ),
 );

@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { mastersApi } from "@/lib/api-service";
+import { mastersApi, adminApi } from "@/lib/api-service";
 import { ROLE_LABELS } from "@/lib/rbac";
 import type { Role } from "@/lib/rbac";
+import { MODULE_GROUPS, ALL_MODULES, MODULE_LABELS } from "@/lib/modules";
 import { useAuth } from "@/stores/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +44,9 @@ import {
   Building2,
   ShieldCheck,
   UserMinus,
+  Shield,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/admin/users")({
@@ -140,6 +143,224 @@ function fmtDate(iso: string | null | undefined) {
   });
 }
 
+// ── Module Access Dialog ─────────────────────────────────────────────────────
+const ACCESS_LEVEL_OPTIONS = [
+  { value: "none", label: "None", color: "text-red-600" },
+  { value: "read", label: "Read", color: "text-amber-600" },
+  { value: "write", label: "Write", color: "text-emerald-600" },
+];
+
+function roleDefaultLevel(role: string, module: string): string {
+  const matrix: Record<string, Record<string, string>> = {
+    SUPER_ADMIN: { dashboard: "write", production: "write", quality: "write", inventory: "write", dispatch: "write", purchase: "write", stores: "write", hr: "write", accounts: "write", maintenance: "write", payroll: "write", sales: "write", lotrac: "write", reports: "write", stock: "write", uploads: "write", analytics: "write", whatsapp: "write", lc_tracking: "write", users: "write", audit: "write", masters: "write", alerts: "write" },
+    MILL_OWNER: { dashboard: "write", production: "write", quality: "write", inventory: "write", dispatch: "write", purchase: "write", stores: "write", hr: "write", accounts: "write", maintenance: "write", payroll: "write", sales: "write", lotrac: "write", reports: "write", stock: "write", uploads: "write", analytics: "write", whatsapp: "write", lc_tracking: "write", users: "write", audit: "write", masters: "write", alerts: "write" },
+    GENERAL_MANAGER: { dashboard: "write", production: "read", quality: "read", purchase: "read", payroll: "read", accounts: "read", reports: "write" },
+    PRODUCTION_MANAGER: { dashboard: "write", production: "write", maintenance: "read", quality: "read", inventory: "read", stock: "read", reports: "write", uploads: "write", analytics: "write", alerts: "read" },
+    QUALITY_MANAGER: { dashboard: "write", quality: "write", production: "read", inventory: "read", stock: "read", reports: "write", uploads: "write", alerts: "read" },
+    DISPATCH_MANAGER: { dashboard: "write", dispatch: "write", lotrac: "write", stores: "write", inventory: "write", sales: "read", stock: "read", reports: "write", uploads: "write", alerts: "read" },
+    STORE_MANAGER: { dashboard: "write", stores: "write", inventory: "write", purchase: "read", maintenance: "read", reports: "write", stock: "write", uploads: "write", alerts: "read" },
+    HR_MANAGER: { dashboard: "write", hr: "write", payroll: "write", reports: "write", uploads: "write", alerts: "read" },
+    ACCOUNTANT: { dashboard: "write", accounts: "write", payroll: "write", purchase: "read", dispatch: "read", sales: "read", reports: "write", lc_tracking: "write", uploads: "write", alerts: "read" },
+    MAINTENANCE_MANAGER: { dashboard: "write", maintenance: "write", stores: "read", production: "read", reports: "write", uploads: "write", alerts: "read" },
+    SUPERVISOR: { dashboard: "write", production: "write", reports: "write", alerts: "read" },
+    MACHINE_OPERATOR: { dashboard: "write", production: "write", alerts: "read" },
+    SECURITY_GATE: { dashboard: "write", dispatch: "read", lotrac: "write", alerts: "read" },
+    AUDITOR: { dashboard: "write", production: "read", quality: "read", hr: "read", accounts: "read", reports: "write", audit: "write", inventory: "read", stores: "read", dispatch: "read", maintenance: "read", alerts: "read" },
+    OPERATOR: { dashboard: "write", production: "write", quality: "read", stores: "read", reports: "read", alerts: "read" },
+  };
+  return matrix[role]?.[module] ?? "none";
+}
+
+function ModuleAccessDialog({
+  user,
+  open,
+  onClose,
+}: {
+  user: any;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const authUser = useAuth((s) => s.user);
+  const qc = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["user-module-access", user?.id],
+    queryFn: () => adminApi.getUserModuleAccess(user.id),
+    enabled: open && !!user?.id,
+  });
+
+  const existingOverrides: Record<string, string> = {};
+  if (data?.overrides) {
+    for (const o of data.overrides) {
+      existingOverrides[o.module] = o.access_level;
+    }
+  }
+
+  const saveMut = useMutation({
+    mutationFn: (overrides: { module: string; access_level: string }[]) =>
+      adminApi.updateUserModuleAccess(user.id, overrides),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["user-module-access", user.id] });
+      toast.success("Module access updated");
+      onClose();
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Failed to update module access"),
+  });
+
+  const [dirty, setDirty] = useState<Record<string, string | null>>({});
+  useEffect(() => {
+    setDirty({});
+  }, [user?.id]);
+
+  function setAccess(module: string, level: string | null) {
+    setDirty((prev) => ({ ...prev, [module]: level }));
+  }
+
+  function effective(module: string): string | null {
+    if (module in dirty) return dirty[module] ?? null;
+    if (module in existingOverrides) return existingOverrides[module];
+    return null;
+  }
+
+  function effectiveLabel(module: string): string {
+    const eff = effective(module);
+    if (eff) return { none: "None", read: "Read", write: "Write" }[eff] ?? "Inherit";
+    return "Inherit";
+  }
+
+  function hasChanges(): boolean {
+    for (const mod of ALL_MODULES) {
+      const eff = effective(mod);
+      const existing = mod in existingOverrides ? existingOverrides[mod] : undefined;
+      if (eff !== null && (existing === undefined || existing !== eff)) return true;
+      if (eff === null && mod in existingOverrides) return true;
+    }
+    return false;
+  }
+
+  function handleSave() {
+    const overrides: { module: string; access_level: string }[] = [];
+    for (const mod of ALL_MODULES) {
+      const eff = effective(mod);
+      if (eff !== null) {
+        overrides.push({ module: mod, access_level: eff });
+      }
+    }
+    saveMut.mutate(overrides);
+  }
+
+  const effectiveOverridesCount = ALL_MODULES.filter(
+    (m) => m in existingOverrides || m in dirty,
+  ).length;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="w-full max-w-2xl mx-4 overflow-y-auto max-h-[90vh]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Shield className="size-5 text-indigo-500" />
+            Module Overrides — {user?.name}
+          </DialogTitle>
+          <DialogDescription>
+            Override the module access for this user. Each module can be set to
+            None, Read, or Write. Modules without an override inherit from the role
+            default (shown in parentheses).
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="flex justify-center py-8 text-sm text-muted-foreground">Loading...</div>
+        ) : (
+          <div className="space-y-4 py-2">
+            {MODULE_GROUPS.map((group) => (
+              <div key={group.label}>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  {group.label}
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {group.modules.map((mod) => {
+                    const eff = effective(mod);
+                    const isOverridden = mod in dirty || mod in existingOverrides;
+                    const roleDef = roleDefaultLevel(user?.role ?? "", mod);
+                    return (
+                      <div
+                        key={mod}
+                        className={cn(
+                          "px-3 py-2 rounded-lg border transition-colors",
+                          isOverridden
+                            ? "border-indigo-200 bg-indigo-50/50 dark:border-indigo-800 dark:bg-indigo-950/20"
+                            : "border-gray-100 dark:border-slate-700",
+                        )}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm font-medium truncate">
+                              {MODULE_LABELS[mod] ?? mod}
+                            </span>
+                            {isOverridden && (
+                              <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-100 dark:bg-indigo-900/40 dark:text-indigo-400 px-1.5 py-0.5 rounded">
+                                custom
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-muted-foreground ml-2 shrink-0">
+                            default: {roleDef}
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          {ACCESS_LEVEL_OPTIONS.map((opt) => {
+                            const selected = eff === opt.value;
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() =>
+                                  setAccess(mod, eff === opt.value ? null : opt.value)
+                                }
+                                className={cn(
+                                  "flex-1 px-2 py-1 text-xs font-medium rounded-md border transition-colors",
+                                  selected
+                                    ? "bg-indigo-600 text-white border-indigo-600"
+                                    : "bg-transparent text-muted-foreground border-gray-200 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-700",
+                                )}
+                              >
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-slate-700">
+              <p className="text-xs text-muted-foreground">
+                {effectiveOverridesCount} of {ALL_MODULES.length} modules have custom overrides
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={!hasChanges() || saveMut.isPending}
+                >
+                  {saveMut.isPending ? "Saving..." : "Save Overrides"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
 // ── useDebounce ───────────────────────────────────────────────────────────────
 function useDebounce<T>(value: T, delay = 350): T {
   const [debounced, setDebounced] = useState(value);
@@ -177,6 +398,7 @@ function AdminUsersPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [successDlg, setSuccessDlg] = useState<{ user: any; pwd: string } | null>(null);
   const [resetDlg, setResetDlg] = useState<{ user: any; pwd: string } | null>(null);
+  const [moduleAccessUser, setModuleAccessUser] = useState<any | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -767,6 +989,12 @@ function AdminUsersPage() {
                             <KeyRound className="size-3" /> Reset
                           </button>
                           <button
+                            onClick={() => setModuleAccessUser(u)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 text-xs border border-gray-200 dark:border-slate-600 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <Shield className="size-3" /> Modules
+                          </button>
+                          <button
                             onClick={() => toggleMut.mutate(u.id)}
                             disabled={toggleMut.isPending}
                             className={cn(
@@ -1102,6 +1330,13 @@ function AdminUsersPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ── Module Access Dialog ──────────────────────────────────────────── */}
+      <ModuleAccessDialog
+        user={moduleAccessUser}
+        open={!!moduleAccessUser}
+        onClose={() => setModuleAccessUser(null)}
+      />
     </div>
   );
 }

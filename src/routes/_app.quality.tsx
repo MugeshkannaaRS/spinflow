@@ -4,11 +4,11 @@ import { qualityApi, exportApi } from "@/lib/api-service";
 import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
-import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRBAC } from "@/hooks/useRBAC";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { DataTable } from "@/components/ui/DataTable";
@@ -68,8 +68,8 @@ export const Route = createFileRoute("/_app/quality")({
 
 function QualityPage() {
   const user = useAuth((s) => s.user);
-  const canEdit = canWrite(user?.role ?? "OPERATOR", "quality");
-  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "MILL_OWNER";
+  const { canAccess } = useRBAC();
+  const canEdit = canAccess("quality", true);
   const qc = useQueryClient();
   const { millId } = useActiveMill();
   const testsQ = useQuery({

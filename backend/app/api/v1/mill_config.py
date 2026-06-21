@@ -18,7 +18,7 @@ from app.db.session import get_db
 from app.core.deps import get_current_user, get_mill_scope
 from app.models.user import User
 from app.models.masters import Mill
-from app.models.mill_config import MillMaster, MillCustomField
+from app.models.mill_config import MillMaster, MillCustomField, MillConfigProfile
 from app.models.billing import CompanySubscription
 
 logger = logging.getLogger(__name__)
@@ -465,3 +465,86 @@ async def update_currency(
         return {"ok": True, "symbol": symbol, "code": code, "warning": "Saved locally only"}
 
     return {"ok": True, "symbol": symbol, "code": code}
+
+
+# ─── GET /mill-config/profile ─────────────────────────────────────────────────
+
+@router.get("/mill-config/profile")
+async def get_mill_config_profile(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id") or current_user.mill_id
+    if not mill_id:
+        return {"field_labels": {}, "dropdown_options": {}}
+
+    r = await db.execute(
+        select(MillConfigProfile).where(MillConfigProfile.mill_id == str(mill_id))
+    )
+    profile = r.scalar_one_or_none()
+    if not profile:
+        return {"field_labels": {}, "dropdown_options": {}}
+
+    return {
+        "id": profile.id,
+        "mill_id": profile.mill_id,
+        "field_labels": profile.field_labels or {},
+        "dropdown_options": profile.dropdown_options or {},
+        "created_at": str(profile.created_at) if profile.created_at else None,
+        "updated_at": str(profile.updated_at) if profile.updated_at else None,
+    }
+
+
+# ─── PUT /mill-config/profile ────────────────────────────────────────────────
+
+class ProfileUpdateBody(BaseModel):
+    field_labels: Optional[dict] = None
+    dropdown_options: Optional[dict] = None
+
+
+@router.put("/mill-config/profile")
+async def update_mill_config_profile(
+    body: ProfileUpdateBody,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code not in ("MILL_OWNER", "SUPER_ADMIN"):
+        raise HTTPException(403, "Only MILL_OWNER can update mill config profile")
+
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id") or current_user.mill_id
+    if not mill_id:
+        raise HTTPException(400, "No mill context for this user")
+    mill_id = str(mill_id)
+
+    r = await db.execute(
+        select(MillConfigProfile).where(MillConfigProfile.mill_id == mill_id)
+    )
+    profile = r.scalar_one_or_none()
+
+    if not profile:
+        profile = MillConfigProfile(
+            mill_id=mill_id,
+            field_labels=body.field_labels or {},
+            dropdown_options=body.dropdown_options or {},
+        )
+        db.add(profile)
+    else:
+        if body.field_labels is not None:
+            profile.field_labels = body.field_labels
+        if body.dropdown_options is not None:
+            profile.dropdown_options = body.dropdown_options
+
+    await db.commit()
+    await db.refresh(profile)
+
+    return {
+        "id": profile.id,
+        "mill_id": profile.mill_id,
+        "field_labels": profile.field_labels or {},
+        "dropdown_options": profile.dropdown_options or {},
+        "created_at": str(profile.created_at) if profile.created_at else None,
+        "updated_at": str(profile.updated_at) if profile.updated_at else None,
+    }

@@ -12,6 +12,27 @@ import {
 export { DASHBOARD_ONLY_ROLES };
 export type { AccessResult, AccessContext };
 
+// Route-to-module mapping replaces the one previously in useModuleAccess.ts
+const ROUTE_TO_MODULE: Record<string, string> = {
+  "/production": "production",
+  "/quality": "quality",
+  "/maintenance": "maintenance",
+  "/hr": "hr",
+  "/payroll": "payroll",
+  "/purchase": "purchase",
+  "/stores": "stores",
+  "/inventory": "inventory",
+  "/dispatch": "dispatch",
+  "/lotrac": "lotrac",
+  "/accounts": "accounts",
+  "/sales": "sales",
+  "/stock": "stock",
+  "/reports": "reports",
+  "/masters": "masters",
+  "/users": "users",
+  "/audit": "audit",
+};
+
 export function useRBAC() {
   const user = useAuth((s) => s.user);
   const role = user?.role ?? "MACHINE_OPERATOR";
@@ -33,12 +54,12 @@ export function useRBAC() {
       }
     },
     enabled: !isSuperAdmin,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
     retry: false,
   });
 
-  const moduleRestrictions = (user?.moduleRestrictions ?? null) as Record<string, boolean> | null;
+  const moduleRestrictions = (user?.moduleRestrictions ?? null) as Record<string, string> | null;
   const modules = (companyModules ?? null) as Record<string, boolean> | null;
 
   const ctx = buildAccessContext(role, modules, moduleRestrictions);
@@ -56,10 +77,19 @@ export function useRBAC() {
     return DASHBOARD_ONLY_ROLES.has(role);
   }
 
+  function canAccessRoute(path: string): boolean {
+    const entry = Object.entries(ROUTE_TO_MODULE).find(
+      ([route]) => path === route || path.startsWith(route + "/"),
+    );
+    if (!entry) return true;
+    return canAccess(entry[1], false);
+  }
+
   return {
     role,
     isSuperAdmin,
     canAccess,
+    canAccessRoute,
     getAccessLevel,
     isDashboardOnly,
     ctx,

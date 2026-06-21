@@ -6,6 +6,7 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from app.core.column_labels import get_column_label
 
 
 def _build_doc(title_text: str, author: str = "SpinFlow ERP") -> tuple[BytesIO, SimpleDocTemplate]:
@@ -28,7 +29,7 @@ def _header_footer(canvas, doc):
     canvas.restoreState()
 
 
-def production_report(data: list[dict], title: str = "Production Report") -> bytes:
+def production_report(data: list[dict], title: str = "Production Report", module: str = "", field_labels: Optional[dict[str, str]] = None) -> bytes:
     buf, doc = _build_doc(title)
     styles = getSampleStyleSheet()
     elements = []
@@ -41,10 +42,14 @@ def production_report(data: list[dict], title: str = "Production Report") -> byt
     if not data:
         elements.append(Paragraph("No data available.", styles["Normal"]))
     else:
-        headers = list(data[0].keys())
-        table_data = [[h.replace("_", " ").title() for h in headers]]
+        raw_headers = list(data[0].keys())
+        headers = [
+            get_column_label(module, h, field_labels) or h.replace("_", " ").title()
+            for h in raw_headers
+        ]
+        table_data = [headers]
         for row in data:
-            table_data.append([str(row.get(h, "")) for h in headers])
+            table_data.append([str(row.get(h, "")) for h in raw_headers])
 
         col_widths = [max(doc.width / len(headers), 50 * mm)] * len(headers)
         t = Table(table_data, colWidths=col_widths, repeatRows=1)

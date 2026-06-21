@@ -35,7 +35,7 @@ function mapUser(u: Record<string, unknown>): AuthUser {
     millName: (u.mill_name as string) ?? "",
     companyId: u.company_id as string | undefined,
     mustChangePassword: u.must_change_password as boolean,
-    moduleRestrictions: (u.module_restrictions as Record<string, boolean> | undefined) ?? null,
+    moduleRestrictions: (u.module_restrictions as Record<string, string> | undefined) ?? null,
     allowedModules: (u.enabled_modules as string[]) ?? [],
     companyMills:
       (u.company_mills as { id: string; name: string; code: string }[] | undefined) ?? [],

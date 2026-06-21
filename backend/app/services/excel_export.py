@@ -2,6 +2,7 @@ from __future__ import annotations
 from io import BytesIO
 from typing import Optional
 from openpyxl import Workbook
+from app.core.column_labels import get_column_label
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
@@ -41,7 +42,7 @@ def _style_sheet(ws, headers: list[str], rows: list[list]):
         ws.column_dimensions[col_letter].width = min(max_len + 3, 40)
 
 
-def production_report(data: list[dict]) -> BytesIO:
+def production_report(data: list[dict], module: str = "", field_labels: Optional[dict[str, str]] = None) -> BytesIO:
     wb = Workbook()
     ws = wb.active
     ws.title = "Production Report"
@@ -53,8 +54,12 @@ def production_report(data: list[dict]) -> BytesIO:
         buf.seek(0)
         return buf
 
-    headers = list(data[0].keys())
-    rows = [[str(row.get(h, "")) for h in headers] for row in data]
+    raw_headers = list(data[0].keys())
+    headers = [
+        get_column_label(module, h, field_labels) or h
+        for h in raw_headers
+    ]
+    rows = [[str(row.get(h, "")) for h in raw_headers] for row in data]
     _style_sheet(ws, headers, rows)
 
     buf = BytesIO()
@@ -63,7 +68,7 @@ def production_report(data: list[dict]) -> BytesIO:
     return buf
 
 
-def payroll_report(data: list[dict]) -> BytesIO:
+def payroll_report(data: list[dict], module: str = "", field_labels: Optional[dict[str, str]] = None) -> BytesIO:
     wb = Workbook()
     ws = wb.active
     ws.title = "Payroll Report"
@@ -75,8 +80,12 @@ def payroll_report(data: list[dict]) -> BytesIO:
         buf.seek(0)
         return buf
 
-    headers = list(data[0].keys())
-    rows = [[str(row.get(h, "")) for h in headers] for row in data]
+    raw_headers = list(data[0].keys())
+    headers = [
+        get_column_label(module, h, field_labels) or h
+        for h in raw_headers
+    ]
+    rows = [[str(row.get(h, "")) for h in raw_headers] for row in data]
     _style_sheet(ws, headers, rows)
 
     buf = BytesIO()

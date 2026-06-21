@@ -6,9 +6,9 @@ import type { MachineGroup } from "@/lib/api-service";
 import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { useAuth } from "@/stores/auth";
-import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { useRBAC } from "@/hooks/useRBAC";
 import { fmtNumber } from "@/lib/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -4675,7 +4675,8 @@ function PackingGrid() {
 
 function ProductionPage() {
   const user = useAuth((s) => s.user);
-  const canEdit = canWrite(user?.role ?? "OPERATOR", "production");
+  const { canAccess } = useRBAC();
+  const canEdit = canAccess("production", true);
   const { millId } = useActiveMill();
   const [activeTab, setActiveTab] = useState<string>("entry");
   const machinesQ = useQuery({

@@ -4,11 +4,11 @@ import { inventoryApi, exportApi } from "@/lib/api-service";
 import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
-import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRBAC } from "@/hooks/useRBAC";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,8 @@ export const Route = createFileRoute("/_app/inventory")({
 
 function InventoryPage() {
   const user = useAuth((s) => s.user);
-  const canEdit = canWrite(user?.role ?? "OPERATOR", "inventory");
+  const { canAccess } = useRBAC();
+  const canEdit = canAccess("inventory", true);
   const qc = useQueryClient();
   const { millId } = useActiveMill();
   const lotColConfig = useColumnConfig("inventory_lots");

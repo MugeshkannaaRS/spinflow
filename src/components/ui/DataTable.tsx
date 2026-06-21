@@ -43,6 +43,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
+import { useMillConfigProfile } from "@/contexts/MillConfigContext";
+import { getColumnLabel } from "@/lib/column-labels";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -93,6 +95,7 @@ interface DataTableProps<T = any> {
   exportFilename?: string;
   disableExport?: boolean;
   rowKey?: (row: T) => string;
+  module?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -123,12 +126,12 @@ const STORAGE_KEY = (tid: string) => `dt_hidden_${tid}`;
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
-function exportToExcel<T>(rows: T[], columns: ColDef<T>[], filename: string) {
+function exportToExcel<T>(rows: T[], columns: ColDef<T>[], filename: string, resolveLabel?: (col: ColDef<T>) => string) {
   const ws = XLSX.utils.json_to_sheet(
     rows.map((row) => {
       const obj: Record<string, string> = {};
       for (const col of columns) {
-        obj[col.label] = getCellValue(row, col.key);
+        obj[resolveLabel ? resolveLabel(col) : col.label] = getCellValue(row, col.key);
       }
       return obj;
     }),
@@ -138,8 +141,8 @@ function exportToExcel<T>(rows: T[], columns: ColDef<T>[], filename: string) {
   XLSX.writeFile(wb, `${filename}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
-function exportToCSV<T>(rows: T[], columns: ColDef<T>[], filename: string) {
-  const lines = [columns.map((c) => `"${c.label}"`).join(",")];
+function exportToCSV<T>(rows: T[], columns: ColDef<T>[], filename: string, resolveLabel?: (col: ColDef<T>) => string) {
+  const lines = [columns.map((c) => `"${resolveLabel ? resolveLabel(c) : c.label}"`).join(",")];
   for (const row of rows) {
     lines.push(columns.map((c) => `"${getCellValue(row, c.key).replace(/"/g, '""')}"`).join(","));
   }
@@ -152,12 +155,12 @@ function exportToCSV<T>(rows: T[], columns: ColDef<T>[], filename: string) {
   URL.revokeObjectURL(url);
 }
 
-async function exportToPDF<T>(rows: T[], columns: ColDef<T>[], title: string) {
+async function exportToPDF<T>(rows: T[], columns: ColDef<T>[], title: string, resolveLabel?: (col: ColDef<T>) => string) {
   const [{ jsPDF }, autoTable] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   doc.setFontSize(10);
   doc.text(title, 14, 10);
-  const headers = columns.map((c) => c.label);
+  const headers = columns.map((c) => (resolveLabel ? resolveLabel(c) : c.label));
   const data = rows.map((row) => columns.map((col) => getCellValue(row, col.key)));
   autoTable.default(doc, {
     head: [headers],
@@ -216,11 +219,17 @@ export function DataTable<T = any>({
   exportFilename,
   disableExport = false,
   rowKey: rowKeyProp,
+  module,
 }: DataTableProps<T>) {
   const loading = isLoading ?? loadingProp;
   const actionNodes = rowActions ?? actionsProp;
   const isServer = pageProp !== undefined;
   const safeData = Array.isArray(data) ? data : [];
+
+  // Mill config profile for field label overrides
+  const { profile: millProfile } = useMillConfigProfile();
+  const colLabel = (col: ColDef<T>) =>
+    module ? getColumnLabel(millProfile, module, col.key) ?? col.label : col.label;
 
   // Column config
   const colConfig = useColumnConfig(tableName ?? "");
@@ -339,9 +348,10 @@ export function DataTable<T = any>({
 
   const handleExport = async (format: "excel" | "csv" | "pdf") => {
     const fn = exportFilename ?? effectiveKey;
-    if (format === "excel") exportToExcel(processed, visibleCols, fn);
-    else if (format === "csv") exportToCSV(processed, visibleCols, fn);
-    else await exportToPDF(processed, visibleCols, fn);
+    const rl = module ? (c: ColDef<T>) => colLabel(c) : undefined;
+    if (format === "excel") exportToExcel(processed, visibleCols, fn, rl);
+    else if (format === "csv") exportToCSV(processed, visibleCols, fn, rl);
+    else await exportToPDF(processed, visibleCols, fn, rl);
     setExportOpen(false);
   };
 
@@ -459,7 +469,7 @@ export function DataTable<T = any>({
                   }}
                   className="text-xs"
                 >
-                  {col.label}
+                  {colLabel(col)}
                 </DropdownMenuCheckboxItem>
               ))}
             </DropdownMenuContent>
@@ -500,7 +510,7 @@ export function DataTable<T = any>({
                       onClick={sortable ? () => handleHeaderClick(col.key) : undefined}
                     >
                       <span className="inline-flex items-center gap-1">
-                        {col.label}
+                        {colLabel(col)}
                         {sortable && (
                           <span className="text-muted-foreground">
                             {isActive && sort.dir === "asc" ? (

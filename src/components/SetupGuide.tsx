@@ -99,6 +99,7 @@ export function SetupGuide() {
     enabled: !!user?.millId,
   });
 
+  // CATEGORY B: ownership gate — only company owner or platform admin can see setup guide.
   if (!user || (user.role !== "SUPER_ADMIN" && user.role !== "MILL_OWNER")) {
     return null;
   }

@@ -4,11 +4,11 @@ import { dispatchApi, mastersApi, exportApi } from "@/lib/api-service";
 import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
-import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRBAC } from "@/hooks/useRBAC";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,8 @@ export const Route = createFileRoute("/_app/dispatch")({
 
 function DispatchPage() {
   const user = useAuth((s) => s.user);
-  const canEdit = canWrite(user?.role ?? "OPERATOR", "dispatch");
+  const { canAccess } = useRBAC();
+  const canEdit = canAccess("dispatch", true);
   const orderColConfig = useColumnConfig("dispatch_sales_orders");
   const tripColConfig = useColumnConfig("dispatch_trips");
   const queryClient = useQueryClient();

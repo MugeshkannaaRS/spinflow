@@ -1,5 +1,5 @@
 from app.db.base import Base
-from app.models.user import User, Role, UserSession
+from app.models.user import User, Role, UserSession, UserModuleAccess
 from app.models.audit import AuditLog
 from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest, AddonPricing, OveragePricing
 from app.models.production import Machine, ProductionEntry, Shift, DowntimeLog
@@ -57,7 +57,7 @@ __all__ = [
     "SetupProgress", "HelpCategory", "HelpArticle",
     "DemoEnvironment", "ProductTour", "TourProgress", "Nudge",
 ]
-from app.models.mill_config import MillMaster, MillCustomField, MillRecordValue
+from app.models.mill_config import MillMaster, MillCustomField, MillRecordValue, MillConfigProfile, NumberingSequence
 from app.models.mixing import (
     MixingRecipe, MixingLayer, MixingChangeLog,
     LaydownRecord, BaleConsumptionLog,

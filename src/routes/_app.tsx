@@ -4,8 +4,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { SidebarProvider, useSidebar } from "@/components/layout/SidebarContext";
 import { AlertBanner } from "@/components/common/AlertBanner";
 import { DashboardOnlyGuard } from "@/components/DashboardOnlyGuard";
-import { DASHBOARD_ONLY_ROLES } from "@/lib/access";
-import { useModuleAccess } from "@/hooks/useModuleAccess";
+import { useRBAC, DASHBOARD_ONLY_ROLES } from "@/hooks/useRBAC";
 import { useEffect, useState } from "react";
 import { Topbar } from "@/components/layout/Topbar";
 import { cn } from "@/lib/utils";
@@ -13,6 +12,7 @@ import { Lock } from "lucide-react";
 import { HelpWidget } from "@/components/help/HelpWidget";
 import { TourOverlay } from "@/components/tour/TourOverlay";
 import { NudgeBar } from "@/components/nudge/NudgeBar";
+import { MillConfigProvider } from "@/contexts/MillConfigContext";
 
 const ALLOWED_DASHBOARD_ONLY_PATHS = ["/dashboard", "/profile", "/login"];
 
@@ -36,10 +36,16 @@ export const Route = createFileRoute("/_app")({
 });
 
 function AppLayout() {
+  const user = useAuth((s) => s.user);
+
+  if (!user) return null;
+
   return (
     <SidebarProvider>
       <RedirectOnMustChangePassword />
-      <AppShell />
+      <MillConfigProvider>
+        <AppShell />
+      </MillConfigProvider>
     </SidebarProvider>
   );
 }
@@ -79,7 +85,7 @@ function RedirectOnMustChangePassword() {
 function ModuleAccessGuard({ children }: { children: React.ReactNode }) {
   const user = useAuth((s) => s.user);
   const location = useLocation();
-  const { canAccessRoute } = useModuleAccess();
+  const { canAccessRoute } = useRBAC();
 
   if (!user || user.role === "SUPER_ADMIN") return <>{children}</>;
 

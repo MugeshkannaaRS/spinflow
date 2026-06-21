@@ -54,3 +54,28 @@ class MillRecordValue(Base):
     value_date: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
+
+
+class MillConfigProfile(Base):
+    """Per-mill configuration profile — field labels, dropdown overrides, and locale."""
+    __tablename__ = "mill_configuration_profiles"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    field_labels: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
+    dropdown_options: Mapped[Optional[dict]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default="now()", onupdate="now()")
+
+
+class NumberingSequence(Base):
+    """Per-mill, per-document-type sequence counter."""
+    __tablename__ = "numbering_sequences"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id", ondelete="CASCADE"), nullable=False, index=True)
+    doc_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    prefix: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    seq: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default="now()", onupdate="now()")

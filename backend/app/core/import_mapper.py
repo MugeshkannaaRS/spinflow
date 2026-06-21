@@ -20,11 +20,13 @@ class SmartColumnMapper:
         self,
         headers: list[str],
         module: str,
+        field_labels: Optional[dict[str, str]] = None,
     ) -> dict[str, str]:
         """
         Returns: {excel_column_header: system_field_name | "custom:HEADER"}
 
         Priority order:
+          0. MillConfigProfile field_labels (custom label override)
           1. Exact alias match (score 100)
           2. Substring alias match (score 70)
           3. Word-overlap scoring (score 40-70)
@@ -32,6 +34,15 @@ class SmartColumnMapper:
         """
         from app.core.field_aliases import FIELD_ALIASES_BY_MODULE
         aliases = FIELD_ALIASES_BY_MODULE.get(module, {})
+
+        # Build reverse lookup from field_labels: {custom_label: field_name}
+        label_to_field: dict[str, str] = {}
+        if field_labels:
+            prefix = f"{module}."
+            for key, label in field_labels.items():
+                if key.startswith(prefix) and label:
+                    label_to_field[self._norm(label)] = key[len(prefix):]
+
         result: dict[str, str] = {}
         used: set[str] = set()
 
@@ -40,38 +51,44 @@ class SmartColumnMapper:
             matched_field: Optional[str] = None
             best_score = 0
 
-            for system_field, alias_list in aliases.items():
-                if system_field in used:
-                    continue
+            # Priority 0: field_labels exact match
+            if normalized in label_to_field:
+                matched_field = label_to_field[normalized]
+                best_score = 100
 
-                for alias in alias_list:
-                    na = self._norm(alias)
+            if not matched_field:
+                for system_field, alias_list in aliases.items():
+                    if system_field in used:
+                        continue
 
-                    # Exact match
-                    if normalized == na:
-                        matched_field = system_field
-                        best_score = 100
+                    for alias in alias_list:
+                        na = self._norm(alias)
+
+                        # Exact match
+                        if normalized == na:
+                            matched_field = system_field
+                            best_score = 100
+                            break
+
+                        # Contains match (header contains alias or alias contains header)
+                        if (na in normalized or normalized in na) and len(na) >= 3:
+                            score = 75
+                            if score > best_score:
+                                best_score = score
+                                matched_field = system_field
+
+                        # Word overlap
+                        h_words = set(normalized.split())
+                        a_words = set(na.split())
+                        overlap = len(h_words & a_words)
+                        if overlap > 0:
+                            score = 40 + (overlap * 15)
+                            if score > best_score:
+                                best_score = score
+                                matched_field = system_field
+
+                    if best_score == 100:
                         break
-
-                    # Contains match (header contains alias or alias contains header)
-                    if (na in normalized or normalized in na) and len(na) >= 3:
-                        score = 75
-                        if score > best_score:
-                            best_score = score
-                            matched_field = system_field
-
-                    # Word overlap
-                    h_words = set(normalized.split())
-                    a_words = set(na.split())
-                    overlap = len(h_words & a_words)
-                    if overlap > 0:
-                        score = 40 + (overlap * 15)
-                        if score > best_score:
-                            best_score = score
-                            matched_field = system_field
-
-                if best_score == 100:
-                    break
 
             if matched_field and best_score >= 60:
                 result[header] = matched_field

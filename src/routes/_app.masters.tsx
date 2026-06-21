@@ -6,11 +6,11 @@ import type { MachineGroup } from "@/lib/api-service";
 import { api } from "@/lib/api";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
-import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRBAC } from "@/hooks/useRBAC";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
@@ -92,7 +92,8 @@ export const Route = createFileRoute("/_app/masters")({
 
 function MastersPage() {
   const user = useAuth((s) => s.user);
-  const canEdit = canWrite(user?.role ?? "OPERATOR", "masters");
+  const { canAccess } = useRBAC();
+  const canEdit = canAccess("masters", true);
   const deptColConfig = useColumnConfig("masters_departments");
   const custColConfig = useColumnConfig("masters_customers");
   const vehColConfig = useColumnConfig("masters_vehicles");
@@ -347,7 +348,7 @@ function MastersPage() {
                     { key: "phone", label: "Phone" },
                   ]}
                   activeKey="is_active"
-                  canEdit={canEdit && user?.role !== "MILL_OWNER"}
+                  canEdit={canEdit && user?.role !== "MILL_OWNER" /* CATEGORY B: deliberate MILL_OWNER exclusion for mill editing — platform operation, not module override. */}
                   onAdd={
                     user?.role !== "MILL_OWNER" ? (
                       <MillForm companies={activeCompaniesData} />

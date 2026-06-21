@@ -15,11 +15,11 @@ import {
 } from "recharts";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
-import { canWrite } from "@/lib/rbac";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRBAC } from "@/hooks/useRBAC";
 import {
   Table,
   TableBody,
@@ -77,8 +77,8 @@ export const Route = createFileRoute("/_app/purchase")({
 
 function PurchasePage() {
   const user = useAuth((s) => s.user);
-  const canEdit = canWrite(user?.role ?? "OPERATOR", "purchase");
-  const isAdmin = user?.role === "SUPER_ADMIN" || user?.role === "MILL_OWNER";
+  const { canAccess } = useRBAC();
+  const canEdit = canAccess("purchase", true);
   const qc = useQueryClient();
   const { millId } = useActiveMill();
   const suppliersQ = useQuery({
@@ -243,7 +243,7 @@ function PurchasePage() {
                   <CardTitle className="text-base">Bale Purchase Entries</CardTitle>
                   <div className="flex gap-1">
                     <ExportDateRangeButton onExportXlsx={(f, t) => exportApi.purchaseXlsx(f, t)} />
-                    {isAdmin && <ColumnConfigurator module="purchase" tableKey="purchases" />}
+                    {canEdit && <ColumnConfigurator module="purchase" tableKey="purchases" />}
                     {canEdit && <NewPurchaseDialog />}
                   </div>
                 </CardHeader>
@@ -328,7 +328,7 @@ function PurchasePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Supplier Directory</CardTitle>
-                  {isAdmin && <ColumnConfigurator module="purchase" tableKey="suppliers" />}
+                  {canEdit && <ColumnConfigurator module="purchase" tableKey="suppliers" />}
                 </CardHeader>
                 <CardContent>
                   <ExcelColumnFilter
@@ -403,7 +403,7 @@ function PurchasePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Goods Received Notes</CardTitle>
-                  {isAdmin && <ColumnConfigurator module="purchase" tableKey="grns" />}
+                  {canEdit && <ColumnConfigurator module="purchase" tableKey="grns" />}
                 </CardHeader>
                 <CardContent>
                   <ExcelColumnFilter data={grns} onFilter={setGrnFiltered} columns={grnColumns} />
