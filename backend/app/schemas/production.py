@@ -50,8 +50,8 @@ class MachineResponse(BaseModel):
 
 
 class ShiftCreate(BaseModel):
-    code: str = Field(..., pattern="^(A|B|C)$")
-    name: str
+    code: str = Field(..., min_length=1, max_length=10)
+    name: str = Field(..., min_length=1, max_length=50)
     start_time: str
     end_time: str
 

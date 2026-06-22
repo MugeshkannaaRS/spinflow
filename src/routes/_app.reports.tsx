@@ -749,9 +749,9 @@ function ProductionRecordsTab() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_all">All Shifts</SelectItem>
-                  <SelectItem value="A">A — Morning</SelectItem>
-                  <SelectItem value="B">B — Afternoon</SelectItem>
-                  <SelectItem value="C">C — Night</SelectItem>
+                  {(millMasters?.shift ?? []).map((s: any) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

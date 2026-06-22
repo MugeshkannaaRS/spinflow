@@ -91,11 +91,7 @@ async def get_all_masters(
     if not mill_id:
         return {
             "department": [], "department_names": [],
-            "shift": [
-                {"id": "A", "name": "A — Morning",   "start": "06:00", "end": "14:00"},
-                {"id": "B", "name": "B — Afternoon", "start": "14:00", "end": "22:00"},
-                {"id": "C", "name": "C — Night",     "start": "22:00", "end": "06:00"},
-            ],
+            "shift": [],
             "designation": [], "grade": [], "machine_type": [], "machines": [],
         }
 
@@ -187,32 +183,20 @@ async def get_all_masters(
         out.setdefault("grade", [])
 
     # ── Shifts from shifts table ──────────────────────────────────────────
-    if not out.get("shift"):
-        try:
-            from app.models.production import Shift
-            shift_res = await db.execute(
-                select(Shift.code, Shift.name, Shift.start_time, Shift.end_time)
-                .where(Shift.mill_id == mill_id)
-                .order_by(Shift.start_time)
-            )
-            shifts = shift_res.all()
-            if shifts:
-                out["shift"] = [
-                    {"id": s.code, "name": s.name, "start": s.start_time, "end": s.end_time}
-                    for s in shifts
-                ]
-            else:
-                out["shift"] = [
-                    {"id": "A", "name": "A — Morning",   "start": "06:00", "end": "14:00"},
-                    {"id": "B", "name": "B — Afternoon", "start": "14:00", "end": "22:00"},
-                    {"id": "C", "name": "C — Night",     "start": "22:00", "end": "06:00"},
-                ]
-        except Exception:
-            out["shift"] = [
-                {"id": "A", "name": "A — Morning",   "start": "06:00", "end": "14:00"},
-                {"id": "B", "name": "B — Afternoon", "start": "14:00", "end": "22:00"},
-                {"id": "C", "name": "C — Night",     "start": "22:00", "end": "06:00"},
-            ]
+    try:
+        from app.models.production import Shift
+        shift_res = await db.execute(
+            select(Shift.code, Shift.name, Shift.start_time, Shift.end_time)
+            .where(Shift.mill_id == mill_id)
+            .order_by(Shift.start_time)
+        )
+        shifts = shift_res.all()
+        out["shift"] = [
+            {"id": s.code, "name": s.name, "start": s.start_time, "end": s.end_time}
+            for s in shifts
+        ]
+    except Exception:
+        out.setdefault("shift", [])
 
     return out
 

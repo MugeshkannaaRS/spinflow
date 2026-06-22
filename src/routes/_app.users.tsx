@@ -287,9 +287,7 @@ function UsersPage() {
                 </Link>
               </div>
             )}
-            <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-              <SheetTrigger asChild>
-                <Button
+            <Button
                   onClick={openNewUser}
                   disabled={atUserLimit}
                   title={atUserLimit ? "User limit reached. Upgrade plan." : ""}
@@ -297,16 +295,16 @@ function UsersPage() {
                   <Plus className="size-4 mr-2" />
                   New User
                 </Button>
-              </SheetTrigger>
-              <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-                <SheetHeader>
-                  <SheetTitle>{editingUser ? "Edit User" : "Create New User"}</SheetTitle>
-                  <SheetDescription>
+            <Dialog open={sheetOpen} onOpenChange={setSheetOpen}>
+              <DialogContent className="w-full sm:max-w-lg overflow-y-auto max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingUser ? "Edit User" : "Create New User"}</DialogTitle>
+                  <DialogDescription>
                     {editingUser
                       ? "Update user details and role."
                       : "Fill in the details to create a new user."}
-                  </SheetDescription>
-                </SheetHeader>
+                  </DialogDescription>
+                </DialogHeader>
                 <div className="space-y-4 mt-6">
                   <div className="space-y-2">
                     <Label htmlFor="full_name">Full Name</Label>
@@ -481,8 +479,8 @@ function UsersPage() {
                     {editingUser ? "Update User" : "Create User"}
                   </Button>
                 </div>
-              </SheetContent>
-            </Sheet>
+              </DialogContent>
+            </Dialog>
           </div>
           <Card>
             <CardContent className="pt-6">

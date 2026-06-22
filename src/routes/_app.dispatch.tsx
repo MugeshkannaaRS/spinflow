@@ -23,6 +23,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import { useState } from "react";
@@ -389,11 +396,11 @@ function DispatchPage() {
           </Tabs>
         </div>
 
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-            <SheetHeader>
-              <SheetTitle>Create New Trip</SheetTitle>
-            </SheetHeader>
+        <Dialog open={sheetOpen} onOpenChange={setSheetOpen}>
+          <DialogContent className="w-full sm:max-w-lg overflow-y-auto max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create New Trip</DialogTitle>
+            </DialogHeader>
             <div className="space-y-4 mt-6">
               <div className="space-y-2">
                 <Label htmlFor="customer">Customer</Label>
@@ -496,7 +503,7 @@ function DispatchPage() {
                 />
               </div>
             </div>
-            <SheetFooter className="mt-6">
+            <DialogFooter className="mt-6">
               <Button
                 onClick={handleCreateTrip}
                 disabled={createTripM.isPending}
@@ -505,9 +512,9 @@ function DispatchPage() {
                 {createTripM.isPending ? <Loader2 className="size-4 mr-1 animate-spin" /> : null}
                 Create Trip
               </Button>
-            </SheetFooter>
-          </SheetContent>
-        </Sheet>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </AccessGuard>
     </>
   );

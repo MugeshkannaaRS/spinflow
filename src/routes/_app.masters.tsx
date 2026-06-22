@@ -33,6 +33,13 @@ import {
   SheetTrigger,
   SheetFooter,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useState, useEffect, useMemo } from "react";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { toast } from "sonner";
@@ -756,35 +763,35 @@ function MasterTable<T = any>({
         </CardContent>
       </Card>
 
-      {/* Edit Sheet */}
-      <Sheet
+      {/* Edit Dialog */}
+      <Dialog
         open={!!editItem}
         onOpenChange={(o) => {
           if (!o) setEditItem(null);
         }}
       >
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Edit {singularize(title)}</SheetTitle>
-          </SheetHeader>
-          <div className="mt-4">{editItem ? onEdit(editItem) : null}</div>
-        </SheetContent>
-      </Sheet>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit {singularize(title)}</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2">{editItem ? onEdit(editItem) : null}</div>
+        </DialogContent>
+      </Dialog>
 
-      {/* Add Sheet */}
-      <Sheet
+      {/* Add Dialog */}
+      <Dialog
         open={adding}
         onOpenChange={(o) => {
           if (!o) setAdding(false);
         }}
       >
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Add {singularize(title)}</SheetTitle>
-          </SheetHeader>
-          <div className="mt-4">{onAdd}</div>
-        </SheetContent>
-      </Sheet>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add {singularize(title)}</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2">{onAdd}</div>
+        </DialogContent>
+      </Dialog>
 
       {/* Deactivate confirmation */}
       {deactivateConfirm && (
@@ -895,11 +902,11 @@ function CompanyModulesPanel({ companyId, onClose }: { companyId: string; onClos
           />
         </div>
       ))}
-      <SheetFooter>
+      <DialogFooter>
         <Button onClick={() => updateM.mutate()} disabled={updateM.isPending}>
           {updateM.isPending ? "Saving…" : "Save"}
         </Button>
-      </SheetFooter>
+      </DialogFooter>
     </div>
   );
 }
@@ -999,11 +1006,11 @@ function MillSettingsPanel({ millId, onClose }: { millId: string; onClose: () =>
           </SelectContent>
         </Select>
       </div>
-      <SheetFooter>
+      <DialogFooter>
         <Button onClick={() => updateM.mutate()} disabled={updateM.isPending}>
           {updateM.isPending ? "Saving…" : "Save"}
         </Button>
-      </SheetFooter>
+      </DialogFooter>
     </div>
   );
 }
@@ -1100,11 +1107,11 @@ function CompanyForm({ item }: { item?: Company }) {
           onChange={(e) => setForm({ ...form, email: e.target.value })}
         />
       </div>
-      <SheetFooter>
+      <DialogFooter>
         <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
           {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
         </Button>
-      </SheetFooter>
+      </DialogFooter>
     </form>
   );
 }
@@ -1233,11 +1240,11 @@ function MillForm({ item, companies }: { item?: Mill; companies: Company[] }) {
           onChange={(e) => setForm({ ...form, email: e.target.value })}
         />
       </div>
-      <SheetFooter>
+      <DialogFooter>
         <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
           {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
         </Button>
-      </SheetFooter>
+      </DialogFooter>
     </form>
   );
 }
@@ -1329,11 +1336,11 @@ function DepartmentForm({ item }: { item?: Department; mills: Mill[] }) {
           <p className="text-xs text-destructive">{err("department_type")}</p>
         )}
       </div>
-      <SheetFooter>
+      <DialogFooter>
         <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
           {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
         </Button>
-      </SheetFooter>
+      </DialogFooter>
     </form>
   );
 }
@@ -1467,11 +1474,11 @@ function YarnCountForm({ item }: { item?: YarnCount; mills: Mill[] }) {
           />
         </div>
       </div>
-      <SheetFooter>
+      <DialogFooter>
         <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
           {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
         </Button>
-      </SheetFooter>
+      </DialogFooter>
     </form>
   );
 }
@@ -1639,11 +1646,11 @@ function CustomerForm({ item }: { item?: Customer; mills: Mill[] }) {
           />
         </div>
       </div>
-      <SheetFooter>
+      <DialogFooter>
         <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
           {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
         </Button>
-      </SheetFooter>
+      </DialogFooter>
     </form>
   );
 }
@@ -1782,11 +1789,11 @@ function VehicleForm({ item }: { item?: MasterVehicle; mills: Mill[] }) {
           />
         </div>
       </div>
-      <SheetFooter>
+      <DialogFooter>
         <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
           {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
         </Button>
-      </SheetFooter>
+      </DialogFooter>
     </form>
   );
 }
@@ -1919,11 +1926,11 @@ function RouteForm({ item }: { item?: MasterRoute; mills: Mill[] }) {
           />
         </div>
       </div>
-      <SheetFooter>
+      <DialogFooter>
         <Button type="submit" disabled={createM.isPending || updateM.isPending || !isComplete}>
           {createM.isPending || updateM.isPending ? "Saving…" : "Save"}
         </Button>
-      </SheetFooter>
+      </DialogFooter>
     </form>
   );
 }
@@ -1992,18 +1999,16 @@ function ShiftForm({ item, mills }: { item?: Shift; mills?: Mill[] }) {
         <Label className={cn(err("code") && "text-destructive")}>
           Shift Code <span className="text-destructive">*</span>
         </Label>
-        <Select value={form.code} onValueChange={(v) => setForm({ ...form, code: v })}>
-          <SelectTrigger className={cn(err("code") && "border-destructive")}>
-            <SelectValue placeholder="Select code" />
-          </SelectTrigger>
-          <SelectContent>
-            {["A", "B", "C"].map((c) => (
-              <SelectItem key={c} value={c}>
-                {c}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Input
+          value={form.code}
+          placeholder="e.g. A, B, Night, G"
+          maxLength={10}
+          onChange={(e) => {
+            setTouched((t) => ({ ...t, code: true }));
+            setForm({ ...form, code: e.target.value.toUpperCase() });
+          }}
+          className={cn(err("code") && "border-destructive")}
+        />
         {err("code") && <p className="text-xs text-destructive">{err("code")}</p>}
       </div>
       <div className="space-y-1.5">
@@ -2043,11 +2048,11 @@ function ShiftForm({ item, mills }: { item?: Shift; mills?: Mill[] }) {
           {err("end_time") && <p className="text-xs text-destructive">{err("end_time")}</p>}
         </div>
       </div>
-      <SheetFooter>
+      <DialogFooter>
         <Button type="submit" disabled={createM.isPending || !isComplete}>
           {createM.isPending ? "Saving…" : "Save"}
         </Button>
-      </SheetFooter>
+      </DialogFooter>
     </form>
   );
 }
@@ -2133,11 +2138,11 @@ function WarehouseForm({ item }: { item?: Warehouse }) {
           }
         />
       </div>
-      <SheetFooter>
+      <DialogFooter>
         <Button type="submit" disabled={createM.isPending || !isComplete}>
           {createM.isPending ? "Saving…" : "Save"}
         </Button>
-      </SheetFooter>
+      </DialogFooter>
     </form>
   );
 }
@@ -2919,7 +2924,7 @@ function MachineGroupsTab({
               </div>
             </div>
           </div>
-          <SheetFooter>
+          <DialogFooter>
             <Button
               onClick={() => saveMut.mutate()}
               disabled={saveMut.isPending || !form.name.trim()}
@@ -2927,7 +2932,7 @@ function MachineGroupsTab({
             >
               {saveMut.isPending ? "Saving…" : editing ? "Update Group" : "Create Group"}
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </SheetContent>
       </Sheet>
     </Card>
@@ -3242,7 +3247,7 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
               )}
             </div>
           </div>
-          <SheetFooter>
+          <DialogFooter>
             <Button
               onClick={() => saveMut.mutate()}
               disabled={saveMut.isPending || !form.name.trim() || (!editing && !form.code)}
@@ -3250,7 +3255,7 @@ function StopCodesTab({ canEdit, search }: { canEdit: boolean; search: string })
             >
               {saveMut.isPending ? "Saving…" : editing ? "Update" : "Add Stop Code"}
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </SheetContent>
       </Sheet>
     </div>

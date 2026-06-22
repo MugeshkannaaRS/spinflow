@@ -33,16 +33,10 @@ export interface MillMasters {
   [key: string]: unknown;
 }
 
-const DEFAULT_SHIFTS: ShiftOption[] = [
-  { id: "A", name: "A — Morning", start: "06:00", end: "14:00" },
-  { id: "B", name: "B — Afternoon", start: "14:00", end: "22:00" },
-  { id: "C", name: "C — Night", start: "22:00", end: "06:00" },
-];
-
 const EMPTY_MASTERS: MillMasters = {
   department: [],
   department_names: [],
-  shift: DEFAULT_SHIFTS,
+  shift: [],
   designation: [],
   grade: [],
   machine_type: [],
@@ -60,12 +54,7 @@ export function useMillMasters() {
     queryFn: () =>
       api
         .get("/mill-config/masters/all")
-        .then((r) => {
-          const d = r.data;
-          // Ensure shift always has fallback
-          if (!d.shift || d.shift.length === 0) d.shift = DEFAULT_SHIFTS;
-          return d;
-        })
+        .then((r) => r.data)
         .catch(() => EMPTY_MASTERS),
     staleTime: 10 * 60 * 1000,
     gcTime: 20 * 60 * 1000,
@@ -127,6 +116,16 @@ export function useUpdateCurrency() {
       }
     },
   });
+}
+
+/**
+ * Returns the shifts defined in Masters → Shifts for the current mill.
+ * Returns an empty array (not hardcoded defaults) when no shifts are configured,
+ * so the UI can prompt the user to add shifts rather than silently using wrong values.
+ */
+export function useShifts() {
+  const { data } = useMillMasters();
+  return (data?.shift ?? []) as ShiftOption[];
 }
 
 /**

@@ -1341,17 +1341,16 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button size="sm">
-          <UserPlus className="size-4 mr-1" />
-          Add Employee
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-xl sm:max-w-[600px] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Add Employee</SheetTitle>
-        </SheetHeader>
+    <>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        <UserPlus className="size-4 mr-1" />
+        Add Employee
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add Employee</DialogTitle>
+        </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="flex gap-2 border-b pb-2">
             <button
@@ -1693,14 +1692,15 @@ function AddEmployeeSheet({ employees }: { employees: EmployeeRow[] }) {
             </div>
           )}
 
-          <SheetFooter>
+          <DialogFooter>
             <Button type="submit" disabled={m.isPending}>
               {m.isPending ? "Saving…" : "Save Employee"}
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
@@ -1823,11 +1823,11 @@ function EditEmployeeSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-xl sm:max-w-[600px] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Edit Employee — {employee.name}</SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Employee — {employee.name}</DialogTitle>
+        </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="flex gap-2 border-b pb-2">
             <button
@@ -2169,14 +2169,14 @@ function EditEmployeeSheet({
             </div>
           )}
 
-          <SheetFooter>
+          <DialogFooter>
             <Button type="submit" disabled={m.isPending}>
               {m.isPending ? "Saving…" : "Update Employee"}
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -2709,17 +2709,16 @@ function MarkAttendanceSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button size="sm">
-          <ClipboardCheck className="size-4 mr-1" />
-          Mark Attendance
-        </Button>
-      </SheetTrigger>
-      <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Mark Attendance</SheetTitle>
-        </SheetHeader>
+    <>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        <ClipboardCheck className="size-4 mr-1" />
+        Mark Attendance
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Mark Attendance</DialogTitle>
+        </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="flex gap-3 items-end">
             <div className="space-y-1.5">
@@ -2791,13 +2790,14 @@ function MarkAttendanceSheet({
             </div>
           </div>
         </div>
-        <SheetFooter>
+        <DialogFooter>
           <Button onClick={handleSubmit} disabled={m.isPending}>
             {m.isPending ? "Saving…" : "Save All"}
           </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 

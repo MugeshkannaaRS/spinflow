@@ -20,6 +20,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Sheet,
@@ -535,18 +536,17 @@ function AddSpareSheet() {
   });
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button size="sm">
-          <Plus className="size-4 mr-1" />
-          Add Spare
-        </Button>
-      </SheetTrigger>
-      <SheetContent className="sm:max-w-lg">
-        <SheetHeader>
-          <SheetTitle>Add Spare</SheetTitle>
-          <SheetDescription>Enter the details for the new spare part.</SheetDescription>
-        </SheetHeader>
+    <>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        <Plus className="size-4 mr-1" />
+        Add Spare
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Add Spare</DialogTitle>
+          <DialogDescription>Enter the details for the new spare part.</DialogDescription>
+        </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -592,7 +592,7 @@ function AddSpareSheet() {
               <Input type="number" {...fnum("unitPrice")} step="0.01" />
             </div>
           </div>
-          <SheetFooter>
+          <DialogFooter>
             <SheetClose asChild>
               <Button type="button" variant="outline">
                 Cancel
@@ -601,10 +601,11 @@ function AddSpareSheet() {
             <Button type="submit" disabled={m.isPending || !allFilled}>
               {m.isPending ? "Saving…" : "Create spare"}
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
@@ -684,17 +685,16 @@ function EditSpareSheet({ item }: { item: any }) {
   });
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button size="sm" variant="ghost">
-          <Pencil className="size-3.5" />
-        </Button>
-      </SheetTrigger>
-      <SheetContent className="sm:max-w-lg">
-        <SheetHeader>
-          <SheetTitle>Edit Spare — {item.code}</SheetTitle>
-          <SheetDescription>Update the spare part details.</SheetDescription>
-        </SheetHeader>
+    <>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+        <Pencil className="size-3.5" />
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Spare — {item.code}</DialogTitle>
+          <DialogDescription>Update the spare part details.</DialogDescription>
+        </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -731,7 +731,7 @@ function EditSpareSheet({ item }: { item: any }) {
               <Input type="number" {...fnum("unitPrice")} step="0.01" />
             </div>
           </div>
-          <SheetFooter>
+          <DialogFooter>
             <SheetClose asChild>
               <Button type="button" variant="outline">
                 Cancel
@@ -740,10 +740,11 @@ function EditSpareSheet({ item }: { item: any }) {
             <Button type="submit" disabled={m.isPending || !allFilled}>
               {m.isPending ? "Saving…" : "Update spare"}
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 

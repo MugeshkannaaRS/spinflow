@@ -30,6 +30,13 @@ import {
   SheetClose,
   SheetFooter,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -496,11 +503,11 @@ function InvoiceSlideOver({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{invoice ? "Edit Invoice" : "New Invoice"}</SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-full sm:max-w-xl overflow-y-auto max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{invoice ? "Edit Invoice" : "New Invoice"}</DialogTitle>
+        </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-6">
           <div className="space-y-1">
             <Label>Customer Name *</Label>
@@ -681,19 +688,17 @@ function InvoiceSlideOver({
             />
           </div>
 
-          <SheetFooter className="pt-2">
-            <SheetClose asChild>
-              <Button type="button" variant="outline" size="sm">
-                Cancel
-              </Button>
-            </SheetClose>
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
             <Button type="submit" size="sm" disabled={!canSubmit || m.isPending}>
               {m.isPending ? "Saving..." : invoice ? "Update Invoice" : "Create Invoice"}
             </Button>
-          </SheetFooter>
+          </DialogFooter>
         </form>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
 

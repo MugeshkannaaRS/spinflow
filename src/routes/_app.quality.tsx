@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { qualityApi, exportApi } from "@/lib/api-service";
 import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
+import { useShifts } from "@/hooks/useMillConfig";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { AccessGuard } from "@/components/AccessGuard";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -1421,7 +1422,7 @@ interface QmFieldDef {
   step?: string;
 }
 
-const SHIFT_OPTIONS = ["A", "B", "C", "R/A", "R/B", "R/C"];
+// SHIFT_OPTIONS removed — shift options now come from Masters → Shifts via useShifts()
 const STATUS_OPTIONS = ["draft", "approved", "rejected"];
 
 // ── Machine autocomplete ─────────────────────────────────────────────────────
@@ -1630,14 +1631,18 @@ function QmFieldInput({
   machines?: any[];
 }) {
   const listId = useMemo(() => `mc-dl-${field.key}-${Math.random().toString(36).slice(2)}`, [field.key]);
+  const shiftOptions = useShifts();
   const base =
     "flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm " +
     "focus:outline-none focus:ring-1 focus:ring-ring";
 
   if (field.type === "shift") {
     return (
-      <select value={value ?? "A"} onChange={(e) => onChange(e.target.value)} className={base}>
-        {SHIFT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+      <select value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={base}>
+        {shiftOptions.length === 0 && (
+          <option value="" disabled>No shifts — add in Masters</option>
+        )}
+        {shiftOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
       </select>
     );
   }
@@ -1877,11 +1882,12 @@ function QmSheetDialog({
 }) {
   const qc = useQueryClient();
   const { data: machines = [] } = useMachines(millId, department);
+  const shiftOptions = useShifts();
   const today = new Date().toISOString().slice(0, 10);
   const listId = useMemo(() => `mc-dl-sheet-${Math.random().toString(36).slice(2)}`, []);
 
   const makeDefault = () => ({
-    date: today, shift_code: "R/A", lot_no: "", process: "",
+    date: today, shift_code: "", lot_no: "", process: "",
     [hankField]: "", cotton_type: "",
     machine_no: "", side: "", time_taken: "",
     r1: "", r2: "", r3: "", r4: "", r5: "",
@@ -1896,7 +1902,7 @@ function QmSheetDialog({
     if (editRecord) {
       setForm({
         date: editRecord.date ?? today,
-        shift_code: editRecord.shift_code ?? "R/A",
+        shift_code: editRecord.shift_code ?? "",
         lot_no: editRecord.lot_no ?? "",
         process: editRecord.process ?? "",
         [hankField]: editRecord[hankField] ?? "",
@@ -1977,7 +1983,8 @@ function QmSheetDialog({
             <label className="text-xs font-medium text-muted-foreground">Shift</label>
             <select value={form.shift_code} onChange={(e) => setF("shift_code", e.target.value)}
               className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-              {SHIFT_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              {shiftOptions.length === 0 && <option value="" disabled>No shifts — add in Masters</option>}
+              {shiftOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
           <div className="space-y-1">

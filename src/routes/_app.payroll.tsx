@@ -14,6 +14,13 @@ import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -238,18 +245,17 @@ function MonthSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button size="sm" variant="outline" className="w-full">
-          {pm ? "Details" : "Process"}
-        </Button>
-      </SheetTrigger>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>
+    <>
+      <Button size="sm" variant="outline" className="w-full" onClick={() => setOpen(true)}>
+        {pm ? "Details" : "Process"}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
             {MONTHS[month - 1]} {year}
-          </SheetTitle>
-        </SheetHeader>
+          </DialogTitle>
+        </DialogHeader>
         <div className="mt-6 space-y-4">
           {pm ? (
             <>
@@ -373,8 +379,9 @@ function MonthSheet({
             </Button>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 

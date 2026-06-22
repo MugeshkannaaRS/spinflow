@@ -128,8 +128,14 @@ function ShiftGrid() {
 
   const [requiredErrors, setRequiredErrors] = useState<Record<string, string>>({});
   const [date, setDate] = useState(localDate);
-  const [shift, setShift] = useState<"A" | "B" | "C">("A");
+  const [shift, setShift] = useState<string>("");
   const { data: millMasters } = useMillMasters();
+  // Auto-select first shift from Masters when loaded
+  useEffect(() => {
+    if (!shift && millMasters?.shift?.length) {
+      setShift(millMasters.shift[0].id);
+    }
+  }, [millMasters?.shift, shift]);
   const deptOptions = millMasters?.department ?? [];
   const DEPARTMENTS = deptOptions.map((d: any) => (typeof d === "string" ? d : d.name));
   const [department, setDepartment] = useState<string>("");
@@ -471,7 +477,7 @@ function ShiftGrid() {
               <Select
                 value={shift}
                 onValueChange={(v) => {
-                  setShift(v as "A" | "B" | "C");
+                  setShift(v);
                   setRequiredErrors((prev) => ({ ...prev, shift: "" }));
                 }}
               >
@@ -483,9 +489,9 @@ function ShiftGrid() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="A">A — Morning</SelectItem>
-                  <SelectItem value="B">B — Afternoon</SelectItem>
-                  <SelectItem value="C">C — Night</SelectItem>
+                  {(millMasters?.shift ?? []).map((s: any) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {requiredErrors.shift && (
@@ -1046,8 +1052,14 @@ function WasteGrid() {
     .toISOString()
     .split("T")[0];
   const [date, setDate] = useState(localDate);
-  const [shift, setShift] = useState<"A" | "B" | "C">("A");
+  const [shift, setShift] = useState<string>("");
   const { data: millMasters } = useMillMasters();
+  // Auto-select first shift from Masters when loaded
+  useEffect(() => {
+    if (!shift && millMasters?.shift?.length) {
+      setShift(millMasters.shift[0].id);
+    }
+  }, [millMasters?.shift, shift]);
   const deptOptions = millMasters?.department ?? [];
   const [department, setDepartment] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
@@ -1259,14 +1271,14 @@ function WasteGrid() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Shift *</Label>
-              <Select value={shift} onValueChange={(v) => setShift(v as "A" | "B" | "C")}>
+              <Select value={shift} onValueChange={(v) => setShift(v)}>
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="A">A — Morning</SelectItem>
-                  <SelectItem value="B">B — Afternoon</SelectItem>
-                  <SelectItem value="C">C — Night</SelectItem>
+                  {(millMasters?.shift ?? []).map((s: any) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -1751,7 +1763,7 @@ function StoppageForm() {
 
   // Header state
   const [date, setDate] = useState(localDate);
-  const [shift, setShift] = useState<"A" | "B" | "C">("A");
+  const [shift, setShift] = useState<string>("");
   const [department, setDepartment] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [selectedMachine, setSelectedMachine] = useState<string>("");
@@ -1776,6 +1788,12 @@ function StoppageForm() {
 
   // Mill masters
   const { data: millMasters } = useMillMasters();
+  // Auto-select first shift from Masters when loaded
+  useEffect(() => {
+    if (!shift && millMasters?.shift?.length) {
+      setShift(millMasters.shift[0].id);
+    }
+  }, [millMasters?.shift, shift]);
   const deptOptions = millMasters?.department ?? [];
   useEffect(() => {
     if (!department && deptOptions.length > 0) {
@@ -2001,14 +2019,14 @@ function StoppageForm() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Shift</Label>
-              <Select value={shift} onValueChange={(v) => setShift(v as "A" | "B" | "C")}>
+              <Select value={shift} onValueChange={(v) => setShift(v)}>
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="A">A — Morning</SelectItem>
-                  <SelectItem value="B">B — Afternoon</SelectItem>
-                  <SelectItem value="C">C — Night</SelectItem>
+                  {(millMasters?.shift ?? []).map((s: any) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -2850,7 +2868,7 @@ function ManpowerGrid() {
     .toISOString()
     .split("T")[0];
   const [date, setDate] = useState(localDate);
-  const [shift, setShift] = useState<"A" | "B" | "C">("A");
+  const [shift, setShift] = useState<string>("");
   const [department, setDepartment] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
 
@@ -2861,6 +2879,12 @@ function ManpowerGrid() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
 
   const { data: millMasters } = useMillMasters();
+  // Auto-select first shift from Masters when loaded
+  useEffect(() => {
+    if (!shift && millMasters?.shift?.length) {
+      setShift(millMasters.shift[0].id);
+    }
+  }, [millMasters?.shift, shift]);
   const deptOptions = (millMasters?.department ?? []) as any[];
 
   useEffect(() => {
@@ -3218,14 +3242,14 @@ function ManpowerGrid() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Shift *</Label>
-              <Select value={shift} onValueChange={(v) => setShift(v as "A" | "B" | "C")}>
+              <Select value={shift} onValueChange={(v) => setShift(v)}>
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="A">A — Morning</SelectItem>
-                  <SelectItem value="B">B — Afternoon</SelectItem>
-                  <SelectItem value="C">C — Night</SelectItem>
+                  {(millMasters?.shift ?? []).map((s: any) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -3890,6 +3914,12 @@ function ProductionReportsTab() {
   const [machineCode, setMachineCode] = useState<string>("");
 
   const { data: millMasters } = useMillMasters();
+  // Auto-select first shift from Masters when loaded
+  useEffect(() => {
+    if (!shift && millMasters?.shift?.length) {
+      setShift(millMasters.shift[0].id);
+    }
+  }, [millMasters?.shift, shift]);
   const deptOptions = (millMasters?.department ?? []) as any[];
 
   const machineGroupsQ = useQuery({
@@ -4050,9 +4080,9 @@ function ProductionReportsTab() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_all">All Shifts</SelectItem>
-                  <SelectItem value="A">A — Morning</SelectItem>
-                  <SelectItem value="B">B — Afternoon</SelectItem>
-                  <SelectItem value="C">C — Night</SelectItem>
+                  {(millMasters?.shift ?? []).map((s: any) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -4249,7 +4279,14 @@ function PackingGrid() {
     .toISOString()
     .split("T")[0];
   const [date, setDate] = useState(localDate);
-  const [shift, setShift] = useState<"A" | "B" | "C">("A");
+  const [shift, setShift] = useState<string>("");
+  const { data: millMasters } = useMillMasters();
+  // Auto-select first shift from Masters when loaded
+  useEffect(() => {
+    if (!shift && millMasters?.shift?.length) {
+      setShift(millMasters.shift[0].id);
+    }
+  }, [millMasters?.shift, shift]);
   const [supervisor, setSupervisor] = useState("");
   const [rows, setRows] = useState<PackingRow[]>([EMPTY_PACKING_ROW()]);
   const [saving, setSaving] = useState(false);
@@ -4482,14 +4519,14 @@ function PackingGrid() {
               value={date}
               onChange={(e) => setDate(e.target.value)}
             />
-            <Select value={shift} onValueChange={(v) => setShift(v as "A" | "B" | "C")}>
+            <Select value={shift} onValueChange={(v) => setShift(v)}>
               <SelectTrigger className="w-28 h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="A">A — Morning</SelectItem>
-                <SelectItem value="B">B — Afternoon</SelectItem>
-                <SelectItem value="C">C — Night</SelectItem>
+                {(millMasters?.shift ?? []).map((s: any) => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Input
