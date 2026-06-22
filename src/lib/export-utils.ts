@@ -168,11 +168,36 @@ export async function exportToPdf(opts: ExportOptions): Promise<void> {
   doc.save(`${opts.filename}.pdf`);
 }
 
-// ── Convenience: export menu component props ─────────────────────────────────
+// ── CSV export ───────────────────────────────────────────────────────────────
 
-export type ExportFormat = "excel" | "pdf";
+export async function exportToCsv(opts: ExportOptions): Promise<void> {
+  const header = opts.columns.map((c) => `"${c.label.replace(/"/g, '""')}"`).join(",");
+  const dataRows = opts.rows.map((row) =>
+    opts.columns
+      .map((col) => {
+        const v = formatCell(col, row);
+        return `"${v.replace(/"/g, '""')}"`;
+      })
+      .join(","),
+  );
+  const csv = [header, ...dataRows].join("\r\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" }); // BOM for Excel compatibility
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${opts.filename}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── Convenience dispatcher ────────────────────────────────────────────────────
+
+export type ExportFormat = "csv" | "excel" | "pdf";
 
 export async function exportData(format: ExportFormat, opts: ExportOptions): Promise<void> {
+  if (format === "csv") return exportToCsv(opts);
   if (format === "excel") return exportToExcel(opts);
   if (format === "pdf") return exportToPdf(opts);
 }

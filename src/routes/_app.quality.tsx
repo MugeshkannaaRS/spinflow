@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { qualityApi, exportApi } from "@/lib/api-service";
-import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
+import { ExportDateRangeButton, type ShiftOption as ExportShiftOption } from "@/components/ui/ExportDateRangeButton";
+import { ExportMenu } from "@/components/ui/ExportMenu";
 import { useAuth } from "@/stores/auth";
 import { useShifts } from "@/hooks/useMillConfig";
 import { useActiveMill } from "@/hooks/useActiveMill";
@@ -67,6 +68,8 @@ function QualityPage() {
   const canEdit = canAccess("quality", true);
   const qc = useQueryClient();
   const { millId } = useActiveMill();
+  const shiftList = useShifts();
+  const shiftOptions = shiftList.map((s: any) => ({ id: s.id, name: s.name, code: s.code }));
   const testsQ = useQuery({
     queryKey: ["quality-tests", millId],
     queryFn: qualityApi.getTests,
@@ -247,6 +250,7 @@ function QualityPage() {
                         <div className="flex gap-1">
                           <ExportDateRangeButton
                             onExportXlsx={(f, t) => exportApi.qualityXlsx(f, t)}
+                            shifts={shiftOptions}
                           />
                           {canEdit && <ImportTestsDialog />}
                         </div>
@@ -2128,30 +2132,6 @@ function QmSheetDialog({
   );
 }
 
-// ── CSV export helper ────────────────────────────────────────────────────────
-function exportQmToCsv(title: string, columns: { key: string; label: string }[], records: any[]) {
-  if (records.length === 0) { toast.info("No records to export"); return; }
-  const cols = columns.filter((c) => !["id","mill_id","company_id","created_at","updated_at"].includes(c.key));
-  const header = cols.map((c) => `"${c.label}"`).join(",");
-  const rows = records.map((r) =>
-    cols.map((c) => {
-      const v = r[c.key];
-      if (v == null || v === "") return "";
-      return `"${String(v).replace(/"/g, '""')}"`;
-    }).join(",")
-  );
-  const csv = [header, ...rows].join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  const date = new Date().toISOString().slice(0, 10);
-  a.href = url;
-  a.download = `${title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_${date}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  toast.success(`Exported ${records.length} records`);
-}
-
 // ── Main QmFormsTab: table + popup ──────────────────────────────────────────
 function QmFormsTab({
   title, endpoint, columns, millId, canEdit, layout = "grid",
@@ -2222,15 +2202,14 @@ function QmFormsTab({
           </div>
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs text-muted-foreground">{records.length} record{records.length !== 1 ? "s" : ""}</span>
-            {records.length > 0 && (
-              <Button
-                size="sm" variant="outline" className="h-7 text-xs gap-1"
-                onClick={() => exportQmToCsv(title, tableCols, records)}
-                title="Export to CSV"
-              >
-                <ArrowUp className="size-3" /> Export
-              </Button>
-            )}
+            <ExportMenu
+              columns={tableCols.map((c) => ({ key: c.key, label: c.label }))}
+              rows={records}
+              filename={title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}
+              title={title}
+              subtitle={`Date: ${filterDate}`}
+              className="h-7"
+            />
             {canEdit && (
               <Button size="sm" className="h-7 text-xs gap-1" onClick={openAdd}>
                 <Plus className="size-3" /> Add record
