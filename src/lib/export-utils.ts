@@ -122,19 +122,48 @@ export async function exportToPdf(opts: ExportOptions): Promise<void> {
   await loadAutoTable();
 
   const { jsPDF } = jspdf;
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+
+  // Auto-select page size based on column count
+  const colCount = opts.columns.length;
+  const format = colCount > 16 ? "a3" : colCount > 10 ? "a3" : "a4";
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format });
+
+  const pageW = doc.internal.pageSize.getWidth();
+  const margin = 14;
+  const usableW = pageW - margin * 2;
 
   // Title block
   const title = opts.title ?? opts.filename;
-  doc.setFontSize(16);
+  doc.setFontSize(15);
   doc.setFont("helvetica", "bold");
-  doc.text(title, 14, 18);
+  doc.setTextColor(20, 20, 20);
+  doc.text(title, margin, 16);
 
-  doc.setFontSize(9);
+  // Thin accent line under title
+  doc.setDrawColor(52, 100, 230);
+  doc.setLineWidth(0.5);
+  doc.line(margin, 19, margin + 60, 19);
+
+  doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(100);
-  const subLine = `${opts.subtitle ? opts.subtitle + "   " : ""}Generated: ${todayStr()}   Total rows: ${opts.rows.length}`;
-  doc.text(subLine, 14, 25);
+  doc.setTextColor(120);
+  const subLine = [
+    opts.subtitle,
+    `Generated: ${todayStr()}`,
+    `Total rows: ${opts.rows.length}`,
+  ].filter(Boolean).join("   ·   ");
+  doc.text(subLine, margin, 25);
+
+  // ── Column width distribution ──────────────────────────────────────────────
+  // Give each column an equal slice; honour explicit col.width overrides.
+  const equalW = Math.floor(usableW / colCount);
+  const colStyles: Record<number, any> = {};
+  opts.columns.forEach((col, i) => {
+    colStyles[i] = { cellWidth: col.width ?? equalW };
+  });
+
+  // Font size: shrink for wide tables so content fits
+  const tableFontSize = colCount > 18 ? 6 : colCount > 12 ? 7 : 8;
 
   // Table
   const head = [opts.columns.map((c) => c.label)];
@@ -144,23 +173,41 @@ export async function exportToPdf(opts: ExportOptions): Promise<void> {
     head,
     body,
     startY: 30,
-    styles: { fontSize: 8, cellPadding: 2 },
-    headStyles: { fillColor: [52, 100, 230], textColor: 255, fontStyle: "bold" },
+    tableWidth: usableW,
+    styles: {
+      fontSize: tableFontSize,
+      cellPadding: { top: 2.5, right: 2, bottom: 2.5, left: 2 },
+      overflow: "linebreak",
+      valign: "middle",
+    },
+    headStyles: {
+      fillColor: [30, 58, 138],   // deep navy
+      textColor: 255,
+      fontStyle: "bold",
+      fontSize: tableFontSize,
+      halign: "center",
+    },
     alternateRowStyles: { fillColor: [245, 247, 252] },
-    columnStyles: opts.columns.reduce((acc: any, col, i) => {
-      if (col.width) acc[i] = { cellWidth: col.width };
-      return acc;
-    }, {}),
-    margin: { left: 14, right: 14 },
+    bodyStyles: { textColor: [30, 30, 30] },
+    columnStyles: colStyles,
+    margin: { left: margin, right: margin },
     didDrawPage: (data: any) => {
-      // Footer
+      const pageH = doc.internal.pageSize.getHeight();
+      // Footer bar
+      doc.setFillColor(248, 249, 252);
+      doc.rect(0, pageH - 10, pageW, 10, "F");
       doc.setFontSize(7);
-      doc.setTextColor(150);
+      doc.setTextColor(140);
+      doc.text("SpinFlow ERP", margin, pageH - 3.5);
       doc.text(
-        `SpinFlow ERP — Page ${data.pageNumber}`,
-        doc.internal.pageSize.getWidth() / 2,
-        doc.internal.pageSize.getHeight() - 8,
+        `Page ${data.pageNumber}`,
+        pageW / 2, pageH - 3.5,
         { align: "center" },
+      );
+      doc.text(
+        new Date().toLocaleString("en-IN"),
+        pageW - margin, pageH - 3.5,
+        { align: "right" },
       );
     },
   });
