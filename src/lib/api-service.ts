@@ -140,6 +140,10 @@ export const productionApi = {
     api.get("/production/waste-entries", { params }).then((r) => r.data),
   getWasteTypes: (params?: Record<string, any>) =>
     api.get("/production/waste-entries/types", { params }).then((r) => r.data),
+  getWasteTypeTemplate: (params: { machine_code?: string; machine_group_id?: string; mill_id?: string }) =>
+    api.get("/production/waste-type-templates", { params }).then((r) => r.data),
+  upsertWasteTypeTemplate: (data: any) =>
+    api.put("/production/waste-type-templates", data).then((r) => r.data),
   createWasteBulk: (data: any, millId?: string) =>
     api
       .post("/production/waste-entries/bulk", data, { params: millId ? { mill_id: millId } : {} })

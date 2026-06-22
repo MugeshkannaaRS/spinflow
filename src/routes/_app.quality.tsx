@@ -44,6 +44,7 @@ import {
   ArrowDown,
   ArrowUp,
   FileDown,
+  FileText,
   Trash2,
   Pencil,
   Save,
@@ -52,6 +53,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { QualityTest } from "@/lib/types";
+import { exportToLetterheadPdf } from "@/lib/export-utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
@@ -67,7 +69,7 @@ function QualityPage() {
   const { canAccess } = useRBAC();
   const canEdit = canAccess("quality", true);
   const qc = useQueryClient();
-  const { millId } = useActiveMill();
+  const { millId, millName } = useActiveMill();
   const shiftList = useShifts();
   const shiftOptions = shiftList.map((s: any) => ({ id: s.id, name: s.name, code: s.code }));
   const testsQ = useQuery({
@@ -425,6 +427,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="grid"
                 />
@@ -469,6 +472,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="rows"
                 />
@@ -480,6 +484,7 @@ function QualityPage() {
                   department="carding"
                   columns={[]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="sheet"
                   hasSide={false}
@@ -521,6 +526,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="grid"
                 />
@@ -572,6 +578,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="grid"
                 />
@@ -583,6 +590,7 @@ function QualityPage() {
                   department="drawing"
                   columns={[]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="sheet"
                   hasSide={true}
@@ -603,6 +611,7 @@ function QualityPage() {
                   department="simplex"
                   columns={[]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="sheet"
                   hasSide={false}
@@ -648,6 +657,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="rows"
                 />
@@ -680,6 +690,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="grid"
                 />
@@ -763,6 +774,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="grid"
                 />
@@ -794,6 +806,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="rows"
                 />
@@ -825,6 +838,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="rows"
                 />
@@ -872,6 +886,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="rows"
                 />
@@ -906,6 +921,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="grid"
                 />
@@ -933,6 +949,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="grid"
                 />
@@ -985,6 +1002,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="grid"
                 />
@@ -1029,6 +1047,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="grid"
                 />
@@ -1048,6 +1067,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="grid"
                 />
@@ -1082,6 +1102,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="grid"
                 />
@@ -1106,6 +1127,7 @@ function QualityPage() {
                     },
                   ]}
                   millId={millId}
+                  millName={millName}
                   canEdit={canEdit}
                   layout="grid"
                 />
@@ -1608,6 +1630,7 @@ interface QmFormsTabProps {
   endpoint: string;
   columns: any[];
   millId: string | null | undefined;
+  millName?: string;
   canEdit: boolean;
   layout?: QmLayout;
   department?: string;
@@ -2136,7 +2159,7 @@ function QmSheetDialog({
 
 // ── Main QmFormsTab: table + popup ──────────────────────────────────────────
 function QmFormsTab({
-  title, endpoint, columns, millId, canEdit, layout = "grid",
+  title, endpoint, columns, millId, millName, canEdit, layout = "grid",
   department, hasSide, hasProcess, hasTime, hankField = "std_hank", readingLabel = "g",
 }: QmFormsTabProps) {
   const qc = useQueryClient();
@@ -2216,6 +2239,27 @@ function QmFormsTab({
               subtitle={`${dateFrom}${dateTo !== dateFrom ? ` → ${dateTo}` : ""}`}
               className="h-7"
             />
+            {records.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1"
+                title="Export as letterhead PDF (one record per page)"
+                onClick={() =>
+                  exportToLetterheadPdf({
+                    filename: title.replace(/[^a-z0-9]/gi, "_").toLowerCase(),
+                    title,
+                    millName,
+                    subtitle: `${dateFrom}${dateTo !== dateFrom ? ` → ${dateTo}` : ""}`,
+                    columns: tableCols.map((c) => ({ key: c.key, label: c.label })),
+                    rows: records,
+                  })
+                }
+              >
+                <FileText className="size-3" />
+                Letterhead
+              </Button>
+            )}
             {canEdit && (
               <Button size="sm" className="h-7 text-xs gap-1" onClick={openAdd}>
                 <Plus className="size-3" /> Add record
@@ -2327,7 +2371,8 @@ function QmFormsTab({
         <QmSheetDialog
           open={dialogOpen} onClose={closeDialog}
           title={title} endpoint={endpoint}
-          editRecord={editRecord} millId={millId} department={department}
+          editRecord={editRecord} millId={millId}
+          department={department}
           hasSide={hasSide} hasProcess={hasProcess} hasTime={hasTime ?? true}
           hankField={hankField} readingLabel={readingLabel}
         />
@@ -2335,7 +2380,8 @@ function QmFormsTab({
         <QmGridDialog
           open={dialogOpen} onClose={closeDialog}
           title={title} endpoint={endpoint} columns={columns}
-          editRecord={editRecord} millId={millId} department={department}
+          editRecord={editRecord} millId={millId}
+          department={department}
         />
       )}
     </Card>

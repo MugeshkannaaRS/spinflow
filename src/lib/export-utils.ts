@@ -239,6 +239,177 @@ export async function exportToCsv(opts: ExportOptions): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
+// ── Letterhead PDF: one record per A4 page ───────────────────────────────────
+// Used for quality department forms.
+// Each row from `opts.rows` gets its own page.
+// Layout: mill name at top, two-column label:value pairs in the middle,
+// waste % summary box (if present), status + signature line at bottom.
+
+export interface LetterheadOptions extends ExportOptions {
+  /** Mill / company name to show in the letterhead header */
+  millName?: string;
+}
+
+
+// Actual implementation using a single jsPDF doc with addPage() between records
+async function _buildLetterheadPdf(opts: LetterheadOptions): Promise<any> {
+  const jspdf = await loadJsPDF();
+  await loadAutoTable();
+  const { jsPDF } = jspdf;
+
+  const SKIP_KEYS = new Set(["id", "mill_id", "company_id", "created_at", "updated_at"]);
+  const visibleCols = opts.columns.filter((c) => !SKIP_KEYS.has(c.key));
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 14;
+  const mill = opts.millName ?? "SpinFlow ERP";
+
+  function drawPage(doc: any, row: any, rowIdx: number, total: number) {
+    const colMid = pageW / 2;
+    const rowH = 7.5;
+
+    // ── Letterhead header ──────────────────────────────────────────────────
+    doc.setFillColor(30, 58, 138);
+    doc.rect(0, 0, pageW, 22, "F");
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.text(mill, margin, 12);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(180, 200, 255);
+    doc.text(opts.title ?? opts.filename, margin, 18);
+    doc.setFontSize(8);
+    doc.setTextColor(200, 220, 255);
+    doc.text(`Record ${rowIdx + 1} of ${total}`, pageW - margin, 14, { align: "right" });
+    doc.setDrawColor(99, 148, 255);
+    doc.setLineWidth(0.4);
+    doc.line(margin, 24, pageW - margin, 24);
+
+    // ── Field pairs ────────────────────────────────────────────────────────
+    const leftCols = visibleCols.filter((_, i) => i % 2 === 0);
+    const rightCols = visibleCols.filter((_, i) => i % 2 === 1);
+    const maxPairs = Math.max(leftCols.length, rightCols.length);
+    const labelW = 46;
+    let y = 31;
+
+    for (let i = 0; i < maxPairs; i++) {
+      const lc = leftCols[i];
+      const rc = rightCols[i];
+      const bg = i % 2 === 0 ? [252, 253, 255] : [246, 248, 252];
+      doc.setFillColor(...bg as [number, number, number]);
+      doc.rect(margin - 1, y - 5, pageW - margin * 2 + 2, rowH, "F");
+
+      if (lc) {
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(70, 80, 100);
+        doc.text(lc.label + ":", margin + 1, y);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(20, 20, 20);
+        const val = String(formatCell(lc, row) || "—");
+        doc.text(doc.splitTextToSize(val, colMid - margin - labelW - 4)[0], margin + labelW, y);
+      }
+      if (rc) {
+        const rx = colMid + 4;
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(70, 80, 100);
+        doc.text(rc.label + ":", rx, y);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(20, 20, 20);
+        const val = String(formatCell(rc, row) || "—");
+        doc.text(doc.splitTextToSize(val, pageW - margin - rx - labelW)[0], rx + labelW, y);
+      }
+      y += rowH;
+
+      if (y > pageH - 50) break; // Safety: don't overflow into footer
+    }
+
+    // ── Waste summary box ─────────────────────────────────────────────────
+    const wasteKeys = visibleCols.filter(
+      (c) => (c.key.includes("waste") || c.key.includes("pct") || c.key.includes("percent")),
+    );
+    if (wasteKeys.length > 0 && y < pageH - 55) {
+      y += 4;
+      const boxRows = Math.ceil(wasteKeys.length / 3);
+      const boxH = 8 + boxRows * 7;
+      doc.setFillColor(240, 244, 255);
+      doc.setDrawColor(150, 170, 230);
+      doc.setLineWidth(0.3);
+      doc.roundedRect(margin, y, pageW - margin * 2, boxH, 2, 2, "FD");
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 58, 138);
+      doc.text("Waste / % Breakdown", margin + 3, y + 6);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(40, 40, 60);
+      let wy = y + 13;
+      wasteKeys.forEach((c, ki) => {
+        const val = formatCell(c, row);
+        const col3 = ki % 3;
+        doc.text(`${c.label}: ${val || "—"}`, margin + 4 + col3 * 60, wy);
+        if (col3 === 2) wy += 7;
+      });
+      y += boxH + 5;
+    }
+
+    // ── Status + signatures ────────────────────────────────────────────────
+    const statusVal = row.status ?? row.ok_input ?? row.result ?? null;
+    const sigY = pageH - 26;
+    doc.setDrawColor(200, 200, 215);
+    doc.setLineWidth(0.3);
+    doc.line(margin, sigY - 5, pageW - margin, sigY - 5);
+
+    if (statusVal !== null) {
+      const statusStr = String(statusVal).toUpperCase();
+      const isOk = ["OK", "PASS", "APPROVED", "TRUE", "1"].includes(statusStr);
+      doc.setFillColor(...(isOk ? [220, 252, 231] : [254, 226, 226]) as [number, number, number]);
+      doc.setDrawColor(...(isOk ? [134, 239, 172] : [252, 165, 165]) as [number, number, number]);
+      doc.roundedRect(margin, sigY - 2, 34, 8, 1.5, 1.5, "FD");
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...(isOk ? [22, 101, 52] : [153, 27, 27]) as [number, number, number]);
+      doc.text(statusStr, margin + 17, sigY + 3.5, { align: "center" });
+    }
+
+    const sigLabels = ["Operator", "Supervisor", "QA Manager"];
+    const sigSpacing = (pageW - margin * 2) / sigLabels.length;
+    sigLabels.forEach((label, i) => {
+      const sx = margin + i * sigSpacing + sigSpacing / 2;
+      doc.setDrawColor(140, 140, 155);
+      doc.setLineWidth(0.3);
+      doc.line(sx - 22, sigY + 9, sx + 22, sigY + 9);
+      doc.setFontSize(6.5);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(130);
+      doc.text(label, sx, sigY + 13, { align: "center" });
+    });
+
+    // Footer bar
+    doc.setFillColor(245, 247, 252);
+    doc.rect(0, pageH - 9, pageW, 9, "F");
+    doc.setFontSize(6.5);
+    doc.setTextColor(150);
+    doc.text("SpinFlow ERP", margin, pageH - 3.5);
+    doc.text(new Date().toLocaleString("en-IN"), pageW - margin, pageH - 3.5, { align: "right" });
+  }
+
+  opts.rows.forEach((row, i) => {
+    if (i > 0) doc.addPage();
+    drawPage(doc, row, i, opts.rows.length);
+  });
+
+  return doc;
+}
+
+// Public function — builds and saves the letterhead PDF
+export async function exportToLetterheadPdf(opts: LetterheadOptions): Promise<void> {
+  const doc = await _buildLetterheadPdf(opts);
+  doc.save(`${opts.filename}_letterhead.pdf`);
+}
+
 // ── Convenience dispatcher ────────────────────────────────────────────────────
 
 export type ExportFormat = "csv" | "excel" | "pdf";

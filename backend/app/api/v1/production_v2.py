@@ -22,6 +22,7 @@ from app.models.production_v2 import (
     ManpowerCategory,
     MixingChangeFibreRow,
     PackingShiftEntry,
+    MachineWasteTypeTemplate,
 )
 from app.models.mixing import MixingChangeLog
 from app.schemas.production_v2 import (
@@ -1098,3 +1099,79 @@ def _pse_dict(r: PackingShiftEntry) -> dict:
         "remarks": r.remarks,
         "status": r.status,
     }
+
+
+# ================================================================== #
+# MACHINE WASTE TYPE TEMPLATES (migration 051)                         #
+# Remembered waste types per machine / machine group                   #
+# ================================================================== #
+
+@router.get("/production/waste-type-templates")
+async def get_waste_type_template(
+    machine_code: Optional[str] = Query(None),
+    machine_group_id: Optional[str] = Query(None),
+    mill_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production")),
+):
+    """Get saved waste types for a machine or group. Returns empty list if none saved yet."""
+    effective_mill_id = await _resolve_mill(current_user, db, mill_id)
+    q = select(MachineWasteTypeTemplate).where(
+        MachineWasteTypeTemplate.mill_id == effective_mill_id,
+    )
+    if machine_group_id:
+        q = q.where(MachineWasteTypeTemplate.machine_group_id == machine_group_id)
+    elif machine_code:
+        q = q.where(MachineWasteTypeTemplate.machine_code == machine_code)
+    else:
+        return {"waste_types": [], "id": None}
+
+    row = (await db.execute(q)).scalar_one_or_none()
+    if not row:
+        return {"waste_types": [], "id": None}
+    return {"waste_types": row.waste_types, "id": row.id}
+
+
+@router.put("/production/waste-type-templates")
+async def upsert_waste_type_template(
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production")),
+):
+    """Save (upsert) waste types for a machine or group.
+    payload: {machine_code?, machine_group_id?, department?, waste_types: [{waste_type, ratio, sort_order}]}
+    """
+    mill_id = await _resolve_mill(current_user, db, payload.get("mill_id"))
+    machine_code = payload.get("machine_code")
+    machine_group_id = payload.get("machine_group_id")
+    waste_types = payload.get("waste_types", [])
+
+    if not machine_code and not machine_group_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="machine_code or machine_group_id required")
+
+    q = select(MachineWasteTypeTemplate).where(
+        MachineWasteTypeTemplate.mill_id == mill_id,
+    )
+    if machine_group_id:
+        q = q.where(MachineWasteTypeTemplate.machine_group_id == machine_group_id)
+    else:
+        q = q.where(MachineWasteTypeTemplate.machine_code == machine_code)
+
+    existing = (await db.execute(q)).scalar_one_or_none()
+    if existing:
+        existing.waste_types = waste_types
+        existing.department = payload.get("department", existing.department)
+    else:
+        existing = MachineWasteTypeTemplate(
+            mill_id=mill_id,
+            machine_code=machine_code,
+            machine_group_id=machine_group_id,
+            department=payload.get("department"),
+            waste_types=waste_types,
+        )
+        db.add(existing)
+
+    await db.commit()
+    await db.refresh(existing)
+    return {"waste_types": existing.waste_types, "id": existing.id}

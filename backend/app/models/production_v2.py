@@ -1,6 +1,7 @@
 """
 Production v2 models: DatalogStopCode, WasteEntry, RFManpowerPlan, MixingChangeFibreRow,
-PackingShiftEntry (migration 039), ManpowerCategory (migration 040)
+PackingShiftEntry (migration 039), ManpowerCategory (migration 040),
+MachineWasteTypeTemplate (migration 051)
 """
 from sqlalchemy import (
     String, Float, Integer, Boolean, DateTime, ForeignKey,
@@ -139,3 +140,23 @@ class MixingChangeFibreRow(Base):
     proposed_lot: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MachineWasteTypeTemplate(Base):
+    """Remembered waste types for a machine or machine group.
+
+    Stores the list of waste types first entered for a machine/group.
+    On subsequent shifts, these are auto-loaded so the operator only fills weight + ratio.
+    waste_types: [{"waste_type": "Fly waste", "ratio": "60:40", "sort_order": 0}, ...]
+    """
+    __tablename__ = "machine_waste_type_templates"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
+    machine_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    machine_group_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    department: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    # [{"waste_type": "Fly waste", "ratio": "60:40", "sort_order": 0}]
+    waste_types: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

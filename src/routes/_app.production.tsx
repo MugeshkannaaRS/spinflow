@@ -79,6 +79,7 @@ export const Route = createFileRoute("/_app/production")({
 type GridRow = {
   machineCode: string;
   machineName: string;
+  machineId?: string;
   operator: string;
   producedKg: string;
   wasteKg: string;
@@ -99,6 +100,7 @@ function buildRows(machines: any[]): GridRow[] {
   return (machines ?? []).map((m: any) => ({
     machineCode: m.code ?? "",
     machineName: m.name ?? m.code ?? "",
+    machineId: m.id ?? undefined,
     operator: "",
     producedKg: "",
     wasteKg: "",
@@ -244,6 +246,7 @@ function ShiftGrid() {
   }, [date, shift]);
 
   const [count, setCount] = useState("30s");
+  const [groupTarget, setGroupTarget] = useState<string>("");
   const config = useColumnConfig("production_entries");
 
   const machinesQ = useQuery({
@@ -376,6 +379,18 @@ function ShiftGrid() {
           machine_status: r.machineStatus,
         })),
       });
+
+      // Save changed target_kg values per machine (fire-and-forget, non-fatal)
+      const changedTargets = rows.filter(
+        (r) => r.machineId && r.targetKg !== (machines.find((m: any) => m.id === r.machineId)?.target_kg ?? 0),
+      );
+      if (changedTargets.length > 0) {
+        await Promise.allSettled(
+          changedTargets.map((r) =>
+            productionApi.updateMachine(r.machineId!, { target_kg: r.targetKg }),
+          ),
+        );
+      }
 
       // Submit linked Carding entries when Blowroom is selected
       if (isBlowroom && cardingRows.length > 0) {
@@ -839,24 +854,56 @@ function ShiftGrid() {
       )}
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between py-3">
-          <CardTitle className="text-sm">
-            Machine Grid —{" "}
-            {usingGroups
-              ? selectedGroupIds
-                  .map((gid) => machineGroups.find((x) => x.id === gid)?.name ?? gid)
-                  .join(" + ")
-              : department}{" "}
-            · Shift {shift} · {date}
-          </CardTitle>
-          <Button
-            size="sm"
-            onClick={handleSubmit}
-            disabled={bulkMutation.isPending || activeCount === 0 || !allHeaderFilled}
-          >
-            <Save className="size-3.5 mr-1.5" />
-            {bulkMutation.isPending ? "Saving…" : `Submit All (${activeCount})`}
-          </Button>
+        <CardHeader className="py-3 space-y-2">
+          <div className="flex flex-row items-center justify-between">
+            <CardTitle className="text-sm">
+              Machine Grid —{" "}
+              {usingGroups
+                ? selectedGroupIds
+                    .map((gid) => machineGroups.find((x) => x.id === gid)?.name ?? gid)
+                    .join(" + ")
+                : department}{" "}
+              · Shift {shift} · {date}
+            </CardTitle>
+            <Button
+              size="sm"
+              onClick={handleSubmit}
+              disabled={bulkMutation.isPending || activeCount === 0 || !allHeaderFilled}
+            >
+              <Save className="size-3.5 mr-1.5" />
+              {bulkMutation.isPending ? "Saving…" : `Submit All (${activeCount})`}
+            </Button>
+          </div>
+          {/* Group target — fills all machines, each remains individually editable */}
+          {rows.length > 0 && (
+            <div className="flex items-center gap-2 pt-1 border-t border-dashed">
+              <span className="text-xs text-muted-foreground shrink-0">Group Target (kg)</span>
+              <Input
+                type="number"
+                min={0}
+                value={groupTarget}
+                onChange={(e) => setGroupTarget(e.target.value)}
+                placeholder="e.g. 500"
+                className="h-7 text-xs w-28"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                disabled={!groupTarget}
+                onClick={() => {
+                  const t = Number(groupTarget) || 0;
+                  setRows((prev) => prev.map((r) => ({ ...r, targetKg: t })));
+                }}
+              >
+                Apply to all
+              </Button>
+              <span className="text-[10px] text-muted-foreground">
+                Individual targets below can still be overridden per machine
+              </span>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           {rows.length === 0 ? (
@@ -1064,14 +1111,20 @@ function WasteGrid() {
   const [department, setDepartment] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  // Entry mode: "individual" (per-machine table) or "group" (single form → all machines)
+  // Entry mode: "individual" (per-machine table) or "group" (multi-row form → all machines)
   const [wasteMode, setWasteMode] = useState<"individual" | "group">("individual");
-  // Group mode single-form state
-  const [groupWasteType, setGroupWasteType] = useState("");
-  const [groupLotNo, setGroupLotNo] = useState("");
-  const [groupRatio, setGroupRatio] = useState("");
-  const [groupWasteKg, setGroupWasteKg] = useState("");
-  const [groupRemarks, setGroupRemarks] = useState("");
+
+  // Group mode — multi-row state (one row per waste type)
+  type GroupWasteRow = { wasteType: string; lotNo: string; ratio: string; wasteKg: string; remarks: string };
+  const makeGroupRow = (): GroupWasteRow => ({ wasteType: "", lotNo: "", ratio: "", wasteKg: "", remarks: "" });
+  const [groupRows, setGroupRows] = useState<GroupWasteRow[]>([makeGroupRow()]);
+
+  const updateGroupRow = (idx: number, field: keyof GroupWasteRow, value: string) =>
+    setGroupRows((prev) => { const n = [...prev]; n[idx] = { ...n[idx], [field]: value }; return n; });
+  const addGroupRow = () => setGroupRows((prev) => prev.length < 8 ? [...prev, makeGroupRow()] : prev);
+  const removeGroupRow = (idx: number) =>
+    setGroupRows((prev) => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev);
+
   // Waste type autocomplete history
   const wasteTypesQ = useQuery({
     queryKey: ["waste-types", millId, department],
@@ -1090,6 +1143,38 @@ function WasteGrid() {
     enabled: !!millId,
   });
   const machineGroups = (machineGroupsQ.data ?? []) as MachineGroup[];
+
+  // Waste type template for the selected group (or individual machines)
+  const wasteTemplateQ = useQuery({
+    queryKey: ["waste-type-template", millId, selectedGroupId, department],
+    queryFn: () =>
+      productionApi.getWasteTypeTemplate(
+        selectedGroupId
+          ? { machine_group_id: selectedGroupId, mill_id: millId ?? undefined }
+          : { machine_code: department, mill_id: millId ?? undefined },
+      ),
+    staleTime: 300_000,
+    enabled: !!millId && wasteMode === "group",
+  });
+
+  // Auto-load template into groupRows when template data arrives
+  useEffect(() => {
+    const tmpl = wasteTemplateQ.data?.waste_types ?? [];
+    if (tmpl.length > 0) {
+      setGroupRows(
+        tmpl.map((t: any) => ({
+          wasteType: t.waste_type ?? "",
+          lotNo: t.lot_no ?? "",
+          ratio: t.ratio ?? "",
+          wasteKg: "",
+          remarks: "",
+        })),
+      );
+    } else if (wasteMode === "group" && !wasteTemplateQ.isLoading) {
+      setGroupRows([makeGroupRow()]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wasteTemplateQ.data, wasteMode]);
 
   useEffect(() => {
     if (!department && deptOptions.length > 0) {
@@ -1155,42 +1240,55 @@ function WasteGrid() {
       if (!date || !shift || !department)
         throw new Error("Date, Shift and Department are required");
       if (wasteMode === "group") {
-        // Group mode: single form entry → log for every machine in selected group
+        // Group mode: multi-row waste types → log all types for every machine in selected group
         if (!selectedGroupId) throw new Error("Select a machine group");
-        if (!groupWasteKg || Number(groupWasteKg) <= 0) throw new Error("Enter waste (kg)");
+        const activeGroupRows = groupRows.filter((r) => Number(r.wasteKg) > 0);
+        if (activeGroupRows.length === 0) throw new Error("Enter waste (kg) for at least one waste type");
         const groupMachines = machines;
         if (groupMachines.length === 0) throw new Error("No machines found in selected group");
         const machineCodes = groupMachines.map((m: any) => m.code).filter(Boolean);
-        const calls = machineCodes.map((mc: string) =>
-          productionApi.createWasteBulk(
-            {
-              date,
-              shift,
-              department,
-              entries: [
-                {
-                  machine_code: mc,
-                  waste_type: groupWasteType || undefined,
-                  lot_no: groupLotNo || undefined,
-                  ratio: groupRatio || undefined,
-                  waste_kg: Number(groupWasteKg),
-                  remarks: groupRemarks || undefined,
-                },
-              ],
-            },
-            millId ?? undefined,
+
+        // Save template (waste types for future shifts — operator won't need to re-enter types)
+        const templatePayload = {
+          machine_group_id: selectedGroupId,
+          department,
+          mill_id: millId,
+          waste_types: activeGroupRows.map((r, i) => ({
+            waste_type: r.wasteType,
+            ratio: r.ratio,
+            lot_no: r.lotNo,
+            sort_order: i,
+          })),
+        };
+        await productionApi.upsertWasteTypeTemplate(templatePayload).catch(() => {/* non-blocking */});
+
+        // Create entries: each machine × each active waste type row
+        const calls = machineCodes.flatMap((mc: string) =>
+          activeGroupRows.map((gr) =>
+            productionApi.createWasteBulk(
+              {
+                date,
+                shift,
+                department,
+                entries: [
+                  {
+                    machine_code: mc,
+                    waste_type: gr.wasteType || undefined,
+                    lot_no: gr.lotNo || undefined,
+                    ratio: gr.ratio || undefined,
+                    waste_kg: Number(gr.wasteKg),
+                    remarks: gr.remarks || undefined,
+                  },
+                ],
+              },
+              millId ?? undefined,
+            ),
           ),
         );
         const results = await Promise.allSettled(calls);
         const succeeded = results.filter((r) => r.status === "fulfilled").length;
-        const failed = results.filter((r) => r.status === "rejected");
-        if (succeeded > 0) {
-          toast.success(`Waste logged for ${succeeded} of ${machineCodes.length} machines`);
-        }
-        failed.forEach((r) => {
-          if (r.status === "rejected") toast.warning(`Error: ${r.reason?.message ?? "unknown"}`);
-        });
         if (succeeded === 0) throw new Error("All submissions failed");
+        toast.success(`Waste logged: ${activeGroupRows.length} type(s) × ${machineCodes.length} machines`);
         return { created: succeeded };
       } else {
         // Individual mode: per-machine table
@@ -1220,12 +1318,8 @@ function WasteGrid() {
         if (res.errors?.length) res.errors.forEach((e: string) => toast.warning(e));
         setRows(buildWasteRows(machines));
       } else {
-        // Reset group form
-        setGroupWasteType("");
-        setGroupLotNo("");
-        setGroupRatio("");
-        setGroupWasteKg("");
-        setGroupRemarks("");
+        // Reset only the weight/remarks — keep waste types (they're remembered for next shift)
+        setGroupRows((prev) => prev.map((r) => ({ ...r, wasteKg: "", remarks: "" })));
       }
       wasteDraft.discardDraft();
       qc.invalidateQueries({ queryKey: ["waste-entries"] });
@@ -1450,82 +1544,129 @@ function WasteGrid() {
             <Button
               size="sm"
               onClick={handleSubmit}
-              disabled={bulkMutation.isPending || !selectedGroupId || !groupWasteKg}
+              disabled={
+                bulkMutation.isPending ||
+                !selectedGroupId ||
+                groupRows.every((r) => !r.wasteKg || Number(r.wasteKg) <= 0)
+              }
               className="bg-amber-500 hover:bg-amber-600 text-white"
             >
               <Save className="size-3.5 mr-1.5" />
-              {bulkMutation.isPending ? "Saving…" : `Log for ${machines.length} machines`}
+              {bulkMutation.isPending
+                ? "Saving…"
+                : `Log ${groupRows.filter((r) => Number(r.wasteKg) > 0).length} type(s) × ${machines.length} machines`}
             </Button>
           )}
         </CardHeader>
         <CardContent className="p-0">
           {wasteMode === "group" ? (
-            /* ── Group mode: single form ── */
+            /* ── Group mode: multi-row waste types ── */
             selectedGroupId && machines.length > 0 ? (
               <div className="p-4 space-y-3">
-                <div className="text-xs text-muted-foreground mb-1">
-                  Fill in one set of values — they will be logged for all {machines.length} machines
-                  in the selected group.
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-muted-foreground">
+                    {wasteTemplateQ.isLoading
+                      ? "Loading saved waste types…"
+                      : wasteTemplateQ.data?.waste_types?.length > 0
+                      ? "Waste types auto-loaded from last entry. Fill weights only."
+                      : "Enter waste types below — they'll be remembered for next shift."}
+                  </p>
+                  <span className="text-xs text-muted-foreground">
+                    Will log for <span className="font-semibold text-foreground">{machines.length}</span> machines
+                  </span>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Waste Type</Label>
-                    <Input
-                      value={groupWasteType}
-                      onChange={(e) => setGroupWasteType(e.target.value)}
-                      placeholder="e.g. Fly waste"
-                      className="h-8 text-sm"
-                      list="waste-type-suggestions-group"
-                      autoComplete="off"
-                    />
-                    <datalist id="waste-type-suggestions-group">
-                      {(wasteTypesQ.data?.types ?? []).map((t: string) => (
-                        <option key={t} value={t} />
+                <datalist id="waste-type-suggestions-group">
+                  {(wasteTypesQ.data?.types ?? []).map((t: string) => (
+                    <option key={t} value={t} />
+                  ))}
+                </datalist>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="bg-amber-50 border-b text-xs text-muted-foreground">
+                        <th className="text-left py-2 pl-3 font-medium w-8">#</th>
+                        <th className="text-left py-2 px-2 font-medium w-44">Waste Type</th>
+                        <th className="text-left py-2 px-2 font-medium w-28">Lot No</th>
+                        <th className="text-left py-2 px-2 font-medium w-24">Ratio</th>
+                        <th className="text-left py-2 px-2 font-medium w-28">Waste (kg) *</th>
+                        <th className="text-left py-2 px-2 font-medium">Remarks</th>
+                        <th className="w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupRows.map((gr, idx) => (
+                        <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-amber-50/30"}>
+                          <td className="py-1.5 pl-3 text-xs text-muted-foreground">{idx + 1}</td>
+                          <td className="py-1.5 px-2">
+                            <Input
+                              value={gr.wasteType}
+                              onChange={(e) => updateGroupRow(idx, "wasteType", e.target.value)}
+                              placeholder="e.g. Fly waste"
+                              className="h-7 text-xs"
+                              list="waste-type-suggestions-group"
+                              autoComplete="off"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <Input
+                              value={gr.lotNo}
+                              onChange={(e) => updateGroupRow(idx, "lotNo", e.target.value)}
+                              placeholder="L001"
+                              className="h-7 text-xs"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <Input
+                              value={gr.ratio}
+                              onChange={(e) => updateGroupRow(idx, "ratio", e.target.value)}
+                              placeholder="60:40"
+                              className="h-7 text-xs"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={gr.wasteKg}
+                              onChange={(e) => updateGroupRow(idx, "wasteKg", e.target.value)}
+                              placeholder="0"
+                              className="h-7 text-xs font-medium"
+                            />
+                          </td>
+                          <td className="py-1.5 px-2">
+                            <Input
+                              value={gr.remarks}
+                              onChange={(e) => updateGroupRow(idx, "remarks", e.target.value)}
+                              placeholder="Remarks…"
+                              className="h-7 text-xs"
+                            />
+                          </td>
+                          <td className="py-1.5 pr-2">
+                            <button
+                              type="button"
+                              onClick={() => removeGroupRow(idx)}
+                              disabled={groupRows.length === 1}
+                              className="text-muted-foreground hover:text-destructive disabled:opacity-30 text-sm px-1"
+                              title="Remove row"
+                            >
+                              ×
+                            </button>
+                          </td>
+                        </tr>
                       ))}
-                    </datalist>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Lot No</Label>
-                    <Input
-                      value={groupLotNo}
-                      onChange={(e) => setGroupLotNo(e.target.value)}
-                      placeholder="e.g. L001"
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Ratio</Label>
-                    <Input
-                      value={groupRatio}
-                      onChange={(e) => setGroupRatio(e.target.value)}
-                      placeholder="60:40"
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">
-                      Waste (kg) <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={groupWasteKg}
-                      onChange={(e) => setGroupWasteKg(e.target.value)}
-                      placeholder="0"
-                      className="h-8 text-sm font-medium"
-                    />
-                  </div>
-                  <div className="space-y-1 col-span-2">
-                    <Label className="text-xs">Remarks</Label>
-                    <Input
-                      value={groupRemarks}
-                      onChange={(e) => setGroupRemarks(e.target.value)}
-                      placeholder="Remarks…"
-                      className="h-8 text-sm"
-                    />
-                  </div>
+                    </tbody>
+                  </table>
                 </div>
+                {groupRows.length < 8 && (
+                  <button
+                    type="button"
+                    onClick={addGroupRow}
+                    className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 font-medium mt-1"
+                  >
+                    <span className="text-base leading-none">+</span> Add waste type
+                  </button>
+                )}
               </div>
             ) : (
               <div className="p-6 text-sm text-muted-foreground text-center">
@@ -1767,12 +1908,14 @@ function StoppageForm() {
   const [department, setDepartment] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [selectedMachine, setSelectedMachine] = useState<string>("");
+  // Machine Group multi-select (declared here so stopDraftKey can reference it)
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
 
   // Multi-row state
   const [rows, setRows] = useState<StopRow[]>([makeStopRow()]);
 
   // Draft persistence — strip ephemeral UI fields before saving
-  const stopDraftKey = `sf_stoppage::${date}::${shift}::${department}::${selectedMachine}`;
+  const stopDraftKey = `sf_stoppage::${date}::${shift}::${department}::${selectedGroupIds.join(",")}::${selectedMachine}`;
   const stopDraft = useDraft<Omit<StopRow, "showDropdown" | "dropdownPos" | "codeSearch">[]>(stopDraftKey);
   useEffect(() => {
     const saveable = rows.map(({ showDropdown: _sd, dropdownPos: _dp, codeSearch: _cs, ...r }) => r);
@@ -1814,8 +1957,7 @@ function StoppageForm() {
   });
   const stopCodes = (stopCodesQ.data ?? []) as any[];
 
-  // Machine Group filter
-  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+  // Machine Group filter — multi-select chips (same as Shift Entry mix group)
   const machineGroupsQ = useQuery({
     queryKey: ["machine-groups", millId],
     queryFn: () => productionApi.getMachineGroups({ mill_id: millId, active_only: true }),
@@ -1824,13 +1966,26 @@ function StoppageForm() {
   });
   const machineGroups = (machineGroupsQ.data ?? []) as MachineGroup[];
 
-  // Machines — filtered by group OR department
+  function addStopGroup(id: string) {
+    if (!id || selectedGroupIds.includes(id)) return;
+    setSelectedGroupIds((prev) => [...prev, id]);
+    setSelectedMachine("");
+  }
+  function removeStopGroup(id: string) {
+    setSelectedGroupIds((prev) => prev.filter((x) => x !== id));
+    setSelectedMachine("");
+  }
+
+  // For backward compat with group-mode UI (single selected group for applying stoppages)
+  const selectedGroupId = selectedGroupIds[0] ?? "";
+
+  // Machines — filtered by groups OR department
   const machinesQ = useQuery({
-    queryKey: ["machines", departmentId || department, millId, "stoppage", selectedGroupId],
+    queryKey: ["machines", departmentId || department, millId, "stoppage", selectedGroupIds],
     queryFn: () =>
       productionApi.getMachines(
-        selectedGroupId
-          ? { machine_group_ids: selectedGroupId, mill_id: millId, page_size: 1000, page: 1 }
+        selectedGroupIds.length > 0
+          ? { machine_group_ids: selectedGroupIds.join(","), mill_id: millId, page_size: 1000, page: 1 }
           : {
               ...(departmentId ? { department_id: departmentId } : { department }),
               mill_id: millId,
@@ -1839,7 +1994,7 @@ function StoppageForm() {
             },
       ),
     staleTime: 60_000,
-    enabled: !!millId && !!(selectedGroupId || departmentId || department),
+    enabled: !!millId && !!(selectedGroupIds.length > 0 || departmentId || department),
   });
   const machines = (
     Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])
@@ -1847,7 +2002,7 @@ function StoppageForm() {
 
   useEffect(() => {
     setSelectedMachine("");
-  }, [department, selectedGroupId]);
+  }, [department, selectedGroupIds.join(",")]);
 
   // Stoppage log date range
   const [logDateFrom, setLogDateFrom] = useState(localDate);
@@ -1893,11 +2048,12 @@ function StoppageForm() {
         if (!selectedMachine) throw new Error("Select a machine first");
         machineCodes = [selectedMachine];
       } else {
-        // Group mode: apply stoppage to all machines in the selected group
+        // Group mode: apply stoppage to all machines in selected group(s)
+        if (selectedGroupIds.length === 0) throw new Error("Select at least one machine group");
         const groupMachines = (
           Array.isArray(machinesQ.data) ? machinesQ.data : (machinesQ.data?.data ?? [])
         ) as any[];
-        if (groupMachines.length === 0) throw new Error("No machines found in selected group");
+        if (groupMachines.length === 0) throw new Error("No machines found in selected group(s)");
         machineCodes = groupMachines.map((m: any) => m.code).filter(Boolean);
       }
 
@@ -1988,7 +2144,7 @@ function StoppageForm() {
                 className={`px-3 py-1.5 font-medium transition-colors ${stoppageMode === "individual" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
                 onClick={() => {
                   setStoppageMode("individual");
-                  setSelectedGroupId("");
+                  setSelectedGroupIds([]);
                 }}
               >
                 Individual
@@ -2036,7 +2192,7 @@ function StoppageForm() {
                 value={department}
                 onValueChange={(v) => {
                   setDepartment(v);
-                  setSelectedGroupId("");
+                  setSelectedGroupIds([]);
                   const d = deptOptions.find(
                     (x: any) => (typeof x === "string" ? x : x.name) === v,
                   );
@@ -2063,33 +2219,43 @@ function StoppageForm() {
           {/* ── Machine selector — mode-aware ── */}
           {stoppageMode === "individual" ? (
             <div className="space-y-3">
-              {/* Group filter (optional, to narrow machine list) */}
+              {/* Group filter chips (optional, to narrow machine list) */}
               {machineGroups.length > 0 && (
-                <div className="flex items-center gap-3">
-                  <Layers className="size-4 text-muted-foreground shrink-0" />
-                  <div className="space-y-1">
+                <div className="flex items-start gap-3">
+                  <Layers className="size-4 text-muted-foreground shrink-0 mt-2" />
+                  <div className="flex-1 space-y-1.5">
                     <Label className="text-xs text-muted-foreground">
-                      Machine Group <span className="text-[10px]">(select to filter machines)</span>
+                      Mix Group <span className="text-[10px]">(select one or more to filter machines)</span>
                     </Label>
-                    <Select
-                      value={selectedGroupId || "_all"}
-                      onValueChange={(v) => {
-                        setSelectedGroupId(v === "_all" ? "" : v);
-                        setSelectedMachine("");
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-sm w-64">
-                        <SelectValue placeholder="— All machines in department —" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="_all">— All machines in department —</SelectItem>
-                        {machineGroups.map((g) => (
-                          <SelectItem key={g.id} value={g.id}>
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      {machineGroups.map((g) => {
+                        const active = selectedGroupIds.includes(g.id);
+                        return (
+                          <button
+                            key={g.id}
+                            type="button"
+                            onClick={() => active ? removeStopGroup(g.id) : addStopGroup(g.id)}
+                            className={[
+                              "text-xs px-2.5 py-1 rounded-full border font-medium transition-colors",
+                              active
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-muted border-border text-muted-foreground hover:border-primary hover:text-primary",
+                            ].join(" ")}
+                          >
                             {g.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          </button>
+                        );
+                      })}
+                      {selectedGroupIds.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedGroupIds([]); setSelectedMachine(""); }}
+                          className="text-xs text-muted-foreground hover:text-destructive ml-1"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -2139,35 +2305,50 @@ function StoppageForm() {
               </div>
             </div>
           ) : (
-            /* Group mode — select group, all machines get the stoppage */
+            /* Group mode — multi-chip selection, all machines get the stoppage */
             <div className="space-y-2">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">
-                  Machine Group <span className="text-destructive">*</span>
+                  Mix Group <span className="text-destructive">*</span>
                   <span className="text-muted-foreground font-normal ml-1 text-[10px]">
-                    (stoppage will be logged for all machines in this group)
+                    (stoppage logged for all machines in selected group(s))
                   </span>
                 </Label>
-                <Select value={selectedGroupId || ""} onValueChange={(v) => setSelectedGroupId(v)}>
-                  <SelectTrigger className="h-9 text-sm border-primary/40 font-medium">
-                    <SelectValue placeholder="Select machine group…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {machineGroups.length === 0 ? (
-                      <SelectItem value="_none" disabled>
-                        No machine groups configured
-                      </SelectItem>
-                    ) : (
-                      machineGroups.map((g) => (
-                        <SelectItem key={g.id} value={g.id}>
+                {machineGroups.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No machine groups configured.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    {machineGroups.map((g) => {
+                      const active = selectedGroupIds.includes(g.id);
+                      return (
+                        <button
+                          key={g.id}
+                          type="button"
+                          onClick={() => active ? removeStopGroup(g.id) : addStopGroup(g.id)}
+                          className={[
+                            "text-xs px-3 py-1.5 rounded-full border font-medium transition-colors",
+                            active
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-muted border-border text-muted-foreground hover:border-primary hover:text-primary",
+                          ].join(" ")}
+                        >
                           {g.name}
-                        </SelectItem>
-                      ))
+                        </button>
+                      );
+                    })}
+                    {selectedGroupIds.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedGroupIds([])}
+                        className="text-xs text-muted-foreground hover:text-destructive ml-1"
+                      >
+                        Clear
+                      </button>
                     )}
-                  </SelectContent>
-                </Select>
+                  </div>
+                )}
               </div>
-              {selectedGroupId && machines.length > 0 && (
+              {selectedGroupIds.length > 0 && machines.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   <span className="text-xs text-muted-foreground">Will log for:</span>
                   {machines.slice(0, 12).map((m: any) => (
@@ -2929,6 +3110,18 @@ function ManpowerGrid() {
   const mpMachines = (
     Array.isArray(mpMachinesQ.data) ? mpMachinesQ.data : (mpMachinesQ.data?.data ?? [])
   ) as any[];
+
+  // Employees for this department — for name searchable dropdown
+  const employeesQ = useQuery({
+    queryKey: ["employees-mp", millId, department],
+    queryFn: () =>
+      api.get("/hr/employees", {
+        params: { mill_id: millId, department: department || undefined, page_size: 500, page: 1 },
+      }).then((r) => (Array.isArray(r.data) ? r.data : (r.data?.data ?? []))),
+    staleTime: 120_000,
+    enabled: !!millId && !!department,
+  });
+  const deptEmployees = (employeesQ.data ?? []) as any[];
 
   // Per-dept categories
   const categoriesQ = useQuery({
@@ -3711,12 +3904,48 @@ function ManpowerGrid() {
                                 <span className="text-[10px] text-muted-foreground w-4 shrink-0 text-right">
                                   {aIdx + 1}.
                                 </span>
-                                <Input
-                                  value={a.name}
-                                  onChange={(e) => updateAssignment(idx, aIdx, "name", e.target.value)}
-                                  placeholder="Name / ID"
-                                  className="h-7 text-xs flex-1 min-w-0"
-                                />
+                                {/* Searchable employee name field — backed by /hr/employees */}
+                                <div className="flex-1 min-w-0 relative">
+                                  <Input
+                                    value={a.name}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      // Try to extract emp_id from "Name (EMP001)" format
+                                      const match = val.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+                                      if (match) {
+                                        updateAssignment(idx, aIdx, "name", match[1].trim());
+                                        updateAssignment(idx, aIdx, "emp_id", match[2].trim());
+                                      } else {
+                                        updateAssignment(idx, aIdx, "name", val);
+                                        if (a.emp_id) updateAssignment(idx, aIdx, "emp_id", "");
+                                      }
+                                    }}
+                                    placeholder={deptEmployees.length > 0 ? "Search name or emp ID…" : "Name / ID"}
+                                    className="h-7 text-xs w-full"
+                                    list={`emp-list-${idx}-${aIdx}`}
+                                    autoComplete="off"
+                                  />
+                                  {deptEmployees.length > 0 && (
+                                    <datalist id={`emp-list-${idx}-${aIdx}`}>
+                                      {deptEmployees
+                                        .filter((e: any) => {
+                                          const q = a.name.toLowerCase();
+                                          if (!q) return true;
+                                          return (
+                                            (e.name ?? "").toLowerCase().includes(q) ||
+                                            (e.employee_id ?? "").toLowerCase().includes(q)
+                                          );
+                                        })
+                                        .slice(0, 20)
+                                        .map((e: any) => (
+                                          <option
+                                            key={e.id ?? e.employee_id}
+                                            value={`${e.name}${e.employee_id ? ` (${e.employee_id})` : ""}`}
+                                          />
+                                        ))}
+                                    </datalist>
+                                  )}
+                                </div>
                                 {/* From dropdown */}
                                 <select
                                   value={a.mc_from ?? ""}
@@ -3892,6 +4121,11 @@ const PROD_REPORT_COLS: Record<ReportRecordType, { key: string; label: string }[
     { key: "total_machines", label: "Machines" },
     { key: "headcount", label: "Headcount" },
     { key: "supervisor", label: "Supervisor" },
+    { key: "person_no", label: "Person #" },
+    { key: "person_name", label: "Name" },
+    { key: "person_emp_id", label: "Emp ID" },
+    { key: "person_mc_from", label: "Allotted From" },
+    { key: "person_mc_to", label: "Allotted To" },
   ],
 };
 
@@ -4004,7 +4238,29 @@ function ProductionReportsTab() {
   const stoppageRows = (
     Array.isArray(stoppageQ.data) ? stoppageQ.data : (stoppageQ.data?.data ?? [])
   ) as any[];
-  const manpowerRows = (manpowerQ.data?.data ?? []) as any[];
+  const manpowerRowsRaw = (manpowerQ.data?.data ?? []) as any[];
+  // Flatten manpower: each assignment (per-person) becomes its own row for export
+  const manpowerRows = useMemo(() => {
+    const out: any[] = [];
+    for (const r of manpowerRowsRaw) {
+      const assignments: any[] = Array.isArray(r.assignments) ? r.assignments : [];
+      if (assignments.length === 0) {
+        out.push({ ...r, person_no: "", person_name: "", person_emp_id: "", person_mc_from: "", person_mc_to: "" });
+      } else {
+        assignments.forEach((a, i) => {
+          out.push({
+            ...r,
+            person_no: i + 1,
+            person_name: a.name ?? "",
+            person_emp_id: a.emp_id ?? "",
+            person_mc_from: a.mc_from ?? "",
+            person_mc_to: a.mc_to ?? "",
+          });
+        });
+      }
+    }
+    return out;
+  }, [manpowerRowsRaw]);
 
   const activeRows =
     recordType === "entries"

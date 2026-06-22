@@ -73,6 +73,7 @@ from app.models.production_v2 import (
     RFManpowerPlan,
     MixingChangeFibreRow,
     PackingShiftEntry,
+    MachineWasteTypeTemplate,
 )
 
 # Quality forms (86 forms from AAYML reference mill)
