@@ -766,15 +766,29 @@ async def _v2_create(slug: str, payload: Dict[str, Any],
     if scope.get("company_id") and "company_id" in allowed_all:
         kwargs["company_id"] = scope["company_id"]
     kwargs.setdefault("status", "draft")
-    record = model(**kwargs)
-    # Run domain-specific calculations
-    if model is QmCardingWasteStudy:
-        await _calculate_waste_study(record)
-    db.add(record)
-    await db.flush()
-    await db.commit()
-    await db.refresh(record)
-    return record
+
+    # Validate required NOT NULL fields before attempting insert
+    for req_field in ("lot_no", "machine_no", "date"):
+        if req_field in allowed and not kwargs.get(req_field):
+            label = {"lot_no": "Process/Lot No", "machine_no": "Machine No", "date": "Date"}.get(req_field, req_field)
+            raise HTTPException(status_code=400, detail=f"{label} is required.")
+
+    try:
+        record = model(**kwargs)
+        # Run domain-specific calculations
+        if model is QmCardingWasteStudy:
+            await _calculate_waste_study(record)
+        db.add(record)
+        await db.flush()
+        await db.commit()
+        await db.refresh(record)
+        return record
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"_v2_create {slug} error: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Save failed: {str(e)}")
 
 
 async def _v2_update(slug: str, record_id: str, payload: Dict[str, Any],
