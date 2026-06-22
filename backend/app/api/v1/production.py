@@ -245,7 +245,7 @@ async def create_machine(
 async def get_shifts(
     mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_module("production")),
+    current_user: User = Depends(require_module("masters")),
 ):
     scope = await get_mill_scope(current_user, db)
     role_code = scope.get("role", "")
@@ -281,7 +281,7 @@ async def get_shifts(
 async def create_shift(
     req: ShiftCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_module("production", write=True)),
+    current_user: User = Depends(require_module("masters", write=True)),
 ):
     scope = await get_mill_scope(current_user, db)
     shift = Shift(**req.model_dump())
@@ -291,6 +291,8 @@ async def create_shift(
         raise HTTPException(status_code=400, detail="mill_id is required for MILL_OWNER")
     db.add(shift)
     await db.flush()
+    await db.commit()
+    await db.refresh(shift)
     return shift
 
 

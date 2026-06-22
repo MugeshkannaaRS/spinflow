@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import logging
 import uuid as _uuid_mod
 from datetime import date as _date, datetime as _datetime, timedelta as _timedelta
@@ -1334,3 +1335,180 @@ async def delete_route(
     route.is_active = False
     await db.commit()
     return {"message": "Route deactivated", "id": route_id}
+
+
+# ── Bulk /masters/all — single round-trip for the Masters page ─────────────────
+
+@router.get("/masters/all")
+async def get_all_masters(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return all master collections in one response to eliminate N parallel calls."""
+    from app.models.production import Shift, Machine as ProdMachine
+    from app.models.inventory import Warehouse
+
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id")
+    company_id = scope.get("company_id")
+
+    def _mill_filter(stmt, model):
+        if mill_id:
+            return stmt.where(model.mill_id == mill_id)
+        if company_id:
+            from app.models.masters import Mill as MillModel
+            return stmt.join(MillModel, model.mill_id == MillModel.id).where(
+                MillModel.company_id == company_id
+            )
+        return stmt
+
+    async def _fetch_companies():
+        stmt = select(Company)
+        if company_id:
+            stmt = stmt.where(Company.id == company_id)
+        r = await db.execute(stmt.order_by(Company.name))
+        return [
+            {"id": str(x.id), "code": x.code, "name": x.name,
+             "is_active": x.is_active, "city": x.city, "state": x.state,
+             "phone": x.phone, "email": x.email, "gstin": x.gstin}
+            for x in r.scalars().all()
+        ]
+
+    async def _fetch_mills():
+        stmt = select(Mill)
+        if mill_id:
+            stmt = stmt.where(Mill.id == mill_id)
+        elif company_id:
+            stmt = stmt.where(Mill.company_id == company_id)
+        r = await db.execute(stmt.order_by(Mill.name))
+        return [
+            {"id": str(x.id), "code": x.code, "name": x.name,
+             "is_active": x.is_active, "city": x.city, "state": x.state,
+             "phone": x.phone, "company_id": str(x.company_id) if x.company_id else None}
+            for x in r.scalars().all()
+        ]
+
+    async def _fetch_departments():
+        stmt = select(Department)
+        stmt = _mill_filter(stmt, Department)
+        r = await db.execute(stmt.order_by(Department.name))
+        return [
+            {"id": str(x.id), "code": x.code, "name": x.name,
+             "is_active": x.is_active, "department_type": x.department_type,
+             "mill_id": str(x.mill_id) if x.mill_id else None}
+            for x in r.scalars().all()
+        ]
+
+    async def _fetch_yarn_counts():
+        stmt = select(YarnCount)
+        stmt = _mill_filter(stmt, YarnCount)
+        r = await db.execute(stmt.order_by(YarnCount.count_value))
+        return [
+            {"id": str(x.id), "code": x.code, "name": x.name,
+             "count_value": x.count_value, "is_active": x.is_active,
+             "mill_id": str(x.mill_id) if x.mill_id else None}
+            for x in r.scalars().all()
+        ]
+
+    async def _fetch_customers():
+        stmt = select(Customer)
+        stmt = _mill_filter(stmt, Customer)
+        r = await db.execute(stmt.order_by(Customer.name))
+        return [
+            {"id": str(x.id), "code": x.code, "name": x.name,
+             "is_active": x.is_active, "city": x.city, "state": x.state,
+             "phone": x.phone, "email": x.email, "gstin": x.gstin,
+             "mill_id": str(x.mill_id) if x.mill_id else None}
+            for x in r.scalars().all()
+        ]
+
+    async def _fetch_vehicles():
+        stmt = select(MasterVehicle)
+        stmt = _mill_filter(stmt, MasterVehicle)
+        r = await db.execute(stmt.order_by(MasterVehicle.code))
+        return [
+            {"id": str(x.id), "code": x.code, "name": x.name,
+             "is_active": x.is_active, "vehicle_type": x.vehicle_type,
+             "capacity_kg": x.capacity_kg,
+             "mill_id": str(x.mill_id) if x.mill_id else None}
+            for x in r.scalars().all()
+        ]
+
+    async def _fetch_routes():
+        stmt = select(Route)
+        stmt = _mill_filter(stmt, Route)
+        r = await db.execute(stmt.order_by(Route.name))
+        return [
+            {"id": str(x.id), "code": x.code, "name": x.name,
+             "is_active": x.is_active, "distance_km": x.distance_km,
+             "mill_id": str(x.mill_id) if x.mill_id else None}
+            for x in r.scalars().all()
+        ]
+
+    async def _fetch_shifts():
+        stmt = select(Shift)
+        if mill_id:
+            stmt = stmt.where(Shift.mill_id == mill_id)
+        r = await db.execute(stmt.order_by(Shift.start_time))
+        return [
+            {"id": str(x.id), "code": x.code, "name": x.name,
+             "start_time": x.start_time, "end_time": x.end_time,
+             "mill_id": str(x.mill_id) if x.mill_id else None}
+            for x in r.scalars().all()
+        ]
+
+    async def _fetch_warehouses():
+        stmt = select(Warehouse)
+        if mill_id:
+            stmt = stmt.where(Warehouse.mill_id == mill_id)
+        r = await db.execute(stmt.order_by(Warehouse.name))
+        return [
+            {"id": str(x.id), "code": x.code, "name": x.name,
+             "is_active": x.is_active,
+             "mill_id": str(x.mill_id) if x.mill_id else None}
+            for x in r.scalars().all()
+        ]
+
+    async def _fetch_machines():
+        stmt = select(ProdMachine)
+        if mill_id:
+            stmt = stmt.where(ProdMachine.mill_id == mill_id)
+        r = await db.execute(stmt.order_by(ProdMachine.code).limit(1000))
+        return [
+            {"id": str(x.id), "code": x.code, "name": x.name,
+             "machine_type": x.machine_type, "department": x.department,
+             "department_id": str(x.department_id) if x.department_id else None,
+             "is_active": getattr(x, "is_active", True),
+             "mill_id": str(x.mill_id) if x.mill_id else None}
+            for x in r.scalars().all()
+        ]
+
+    # Run all fetches in parallel
+    (
+        companies, mills, departments, yarn_counts, customers,
+        vehicles, routes, shifts, warehouses, machines
+    ) = await asyncio.gather(
+        _fetch_companies(), _fetch_mills(), _fetch_departments(),
+        _fetch_yarn_counts(), _fetch_customers(), _fetch_vehicles(),
+        _fetch_routes(), _fetch_shifts(), _fetch_warehouses(), _fetch_machines(),
+        return_exceptions=True,
+    )
+
+    def _safe(val, name):
+        if isinstance(val, Exception):
+            logger.warning(f"masters/all: {name} failed: {val}")
+            return []
+        return val
+
+    return {
+        "companies":    _safe(companies, "companies"),
+        "mills":        _safe(mills, "mills"),
+        "departments":  _safe(departments, "departments"),
+        "yarn_counts":  _safe(yarn_counts, "yarn_counts"),
+        "customers":    _safe(customers, "customers"),
+        "vehicles":     _safe(vehicles, "vehicles"),
+        "routes":       _safe(routes, "routes"),
+        "shifts":       _safe(shifts, "shifts"),
+        "warehouses":   _safe(warehouses, "warehouses"),
+        "machines":     _safe(machines, "machines"),
+    }

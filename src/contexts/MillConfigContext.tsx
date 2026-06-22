@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/stores/auth";
 import { api } from "@/lib/api";
 
@@ -26,42 +27,37 @@ const MillConfigContext = createContext<MillConfigContextValue>({
 
 export function MillConfigProvider({ children }: { children: ReactNode }) {
   const user = useAuth((s) => s.user);
-  const [profile, setProfile] = useState<MillConfigProfile>(EMPTY_PROFILE);
-  const [loading, setLoading] = useState(false);
-  const [fetchKey, setFetchKey] = useState(0);
+  const qc = useQueryClient();
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
 
-  const refetch = () => setFetchKey((k) => k + 1);
+  // useQuery deduplicates concurrent callers — no matter how many DataTable /
+  // CustomLabel components mount at once, only one HTTP request is made.
+  const { data, isLoading } = useQuery<MillConfigProfile>({
+    queryKey: ["mill-config-profile", user?.millId ?? user?.id],
+    queryFn: () =>
+      api
+        .get("/mill-config/profile")
+        .then((r) => ({
+          field_labels: r.data?.field_labels ?? {},
+          dropdown_options: r.data?.dropdown_options ?? {},
+        }))
+        .catch(() => EMPTY_PROFILE),
+    staleTime: 10 * 60 * 1000,   // 10 min
+    gcTime: 20 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    retry: 1,
+    enabled: !!user && !isSuperAdmin,
+    placeholderData: EMPTY_PROFILE,
+  });
 
-  useEffect(() => {
-    if (!user || user.role === "SUPER_ADMIN") {
-      setProfile(EMPTY_PROFILE);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    api
-      .get("/mill-config/profile")
-      .then((r) => {
-        if (!cancelled) {
-          setProfile({
-            field_labels: r.data?.field_labels ?? {},
-            dropdown_options: r.data?.dropdown_options ?? {},
-          });
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setProfile(EMPTY_PROFILE);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [user, fetchKey]);
+  const refetch = () =>
+    qc.invalidateQueries({ queryKey: ["mill-config-profile"] });
 
   return (
-    <MillConfigContext.Provider value={{ profile, loading, refetch }}>
+    <MillConfigContext.Provider
+      value={{ profile: data ?? EMPTY_PROFILE, loading: isLoading, refetch }}
+    >
       {children}
     </MillConfigContext.Provider>
   );

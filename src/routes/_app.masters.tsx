@@ -118,7 +118,7 @@ function MastersPage() {
       .deactivateCustomer(id)
       .then(() => {
         toast.success("Customer deactivated");
-        qcMasters.invalidateQueries({ queryKey: ["masters", "customers"] });
+        qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
       })
       .catch(() => toast.error("Failed to deactivate customer"));
   }
@@ -128,7 +128,7 @@ function MastersPage() {
       .deleteDepartment(id)
       .then(() => {
         toast.success("Department deactivated");
-        qcMasters.invalidateQueries({ queryKey: ["masters", "departments"] });
+        qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
       })
       .catch(() => toast.error("Failed to deactivate department"));
   }
@@ -138,7 +138,7 @@ function MastersPage() {
       .deleteYarnCount(id)
       .then(() => {
         toast.success("Yarn count deactivated");
-        qcMasters.invalidateQueries({ queryKey: ["masters", "yarn-counts"] });
+        qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
       })
       .catch(() => toast.error("Failed to deactivate yarn count"));
   }
@@ -148,7 +148,7 @@ function MastersPage() {
       .deleteVehicle(id)
       .then(() => {
         toast.success("Vehicle deactivated");
-        qcMasters.invalidateQueries({ queryKey: ["masters", "vehicles"] });
+        qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
       })
       .catch(() => toast.error("Failed to deactivate vehicle"));
   }
@@ -158,7 +158,7 @@ function MastersPage() {
       .deleteRoute(id)
       .then(() => {
         toast.success("Route deactivated");
-        qcMasters.invalidateQueries({ queryKey: ["masters", "routes"] });
+        qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
       })
       .catch(() => toast.error("Failed to deactivate route"));
   }
@@ -168,87 +168,36 @@ function MastersPage() {
       .deleteWarehouse(id)
       .then(() => {
         toast.success("Warehouse deactivated");
-        qcMasters.invalidateQueries({ queryKey: ["masters", "warehouses"] });
+        qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
       })
       .catch(() => toast.error("Failed to deactivate warehouse"));
   }
 
-  const companiesQ = useQuery({
-    queryKey: ["masters", "companies"],
-    queryFn: () => mastersApi.getCompanies(),
-    staleTime: 60_000,
+  // ── Single bulk fetch — replaces 10 individual API calls ────────────────────
+  const allMastersQ = useQuery({
+    queryKey: ["masters", "all"],
+    queryFn: () => api.get("/masters/all").then((r) => r.data),
+    staleTime: 5 * 60_000,   // 5 min — masters rarely change mid-session
+    gcTime: 15 * 60_000,
     retry: 1,
+    refetchOnWindowFocus: false,
   });
-  const millsQ = useQuery({
-    queryKey: ["masters", "mills"],
-    queryFn: () => mastersApi.getMills(),
-    staleTime: 60_000,
-    retry: 1,
-  });
-  const deptsQ = useQuery({
-    queryKey: ["masters", "departments"],
-    queryFn: () => mastersApi.getDepartments(),
-    staleTime: 60_000,
-    retry: 1,
-  });
-  const yarnQ = useQuery({
-    queryKey: ["masters", "yarn-counts"],
-    queryFn: () => mastersApi.getYarnCounts(),
-    staleTime: 60_000,
-    retry: 1,
-  });
-  const custQ = useQuery({
-    queryKey: ["masters", "customers"],
-    queryFn: () => mastersApi.getCustomers(),
-    staleTime: 60_000,
-    retry: 1,
-  });
-  const vehQ = useQuery({
-    queryKey: ["masters", "vehicles"],
-    queryFn: () => mastersApi.getVehicles(),
-    staleTime: 60_000,
-    retry: 1,
-  });
-  const routeQ = useQuery({
-    queryKey: ["masters", "routes"],
-    queryFn: () => mastersApi.getRoutes(),
-    staleTime: 60_000,
-    retry: 1,
-  });
+  const _all = allMastersQ.data ?? {};
 
-  const shiftsQ = useQuery({
-    queryKey: ["masters", "shifts"],
-    queryFn: () => productionApi.getShifts(),
-    staleTime: 60_000,
-    retry: 1,
-  });
-  const warehousesQ = useQuery({
-    queryKey: ["masters", "warehouses"],
-    queryFn: () => inventoryApi.getWarehouses(),
-    staleTime: 60_000,
-    retry: 1,
-  });
-  const machinesQ = useQuery({
-    queryKey: ["masters", "machines"],
-    queryFn: () => productionApi.getMachines({ page_size: 1000, page: 1 }),
-    staleTime: 60_000,
-    retry: 1,
-  });
-
-  const companiesData = (companiesQ.data ?? []) as Company[];
+  const companiesData = (_all.companies ?? []) as Company[];
   const activeCompaniesData = useMemo(
     () => companiesData.filter((c: any) => c?.id && c.is_active !== false),
     [companiesData],
   );
-  const millsData = (millsQ.data ?? []) as Mill[];
-  const deptsData = (deptsQ.data ?? []) as Department[];
-  const yarnData = (yarnQ.data ?? []) as YarnCount[];
-  const custData = (custQ.data ?? []) as Customer[];
-  const vehData = (vehQ.data ?? []) as MasterVehicle[];
-  const routeData = (routeQ.data ?? []) as MasterRoute[];
-  const shiftsData = (shiftsQ.data ?? []) as any[];
-  const warehousesData = (warehousesQ.data ?? []) as any[];
-  const machinesData = (Array.isArray(machinesQ.data) ? machinesQ.data : []) as any[];
+  const millsData    = (_all.mills        ?? []) as Mill[];
+  const deptsData    = (_all.departments  ?? []) as Department[];
+  const yarnData     = (_all.yarn_counts  ?? []) as YarnCount[];
+  const custData     = (_all.customers    ?? []) as Customer[];
+  const vehData      = (_all.vehicles     ?? []) as MasterVehicle[];
+  const routeData    = (_all.routes       ?? []) as MasterRoute[];
+  const shiftsData   = (_all.shifts       ?? []) as any[];
+  const warehousesData = (_all.warehouses ?? []) as any[];
+  const machinesData = (_all.machines     ?? []) as any[];
 
   if (!user)
     return (
@@ -269,8 +218,8 @@ function MastersPage() {
       <PageHeader
         title="Masters"
         subtitle="Manage companies, mills, departments & reference data"
-        onRefresh={() => qcMasters.invalidateQueries({ queryKey: ["masters"] })}
-        isRefreshing={companiesQ.isFetching}
+        onRefresh={() => qcMasters.invalidateQueries({ queryKey: ["masters", "all"] })}
+        isRefreshing={allMastersQ.isFetching}
       />
       <AccessGuard module="masters">
         <div className="p-6">
@@ -395,11 +344,11 @@ function MastersPage() {
               <ErrorBoundary inline label="Machines">
                 <MachinesTab
                   machines={machinesData.filter((x: any) => matchesSearch(x, search))}
-                  isLoading={machinesQ.isLoading}
+                  isLoading={allMastersQ.isLoading}
                   colConfig={machineColConfig}
                   canEdit={canEdit}
                   onImportSuccess={() =>
-                    qcMasters.invalidateQueries({ queryKey: ["masters", "machines"] })
+                    qcMasters.invalidateQueries({ queryKey: ["masters", "all"] })
                   }
                 />
               </ErrorBoundary>
@@ -576,7 +525,7 @@ function MastersPage() {
                 companyId={modulesCompany.id}
                 onClose={() => {
                   setModulesCompany(null);
-                  qcMasters.invalidateQueries({ queryKey: ["masters", "companies"] });
+                  qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
                 }}
               />
             )}
@@ -598,7 +547,7 @@ function MastersPage() {
                 millId={settingsMill.id}
                 onClose={() => {
                   setSettingsMill(null);
-                  qcMasters.invalidateQueries({ queryKey: ["masters", "mills"] });
+                  qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
                 }}
               />
             )}
@@ -1038,14 +987,14 @@ function CompanyForm({ item }: { item?: Company }) {
     mutationFn: () => mastersApi.createCompany(form),
     onSuccess: () => {
       toast.success("Company created");
-      qc.invalidateQueries({ queryKey: ["masters", "companies"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
   const updateM = useMutation({
     mutationFn: () => mastersApi.updateCompany(item!.id, form),
     onSuccess: () => {
       toast.success("Company updated");
-      qc.invalidateQueries({ queryKey: ["masters", "companies"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
 
@@ -1140,14 +1089,14 @@ function MillForm({ item, companies }: { item?: Mill; companies: Company[] }) {
     mutationFn: () => mastersApi.createMill(form),
     onSuccess: () => {
       toast.success("Mill created");
-      qc.invalidateQueries({ queryKey: ["masters", "mills"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
   const updateM = useMutation({
     mutationFn: () => mastersApi.updateMill(item!.id, form),
     onSuccess: () => {
       toast.success("Mill updated");
-      qc.invalidateQueries({ queryKey: ["masters", "mills"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
 
@@ -1271,14 +1220,14 @@ function DepartmentForm({ item }: { item?: Department; mills: Mill[] }) {
     mutationFn: () => mastersApi.createDepartment(form),
     onSuccess: () => {
       toast.success("Department created");
-      qc.invalidateQueries({ queryKey: ["masters", "departments"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
   const updateM = useMutation({
     mutationFn: () => mastersApi.updateDepartment(item!.id, form),
     onSuccess: () => {
       toast.success("Department updated");
-      qc.invalidateQueries({ queryKey: ["masters", "departments"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
 
@@ -1377,14 +1326,14 @@ function YarnCountForm({ item }: { item?: YarnCount; mills: Mill[] }) {
     mutationFn: () => mastersApi.createYarnCount(form),
     onSuccess: () => {
       toast.success("Yarn count created");
-      qc.invalidateQueries({ queryKey: ["masters", "yarn-counts"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
   const updateM = useMutation({
     mutationFn: () => mastersApi.updateYarnCount(item!.id, form),
     onSuccess: () => {
       toast.success("Yarn count updated");
-      qc.invalidateQueries({ queryKey: ["masters", "yarn-counts"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
 
@@ -1523,14 +1472,14 @@ function CustomerForm({ item }: { item?: Customer; mills: Mill[] }) {
     mutationFn: () => mastersApi.createCustomer(form),
     onSuccess: () => {
       toast.success("Customer created");
-      qc.invalidateQueries({ queryKey: ["masters", "customers"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
   const updateM = useMutation({
     mutationFn: () => mastersApi.updateCustomer(item!.id, form),
     onSuccess: () => {
       toast.success("Customer updated");
-      qc.invalidateQueries({ queryKey: ["masters", "customers"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
 
@@ -1689,14 +1638,14 @@ function VehicleForm({ item }: { item?: MasterVehicle; mills: Mill[] }) {
     mutationFn: () => mastersApi.createVehicle(form),
     onSuccess: () => {
       toast.success("Vehicle created");
-      qc.invalidateQueries({ queryKey: ["masters", "vehicles"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
   const updateM = useMutation({
     mutationFn: () => mastersApi.updateVehicle(item!.id, form),
     onSuccess: () => {
       toast.success("Vehicle updated");
-      qc.invalidateQueries({ queryKey: ["masters", "vehicles"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
 
@@ -1830,14 +1779,14 @@ function RouteForm({ item }: { item?: MasterRoute; mills: Mill[] }) {
     mutationFn: () => mastersApi.createRoute(form),
     onSuccess: () => {
       toast.success("Route created");
-      qc.invalidateQueries({ queryKey: ["masters", "routes"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
   const updateM = useMutation({
     mutationFn: () => mastersApi.updateRoute(item!.id, form),
     onSuccess: () => {
       toast.success("Route updated");
-      qc.invalidateQueries({ queryKey: ["masters", "routes"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
 
@@ -1949,7 +1898,7 @@ function ImportCustomersDialog() {
         onClose={() => setOpen(false)}
         tableName="masters_customers"
         endpoint="/masters/customers/bulk"
-        onSuccess={() => qc.invalidateQueries({ queryKey: ["masters", "customers"] })}
+        onSuccess={() => qc.invalidateQueries({ queryKey: ["masters", "all"] })}
         title="Import Customers"
       />
     </>
@@ -1982,7 +1931,7 @@ function ShiftForm({ item, mills }: { item?: Shift; mills?: Mill[] }) {
     mutationFn: () => productionApi.createShift(form),
     onSuccess: () => {
       toast.success("Shift created");
-      qc.invalidateQueries({ queryKey: ["masters", "shifts"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
 
@@ -2083,7 +2032,7 @@ function WarehouseForm({ item }: { item?: Warehouse }) {
     mutationFn: () => inventoryApi.createWarehouse(form),
     onSuccess: () => {
       toast.success("Warehouse created");
-      qc.invalidateQueries({ queryKey: ["masters", "warehouses"] });
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
     },
   });
 
@@ -2348,7 +2297,7 @@ function MachinesTab({
                 <ConfirmDeleteButton
                   onConfirm={async () => {
                     await productionApi.deleteMachine(m.id);
-                    qc.invalidateQueries({ queryKey: ["masters", "machines"] });
+                    qc.invalidateQueries({ queryKey: ["masters", "all"] });
                     qc.invalidateQueries({ queryKey: ["machines"] });
                   }}
                   label={`Delete machine ${m.code}?`}
