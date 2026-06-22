@@ -337,7 +337,7 @@ export interface UseColumnConfigReturn {
 export function useColumnConfig(tableName: string): UseColumnConfigReturn {
   const user = useAuth((s) => s.user);
   const millId = user?.millId ?? "default";
-  const isValid = Boolean(tableName && tableName.trim() !== "");
+  const isValid = Boolean(tableName && tableName.trim() !== "" && !!user);
 
   const query = useQuery({
     queryKey: ["column-config", tableName, millId],

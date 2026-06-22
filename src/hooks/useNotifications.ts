@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { api } from "@/lib/api";
 import { useWebSocket } from "@/hooks/useWebSocket";
+import { useAuth } from "@/stores/auth";
 
 export interface DbNotification {
   id: string;
@@ -27,6 +28,8 @@ export interface DbNotification {
 export function useNotifications(opts?: { limit?: number }) {
   const qc = useQueryClient();
   const limit = opts?.limit ?? 10;
+  const user = useAuth((s) => s.user);
+  const isReady = !!user;
 
   // Unread count (fast, badge)
   const countQ = useQuery<number>({
@@ -36,6 +39,7 @@ export function useNotifications(opts?: { limit?: number }) {
     staleTime: 30_000,
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
+    enabled: isReady,
   });
 
   // Recent notifications (for dropdown)
@@ -47,6 +51,7 @@ export function useNotifications(opts?: { limit?: number }) {
         .then((r: any) => r.data?.data ?? []),
     staleTime: 30_000,
     refetchOnWindowFocus: true,
+    enabled: isReady,
   });
 
   // When WS fires a new notification, refresh both queries
