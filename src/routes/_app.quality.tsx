@@ -2141,14 +2141,15 @@ function QmFormsTab({
 }: QmFormsTabProps) {
   const qc = useQueryClient();
   const today = new Date().toISOString().slice(0, 10);
-  const [filterDate, setFilterDate] = useState(today);
+  const [dateFrom, setDateFrom] = useState(today);
+  const [dateTo, setDateTo] = useState(today);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editRecord, setEditRecord] = useState<any | null>(null);
 
   const { data: records = [], isLoading } = useQuery({
-    queryKey: ["qm-tab", endpoint, millId, filterDate],
+    queryKey: ["qm-tab", endpoint, millId, dateFrom, dateTo],
     queryFn: async () => {
-      const p = new URLSearchParams({ page_size: "200", date: filterDate });
+      const p = new URLSearchParams({ page_size: "500", date_from: dateFrom, date_to: dateTo });
       const res = await api.get(`${endpoint}?${p}`);
       return (res.data?.data ?? res.data ?? []) as any[];
     },
@@ -2198,8 +2199,11 @@ function QmFormsTab({
         <div className="flex items-center gap-2 flex-wrap">
           <CardTitle className="text-sm font-medium">{title}</CardTitle>
           <div className="flex items-center gap-1 ml-2">
-            <span className="text-[10px] text-muted-foreground">Date</span>
-            <input type="date" value={filterDate} onChange={(e) => setFilterDate(e.target.value)}
+            <span className="text-[10px] text-muted-foreground">From</span>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+              className="h-7 text-xs border border-border rounded px-2 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
+            <span className="text-[10px] text-muted-foreground">To</span>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
               className="h-7 text-xs border border-border rounded px-2 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary" />
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -2209,7 +2213,7 @@ function QmFormsTab({
               rows={records}
               filename={title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}
               title={title}
-              subtitle={`Date: ${filterDate}`}
+              subtitle={`${dateFrom}${dateTo !== dateFrom ? ` → ${dateTo}` : ""}`}
               className="h-7"
             />
             {canEdit && (
@@ -2226,7 +2230,7 @@ function QmFormsTab({
           <div className="px-4 py-6 text-xs text-muted-foreground">Loading…</div>
         ) : records.length === 0 ? (
           <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            No records for {filterDate}.{" "}
+            No records for {dateFrom}{dateTo !== dateFrom ? ` → ${dateTo}` : ""}.{" "}
             {canEdit && (
               <button onClick={openAdd} className="underline text-primary hover:text-primary/80">Add one now</button>
             )}

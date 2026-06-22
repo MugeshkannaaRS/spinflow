@@ -741,13 +741,21 @@ def _model_cols(model) -> set:
 
 async def _v2_list(slug: str, db: AsyncSession, current_user: User,
                    date: Optional[str], lot_no: Optional[str],
-                   machine_no: Optional[str], page: int, page_size: int):
+                   machine_no: Optional[str], page: int, page_size: int,
+                   date_from: Optional[str] = None, date_to: Optional[str] = None):
     model = _V2_MODEL_MAP[slug]
     q = select(model)
     q, _ = await _apply_scope(db, current_user, model, q)
     cols = _model_cols(model)
-    if date and "date" in cols:
-        q = q.where(model.date == date)
+    if "date" in cols:
+        if date_from and date_to:
+            q = q.where(model.date >= date_from).where(model.date <= date_to)
+        elif date_from:
+            q = q.where(model.date >= date_from)
+        elif date_to:
+            q = q.where(model.date <= date_to)
+        elif date:
+            q = q.where(model.date == date)
     if lot_no and "lot_no" in cols:
         q = q.where(model.lot_no == lot_no)
     if machine_no and "machine_no" in cols:
@@ -848,6 +856,8 @@ for _slug in _V2_MODEL_MAP:
         @router.get(f"/quality/v2/{slug}", tags=["quality-v2"])
         async def list_v2(
             date: Optional[str] = Query(None),
+            date_from: Optional[str] = Query(None),
+            date_to: Optional[str] = Query(None),
             lot_no: Optional[str] = Query(None),
             machine_no: Optional[str] = Query(None),
             page: int = Query(1, ge=1),
@@ -855,7 +865,7 @@ for _slug in _V2_MODEL_MAP:
             db: AsyncSession = Depends(get_db),
             current_user: User = Depends(require_module("quality")),
         ):
-            return await _v2_list(slug, db, current_user, date, lot_no, machine_no, page, page_size)
+            return await _v2_list(slug, db, current_user, date, lot_no, machine_no, page, page_size, date_from, date_to)
         list_v2.__name__ = f"list_v2_{slug.replace('/', '_')}"
         return list_v2
 
