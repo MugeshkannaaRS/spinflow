@@ -553,6 +553,8 @@ function MaintenancePage() {
                       toolbar={
                         <ExportDateRangeButton
                           onExportXlsx={(f, t) => exportApi.maintenanceXlsx(f, t)}
+                          onFetchData={(f, t) => exportApi.maintenanceJson(f, t)}
+                          exportTitle="Maintenance Logs"
                         />
                       }
                       actions={

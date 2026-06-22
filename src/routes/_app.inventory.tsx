@@ -247,6 +247,8 @@ function InventoryPage() {
                       toolbar={
                         <ExportDateRangeButton
                           onExportXlsx={(f, t) => exportApi.inventoryXlsx(f, t)}
+                          onFetchData={(f, t) => exportApi.inventoryJson(f, t)}
+                          exportTitle="Inventory Lots"
                         />
                       }
                       actions={

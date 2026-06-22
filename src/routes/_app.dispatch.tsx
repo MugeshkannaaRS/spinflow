@@ -367,7 +367,11 @@ function DispatchPage() {
                   exportFilename="dispatch_orders"
                   disableExport={true}
                   toolbar={
-                    <ExportDateRangeButton onExportXlsx={(f, t) => exportApi.dispatchXlsx(f, t)} />
+                    <ExportDateRangeButton
+                      onExportXlsx={(f, t) => exportApi.dispatchXlsx(f, t)}
+                      onFetchData={(f, t) => exportApi.dispatchJson(f, t)}
+                      exportTitle="Dispatch Records"
+                    />
                   }
                   actions={
                     canEdit

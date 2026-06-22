@@ -250,6 +250,8 @@ function QualityPage() {
                         <div className="flex gap-1">
                           <ExportDateRangeButton
                             onExportXlsx={(f, t) => exportApi.qualityXlsx(f, t)}
+                            onFetchData={(f, t) => exportApi.qualityJson(f, t)}
+                            exportTitle="Quality Lab Tests"
                             shifts={shiftOptions}
                           />
                           {canEdit && <ImportTestsDialog />}

@@ -5573,9 +5573,10 @@ function ProductionPage() {
                           onExportXlsx={(f, t) =>
                             exportApi.productionXlsx(f, t, undefined, entriesGroupId || undefined)
                           }
-                          onExportPdf={(f, t) =>
-                            exportApi.productionPdf(f, t, undefined, entriesGroupId || undefined)
+                          onFetchData={(f, t) =>
+                            exportApi.productionJson(f, t, undefined, entriesGroupId || undefined)
                           }
+                          exportTitle="Production Entries"
                         />
                       }
                       actions={

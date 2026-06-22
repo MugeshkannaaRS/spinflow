@@ -698,6 +698,52 @@ export const exportApi = {
       `attendance_${new Date().toISOString().slice(0, 10)}.xlsx`,
     );
   },
+
+  // JSON endpoints — used by ExportDateRangeButton for CSV / PDF client-side generation
+  productionJson: (dateFrom?: string, dateTo?: string, operatorGroupId?: string, machineGroupId?: string) => {
+    const p = new URLSearchParams();
+    if (dateFrom) p.set("date_from", dateFrom);
+    if (dateTo) p.set("date_to", dateTo);
+    if (operatorGroupId) p.set("operator_group_id", operatorGroupId);
+    if (machineGroupId) p.set("machine_group_id", machineGroupId);
+    return api.get(`/exports/production/json${p.toString() ? `?${p}` : ""}`).then((r) => r.data);
+  },
+  qualityJson: (dateFrom?: string, dateTo?: string) => {
+    const p = new URLSearchParams();
+    if (dateFrom) p.set("date_from", dateFrom);
+    if (dateTo) p.set("date_to", dateTo);
+    return api.get(`/exports/quality/json${p.toString() ? `?${p}` : ""}`).then((r) => r.data);
+  },
+  maintenanceJson: (dateFrom?: string, dateTo?: string) => {
+    const p = new URLSearchParams();
+    if (dateFrom) p.set("date_from", dateFrom);
+    if (dateTo) p.set("date_to", dateTo);
+    return api.get(`/exports/maintenance/json${p.toString() ? `?${p}` : ""}`).then((r) => r.data);
+  },
+  purchaseJson: (dateFrom?: string, dateTo?: string) => {
+    const p = new URLSearchParams();
+    if (dateFrom) p.set("date_from", dateFrom);
+    if (dateTo) p.set("date_to", dateTo);
+    return api.get(`/exports/purchase/json${p.toString() ? `?${p}` : ""}`).then((r) => r.data);
+  },
+  dispatchJson: (dateFrom?: string, dateTo?: string) => {
+    const p = new URLSearchParams();
+    if (dateFrom) p.set("date_from", dateFrom);
+    if (dateTo) p.set("date_to", dateTo);
+    return api.get(`/exports/dispatch/json${p.toString() ? `?${p}` : ""}`).then((r) => r.data);
+  },
+  storesJson: (dateFrom?: string, dateTo?: string) => {
+    const p = new URLSearchParams();
+    if (dateFrom) p.set("date_from", dateFrom);
+    if (dateTo) p.set("date_to", dateTo);
+    return api.get(`/exports/stores/json${p.toString() ? `?${p}` : ""}`).then((r) => r.data);
+  },
+  inventoryJson: (dateFrom?: string, dateTo?: string) => {
+    const p = new URLSearchParams();
+    if (dateFrom) p.set("date_from", dateFrom);
+    if (dateTo) p.set("date_to", dateTo);
+    return api.get(`/exports/inventory/json${p.toString() ? `?${p}` : ""}`).then((r) => r.data);
+  },
 };
 
 export const adminApi = {

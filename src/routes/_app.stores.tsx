@@ -280,6 +280,8 @@ function StoresPage() {
                       toolbar={
                         <ExportDateRangeButton
                           onExportXlsx={(f, t) => exportApi.storesXlsx(f, t)}
+                          onFetchData={(f, t) => exportApi.storesJson(f, t)}
+                          exportTitle="Spare Issues"
                         />
                       }
                       actions={

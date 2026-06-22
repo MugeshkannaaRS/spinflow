@@ -17,6 +17,7 @@ from app.models.maintenance import MaintenanceLog
 from app.models.stores import SpareIssue
 from app.models.inventory import Lot
 from app.models.hr import Attendance, Employee
+from app.models.masters import Mill
 from app.services.production_service import ProductionService
 from app.services.payroll_service import PayrollService
 from app.services.pdf_export import production_report as pdf_production, payslip as pdf_payslip, dispatch_summary as pdf_dispatch
@@ -655,3 +656,157 @@ async def export_attendance_xlsx(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename=attendance_{datetime.now(timezone.utc).strftime('%Y%m%d')}.xlsx"},
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# JSON endpoints — used by frontend for CSV / PDF client-side generation
+# Same data as xlsx endpoints, returned as JSON for ExportDateRangeButton
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _scope_filter(stmt, model, scope, mill_join=None):
+    """Apply mill/company scope filter to a statement."""
+    if scope.get("mill_id"):
+        return stmt.where(model.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        target = mill_join or model
+        return stmt.join(Mill, target.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    return stmt
+
+
+@router.get("/exports/production/json")
+async def export_production_json(
+    date_from: str = Query(None), date_to: str = Query(None),
+    operator_group_id: str = Query(None), machine_group_id: str = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production")),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(ProductionEntry).order_by(ProductionEntry.date.desc())
+    if scope.get("mill_id"):
+        stmt = stmt.where(ProductionEntry.mill_id == scope["mill_id"])
+    if date_from: stmt = stmt.where(ProductionEntry.date >= date_from)
+    if date_to:   stmt = stmt.where(ProductionEntry.date <= date_to)
+    if machine_group_id:
+        mg = (await db.execute(select(MachineGroup).where(MachineGroup.id == machine_group_id))).scalar_one_or_none()
+        if mg and mg.machine_codes:
+            stmt = stmt.where(ProductionEntry.machine_code.in_(mg.machine_codes))
+    elif operator_group_id:
+        grp = (await db.execute(select(OperatorGroup).where(OperatorGroup.id == operator_group_id))).scalar_one_or_none()
+        if grp and grp.machine_codes:
+            stmt = stmt.where(ProductionEntry.machine_code.in_(grp.machine_codes))
+    items = (await db.execute(stmt)).scalars().all()
+    return {
+        "columns": ["Date","Shift","Machine","Department","Operator","Produced (kg)","Waste (kg)"],
+        "rows": [{"Date":e.date,"Shift":e.shift,"Machine":e.machine_code,"Department":e.department,"Operator":e.operator or "","Produced (kg)":e.produced_kg,"Waste (kg)":e.waste_kg or ""} for e in items],
+    }
+
+
+@router.get("/exports/quality/json")
+async def export_quality_json(
+    date_from: str = Query(None), date_to: str = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("quality")),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(QualityTest).join(Lot, QualityTest.lot_id == Lot.id, isouter=True).order_by(QualityTest.date.desc())
+    if scope.get("mill_id"):
+        stmt = stmt.where(Lot.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, Lot.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if date_from: stmt = stmt.where(QualityTest.date >= date_from)
+    if date_to:   stmt = stmt.where(QualityTest.date <= date_to)
+    items = (await db.execute(stmt)).scalars().all()
+    return {
+        "columns": ["Date","Type","Lot No","Machine","Sample Ref","Result","Unit","Standard","Status","Tested By"],
+        "rows": [{"Date":t.date,"Type":t.type,"Lot No":t.lot_no or "","Machine":t.machine_code or "","Sample Ref":t.sample_ref or "","Result":t.result,"Unit":t.unit or "","Standard":t.standard,"Status":t.status,"Tested By":t.tested_by or ""} for t in items],
+    }
+
+
+@router.get("/exports/maintenance/json")
+async def export_maintenance_json(
+    date_from: str = Query(None), date_to: str = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance")),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(MaintenanceLog).order_by(MaintenanceLog.date.desc())
+    stmt = _scope_filter(stmt, MaintenanceLog, scope)
+    if date_from: stmt = stmt.where(MaintenanceLog.date >= date_from)
+    if date_to:   stmt = stmt.where(MaintenanceLog.date <= date_to)
+    items = (await db.execute(stmt)).scalars().all()
+    return {
+        "columns": ["Date","Machine","Issue","Action Taken","Technician","Duration (hrs)","Status"],
+        "rows": [{"Date":m.date,"Machine":m.machine_code or "","Issue":m.issue_description or "","Action Taken":m.action_taken or "","Technician":m.technician or "","Duration (hrs)":m.duration_hours or "","Status":m.status} for m in items],
+    }
+
+
+@router.get("/exports/purchase/json")
+async def export_purchase_json(
+    date_from: str = Query(None), date_to: str = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("purchase")),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(CottonPurchase).order_by(CottonPurchase.date.desc())
+    stmt = _scope_filter(stmt, CottonPurchase, scope)
+    if date_from: stmt = stmt.where(CottonPurchase.date >= date_from)
+    if date_to:   stmt = stmt.where(CottonPurchase.date <= date_to)
+    items = (await db.execute(stmt)).scalars().all()
+    return {
+        "columns": ["Date","Supplier","Invoice No","Variety","Qty (Bales)","Weight (kg)","Rate","Amount","Status"],
+        "rows": [{"Date":p.date,"Supplier":p.supplier_name or "","Invoice No":p.invoice_no or "","Variety":p.variety or "","Qty (Bales)":p.quantity_bales or "","Weight (kg)":p.weight_kg or "","Rate":p.rate or "","Amount":p.amount or "","Status":p.status or ""} for p in items],
+    }
+
+
+@router.get("/exports/dispatch/json")
+async def export_dispatch_json(
+    date_from: str = Query(None), date_to: str = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("dispatch")),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(Dispatch).order_by(Dispatch.date.desc())
+    stmt = _scope_filter(stmt, Dispatch, scope)
+    if date_from: stmt = stmt.where(Dispatch.date >= date_from)
+    if date_to:   stmt = stmt.where(Dispatch.date <= date_to)
+    items = (await db.execute(stmt)).scalars().all()
+    return {
+        "columns": ["Date","Dispatch No","Customer","Vehicle No","Quantity (kg)","Total Bags","Status"],
+        "rows": [{"Date":d.date,"Dispatch No":d.dispatch_no,"Customer":d.customer,"Vehicle No":d.vehicle_no or "","Quantity (kg)":d.quantity_kg,"Total Bags":d.total_bags,"Status":d.status} for d in items],
+    }
+
+
+@router.get("/exports/stores/json")
+async def export_stores_json(
+    date_from: str = Query(None), date_to: str = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("stores")),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(SpareIssue).order_by(SpareIssue.date.desc())
+    stmt = _scope_filter(stmt, SpareIssue, scope)
+    if date_from: stmt = stmt.where(SpareIssue.date >= date_from)
+    if date_to:   stmt = stmt.where(SpareIssue.date <= date_to)
+    items = (await db.execute(stmt)).scalars().all()
+    return {
+        "columns": ["Date","Part Name","Part Code","Quantity","Department","Machine","Issued By","Purpose"],
+        "rows": [{"Date":s.date,"Part Name":s.part_name or "","Part Code":s.part_code or "","Quantity":s.quantity,"Department":s.department or "","Machine":s.machine_code or "","Issued By":s.issued_by or "","Purpose":s.purpose or ""} for s in items],
+    }
+
+
+@router.get("/exports/inventory/json")
+async def export_inventory_json(
+    date_from: str = Query(None), date_to: str = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("stock")),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(Lot).order_by(Lot.created_at.desc())
+    stmt = _scope_filter(stmt, Lot, scope)
+    if date_from: stmt = stmt.where(Lot.created_at >= date_from)
+    if date_to:   stmt = stmt.where(Lot.created_at <= date_to)
+    items = (await db.execute(stmt)).scalars().all()
+    return {
+        "columns": ["Lot No","Count (Ne)","Variety","Qty (kg)","Status","Created At"],
+        "rows": [{"Lot No":l.lot_no,"Count (Ne)":l.count_ne or "","Variety":l.variety or "","Qty (kg)":l.qty_kg or "","Status":l.status or "","Created At":str(l.created_at)[:10] if l.created_at else ""} for l in items],
+    }
