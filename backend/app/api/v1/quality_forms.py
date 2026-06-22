@@ -199,6 +199,7 @@ async def create_waste_study(
     await _calculate_waste_study(record)
     db.add(record)
     await db.flush()
+    await db.commit()
     return record
 
 
@@ -215,6 +216,7 @@ async def update_waste_study_status(
         raise HTTPException(status_code=404, detail="Waste study record not found")
     record.status = status
     await db.flush()
+    await db.commit()
     return {"id": record_id, "status": status}
 
 
@@ -254,6 +256,7 @@ async def create_simplex_hank(
     await _calculate_simplex_hank(record)
     db.add(record)
     await db.flush()
+    await db.commit()
     return record
 
 
@@ -269,6 +272,7 @@ async def update_simplex_hank_status(
         raise HTTPException(status_code=404, detail="Simplex hank record not found")
     record.status = status
     await db.flush()
+    await db.commit()
     return {"id": record_id, "status": status}
 
 
@@ -310,6 +314,7 @@ async def create_sliver_wrapping(
     )
     db.add(record)
     await db.flush()
+    await db.commit()
     return record
 
 
@@ -350,6 +355,7 @@ async def create_carding_wrapping(
     )
     db.add(record)
     await db.flush()
+    await db.commit()
     return record
 
 
@@ -388,6 +394,7 @@ async def create_autoconer_cut(
     )
     db.add(record)
     await db.flush()
+    await db.commit()
     return record
 
 
@@ -429,6 +436,7 @@ async def update_bag_weight(
     }.items():
         setattr(record, key, val)
     await db.flush()
+    await db.commit()
     return record
 
 
@@ -445,6 +453,7 @@ async def delete_bag_weight(
         raise HTTPException(status_code=404, detail="Bag weight check record not found")
     await db.delete(record)
     await db.flush()
+    await db.commit()
     return {"ok": True, "id": record_id}
 
 
@@ -491,6 +500,7 @@ async def create_bag_weight(
     )
     db.add(record)
     await db.flush()
+    await db.commit()
     return record
 
 
@@ -527,6 +537,7 @@ async def update_paper_cone(
     }.items():
         setattr(record, key, val)
     await db.flush()
+    await db.commit()
     return record
 
 
@@ -543,6 +554,7 @@ async def delete_paper_cone(
         raise HTTPException(status_code=404, detail="Paper cone check record not found")
     await db.delete(record)
     await db.flush()
+    await db.commit()
     return {"ok": True, "id": record_id}
 
 
@@ -584,6 +596,7 @@ async def create_paper_cone(
     )
     db.add(record)
     await db.flush()
+    await db.commit()
     return record
 
 
@@ -631,6 +644,7 @@ async def create_csp_strength(
     )
     db.add(record)
     await db.flush()
+    await db.commit()
     return record
 
 

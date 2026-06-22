@@ -41,6 +41,8 @@ import {
   FlaskConical,
   AlertTriangle,
   ArrowDown,
+  ArrowUp,
+  FileDown,
   Trash2,
   Pencil,
   Save,
@@ -2126,6 +2128,30 @@ function QmSheetDialog({
   );
 }
 
+// ── CSV export helper ────────────────────────────────────────────────────────
+function exportQmToCsv(title: string, columns: { key: string; label: string }[], records: any[]) {
+  if (records.length === 0) { toast.info("No records to export"); return; }
+  const cols = columns.filter((c) => !["id","mill_id","company_id","created_at","updated_at"].includes(c.key));
+  const header = cols.map((c) => `"${c.label}"`).join(",");
+  const rows = records.map((r) =>
+    cols.map((c) => {
+      const v = r[c.key];
+      if (v == null || v === "") return "";
+      return `"${String(v).replace(/"/g, '""')}"`;
+    }).join(",")
+  );
+  const csv = [header, ...rows].join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const date = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `${title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}_${date}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success(`Exported ${records.length} records`);
+}
+
 // ── Main QmFormsTab: table + popup ──────────────────────────────────────────
 function QmFormsTab({
   title, endpoint, columns, millId, canEdit, layout = "grid",
@@ -2196,6 +2222,15 @@ function QmFormsTab({
           </div>
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs text-muted-foreground">{records.length} record{records.length !== 1 ? "s" : ""}</span>
+            {records.length > 0 && (
+              <Button
+                size="sm" variant="outline" className="h-7 text-xs gap-1"
+                onClick={() => exportQmToCsv(title, tableCols, records)}
+                title="Export to CSV"
+              >
+                <ArrowUp className="size-3" /> Export
+              </Button>
+            )}
             {canEdit && (
               <Button size="sm" className="h-7 text-xs gap-1" onClick={openAdd}>
                 <Plus className="size-3" /> Add record

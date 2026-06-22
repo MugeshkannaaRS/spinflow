@@ -8,7 +8,7 @@
  *   />
  */
 import { useState } from "react";
-import { Download, FileSpreadsheet, FileDown, Loader2 } from "lucide-react";
+import { ArrowUp, FileSpreadsheet, FileDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -61,7 +61,7 @@ export function ExportDateRangeButton({ onExportXlsx, onExportPdf }: ExportDateR
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
-          <Download className="size-3.5" />
+          <ArrowUp className="size-3.5" />
           Export
         </Button>
       </DialogTrigger>
@@ -143,7 +143,7 @@ export function ExportDateRangeButton({ onExportXlsx, onExportPdf }: ExportDateR
               </>
             ) : (
               <>
-                <Download className="size-3.5 mr-1" />
+                <ArrowUp className="size-3.5 mr-1" />
                 Download
               </>
             )}
