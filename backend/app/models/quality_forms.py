@@ -126,11 +126,16 @@ class QmCardingWasteStudy(TimestampMixin, Base):
     sliver_can_gross_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     total_production_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     licker_in2_waste_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    licker_in2_waste_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)   # computed
     licker_in3_waste_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    licker_in3_waste_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)   # computed
     flat_strips_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    flat_strips_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)         # computed
     suction_hood_back_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    suction_hood_back_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)   # computed
     suction_hood_front_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    total_wastage_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)   # computed
+    suction_hood_front_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # computed
+    total_wastage_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)       # computed
     remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="draft")
 

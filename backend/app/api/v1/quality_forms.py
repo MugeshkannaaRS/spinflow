@@ -106,14 +106,35 @@ async def _paginate(db, query, page, page_size):
 
 
 async def _calculate_waste_study(record: QmCardingWasteStudy) -> QmCardingWasteStudy:
-    """Auto-calculate waste percentages."""
+    """Auto-calculate total production and all waste percentages.
+
+    Paper formula: each_waste_pct = (waste_kg / total_production_kg) * 100
+    total_production_kg = sliver_can_gross_kg - empty_can_kg  (if not provided)
+    total_wastage_pct = sum of all individual waste percentages
+    """
+    # Auto-derive production if not explicitly supplied
+    if (record.total_production_kg is None and
+            record.sliver_can_gross_kg is not None and
+            record.empty_can_kg is not None):
+        record.total_production_kg = round(
+            record.sliver_can_gross_kg - record.empty_can_kg, 3
+        )
     prod = record.total_production_kg or 0
-    total_waste = sum(filter(None, [
-        record.licker_in2_waste_kg, record.licker_in3_waste_kg,
-        record.flat_strips_kg, record.suction_hood_front_kg,
-        record.suction_hood_back_kg,
-    ]))
     if prod > 0:
+        def _pct(kg: Optional[float]) -> Optional[float]:
+            return round((kg / prod) * 100, 2) if kg is not None else None
+
+        record.licker_in2_waste_pct = _pct(record.licker_in2_waste_kg)
+        record.licker_in3_waste_pct = _pct(record.licker_in3_waste_kg)
+        record.flat_strips_pct = _pct(record.flat_strips_kg)
+        record.suction_hood_back_pct = _pct(record.suction_hood_back_kg)
+        record.suction_hood_front_pct = _pct(record.suction_hood_front_kg)
+
+        total_waste = sum(filter(None, [
+            record.licker_in2_waste_kg, record.licker_in3_waste_kg,
+            record.flat_strips_kg, record.suction_hood_front_kg,
+            record.suction_hood_back_kg,
+        ]))
         record.total_wastage_pct = round((total_waste / prod) * 100, 2)
     return record
 
@@ -730,10 +751,15 @@ async def _v2_create(slug: str, payload: Dict[str, Any],
     if not mill_id:
         raise HTTPException(status_code=400, detail="No mill selected. Please select a mill before saving quality records.")
     kwargs["mill_id"] = mill_id
-    if scope.get("company_id"):
+    # Only set company_id if the model actually has that column
+    allowed_all = {c.key for c in model.__table__.columns}
+    if scope.get("company_id") and "company_id" in allowed_all:
         kwargs["company_id"] = scope["company_id"]
     kwargs.setdefault("status", "draft")
     record = model(**kwargs)
+    # Run domain-specific calculations
+    if model is QmCardingWasteStudy:
+        await _calculate_waste_study(record)
     db.add(record)
     await db.flush()
     await db.refresh(record)
@@ -752,6 +778,9 @@ async def _v2_update(slug: str, record_id: str, payload: Dict[str, Any],
     for k, v in payload.items():
         if k in allowed:
             setattr(record, k, v)
+    # Re-run domain-specific calculations after update
+    if model is QmCardingWasteStudy:
+        await _calculate_waste_study(record)
     await db.flush()
     await db.refresh(record)
     return record

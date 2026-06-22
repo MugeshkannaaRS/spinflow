@@ -450,10 +450,15 @@ function QualityPage() {
                     { key: "sliver_can_gross_kg", label: "Sliver Gross (kg)" },
                     { key: "total_production_kg", label: "Total Prod (kg)" },
                     { key: "licker_in2_waste_kg", label: "Licker-II (kg)" },
+                    { key: "licker_in2_waste_pct", label: "Licker-II %" },
                     { key: "licker_in3_waste_kg", label: "Licker-III (kg)" },
+                    { key: "licker_in3_waste_pct", label: "Licker-III %" },
                     { key: "flat_strips_kg", label: "Flat Strips (kg)" },
+                    { key: "flat_strips_pct", label: "Flat Strips %" },
                     { key: "suction_hood_back_kg", label: "Suction Back (kg)" },
+                    { key: "suction_hood_back_pct", label: "Suction Back %" },
                     { key: "suction_hood_front_kg", label: "Suction Front (kg)" },
+                    { key: "suction_hood_front_pct", label: "Suction Front %" },
                     { key: "total_wastage_pct", label: "Total Wastage %" },
                     { key: "remarks", label: "Remarks" },
                     {
@@ -1698,15 +1703,36 @@ function computeReadings(form: Record<string, any>, hankField: string) {
   return { avgWt, hank, cv };
 }
 
+const WASTE_KG_FIELDS = [
+  "licker_in2_waste_kg",
+  "licker_in3_waste_kg",
+  "flat_strips_kg",
+  "suction_hood_back_kg",
+  "suction_hood_front_kg",
+] as const;
+
+const WASTE_PCT_MAP: Record<string, string> = {
+  licker_in2_waste_kg:   "licker_in2_waste_pct",
+  licker_in3_waste_kg:   "licker_in3_waste_pct",
+  flat_strips_kg:        "flat_strips_pct",
+  suction_hood_back_kg:  "suction_hood_back_pct",
+  suction_hood_front_kg: "suction_hood_front_pct",
+};
+
 function computeWaste(form: Record<string, any>) {
   const gross = parseFloat(form.sliver_can_gross_kg) || 0;
   const empty = parseFloat(form.empty_can_kg) || 0;
   const prod = gross > 0 && empty >= 0 ? gross - empty : null;
-  if (!prod || prod <= 0) return { prod: null, wastePct: null };
-  const waste = ["licker_in2_waste_kg","licker_in3_waste_kg","flat_strips_kg",
-    "suction_hood_back_kg","suction_hood_front_kg"]
-    .reduce((s, k) => s + (parseFloat(form[k]) || 0), 0);
-  return { prod, wastePct: (waste / prod) * 100 };
+  if (!prod || prod <= 0) return { prod: null, wastePct: null, indivPct: {} as Record<string, number> };
+  const indivPct: Record<string, number> = {};
+  let totalWaste = 0;
+  for (const kgKey of WASTE_KG_FIELDS) {
+    const kg = parseFloat(form[kgKey]) || 0;
+    totalWaste += kg;
+    const pctKey = WASTE_PCT_MAP[kgKey];
+    if (pctKey) indivPct[pctKey] = (kg / prod) * 100;
+  }
+  return { prod, wastePct: (totalWaste / prod) * 100, indivPct };
 }
 
 // ── Grid dialog (most forms) ─────────────────────────────────────────────────
@@ -1754,7 +1780,7 @@ function QmGridDialog({
   const setField = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
   // Live computed display
-  const { prod, wastePct } = useMemo(() => computeWaste(form), [form]);
+  const { prod, wastePct, indivPct } = useMemo(() => computeWaste(form), [form]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -1765,6 +1791,10 @@ function QmGridDialog({
       if (prod != null) {
         payload.total_production_kg = parseFloat(prod.toFixed(3));
         if (wastePct != null) payload.total_wastage_pct = parseFloat(wastePct.toFixed(2));
+        // Individual waste percentages
+        for (const [k, v] of Object.entries(indivPct)) {
+          payload[k] = parseFloat(v.toFixed(2));
+        }
       }
       if (editRecord?.id) {
         await api.patch(`${endpoint}/${editRecord.id}`, payload);
@@ -1782,8 +1812,12 @@ function QmGridDialog({
     }
   };
 
-  // Split into groups of ~3 for a 3-column grid layout
-  const COMPUTED_KEYS = new Set(["total_production_kg", "total_wastage_pct", "avg_weight", "actual_hank", "cv_pct"]);
+  // Computed keys — shown as read-only green tiles, not editable inputs
+  const COMPUTED_KEYS = new Set([
+    "total_production_kg", "total_wastage_pct", "avg_weight", "actual_hank", "cv_pct",
+    "licker_in2_waste_pct", "licker_in3_waste_pct",
+    "flat_strips_pct", "suction_hood_back_pct", "suction_hood_front_pct",
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -1795,14 +1829,23 @@ function QmGridDialog({
           {formFields.map((field) => {
             const isComputed = COMPUTED_KEYS.has(field.key);
             let computedDisplay: string | null = null;
-            if (field.key === "total_production_kg" && prod != null) computedDisplay = prod.toFixed(3) + " kg";
-            if (field.key === "total_wastage_pct" && wastePct != null) computedDisplay = wastePct.toFixed(2) + "%";
+            if (field.key === "total_production_kg" && prod != null)
+              computedDisplay = prod.toFixed(3) + " kg";
+            if (field.key === "total_wastage_pct" && wastePct != null)
+              computedDisplay = wastePct.toFixed(2) + "%";
+            // Individual waste % — look up from indivPct by matching key
+            if (isComputed && indivPct[field.key] != null)
+              computedDisplay = indivPct[field.key].toFixed(2) + "%";
             return (
               <div key={field.key} className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">{field.label}</label>
                 {isComputed && computedDisplay ? (
                   <div className="flex h-9 items-center rounded-md border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20 px-3 text-sm font-medium text-emerald-700 dark:text-emerald-400">
                     {computedDisplay} <span className="ml-1 text-[10px] text-muted-foreground">(auto)</span>
+                  </div>
+                ) : isComputed ? (
+                  <div className="flex h-9 items-center rounded-md border border-border bg-muted/30 px-3 text-sm text-muted-foreground">
+                    — <span className="ml-1 text-[10px]">(auto)</span>
                   </div>
                 ) : (
                   <QmFieldInput field={field} value={form[field.key]} onChange={(v) => setField(field.key, v)} machines={machines} />
