@@ -1932,6 +1932,7 @@ function ShiftForm({ item, mills }: { item?: Shift; mills?: Mill[] }) {
     onSuccess: () => {
       toast.success("Shift created");
       qc.invalidateQueries({ queryKey: ["masters", "all"] });
+      qc.invalidateQueries({ queryKey: ["mill-masters"] }); // refresh useShifts() in all pages
     },
   });
 
