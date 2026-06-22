@@ -94,6 +94,7 @@ async def create_plan(
                 is_included=mp.get("is_included", False),
             ))
         await db.flush()
+        await db.commit()
     await db.refresh(plan)
     result = await db.execute(
         select(SubscriptionPlan)

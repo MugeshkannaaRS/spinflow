@@ -206,4 +206,5 @@ async def generate_qr_for_bag(
     )
     bag.qr_code = qr
     await db.flush()
+    await db.commit()
     return {"qr_code": qr, "bag_id": bag.id, "bag_no": bag.bag_no}

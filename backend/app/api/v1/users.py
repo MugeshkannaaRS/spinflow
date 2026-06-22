@@ -146,6 +146,7 @@ async def create_user(
     )
     db.add(user)
     await db.flush()
+    await db.commit()
     role_code = role.code
     return UserOut(
         id=user.id,
@@ -196,6 +197,7 @@ async def update_user(
     if req.email is not None:
         user.email = req.email
     await db.flush()
+    await db.commit()
     role_code = user.role_rel.code if user.role_rel else "UNKNOWN"
     return UserOut(
         id=user.id,
@@ -231,6 +233,7 @@ async def deactivate_user(
     user.is_active = not user.is_active
     was_active = user.is_active
     await db.flush()
+    await db.commit()
     role_code = user.role_rel.code if user.role_rel else "UNKNOWN"
     action_str = "user_deactivated" if was_active else "user_activated"
     await log_audit(
@@ -273,4 +276,5 @@ async def reset_user_password(
     user.password_hash = hash_password(req.new_password)
     user.must_change_password = True
     await db.flush()
+    await db.commit()
     return {"message": "Password reset successfully"}

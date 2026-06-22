@@ -134,6 +134,7 @@ async def create_trip(
         )
         db.add(trip)
         await db.flush()
+        await db.commit()
         return TripOut.model_validate(trip).model_dump()
     except HTTPException:
         raise
@@ -334,6 +335,7 @@ async def dispatch_trip(
     if driver_name:
         trip.driver_name = driver_name
     await db.flush()
+    await db.commit()
     return {"id": trip.id, "status": trip.status, "message": "Trip dispatched"}
 
 
@@ -358,6 +360,7 @@ async def deliver_trip(
     trip.status = "delivered"
     trip.delivered_at = datetime.now(timezone.utc)
     await db.flush()
+    await db.commit()
     return {"id": trip.id, "status": trip.status, "message": "Trip delivered"}
 
 
@@ -442,4 +445,5 @@ async def delete_dispatch_order(
         raise HTTPException(status_code=400, detail="Only pending orders can be cancelled")
     order.status = "cancelled"
     await db.flush()
+    await db.commit()
     return {"message": "Dispatch order cancelled", "id": dispatch_id}

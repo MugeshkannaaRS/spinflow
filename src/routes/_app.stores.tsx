@@ -22,16 +22,6 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-  SheetTrigger,
-  SheetClose,
-} from "@/components/ui/sheet";
 import { FileUpload, type UploadedFile } from "@/components/ui/file-upload";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import { Textarea } from "@/components/ui/textarea";
@@ -593,11 +583,9 @@ function AddSpareSheet() {
             </div>
           </div>
           <DialogFooter>
-            <SheetClose asChild>
-              <Button type="button" variant="outline">
+                          <Button onClick={() => setOpen(false)} type="button" variant="outline">
                 Cancel
               </Button>
-            </SheetClose>
             <Button type="submit" disabled={m.isPending || !allFilled}>
               {m.isPending ? "Saving…" : "Create spare"}
             </Button>
@@ -732,11 +720,9 @@ function EditSpareSheet({ item }: { item: any }) {
             </div>
           </div>
           <DialogFooter>
-            <SheetClose asChild>
-              <Button type="button" variant="outline">
+                          <Button onClick={() => setOpen(false)} type="button" variant="outline">
                 Cancel
               </Button>
-            </SheetClose>
             <Button type="submit" disabled={m.isPending || !allFilled}>
               {m.isPending ? "Saving…" : "Update spare"}
             </Button>

@@ -446,6 +446,7 @@ async def forgot_password(req: ForgotPasswordRequest, request: Request, db: Asyn
         user.otp_code = otp
         user.otp_expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
         await db.flush()
+        await db.commit()
         try:
             await send_otp_email(to=user.email, full_name=user.name, otp_code=otp, otp_type="password_reset")
         except SpinFlowException:
@@ -489,6 +490,7 @@ async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(g
     user.password_hash = hash_password(req.new_password)
     user.force_password_reset = False
     await db.flush()
+    await db.commit()
     return {"message": "Password reset successfully"}
 
 
@@ -582,6 +584,7 @@ async def create_user(
     )
     db.add(user)
     await db.flush()
+    await db.commit()
     role_code = user.role_rel.code if user.role_rel else role.code
     return UserResponse(
         id=user.id,
@@ -659,6 +662,7 @@ async def force_change_password(
     )
     db.add(session)
     await db.flush()
+    await db.commit()
     client_ip = "0.0.0.0"
     await log_audit(db, user.id, role_code, "force_change_password", "auth", user.id, "Password changed via force change — all prior sessions revoked", ip_address=client_ip)
     _set_refresh_cookie(response, refresh_token)

@@ -101,6 +101,7 @@ async def create_task(
     )
     db.add(task)
     await db.flush()
+    await db.commit()
     return task
 
 
@@ -130,6 +131,7 @@ async def update_task_status(
     if req.actual_minutes is not None:
         task.downtime_min = req.actual_minutes
     await db.flush()
+    await db.commit()
     return task
 
 
@@ -198,6 +200,7 @@ async def create_schedule(
     )
     db.add(schedule)
     await db.flush()
+    await db.commit()
     return schedule
 
 
@@ -280,6 +283,7 @@ async def update_schedule(
     if req.next_due_date is not None:
         schedule.next_due = req.next_due_date.isoformat()
     await db.flush()
+    await db.commit()
     return schedule
 
 
@@ -444,6 +448,7 @@ async def delete_maintenance_task(
         raise HTTPException(status_code=404, detail="Maintenance task not found")
     task.status = "cancelled"
     await db.flush()
+    await db.commit()
     return {"message": "Maintenance task deleted", "id": task_id}
 
 
@@ -470,4 +475,5 @@ async def delete_maintenance_schedule(
         raise HTTPException(status_code=404, detail="Maintenance schedule not found")
     schedule.is_active = False
     await db.flush()
+    await db.commit()
     return {"message": "Maintenance schedule deleted", "id": schedule_id}

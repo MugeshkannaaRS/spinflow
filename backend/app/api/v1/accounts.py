@@ -94,6 +94,7 @@ async def create_invoice(
     )
     db.add(invoice)
     await db.flush()
+    await db.commit()
     return invoice
 
 
@@ -123,6 +124,7 @@ async def update_invoice(
     if req.due_date is not None:
         invoice.due_date = req.due_date.isoformat()
     await db.flush()
+    await db.commit()
     return invoice
 
 
@@ -145,6 +147,7 @@ async def delete_invoice(
             raise HTTPException(status_code=404, detail="Invoice not found")
         await db.delete(invoice)
         await db.flush()
+        await db.commit()
         return {"message": "Invoice deleted"}
     except HTTPException:
         raise
@@ -229,6 +232,7 @@ async def create_payment(
         invoice.status = "paid"
         invoice.paid_at = datetime.now(timezone.utc)
     await db.flush()
+    await db.commit()
     return payment
 
 

@@ -16,7 +16,13 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -435,15 +441,14 @@ function NewTripSheet() {
     .slice(0, 20);
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button>New Trip</Button>
-      </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Create New Trip</SheetTitle>
-        </SheetHeader>
-        <div className="space-y-4 mt-4">
+    <>
+      <Button onClick={() => setOpen(true)}>New Trip</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Create New Trip</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 mt-2">
           <div>
             <label className="text-sm font-medium">From Warehouse</label>
             <Input
@@ -609,12 +614,16 @@ function NewTripSheet() {
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
             />
           </div>
-          <Button className="w-full" onClick={handleSubmit} disabled={m.isPending}>
-            {m.isPending ? "Creating..." : "Create Trip"}
-          </Button>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={handleSubmit} disabled={m.isPending}>
+              {m.isPending ? "Creating..." : "Create Trip"}
+            </Button>
+          </DialogFooter>
         </div>
-      </SheetContent>
-    </Sheet>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
