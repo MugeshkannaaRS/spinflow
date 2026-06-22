@@ -747,9 +747,19 @@ async def _v2_create(slug: str, payload: Dict[str, Any],
     scope = await get_mill_scope(current_user, db)
     allowed = _model_cols(model)
     kwargs = {k: v for k, v in payload.items() if k in allowed}
+
     mill_id = scope.get("mill_id")
+    # MILL_OWNER has mill_id=None — resolve to their first mill
+    if not mill_id and scope.get("company_id"):
+        r = await db.execute(
+            select(Mill).where(Mill.company_id == scope["company_id"]).limit(1)
+        )
+        first_mill = r.scalar_one_or_none()
+        if first_mill:
+            mill_id = str(first_mill.id)
     if not mill_id:
-        raise HTTPException(status_code=400, detail="No mill selected. Please select a mill before saving quality records.")
+        raise HTTPException(status_code=400, detail="No mill found. Assign a mill to your account.")
+
     kwargs["mill_id"] = mill_id
     # Only set company_id if the model actually has that column
     allowed_all = {c.key for c in model.__table__.columns}
@@ -762,6 +772,7 @@ async def _v2_create(slug: str, payload: Dict[str, Any],
         await _calculate_waste_study(record)
     db.add(record)
     await db.flush()
+    await db.commit()
     await db.refresh(record)
     return record
 
@@ -782,6 +793,7 @@ async def _v2_update(slug: str, record_id: str, payload: Dict[str, Any],
     if model is QmCardingWasteStudy:
         await _calculate_waste_study(record)
     await db.flush()
+    await db.commit()
     await db.refresh(record)
     return record
 
@@ -795,6 +807,7 @@ async def _v2_delete(slug: str, record_id: str,
     if not record:
         raise HTTPException(status_code=404, detail="Record not found")
     await db.delete(record)
+    await db.commit()
     return {"deleted": record_id}
 
 

@@ -12,9 +12,10 @@ from typing import List, Optional
 from datetime import datetime, timezone
 
 from app.db.session import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, get_mill_scope
 from app.models.user import User
 from app.models.ui_config import ColumnConfig, ColumnDropdownOption
+from app.models.masters import Mill
 
 router = APIRouter()
 
@@ -402,72 +403,78 @@ async def get_column_config(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not table or not table.strip():
-        return _default_config(table, "default")
+    try:
+        if not table or not table.strip():
+            return _default_config(table, "default")
 
-    role_name = current_user.role_rel.code if current_user.role_rel else ""
-    effective_mill_id = mill_id
-    if role_name != "SUPER_ADMIN":
-        effective_mill_id = current_user.mill_id
-    if not effective_mill_id:
-        effective_mill_id = "default"
+        role_name = current_user.role_rel.code if current_user.role_rel else (getattr(current_user, "role", "") or "")
+        scope = await get_mill_scope(current_user, db)
+        effective_mill_id = mill_id
+        if role_name != "SUPER_ADMIN":
+            effective_mill_id = scope.get("mill_id") or current_user.mill_id
+            # MILL_OWNER has mill_id=None — resolve to their first mill
+            if not effective_mill_id and scope.get("company_id"):
+                r = await db.execute(
+                    select(Mill).where(Mill.company_id == scope["company_id"]).limit(1)
+                )
+                fm = r.scalar_one_or_none()
+                if fm:
+                    effective_mill_id = str(fm.id)
+        if not effective_mill_id:
+            effective_mill_id = "default"
 
-    result = await db.execute(
-        select(ColumnConfig).where(
-            ColumnConfig.mill_id == effective_mill_id,
-            ColumnConfig.table_key == table,
-        ).order_by(ColumnConfig.updated_at.desc())
-    )
-    config = result.scalars().first()
+        result = await db.execute(
+            select(ColumnConfig).where(
+                ColumnConfig.mill_id == effective_mill_id,
+                ColumnConfig.table_key == table,
+            ).order_by(ColumnConfig.updated_at.desc())
+        )
+        config = result.scalars().first()
 
-    defaults = _get_default_columns(table)
+        defaults = _get_default_columns(table)
 
-    if not config:
+        if not config:
+            return {
+                "table": table,
+                "mill_id": effective_mill_id,
+                "columns": [d.model_dump() for d in defaults],
+            }
+
+        import json
+        try:
+            parsed = json.loads(config.columns)
+        except (json.JSONDecodeError, TypeError):
+            parsed = []
+
+        do_result = await db.execute(
+            select(ColumnDropdownOption).where(
+                ColumnDropdownOption.mill_id == effective_mill_id,
+                ColumnDropdownOption.table_name == table,
+                ColumnDropdownOption.is_active == True,
+            ).order_by(ColumnDropdownOption.display_order)
+        )
+        dropdown_rows = do_result.scalars().all()
+
+        dropdown_map: dict = {}
+        for d in dropdown_rows:
+            if d.column_key not in dropdown_map:
+                dropdown_map[d.column_key] = []
+            dropdown_map[d.column_key].append({
+                "value": d.option_value,
+                "label": d.option_label,
+            })
+
+        columns = [c.model_dump() for c in _build_column_response(parsed, dropdown_map)]
+
         return {
             "table": table,
             "mill_id": effective_mill_id,
-            "columns": [d.model_dump() for d in defaults],
+            "columns": columns,
         }
-
-    import json
-    try:
-        parsed = json.loads(config.columns)
-    except (json.JSONDecodeError, TypeError):
-        parsed = []
-
-    do_result = await db.execute(
-        select(ColumnDropdownOption).where(
-            ColumnDropdownOption.mill_id == effective_mill_id,
-            ColumnDropdownOption.table_name == table,
-            ColumnDropdownOption.is_active == True,
-        ).order_by(ColumnDropdownOption.display_order)
-    )
-    dropdown_rows = do_result.scalars().all()
-
-    dropdown_map: dict = {}
-    for d in dropdown_rows:
-        if d.column_key not in dropdown_map:
-            dropdown_map[d.column_key] = []
-        dropdown_map[d.column_key].append({
-            "value": d.option_value,
-            "label": d.option_label,
-        })
-
-    columns = [c.model_dump() for c in _build_column_response(parsed, dropdown_map)]
-
-    return {
-        "table": table,
-        "mill_id": effective_mill_id,
-        "columns": columns,
-    }
-
-
-def _default_config(table: str, mill_id: str = "default") -> dict:
-    return {
-        "table": table,
-        "mill_id": mill_id,
-        "columns": [d.model_dump() for d in _get_default_columns(table)],
-    }
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"ui-config/columns error table={table}: {e}", exc_info=True)
+        return _default_config(table, "default")
 
 
 @router.get("/ui-config/columns/all", response_model=dict)
