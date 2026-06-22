@@ -164,6 +164,7 @@ function UsersPage() {
       setSuccessDialog({ user: resp, password: form.password });
       setForm(INITIAL_FORM);
     },
+    onError: (err: any) => toast.error(err?.response?.data?.detail || "Failed to create user"),
   });
 
   const updateMutation = useMutation({
@@ -174,6 +175,7 @@ function UsersPage() {
       setEditingUser(null);
       setForm(INITIAL_FORM);
     },
+    onError: (err: any) => toast.error(err?.response?.data?.detail || "Failed to update user"),
   });
 
   const deactivateMutation = useMutation({

@@ -530,6 +530,7 @@ class CompanyDeletionService:
                 except Exception:
                     pass  # log update is best-effort
 
+            await self.db.commit()
             role_code = self.current_user.role_rel.code if self.current_user.role_rel else "SUPER_ADMIN"
             await log_audit(
                 self.db, self.current_user.id, role_code,
@@ -560,6 +561,7 @@ class CompanyDeletionService:
         mills_q = await self.db.execute(text("UPDATE mills SET is_active = false WHERE company_id = :p"), {"p": company_id})
         user_q = await self.db.execute(text("UPDATE users SET is_active = false WHERE company_id = :p"), {"p": company_id})
 
+        await self.db.commit()
         role_code = self.current_user.role_rel.code if self.current_user.role_rel else "SUPER_ADMIN"
         await log_audit(
             self.db, self.current_user.id, role_code,

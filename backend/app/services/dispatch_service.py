@@ -88,6 +88,7 @@ class DispatchService(BaseService):
         )
         self.db.add(dispatch)
         await self.db.flush()
+        await self.db.commit()
 
         await self._audit(
             action="create",
@@ -153,6 +154,7 @@ class DispatchService(BaseService):
             dispatch.status = "loading"
 
         await self.db.flush()
+        await self.db.commit()
 
         await self._audit(
             action="add_item",
@@ -224,6 +226,7 @@ class DispatchService(BaseService):
             dispatch.approved_by = self.current_user.name
             dispatch.approved_at = datetime.now(timezone.utc)
         await self.db.flush()
+        await self.db.commit()
 
         await self._audit(
             action="transition_status",
@@ -259,6 +262,7 @@ class DispatchService(BaseService):
         )
         self.db.add(scan)
         await self.db.flush()
+        await self.db.commit()
 
         await self._audit(
             action="qr_scan",

@@ -374,6 +374,7 @@ function NewIssueNoteDialog({ items }: { items: any[] }) {
         setFiles([]);
         setOpen(false);
       },
+      onError: (err: any) => toast.error(err?.response?.data?.detail || "Failed to create issue note"),
     });
   };
 
@@ -785,6 +786,7 @@ function ReceiveStockButton({ item }: { item: any }) {
         setForm({ quantityReceived: 0, supplier: "", notes: "" });
         setOpen(false);
       },
+      onError: (err: any) => toast.error(err?.response?.data?.detail || "Failed to receive stock"),
     });
   };
 

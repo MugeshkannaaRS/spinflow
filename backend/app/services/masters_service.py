@@ -114,6 +114,7 @@ class MastersService(BaseService):
         )
         self.db.add(log)
         await self.db.flush()
+        await self.db.commit()
         return record
 
     async def update_company(self, id: str, dto: CompanyUpdate, updated_by: Optional[str] = None):
@@ -122,6 +123,7 @@ class MastersService(BaseService):
         for key, value in update_data.items():
             setattr(record, key, value)
         await self.db.flush()
+        await self.db.commit()
         await self._audit(action="update", entity="Company", entity_id=record.id, details=f"Updated company: {record.name}")
         return record
 
@@ -178,6 +180,7 @@ class MastersService(BaseService):
         )
         self.db.add(log)
         await self.db.flush()
+        await self.db.commit()
         return record
 
     async def update_mill(self, id: str, dto: MillUpdate, updated_by: Optional[str] = None):
@@ -186,6 +189,7 @@ class MastersService(BaseService):
         for key, value in update_data.items():
             setattr(record, key, value)
         await self.db.flush()
+        await self.db.commit()
         await self._audit(action="update", entity="Mill", entity_id=record.id, details=f"Updated mill: {record.name}")
         return record
 
@@ -213,6 +217,7 @@ class MastersService(BaseService):
             await self.db.flush()
         except IntegrityError:
             raise SpinFlowException.conflict(f"Department with code '{dto.code}' already exists in this mill")
+        await self.db.commit()
         await self._audit(action="create", entity="Department", entity_id=record.id, details=f"Created department: {record.name}")
         return record
 
@@ -222,6 +227,7 @@ class MastersService(BaseService):
         for key, value in update_data.items():
             setattr(record, key, value)
         await self.db.flush()
+        await self.db.commit()
         await self._audit(action="update", entity="Department", entity_id=record.id, details=f"Updated department: {record.name}")
         return record
 
@@ -249,6 +255,7 @@ class MastersService(BaseService):
             await self.db.flush()
         except IntegrityError:
             raise SpinFlowException.conflict(f"Yarn count '{dto.count}' already exists")
+        await self.db.commit()
         await self._audit(action="create", entity="YarnCount", entity_id=record.id, details=f"Created yarn count: {record.count}")
         return record
 
@@ -258,6 +265,7 @@ class MastersService(BaseService):
         for key, value in update_data.items():
             setattr(record, key, value)
         await self.db.flush()
+        await self.db.commit()
         await self._audit(action="update", entity="YarnCount", entity_id=record.id, details=f"Updated yarn count: {record.count}")
         return record
 
@@ -285,6 +293,7 @@ class MastersService(BaseService):
             await self.db.flush()
         except IntegrityError:
             raise SpinFlowException.conflict(f"Customer with code '{dto.code}' already exists")
+        await self.db.commit()
         await self._audit(action="create", entity="Customer", entity_id=record.id, details=f"Created customer: {record.name}")
         return record
 
@@ -294,6 +303,7 @@ class MastersService(BaseService):
         for key, value in update_data.items():
             setattr(record, key, value)
         await self.db.flush()
+        await self.db.commit()
         await self._audit(action="update", entity="Customer", entity_id=record.id, details=f"Updated customer: {record.name}")
         return record
 
@@ -302,6 +312,7 @@ class MastersService(BaseService):
         if hasattr(record, "is_active"):
             record.is_active = False
         await self.db.flush()
+        await self.db.commit()
         await self._audit(action="deactivate", entity="Customer", entity_id=record.id, details=f"Deactivated customer: {record.name}")
         return record
 
@@ -329,6 +340,7 @@ class MastersService(BaseService):
             await self.db.flush()
         except IntegrityError:
             raise SpinFlowException.conflict(f"Vehicle with number '{dto.vehicle_no}' already exists")
+        await self.db.commit()
         await self._audit(action="create", entity="MasterVehicle", entity_id=record.id, details=f"Created vehicle: {record.vehicle_no}")
         return record
 
@@ -338,6 +350,7 @@ class MastersService(BaseService):
         for key, value in update_data.items():
             setattr(record, key, value)
         await self.db.flush()
+        await self.db.commit()
         await self._audit(action="update", entity="MasterVehicle", entity_id=record.id, details=f"Updated vehicle: {record.vehicle_no}")
         return record
 
@@ -365,6 +378,7 @@ class MastersService(BaseService):
             await self.db.flush()
         except IntegrityError:
             raise SpinFlowException.conflict(f"Route with code '{dto.code}' already exists")
+        await self.db.commit()
         await self._audit(action="create", entity="Route", entity_id=record.id, details=f"Created route: {record.name}")
         return record
 
@@ -374,5 +388,6 @@ class MastersService(BaseService):
         for key, value in update_data.items():
             setattr(record, key, value)
         await self.db.flush()
+        await self.db.commit()
         await self._audit(action="update", entity="Route", entity_id=record.id, details=f"Updated route: {record.name}")
         return record

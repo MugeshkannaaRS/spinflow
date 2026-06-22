@@ -141,6 +141,7 @@ class QualityService(BaseService):
         )
         self.db.add(test)
         await self.db.flush()
+        await self.db.commit()
 
         await self._audit(
             action="create",
@@ -172,6 +173,7 @@ class QualityService(BaseService):
             test.status = "rejected"
 
         await self.db.flush()
+        await self.db.commit()
 
         if test.lot_id:
             lot_result = await self.db.execute(select(Lot).where(Lot.id == test.lot_id))
@@ -179,6 +181,7 @@ class QualityService(BaseService):
             if lot:
                 lot.quality_status = test.status
                 await self.db.flush()
+                await self.db.commit()
 
                 stock_service = StockLedgerService(self.db, self.current_user)
                 mill_id = self.current_user.mill_id or lot.mill_id or ""

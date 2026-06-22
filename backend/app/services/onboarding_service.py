@@ -169,6 +169,7 @@ class OnboardingService:
             details=f"Onboarded company: {company.name} ({dto.plan_code}, {len(dto.mills)} mills)",
         ))
 
+        await self.db.commit()
         logger.info("Onboarding complete: company=%s mills=%d owner=%s", company.code, len(mill_ids), dto.owner.email)
         return OnboardingResult(
             company_id=company.id,

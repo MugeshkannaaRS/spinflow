@@ -1,4 +1,5 @@
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -83,8 +84,8 @@ export function ColumnConfigurator({ module, tableKey }: ColumnConfiguratorProps
         },
       );
       setOpen(false);
-    } catch {
-      // silent
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail || "Failed to save column config");
     } finally {
       setIsSaving(false);
     }
