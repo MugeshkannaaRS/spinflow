@@ -214,6 +214,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
         )
         db.add(session)
         await db.flush()
+        await db.commit()
 
         # Fetch enabled modules for this company
         enabled_modules: list[str] = []
@@ -302,6 +303,7 @@ async def refresh(request: Request, response: Response, req: Optional[RefreshReq
             expires_at=new_expires,
         )
         db.add(new_session)
+        await db.commit()
     _set_refresh_cookie(response, new_refresh)
     return TokenResponse(access_token=new_access, refresh_token=new_refresh)
 
@@ -314,6 +316,7 @@ async def logout(db: AsyncSession = Depends(get_db), current_user: User = Depend
     sessions = result.scalars().all()
     for s in sessions:
         s.is_active = False
+    await db.commit()
     role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
     await log_audit(db, current_user.id, role_code, "logout", "auth", current_user.id, "User logged out")
     return {"message": "Logged out successfully"}

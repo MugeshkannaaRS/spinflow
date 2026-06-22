@@ -1931,15 +1931,27 @@ function ShiftForm({ item, mills }: { item?: Shift; mills?: Mill[] }) {
     onSuccess: () => {
       toast.success("Shift created");
       qc.invalidateQueries({ queryKey: ["masters", "all"] });
-      qc.invalidateQueries({ queryKey: ["mill-masters"] }); // refresh useShifts() in all pages
+      qc.invalidateQueries({ queryKey: ["mill-masters"] });
     },
   });
+
+  const updateM = useMutation({
+    mutationFn: () => productionApi.updateShift(item!.id, form),
+    onSuccess: () => {
+      toast.success("Shift updated");
+      qc.invalidateQueries({ queryKey: ["masters", "all"] });
+      qc.invalidateQueries({ queryKey: ["mill-masters"] });
+    },
+  });
+
+  const isPending = createM.isPending || updateM.isPending;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setTouched(Object.fromEntries(requiredFields.map((f) => [f, true])));
     if (!isComplete) return;
-    createM.mutate();
+    if (item?.id) updateM.mutate();
+    else createM.mutate();
   };
 
   return (
@@ -1998,8 +2010,8 @@ function ShiftForm({ item, mills }: { item?: Shift; mills?: Mill[] }) {
         </div>
       </div>
       <DialogFooter>
-        <Button type="submit" disabled={createM.isPending || !isComplete}>
-          {createM.isPending ? "Saving…" : "Save"}
+        <Button type="submit" disabled={isPending || !isComplete}>
+          {isPending ? "Saving…" : item?.id ? "Update" : "Save"}
         </Button>
       </DialogFooter>
     </form>
@@ -2089,7 +2101,7 @@ function WarehouseForm({ item }: { item?: Warehouse }) {
       </div>
       <DialogFooter>
         <Button type="submit" disabled={createM.isPending || !isComplete}>
-          {createM.isPending ? "Saving…" : "Save"}
+          {createM.isPending ? "Saving…" : item?.id ? "Update" : "Save"}
         </Button>
       </DialogFooter>
     </form>

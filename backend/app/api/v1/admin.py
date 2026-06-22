@@ -764,10 +764,14 @@ async def admin_onboarding(
 
     svc = OnboardingService(db, current_user)
     try:
-        return await svc.onboard(dto)
+        result = await svc.onboard(dto)
+        await db.commit()
+        return result
     except SpinFlowException:
+        await db.rollback()
         raise
     except Exception:
+        await db.rollback()
         logger.exception("Onboarding failed unexpectedly")
         raise HTTPException(500, "Internal server error during onboarding")
 
@@ -892,8 +896,10 @@ async def update_mill_settings(
             )
             db.add(settings)
         await db.flush()
+        await db.commit()
         return {"message": "Mill settings updated"}
     except Exception as e:
+        await db.rollback()
         logger.error(f"admin.mill_settings update error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 

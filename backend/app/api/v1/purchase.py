@@ -124,6 +124,7 @@ async def create_purchase(
     )
     db.add(purchase)
     await db.flush()
+    await db.commit()
     role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
     await log_audit(db, current_user.id, role_code, "create", "CottonPurchase", purchase.id,
                     f"Purchase {purchase.invoice_no} created")
@@ -195,6 +196,7 @@ async def create_supplier(
     )
     db.add(supplier)
     await db.flush()
+    await db.commit()
     role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
     await log_audit(db, current_user.id, role_code, "create", "Supplier", supplier.id,
                     f"Supplier {supplier.name} created")
@@ -372,6 +374,7 @@ async def create_bale(
     )
     db.add(bale)
     await db.flush()
+    await db.commit()
     return bale
 
 
@@ -491,6 +494,7 @@ async def create_grn(
     )
     db.add(grn)
     await db.flush()
+    await db.commit()
     role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
     await log_audit(db, current_user.id, role_code, "create", "GRNEntry", grn.id,
                     f"GRN {grn.grn_no} created")
@@ -532,6 +536,7 @@ async def delete_purchase(
         raise HTTPException(status_code=400, detail="Only pending purchases can be cancelled")
     purchase.status = "cancelled"
     await db.flush()
+    await db.commit()
     return {"message": "Purchase cancelled", "id": purchase_id}
 
 
@@ -554,4 +559,5 @@ async def delete_supplier(
         raise HTTPException(status_code=404, detail="Supplier not found")
     supplier.status = False
     await db.flush()
+    await db.commit()
     return {"message": "Supplier deactivated", "id": supplier_id}

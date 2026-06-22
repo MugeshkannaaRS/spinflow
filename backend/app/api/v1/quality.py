@@ -188,6 +188,7 @@ async def bulk_create_tests(
             skipped += 1
             errors.append(f"Row {i + 1}: {str(e)}")
     await db.flush()
+    await db.commit()
     return {"created": created, "skipped": skipped, "errors": errors}
 
 
@@ -404,6 +405,7 @@ async def approve_or_reject_approval(
     approval.approved_by = approved_by
     approval.approved_at = datetime.now(timezone.utc)
     await db.flush()
+    await db.commit()
 
     return {
         "id": approval.id,
@@ -495,4 +497,5 @@ async def delete_quality_test(
         raise HTTPException(status_code=400, detail="Only pending tests can be deleted")
     test.status = "cancelled"
     await db.flush()
+    await db.commit()
     return {"message": "Quality test cancelled", "id": test_id}

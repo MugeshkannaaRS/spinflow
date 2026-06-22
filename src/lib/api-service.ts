@@ -112,6 +112,7 @@ export const productionApi = {
     api.patch(`/production/machines/${id}/status`, data).then((r) => r.data),
   getShifts: () => api.get("/production/shifts").then((r: any) => extractList(r.data)),
   createShift: (data: any) => api.post("/production/shifts", data).then((r) => r.data),
+  updateShift: (id: string, data: any) => api.patch(`/production/shifts/${id}`, data).then((r) => r.data),
   deleteMachine: (id: string) => api.delete(`/production/machines/${id}`).then((r) => r.data),
   deleteEntry: (id: string) => api.delete(`/production/entries/${id}`).then((r) => r.data),
   updateEntry: (id: string, data: any) =>

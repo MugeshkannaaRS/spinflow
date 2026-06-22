@@ -315,6 +315,7 @@ async def create_employee(
     )
     db.add(emp)
     await db.flush()
+    await db.commit()
     return emp
 
 
@@ -354,6 +355,7 @@ async def update_employee(
         )
 
     await db.flush()
+    await db.commit()
     return emp
 
 
@@ -375,6 +377,7 @@ async def delete_employee(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
     emp.is_active = False
     await db.flush()
+    await db.commit()
     return {"message": "Employee deactivated", "id": employee_id}
 
 
@@ -959,6 +962,7 @@ async def calculate_payroll(
         created_count += 1
 
     await db.flush()
+    await db.commit()
     return {"message": f"Payroll calculated for {created_count} employees", "count": created_count}
 
 
@@ -986,6 +990,7 @@ async def update_payroll_row(
         setattr(payroll, key, value)
 
     await db.flush()
+    await db.commit()
     return payroll
 
 
@@ -1022,6 +1027,7 @@ async def finalize_payroll(
         row.is_finalized = True
 
     await db.flush()
+    await db.commit()
     return {"message": f"Payroll finalized for {len(rows)} employees", "count": len(rows)}
 
 
@@ -1162,6 +1168,7 @@ async def create_attendance(
     )
     db.add(att)
     await db.flush()
+    await db.commit()
     return att
 
 
@@ -1191,6 +1198,7 @@ async def create_bulk_attendance(
         db.add(att)
         records.append(att)
     await db.flush()
+    await db.commit()
     return records
 
 

@@ -238,6 +238,7 @@ async def create_machine(
         raise HTTPException(status_code=400, detail="mill_id is required for MILL_OWNER")
     db.add(machine)
     await db.flush()
+    await db.commit()
     return machine
 
 
@@ -285,11 +286,46 @@ async def create_shift(
 ):
     scope = await get_mill_scope(current_user, db)
     shift = Shift(**req.model_dump())
-    if scope["mill_id"]:
-        shift.mill_id = scope["mill_id"]
-    elif scope["company_id"]:
-        raise HTTPException(status_code=400, detail="mill_id is required for MILL_OWNER")
+
+    mill_id = scope.get("mill_id")
+
+    # MILL_OWNER has mill_id=None in scope — resolve to their first mill
+    if not mill_id and scope.get("company_id"):
+        r = await db.execute(
+            select(Mill).where(Mill.company_id == scope["company_id"]).limit(1)
+        )
+        first_mill = r.scalar_one_or_none()
+        if first_mill:
+            mill_id = str(first_mill.id)
+
+    if not mill_id:
+        raise HTTPException(status_code=400, detail="Cannot determine mill — assign a mill to your account")
+
+    shift.mill_id = mill_id
     db.add(shift)
+    await db.flush()
+    await db.commit()
+    await db.refresh(shift)
+    return shift
+
+
+@router.patch("/production/shifts/{shift_id}", response_model=ShiftOut)
+async def update_shift(
+    shift_id: str,
+    req: ShiftCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("masters", write=True)),
+):
+    r = await db.execute(select(Shift).where(Shift.id == shift_id))
+    shift = r.scalar_one_or_none()
+    if not shift:
+        raise HTTPException(status_code=404, detail="Shift not found")
+
+    shift.code = req.code
+    shift.name = req.name
+    shift.start_time = req.start_time
+    shift.end_time = req.end_time
+
     await db.flush()
     await db.commit()
     await db.refresh(shift)
