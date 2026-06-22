@@ -15,6 +15,7 @@ from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
 from app.models.masters import Mill
 from app.models.production import DowntimeLog
+from app.models.hr import Employee
 from app.models.production_v2 import (
     DatalogStopCode,
     WasteEntry,
@@ -1175,3 +1176,51 @@ async def upsert_waste_type_template(
     await db.commit()
     await db.refresh(existing)
     return {"waste_types": existing.waste_types, "id": existing.id}
+
+
+@router.get("/production/employees-lookup")
+async def production_employees_lookup(
+    department: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    mill_id: Optional[str] = Query(None),
+    page_size: int = Query(200, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production")),
+):
+    """Lightweight employee lookup for production forms (manpower assignments)."""
+    from sqlalchemy import or_
+    scope = await get_mill_scope(current_user, db)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        elif role_code == "MILL_OWNER":
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+
+    stmt = select(Employee.id, Employee.name, Employee.employee_id, Employee.department).where(
+        Employee.is_active == True
+    )
+    if effective_mill_id:
+        stmt = stmt.where(Employee.mill_id == effective_mill_id)
+    if department:
+        stmt = stmt.where(Employee.department == department)
+    if search:
+        pattern = f"%{search}%"
+        stmt = stmt.where(
+            or_(
+                Employee.name.ilike(pattern),
+                Employee.employee_id.ilike(pattern),
+            )
+        )
+    stmt = stmt.order_by(Employee.name).limit(page_size)
+    rows = (await db.execute(stmt)).all()
+    return [{"id": r.id, "name": r.name, "employee_id": r.employee_id, "department": r.department} for r in rows]
