@@ -71,6 +71,7 @@ import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { useMillMasters, useMillMasterCategory } from "@/hooks/useMillConfig";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CustomFieldsSection } from "@/components/ui/CustomFieldsSection";
 
 export const Route = createFileRoute("/_app/production")({
   head: () => ({ meta: [{ title: "Production — SpinFlow ERP" }] }),
@@ -248,6 +249,7 @@ function ShiftGrid() {
 
   const [count, setCount] = useState("30s");
   const [groupTarget, setGroupTarget] = useState<string>("");
+  const [shiftCustomFields, setShiftCustomFields] = useState<Record<string, unknown>>({});
   const config = useColumnConfig("production_entries");
 
   const machinesQ = useQuery({
@@ -378,6 +380,7 @@ function ShiftGrid() {
           stoppage_mins: Number(r.stoppageMins) || 0,
           stoppage_reason: r.stoppageReason || undefined,
           machine_status: r.machineStatus,
+          custom_fields: shiftCustomFields ?? {},
         })),
       });
 
@@ -1059,6 +1062,14 @@ function ShiftGrid() {
           )}
         </CardContent>
       </Card>
+      <CustomFieldsSection
+        tableName="production_entries"
+        millId={millId}
+        values={shiftCustomFields}
+        onChange={(key, value) =>
+          setShiftCustomFields((p) => ({ ...p, [key]: value }))
+        }
+      />
       <p className="text-xs text-muted-foreground">
         Only rows with Produced kg &gt; 0 will be submitted. Empty rows are ignored.
       </p>
@@ -1116,6 +1127,7 @@ function WasteGrid() {
   const [department, setDepartment] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [wasteCustomFields, setWasteCustomFields] = useState<Record<string, unknown>>({});
   // Entry mode: "individual" (per-machine table) or "group" (multi-row form → all machines)
   const [wasteMode, setWasteMode] = useState<"individual" | "group">("individual");
 
@@ -1319,6 +1331,7 @@ function WasteGrid() {
                     ratio: gr.ratio || undefined,
                     waste_kg: Number(gr.wasteKg),
                     remarks: gr.remarks || undefined,
+                    custom_fields: wasteCustomFields ?? {},
                   },
                 ],
               },
@@ -1345,6 +1358,7 @@ function WasteGrid() {
                 ratio: e.ratio || undefined,
                 waste_kg: Number(e.wasteKg),
                 remarks: e.remarks || undefined,
+                custom_fields: wasteCustomFields ?? {},
               });
             }
           }
@@ -1582,6 +1596,15 @@ function WasteGrid() {
           }}
         />
       )}
+
+      <CustomFieldsSection
+        tableName="waste_entries"
+        millId={millId}
+        values={wasteCustomFields}
+        onChange={(key, value) =>
+          setWasteCustomFields((p) => ({ ...p, [key]: value }))
+        }
+      />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between py-3">

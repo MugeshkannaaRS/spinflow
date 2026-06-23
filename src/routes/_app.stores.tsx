@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { storesApi, uploadApi, exportApi } from "@/lib/api-service";
+import { CustomFieldsSection } from "@/components/ui/CustomFieldsSection";
 import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
@@ -312,6 +313,7 @@ function StoresPage() {
 
 function NewIssueNoteDialog({ items }: { items: any[] }) {
   const qc = useQueryClient();
+  const { millId } = useActiveMill();
   const [open, setOpen] = useState(false);
   const [requiredErrors, setRequiredErrors] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -325,6 +327,7 @@ function NewIssueNoteDialog({ items }: { items: any[] }) {
     department: "",
     purpose: "",
     issuedBy: "",
+    custom_fields: {} as Record<string, unknown>,
   });
 
   const reqFields = [
@@ -343,7 +346,7 @@ function NewIssueNoteDialog({ items }: { items: any[] }) {
 
   const m = useMutation({
     mutationFn: async () => {
-      const entry = await storesApi.createIssue(form);
+      const entry = await storesApi.createIssue({ ...form, custom_fields: form.custom_fields ?? {} });
       if (files.length > 0)
         await Promise.all(files.map((f) => uploadApi.upload("stores_issue", entry.id, f.file)));
       return entry;
@@ -437,6 +440,14 @@ function NewIssueNoteDialog({ items }: { items: any[] }) {
               <FileUpload files={files} onFilesChange={setFiles} multiple={false} />
             </div>
           </div>
+          <CustomFieldsSection
+            tableName="spare_issues"
+            millId={millId}
+            values={form.custom_fields}
+            onChange={(key, value) =>
+              setForm((p) => ({ ...p, custom_fields: { ...p.custom_fields, [key]: value } }))
+            }
+          />
           <DialogFooter>
             <Button type="submit" disabled={m.isPending || !allFilled}>
               {m.isPending ? "Saving…" : "Create issue note"}

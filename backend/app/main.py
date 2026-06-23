@@ -36,6 +36,7 @@ from app.api.v1.notifications import router as notifications_router
 from app.api.v1.alerts import router as alerts_router
 from app.api.v1.customer_success import router as customer_success_router
 from app.api.v1.demo import router as demo_router
+from app.api.v1.custom_fields import router as custom_fields_router
 from app.ws.notifications import router as ws_router
 
 setup_logging()
@@ -513,6 +514,7 @@ app.include_router(notifications_router, prefix=API_PREFIX, tags=["Notifications
 app.include_router(alerts_router, prefix=API_PREFIX, tags=["Alerts"])
 app.include_router(customer_success_router, prefix=API_PREFIX, tags=["Customer Success"])
 app.include_router(demo_router, prefix=API_PREFIX, tags=["Demo & Trial"])
+app.include_router(custom_fields_router, prefix=API_PREFIX, tags=["Custom Fields"])
 app.include_router(ws_router)
 
 

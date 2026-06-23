@@ -60,6 +60,7 @@ import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useMillMasterCategory, useMillMasters } from "@/hooks/useMillConfig";
 import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CustomFieldsManager } from "@/components/ui/CustomFieldsManager";
 import type {
   Company,
   Mill,
@@ -277,6 +278,7 @@ function MastersPage() {
                   { key: "shifts", label: "Shifts" },
                   { key: "warehouses", label: "Warehouses" },
                   { key: "stop-codes", label: "Stop Codes" },
+                  { key: "custom-fields", label: "Custom Fields" },
                 ];
                 const isSuperAdmin = false;
                 return allTabs

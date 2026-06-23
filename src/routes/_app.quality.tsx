@@ -59,6 +59,7 @@ import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CustomFieldsSection } from "@/components/ui/CustomFieldsSection";
 
 export const Route = createFileRoute("/_app/quality")({
   head: () => ({ meta: [{ title: "Quality — SpinFlow ERP" }] }),
@@ -1797,11 +1798,16 @@ function QmGridDialog({
   const draft = useLocalDraft<Record<string, any>>(draftKey);
 
   const [form, setForm] = useState<Record<string, any>>(makeDefault);
+  const [customFields, setCustomFields] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
+
+  // Derive DB table name from the endpoint's last path segment (e.g. "/quality/v2/carding/cv-record" → "qm_carding_cv_record")
+  const tableName = "qm_" + endpoint.split("/").pop()!.replace(/-/g, "_");
 
   // Pre-fill when editing; for new records restore draft if present
   useEffect(() => {
     if (editRecord) {
+      setCustomFields((editRecord.custom_fields as Record<string, unknown>) ?? {});
       const d: Record<string, any> = {};
       formFields.forEach((f) => { d[f.key] = editRecord[f.key] ?? ""; });
       setForm(d);
@@ -1839,6 +1845,7 @@ function QmGridDialog({
           payload[k] = parseFloat(v.toFixed(2));
         }
       }
+      payload.custom_fields = customFields ?? {};
       if (editRecord?.id) {
         await api.patch(`${endpoint}/${editRecord.id}`, payload);
         toast.success("Updated");
@@ -1897,6 +1904,12 @@ function QmGridDialog({
             );
           })}
         </div>
+        <CustomFieldsSection
+          tableName={tableName}
+          millId={millId}
+          values={customFields}
+          onChange={(key, value) => setCustomFields((p) => ({ ...p, [key]: value }))}
+        />
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button onClick={handleSave} disabled={saving}>
@@ -1936,11 +1949,14 @@ function QmSheetDialog({
   const sheetDraft = useLocalDraft<Record<string, any>>(sheetDraftKey);
 
   const [form, setForm] = useState<Record<string, any>>(makeDefault);
+  const [customFields, setCustomFields] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
   const setF = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
+  const sheetTableName = "qm_" + endpoint.split("/").pop()!.replace(/-/g, "_");
 
   useEffect(() => {
     if (editRecord) {
+      setCustomFields((editRecord.custom_fields as Record<string, unknown>) ?? {});
       setForm({
         date: editRecord.date ?? today,
         shift_code: editRecord.shift_code ?? "",
@@ -1999,6 +2015,7 @@ function QmSheetDialog({
       };
       if (hasSide) payload.side = form.side || null;
       if (hasProcess) payload.process = form.process || null;
+      payload.custom_fields = customFields ?? {};
       if (editRecord?.id) {
         await api.patch(`${endpoint}/${editRecord.id}`, payload);
         toast.success("Updated");
@@ -2179,6 +2196,13 @@ function QmSheetDialog({
               className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
           </div>
         </div>
+
+        <CustomFieldsSection
+          tableName={sheetTableName}
+          millId={millId}
+          values={customFields}
+          onChange={(key, value) => setCustomFields((p) => ({ ...p, [key]: value }))}
+        />
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>

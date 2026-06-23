@@ -99,3 +99,6 @@ from app.models.quality_forms import (
     QmPwseCheck, QmBlendTest,
     QmBagWeightCheck, QmPaperConeCheck,
 )
+
+from app.models.custom_fields import CustomFieldDefinition
+
