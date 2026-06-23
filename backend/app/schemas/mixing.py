@@ -353,7 +353,7 @@ class SpliceQualityOut(BaseModel):
 
 class ManpowerPlanCreate(BaseModel):
     date: str
-    shift: str = Field(..., pattern="^(A|B|C)$")
+    shift: str
     department: str
     planned_count: int = Field(..., ge=0)
     actual_count: int = 0

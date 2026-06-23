@@ -104,7 +104,7 @@ class ProductionEntryResponse(BaseModel):
 
 class ProductionEntryCreate(BaseModel):
     date: str
-    shift: str = Field(..., pattern="^(A|B|C)$")
+    shift: str
     # Optional 2-hour block within shift: "08:00", "10:00", "12:00", "14:00"
     hour_block: Optional[str] = None
     machine_code: str
@@ -199,7 +199,7 @@ class ProductionBulkItem(BaseModel):
 
 class ProductionBulkCreate(BaseModel):
     date: str
-    shift: str = Field(..., pattern="^(A|B|C)$")
+    shift: str
     department: str
     entries: List[ProductionBulkItem]
 

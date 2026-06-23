@@ -34,7 +34,7 @@ class WasteEntry(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
-    shift: Mapped[str] = mapped_column(String(1), nullable=False)
+    shift: Mapped[str] = mapped_column(String(20), nullable=False)
     department: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     machine_code: Mapped[str] = mapped_column(String(50), nullable=False)
     lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -60,7 +60,7 @@ class RFManpowerPlan(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
-    shift: Mapped[str] = mapped_column(String(1), nullable=False)
+    shift: Mapped[str] = mapped_column(String(20), nullable=False)
     # category: line_man | doffer | house_keeper | pneumafil_collection |
     #           floor_cleaner | gripperman | cope_carrier | robo_doffer |
     #           roving_carrier | maintenance_assi

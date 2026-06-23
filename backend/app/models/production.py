@@ -77,7 +77,7 @@ class ProductionEntry(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
-    shift: Mapped[str] = mapped_column(String(1), nullable=False)
+    shift: Mapped[str] = mapped_column(String(20), nullable=False)
     # v2: hour block within shift e.g. "08:00", "10:00", "12:00", "14:00"
     hour_block: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     # machine_code: string reference to machines.code; DB FK dropped in migration 023

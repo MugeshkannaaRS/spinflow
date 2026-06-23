@@ -39,7 +39,7 @@ class DatalogStopCodeUpdate(BaseModel):
 
 class WasteEntryCreate(BaseModel):
     date: str
-    shift: str = Field(..., pattern="^(A|B|C)$")
+    shift: str
     department: str
     machine_code: str
     waste_type: Optional[str] = None
@@ -65,7 +65,7 @@ class WasteEntryBulkItem(BaseModel):
 
 class WasteEntryBulkCreate(BaseModel):
     date: str
-    shift: str = Field(..., pattern="^(A|B|C)$")
+    shift: str
     department: str
     entries: List[WasteEntryBulkItem]
 
@@ -144,7 +144,7 @@ class RFManpowerCreate(BaseModel):
 
 class RFManpowerBulkCreate(BaseModel):
     date: str
-    shift: str = Field(..., pattern="^(A|B|C)$")
+    shift: str
     rows: List[RFManpowerCreate]
 
 
