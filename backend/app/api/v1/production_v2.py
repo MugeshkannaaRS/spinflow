@@ -652,170 +652,223 @@ async def download_rf_manpower_pdf(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("production")),
 ):
-    """Generate Learner Allocation sheet PDF for a given date + shift."""
+    """
+    Generate Learner Allocation letterhead PDF.
+    One page per (date × shift) combination, categories grouped with sub-rows per MC range.
+    """
     import io
+    from collections import defaultdict
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
     from reportlab.lib.units import mm
     from reportlab.pdfgen import canvas as rl_canvas
-    from reportlab.platypus import Table, TableStyle
 
     effective_mill_id = await _resolve_mill(current_user, db, mill_id)
 
-    # Fetch mill details
+    # ── Mill info ────────────────────────────────────────────────────
     mill = (await db.execute(select(Mill).where(Mill.id == effective_mill_id))).scalar_one_or_none()
-    mill_name = mill.name if mill else "SpinFlow Mill"
-    mill_address = " ".join(filter(None, [mill.city if mill else None, mill.address if mill else None])) or ""
+    mill_name    = (mill.name    if mill else "SpinFlow Mill").upper()
+    mill_address = ", ".join(filter(None, [
+        mill.address if mill else None,
+        mill.city    if mill else None,
+        mill.state   if mill else None,
+    ])) if mill else ""
 
-    # Fetch all manpower records for date+shift
+    # ── Fetch records ────────────────────────────────────────────────
     q = (
         select(RFManpowerPlan)
-        .where(RFManpowerPlan.mill_id == effective_mill_id, RFManpowerPlan.date == date, RFManpowerPlan.shift == shift)
-        .order_by(RFManpowerPlan.category)
+        .where(
+            RFManpowerPlan.mill_id == effective_mill_id,
+            RFManpowerPlan.date == date,
+            RFManpowerPlan.shift == shift,
+        )
+        .order_by(RFManpowerPlan.category, RFManpowerPlan.mc_id_from)
     )
     records = (await db.execute(q)).scalars().all()
 
-    # Group by department (using mc_id_from prefix or category)
-    from collections import defaultdict
-    dept_map: dict = defaultdict(list)
-    for r in records:
-        dept_label = r.category.split("_")[0].upper() if "_" in r.category else r.category.upper()
-        dept_map[r.category].append(r)
-
-    grand_total = sum(r.headcount for r in records)
-
-    # ── PDF generation ──────────────────────────────────────────────
-    W, H = A4
-    buf = io.BytesIO()
-    c = rl_canvas.Canvas(buf, pagesize=A4)
-
-    def draw_border(c, x, y, w, h):
-        c.rect(x, y, w, h)
-
-    def header(c, page_num=1):
-        c.setFont("Helvetica-Bold", 14)
-        c.drawCentredString(W / 2, H - 18 * mm, mill_name)
-        c.setFont("Helvetica", 8)
-        c.drawCentredString(W / 2, H - 24 * mm, mill_address)
-        c.setFont("Helvetica-Bold", 12)
-        c.drawCentredString(W / 2, H - 31 * mm, "Learner Allocation")
-        c.setFont("Helvetica", 9)
-        c.drawString(14 * mm, H - 38 * mm, f"Date: {date}")
-        c.drawString(80 * mm, H - 38 * mm, f"Shift: {shift}")
-        c.drawString(150 * mm, H - 38 * mm, f"Page: {page_num}")
-        c.line(10 * mm, H - 41 * mm, W - 10 * mm, H - 41 * mm)
-
-    header(c)
-
-    y = H - 48 * mm
-    col_w = [28 * mm, 28 * mm, 22 * mm, 22 * mm, 80 * mm]  # M/C From, M/C To, Headcount, Machines/Person, Assignments
-    x0 = 10 * mm
-    row_h = 7 * mm
-    small_font = 7
-
-    def draw_section_header(c, y, dept_name):
-        c.setFillColor(colors.HexColor("#1e3a5f"))
-        c.rect(x0, y - 5 * mm, W - 20 * mm, 5.5 * mm, fill=1, stroke=0)
-        c.setFillColor(colors.white)
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(x0 + 2 * mm, y - 3.5 * mm, dept_name.upper())
-        c.setFillColor(colors.black)
-        return y - 6 * mm
-
-    def draw_table_header(c, y):
-        hdrs = ["M/C From", "M/C To", "Headcount", "M/Person", "Assignments (Name · Emp ID · M/C Range)"]
-        c.setFillColor(colors.HexColor("#e8edf4"))
-        c.rect(x0, y - row_h, W - 20 * mm, row_h, fill=1, stroke=1)
-        c.setFillColor(colors.black)
-        c.setFont("Helvetica-Bold", small_font)
-        cx = x0 + 1 * mm
-        for i, hdr in enumerate(hdrs):
-            c.drawString(cx, y - row_h + 2 * mm, hdr)
-            cx += col_w[i]
-        return y - row_h
-
-    def draw_row(c, y, row, alt=False):
-        nonlocal records
-        if alt:
-            c.setFillColor(colors.HexColor("#f7f9fc"))
-            c.rect(x0, y - row_h, W - 20 * mm, row_h, fill=1, stroke=0)
-            c.setFillColor(colors.black)
-        c.rect(x0, y - row_h, W - 20 * mm, row_h)
-
-        c.setFont("Helvetica", small_font)
-        cx = x0 + 1 * mm
-        vals = [
-            row.mc_id_from or "—",
-            row.mc_id_to or "—",
-            str(row.headcount),
-            str(row.machines_per_person or "—"),
-        ]
-        for i, v in enumerate(vals):
-            c.drawString(cx, y - row_h + 2 * mm, v)
-            cx += col_w[i]
-
-        # Assignments inline
-        assignments = row.assignments or []
-        asgn_parts = []
-        for a in assignments:
-            parts = [a.get("name", ""), a.get("emp_id", "")]
-            mc = f"{a.get('mc_from','')}–{a.get('mc_to','')}" if a.get("mc_from") else ""
-            if mc:
-                parts.append(mc)
-            asgn_parts.append("  ·  ".join(p for p in parts if p))
-        asgn_text = "   |   ".join(asgn_parts) if asgn_parts else "—"
-        # Truncate if too long
-        max_chars = 70
-        if len(asgn_text) > max_chars:
-            asgn_text = asgn_text[:max_chars] + "…"
-        c.drawString(cx, y - row_h + 2 * mm, asgn_text)
-        return y - row_h
-
-    PAGE_BOTTOM = 45 * mm  # leave space for signatures
-
-    def check_page(c, y):
-        nonlocal page_num
-        if y < PAGE_BOTTOM:
-            draw_signatures(c, y)
-            c.showPage()
-            page_num += 1
-            header(c, page_num)
-            y = H - 48 * mm
-        return y
-
-    def draw_signatures(c, y):
-        sig_y = 20 * mm
-        c.line(10 * mm, sig_y + 8 * mm, W - 10 * mm, sig_y + 8 * mm)
-        roles = ["Prepared by", "APO/DPO(T)", "DM(R)", "M(P)", "Sr.M(P)", "AGM"]
-        slot_w = (W - 20 * mm) / len(roles)
-        c.setFont("Helvetica", 7)
-        for i, role in enumerate(roles):
-            rx = 10 * mm + i * slot_w + slot_w / 2
-            c.drawCentredString(rx, sig_y, role)
-        # Grand total box
-        c.setFont("Helvetica-Bold", 9)
-        c.drawString(W - 60 * mm, sig_y + 4 * mm, f"Grand Total = {grand_total}")
-
-    page_num = 1
-
-    # Group records by category label
+    # ── Group by category ────────────────────────────────────────────
     cat_groups: dict = defaultdict(list)
     for r in records:
         cat_label = RF_CATEGORY_LABELS.get(r.category, r.category.replace("_", " ").title())
-        # Use mc_id_from prefix as dept grouping if available
         cat_groups[cat_label].append(r)
 
-    for dept_label, dept_records in cat_groups.items():
-        y = check_page(c, y)
-        y = draw_section_header(c, y, dept_label)
-        y = check_page(c, y)
-        y = draw_table_header(c, y)
-        for i, r in enumerate(dept_records):
-            y = check_page(c, y)
-            y = draw_row(c, y, r, alt=(i % 2 == 1))
-        y -= 2 * mm  # gap between sections
+    grand_total = sum(r.headcount for r in records)
 
-    draw_signatures(c, y)
+    # ── Layout constants ─────────────────────────────────────────────
+    W, H    = A4
+    M       = 12 * mm          # page margin
+    x0      = M
+    pw      = W - 2 * M        # printable width
+    ROW_H   = 6.5 * mm
+    SEC_H   = 6 * mm
+    HDR_H   = 6 * mm
+    FONT_SM = 7
+    FONT_MD = 8
+    FONT_LG = 11
+    NAVY    = colors.HexColor("#1e3a5f")
+    LTBLUE  = colors.HexColor("#e8edf4")
+    ALT     = colors.HexColor("#f4f7fb")
+    BLACK   = colors.black
+    WHITE   = colors.white
+
+    # Column widths — MC From | MC To | HC | M/P | Supervisor | Assignments
+    CW = [22*mm, 22*mm, 16*mm, 16*mm, 28*mm, pw - 22*mm - 22*mm - 16*mm - 16*mm - 28*mm]
+
+    buf = io.BytesIO()
+    c   = rl_canvas.Canvas(buf, pagesize=A4)
+    page_num = [1]
+
+    def new_page(show_prev=True):
+        if show_prev:
+            _draw_footer(c)
+            c.showPage()
+        page_num[0] += 1
+        _draw_letterhead(c)
+
+    def _draw_letterhead(cv):
+        # Outer border
+        cv.setStrokeColor(NAVY)
+        cv.setLineWidth(1.5)
+        cv.rect(M - 2*mm, 18*mm, pw + 4*mm, H - 22*mm, fill=0)
+        cv.setLineWidth(0.5)
+
+        # Mill name
+        cv.setFont("Helvetica-Bold", FONT_LG + 3)
+        cv.setFillColor(NAVY)
+        cv.drawCentredString(W/2, H - 20*mm, mill_name)
+
+        # Address
+        cv.setFont("Helvetica", FONT_MD - 1)
+        cv.setFillColor(BLACK)
+        cv.drawCentredString(W/2, H - 26*mm, mill_address)
+
+        # Title bar
+        cv.setFillColor(NAVY)
+        cv.rect(x0, H - 34*mm, pw, 8*mm, fill=1, stroke=0)
+        cv.setFillColor(WHITE)
+        cv.setFont("Helvetica-Bold", FONT_LG)
+        cv.drawCentredString(W/2, H - 29.5*mm, "LEARNER ALLOCATION")
+        cv.setFillColor(BLACK)
+
+        # Meta row
+        meta_y = H - 39*mm
+        cv.setFont("Helvetica-Bold", FONT_SM)
+        cv.drawString(x0, meta_y, f"Date:  {date}")
+        cv.drawCentredString(W/2, meta_y, f"Shift:  {shift}")
+        cv.drawRightString(x0 + pw, meta_y, f"Page {page_num[0]}")
+
+        # Divider
+        cv.setStrokeColor(NAVY)
+        cv.line(x0, H - 41*mm, x0 + pw, H - 41*mm)
+
+    def _draw_footer(cv):
+        fy = 22*mm
+        cv.setStrokeColor(NAVY)
+        cv.line(x0, fy + 5*mm, x0 + pw, fy + 5*mm)
+        roles = ["Prepared by", "APO/DPO(T)", "DM(R)", "M(P)", "Sr.M(P)", "AGM"]
+        sw = pw / len(roles)
+        cv.setFont("Helvetica", FONT_SM - 1)
+        cv.setFillColor(BLACK)
+        for i, role in enumerate(roles):
+            cv.drawCentredString(x0 + i*sw + sw/2, fy, role)
+        # Grand total
+        cv.setFont("Helvetica-Bold", FONT_MD)
+        cv.setFillColor(NAVY)
+        cv.drawRightString(x0 + pw, fy + 7*mm, f"Grand Total = {grand_total} persons")
+        cv.setFillColor(BLACK)
+
+    def _col_headers(cv, y):
+        hdrs = ["MC From", "MC To", "HC", "M/P", "Supervisor", "Assignments  (Name · Emp ID · MC Range)"]
+        cv.setFillColor(LTBLUE)
+        cv.rect(x0, y - HDR_H, pw, HDR_H, fill=1, stroke=1)
+        cv.setFillColor(NAVY)
+        cv.setFont("Helvetica-Bold", FONT_SM)
+        cx = x0 + 1.5*mm
+        for i, hdr in enumerate(hdrs):
+            cv.drawString(cx, y - HDR_H + 1.8*mm, hdr)
+            cx += CW[i]
+        cv.setFillColor(BLACK)
+        return y - HDR_H
+
+    def _data_row(cv, y, row, alt=False):
+        if alt:
+            cv.setFillColor(ALT)
+            cv.rect(x0, y - ROW_H, pw, ROW_H, fill=1, stroke=0)
+            cv.setFillColor(BLACK)
+        cv.setStrokeColor(colors.HexColor("#d0d8e4"))
+        cv.rect(x0, y - ROW_H, pw, ROW_H, fill=0, stroke=1)
+        cv.setStrokeColor(BLACK)
+
+        cv.setFont("Helvetica", FONT_SM)
+        cx = x0 + 1.5*mm
+        vals = [
+            row.mc_id_from or "—",
+            row.mc_id_to   or "—",
+            str(row.headcount),
+            str(row.machines_per_person or "—"),
+            row.supervisor or "—",
+        ]
+        for i, v in enumerate(vals):
+            cv.drawString(cx, y - ROW_H + 1.8*mm, str(v))
+            cx += CW[i]
+
+        # Assignments
+        asgns = row.assignments or []
+        parts = []
+        for a in asgns:
+            name   = a.get("name", "")
+            emp_id = a.get("emp_id", "")
+            mc_r   = f"{a.get('mc_from','')}–{a.get('mc_to','')}" if a.get("mc_from") else ""
+            seg = "  ·  ".join(p for p in [name, emp_id, mc_r] if p)
+            if seg:
+                parts.append(seg)
+        asgn_txt = "   |   ".join(parts) if parts else "—"
+        if len(asgn_txt) > 72:
+            asgn_txt = asgn_txt[:72] + "…"
+        cv.drawString(cx, y - ROW_H + 1.8*mm, asgn_txt)
+        return y - ROW_H
+
+    def _section_bar(cv, y, label, sub_total):
+        cv.setFillColor(NAVY)
+        cv.rect(x0, y - SEC_H, pw, SEC_H, fill=1, stroke=0)
+        cv.setFillColor(WHITE)
+        cv.setFont("Helvetica-Bold", FONT_SM + 1)
+        cv.drawString(x0 + 2*mm, y - SEC_H + 1.5*mm, label.upper())
+        cv.drawRightString(x0 + pw - 2*mm, y - SEC_H + 1.5*mm, f"Total: {sub_total}")
+        cv.setFillColor(BLACK)
+        return y - SEC_H
+
+    def need_space(y, n_rows):
+        """True if there's room for section bar + col hdr + n_rows without hitting footer."""
+        needed = SEC_H + HDR_H + n_rows * ROW_H + 2*mm
+        return y - needed >= 26*mm
+
+    # ── Draw ─────────────────────────────────────────────────────────
+    _draw_letterhead(c)
+    y = H - 43*mm
+
+    for cat_label, cat_records in cat_groups.items():
+        sub_total = sum(r.headcount for r in cat_records)
+
+        # If not enough space for at least the bar + header + 1 row, new page
+        if not need_space(y, 1):
+            new_page()
+            y = H - 43*mm
+
+        y = _section_bar(c, y, cat_label, sub_total)
+        y = _col_headers(c, y)
+
+        for i, row in enumerate(cat_records):
+            if y - ROW_H < 26*mm:
+                new_page()
+                y = H - 43*mm
+                y = _section_bar(c, y, cat_label + " (cont.)", sub_total)
+                y = _col_headers(c, y)
+            y = _data_row(c, y, row, alt=(i % 2 == 1))
+
+        y -= 3*mm  # gap between categories
+
+    _draw_footer(c)
     c.save()
     buf.seek(0)
 

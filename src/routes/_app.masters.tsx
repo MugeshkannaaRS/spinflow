@@ -539,6 +539,12 @@ function MastersPage() {
                 <StopCodesTab canEdit={canEdit} search={search} />
               </ErrorBoundary>
             </TabsContent>
+
+            <TabsContent value="custom-fields">
+              <ErrorBoundary inline label="Custom Fields">
+                <CustomFieldsManager />
+              </ErrorBoundary>
+            </TabsContent>
           </Tabs>
         </div>
 
