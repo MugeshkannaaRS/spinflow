@@ -172,6 +172,36 @@ function MastersPage() {
       .catch(() => toast.error("Failed to deactivate warehouse"));
   }
 
+  async function deleteDepartment(id: string) {
+    await mastersApi.deleteDepartment(id);
+    qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
+  }
+  async function deleteYarnCount(id: string) {
+    await mastersApi.deleteYarnCount(id);
+    qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
+  }
+  async function deleteCustomer(id: string) {
+    await api.delete(`/masters/customers/${id}`);
+    qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
+  }
+  async function deleteVehicle(id: string) {
+    await mastersApi.deleteVehicle(id);
+    qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
+  }
+  async function deleteRoute(id: string) {
+    await mastersApi.deleteRoute(id);
+    qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
+  }
+  async function deleteWarehouse(id: string) {
+    await inventoryApi.deleteWarehouse(id);
+    qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
+  }
+  async function deleteShift(id: string) {
+    await api.delete(`/production/shifts/${id}`);
+    qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
+    qcMasters.invalidateQueries({ queryKey: ["mill-masters"] });
+  }
+
   // ── Single bulk fetch — replaces 10 individual API calls ────────────────────
   const allMastersQ = useQuery({
     queryKey: ["masters", "all"],
@@ -373,7 +403,7 @@ function MastersPage() {
                   canEdit={canEdit}
                   onAdd={<DepartmentForm mills={millsData} />}
                   onEdit={(item) => <DepartmentForm item={item} mills={millsData} />}
-                  onDeactivate={canEdit ? deactivateDepartment : undefined}
+                  onDelete={canEdit ? deleteDepartment : undefined}
                 />
               </ErrorBoundary>
             </TabsContent>
@@ -393,7 +423,7 @@ function MastersPage() {
                   canEdit={canEdit}
                   onAdd={<YarnCountForm mills={millsData} />}
                   onEdit={(item) => <YarnCountForm item={item} mills={millsData} />}
-                  onDeactivate={canEdit ? deactivateYarnCount : undefined}
+                  onDelete={canEdit ? deleteYarnCount : undefined}
                 />
               </ErrorBoundary>
             </TabsContent>
@@ -414,7 +444,7 @@ function MastersPage() {
                   canEdit={canEdit}
                   onAdd={<CustomerForm mills={millsData} />}
                   onEdit={(item) => <CustomerForm item={item} mills={millsData} />}
-                  onDeactivate={canEdit ? deactivateCustomer : undefined}
+                  onDelete={canEdit ? deleteCustomer : undefined}
                   headerExtra={canEdit ? <ImportCustomersDialog /> : undefined}
                 />
               </ErrorBoundary>
@@ -436,7 +466,7 @@ function MastersPage() {
                   canEdit={canEdit}
                   onAdd={<VehicleForm mills={millsData} />}
                   onEdit={(item) => <VehicleForm item={item} mills={millsData} />}
-                  onDeactivate={canEdit ? deactivateVehicle : undefined}
+                  onDelete={canEdit ? deleteVehicle : undefined}
                 />
               </ErrorBoundary>
             </TabsContent>
@@ -457,7 +487,7 @@ function MastersPage() {
                   canEdit={canEdit}
                   onAdd={<RouteForm mills={millsData} />}
                   onEdit={(item) => <RouteForm item={item} mills={millsData} />}
-                  onDeactivate={canEdit ? deactivateRoute : undefined}
+                  onDelete={canEdit ? deleteRoute : undefined}
                 />
               </ErrorBoundary>
             </TabsContent>
@@ -477,6 +507,7 @@ function MastersPage() {
                   canEdit={canEdit}
                   onAdd={<ShiftForm />}
                   onEdit={(item) => <ShiftForm item={item} />}
+                  onDelete={canEdit ? deleteShift : undefined}
                 />
               </ErrorBoundary>
             </TabsContent>
@@ -496,7 +527,7 @@ function MastersPage() {
                   canEdit={canEdit}
                   onAdd={<WarehouseForm />}
                   onEdit={(item) => <WarehouseForm item={item} />}
-                  onDeactivate={canEdit ? deactivateWarehouse : undefined}
+                  onDelete={canEdit ? deleteWarehouse : undefined}
                 />
               </ErrorBoundary>
             </TabsContent>
@@ -583,6 +614,7 @@ function MasterTable<T = any>({
   onAdd,
   onEdit,
   onDeactivate,
+  onDelete,
   extraActions,
   headerExtra,
 }: {
@@ -595,6 +627,7 @@ function MasterTable<T = any>({
   onAdd: React.ReactElement;
   onEdit: (item: T) => React.ReactElement;
   onDeactivate?: (id: string) => void;
+  onDelete?: (id: string) => Promise<void>;
   extraActions?: (item: T) => React.ReactElement;
   headerExtra?: React.ReactNode;
 }) {
@@ -689,8 +722,18 @@ function MasterTable<T = any>({
                           </button>
                         )}
                         {extraActions?.(item)}
-                        {/* Deactivate — confirm then call */}
-                        {canEdit && onDeactivate && (
+                        {/* Hard delete — ConfirmDeleteButton */}
+                        {canEdit && onDelete && (
+                          <ConfirmDeleteButton
+                            onConfirm={() => onDelete(id)}
+                            label={`Delete this ${singularize(title).toLowerCase()}?`}
+                            title={`Delete ${singularize(title)}?`}
+                            confirmText="Delete"
+                            successMessage={`${singularize(title)} deleted`}
+                          />
+                        )}
+                        {/* Deactivate — confirm then call (only when no hard delete) */}
+                        {canEdit && onDeactivate && !onDelete && (
                           <button
                             title={
                               row[activeKey ?? "is_active"] ? "Deactivate" : "Already inactive"

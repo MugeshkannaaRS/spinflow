@@ -332,6 +332,24 @@ async def update_shift(
     return shift
 
 
+@router.delete("/production/shifts/{shift_id}", status_code=204)
+async def delete_shift(
+    shift_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id")
+    q = select(Shift).where(Shift.id == shift_id)
+    if mill_id:
+        q = q.where(Shift.mill_id == mill_id)
+    row = (await db.execute(q)).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Shift not found")
+    await db.delete(row)
+    await db.commit()
+
+
 @router.get("/production/entries")
 async def get_entries(
     date: Optional[str] = Query(None),
