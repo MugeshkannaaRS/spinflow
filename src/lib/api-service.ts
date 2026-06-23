@@ -167,6 +167,8 @@ export const productionApi = {
   getDowntimeLogs: (params?: Record<string, any>) =>
     api.get("/production/downtime", { params }).then((r: any) => r.data),
   deleteDowntime: (id: string) => api.delete(`/production/downtime/${id}`).then((r) => r.data),
+  deleteWasteEntry: (id: string) => api.delete(`/production/waste-entries/${id}`),
+  deleteRFManpower: (id: string) => api.delete(`/production/rf-manpower/${id}`),
 };
 
 // Quality

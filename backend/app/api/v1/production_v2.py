@@ -371,6 +371,22 @@ async def approve_waste_entry(
     return entry
 
 
+@router.delete("/production/waste-entries/{entry_id}", status_code=204)
+async def delete_waste_entry(
+    entry_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    mill_id = await _resolve_mill(current_user, db)
+    row = (await db.execute(
+        select(WasteEntry).where(WasteEntry.id == entry_id, WasteEntry.mill_id == mill_id)
+    )).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Waste entry not found")
+    await db.delete(row)
+    await db.commit()
+
+
 # ------------------------------------------------------------------ #
 # Waste type history (autocomplete source)                             #
 # ------------------------------------------------------------------ #
@@ -606,6 +622,22 @@ async def upsert_rf_manpower_bulk(
 
     await db.commit()
     return {"upserted": upserted, "errors": errors}
+
+
+@router.delete("/production/rf-manpower/{plan_id}", status_code=204)
+async def delete_rf_manpower(
+    plan_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("production", write=True)),
+):
+    mill_id = await _resolve_mill(current_user, db)
+    row = (await db.execute(
+        select(RFManpowerPlan).where(RFManpowerPlan.id == plan_id, RFManpowerPlan.mill_id == mill_id)
+    )).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Manpower record not found")
+    await db.delete(row)
+    await db.commit()
 
 
 # ================================================================== #

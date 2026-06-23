@@ -1886,6 +1886,7 @@ function WasteGrid() {
                     <TableHead>Waste kg</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Entered By</TableHead>
+                    <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1901,6 +1902,18 @@ function WasteGrid() {
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {e.entered_by}
+                      </TableCell>
+                      <TableCell>
+                        <ConfirmDeleteButton
+                          onConfirm={async () => {
+                            await productionApi.deleteWasteEntry(e.id);
+                            qc.invalidateQueries({ queryKey: ["waste-entries"] });
+                          }}
+                          label={`Delete waste entry for ${e.machine_code}?`}
+                          title="Delete Waste Entry?"
+                          confirmText="Delete"
+                          successMessage="Entry deleted"
+                        />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -4237,6 +4250,29 @@ function ProductionReportsTab() {
   const [shift, setShift] = useState<string>("_all");
   const [department, setDepartment] = useState<string>("");
   const [machineCode, setMachineCode] = useState<string>("");
+  const qc = useQueryClient();
+
+  async function handleReportDelete(row: any) {
+    if (recordType === "wastage") {
+      await productionApi.deleteWasteEntry(row.id);
+      qc.invalidateQueries({ queryKey: ["prod-report-wastage"] });
+      qc.invalidateQueries({ queryKey: ["waste-entries"] });
+    } else if (recordType === "entries") {
+      await api.delete(`/production/entries/${row.id}`);
+      qc.invalidateQueries({ queryKey: ["prod-report-entries"] });
+      qc.invalidateQueries({ queryKey: ["shifts"] });
+    } else if (recordType === "stoppage") {
+      await productionApi.deleteDowntime(row.id);
+      qc.invalidateQueries({ queryKey: ["prod-report-stoppage"] });
+      qc.invalidateQueries({ queryKey: ["downtime"] });
+    } else if (recordType === "packing") {
+      await api.delete(`/production/packing/entries/${row.id}`);
+      qc.invalidateQueries({ queryKey: ["prod-report-packing"] });
+    } else if (recordType === "manpower") {
+      await productionApi.deleteRFManpower(row.id);
+      qc.invalidateQueries({ queryKey: ["prod-report-manpower"] });
+    }
+  }
 
   const { data: millMasters } = useMillMasters();
   // Auto-select first shift from Masters when loaded
@@ -4538,6 +4574,7 @@ function ProductionReportsTab() {
                         {c.label}
                       </TableHead>
                     ))}
+                    <TableHead className="w-10"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -4566,6 +4603,17 @@ function ProductionReportsTab() {
                           </TableCell>
                         );
                       })}
+                      <TableCell className="px-2">
+                        {row.id && (
+                          <ConfirmDeleteButton
+                            onConfirm={() => handleReportDelete(row)}
+                            label="Delete this record?"
+                            title="Delete Record?"
+                            confirmText="Delete"
+                            successMessage="Record deleted"
+                          />
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
