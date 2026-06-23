@@ -8,7 +8,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "052"
-down_revision = "051"
+down_revision = "051_machine_waste_type_templates"
 branch_labels = None
 depends_on = None
 

@@ -60,6 +60,7 @@ import {
   Layers,
   PowerOff,
   FileText,
+  FileDown,
   Settings2,
   X,
 } from "lucide-react";
@@ -3822,6 +3823,33 @@ function ManpowerGrid() {
             >
               <Settings2 className="size-3.5 mr-1.5" />
               Manage
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!date || !shift}
+              onClick={async () => {
+                try {
+                  const params = new URLSearchParams({ date, shift });
+                  if (millId) params.set("mill_id", millId);
+                  const { api } = await import("@/lib/api");
+                  const res = await api.get(`/production/rf-manpower/pdf`, {
+                    params: Object.fromEntries(params),
+                    responseType: "blob",
+                  });
+                  const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `learner_allocation_${date}_${shift}.pdf`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch {
+                  toast.error("Could not generate PDF");
+                }
+              }}
+            >
+              <FileDown className="size-3.5 mr-1.5" />
+              Download Sheet
             </Button>
             <Button
               size="sm"
