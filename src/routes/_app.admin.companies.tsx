@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, adminApi } from "@/lib/api-service";
 import { api } from "@/lib/api";
@@ -37,8 +37,8 @@ import {
   Blocks,
   Ban,
   Pencil,
-  Download,
-  Upload,
+  ArrowDownToLine,
+  ArrowUpFromLine,
   CheckCircle,
   AlertTriangle,
 } from "lucide-react";
@@ -146,6 +146,8 @@ function CompaniesPage() {
   const user = useAuth((s) => s.user);
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isChildRoute = pathname !== "/admin/companies";
 
   const [editCompany, setEditCompany] = useState<Company | null>(null);
   const [modulesCompany, setModulesCompany] = useState<Company | null>(null);
@@ -166,13 +168,26 @@ function CompaniesPage() {
     }
   };
 
+  const handleImport = () => {
+    // Open file picker for Excel import
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".xlsx,.xls,.csv";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      toast.info("Import via Import Hub — go to Import Hub → Companies to bulk-upload companies.");
+    };
+    input.click();
+  };
+
   const handleExport = () => {
     const rows = companiesData.map((c) => ({
       Code: c.code,
       "Company Name": c.name,
-      GSTIN: c.gstin || "\u2014",
-      Phone: c.phone || "\u2014",
-      Email: c.email || "\u2014",
+      GSTIN: c.gstin || "—",
+      Phone: c.phone || "—",
+      Email: c.email || "—",
       "Max Users": c.max_users || 50,
       "Active Users": companyUserCounts[c.id] ?? 0,
       Mills: companyMillCounts[c.id] ?? 0,
@@ -245,6 +260,9 @@ function CompaniesPage() {
     );
   }
 
+  // Render child routes (onboard, $companyId) directly
+  if (isChildRoute) return <Outlet />;
+
   return (
     <div className="p-6">
       {companiesQ.isError && (
@@ -268,7 +286,10 @@ function CompaniesPage() {
           <CardTitle className="text-base">Active Companies ({activeCompanies.length})</CardTitle>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={handleExport}>
-              <Upload className="size-4 mr-1" /> Import
+              <ArrowUpFromLine className="size-4 mr-1" /> Export
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleImport}>
+              <ArrowDownToLine className="size-4 mr-1" /> Import
             </Button>
             <Button size="sm" onClick={() => navigate({ to: "/admin/companies/onboard" as any })}>
               <Plus className="size-4 mr-1" /> Add Company
@@ -493,7 +514,7 @@ function EditCompanyDialog({
     <Dialog open={!!company} onOpenChange={onClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Edit Company \u2014 {company?.name}</DialogTitle>
+          <DialogTitle>Edit Company — {company?.name}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
@@ -606,7 +627,7 @@ function ModulesDialog({
     <Dialog open={!!company} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Module Access \u2014 {company?.name}</DialogTitle>
+          <DialogTitle>Module Access — {company?.name}</DialogTitle>
           <DialogDescription>
             Toggle which modules this company can access based on their plan.
           </DialogDescription>
@@ -617,7 +638,7 @@ function ModulesDialog({
             <span className="text-xs font-bold uppercase tracking-widest text-gray-400">
               Core Modules
             </span>
-            <span className="text-xs text-gray-400">\u2014 included in licence</span>
+            <span className="text-xs text-gray-400">— included in licence</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {CORE_MODULES.map((mod) => (
@@ -644,7 +665,7 @@ function ModulesDialog({
             <span className="text-xs font-bold uppercase tracking-widest text-blue-500">
               Add-On Modules
             </span>
-            <span className="text-xs text-blue-500">\u2014 monthly billing</span>
+            <span className="text-xs text-blue-500">— monthly billing</span>
           </div>
           <div className="space-y-2">
             {ADDON_MODULES.map((mod) => (

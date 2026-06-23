@@ -1988,7 +1988,8 @@ async def action_approval_request(request_id: str, body: dict, current_user: Use
     req = await db.get(ApprovalRequest, request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Approval request not found")
-    if str(req.company_id) != str(current_user.company_id):
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code != "SUPER_ADMIN" and str(req.company_id) != str(current_user.company_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cross-company access denied")
     if req.status != "pending":
         raise HTTPException(status_code=400, detail=f"Request already {req.status}")
@@ -2046,6 +2047,129 @@ async def list_pending_approvals(current_user: User = Depends(get_current_user),
         "current_step": r.current_step_index + 1,
         "created_at": r.created_at.isoformat() if r.created_at else None,
     } for r in result.scalars().all()]
+
+
+@router.get("/approval-requests")
+async def list_approval_requests(
+    status: Optional[str] = None,
+    company_id: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List approval requests with filters. SUPER_ADMIN sees all companies."""
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Only SUPER_ADMIN can list all approval requests")
+
+    conditions = []
+    if status and status != "all":
+        conditions.append(ApprovalRequest.status == status)
+    if company_id:
+        conditions.append(ApprovalRequest.company_id == company_id)
+
+    total_q = select(func.count(ApprovalRequest.id)).where(*conditions)
+    total_res = await db.execute(total_q)
+    total = total_res.scalar_one()
+
+    offset = (page - 1) * page_size
+    result = await db.execute(
+        select(ApprovalRequest)
+        .where(*conditions)
+        .options(selectinload(ApprovalRequest.actions))
+        .order_by(ApprovalRequest.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
+    )
+    requests = result.scalars().all()
+
+    # Enrich with company name and requester name
+    company_ids = list({r.company_id for r in requests})
+    user_ids = list({r.requested_by for r in requests})
+
+    companies_map: dict = {}
+    if company_ids:
+        co_res = await db.execute(select(Company.id, Company.name).where(Company.id.in_(company_ids)))
+        companies_map = {str(r.id): r.name for r in co_res.fetchall()}
+
+    users_map: dict = {}
+    if user_ids:
+        u_res = await db.execute(select(User.id, User.full_name, User.email).where(User.id.in_(user_ids)))
+        users_map = {str(r.id): (r.full_name or r.email) for r in u_res.fetchall()}
+
+    items = []
+    for r in requests:
+        items.append({
+            "id": r.id,
+            "company_id": r.company_id,
+            "company_name": companies_map.get(str(r.company_id), "—"),
+            "workflow_id": r.workflow_id,
+            "entity_type": r.entity_type,
+            "entity_id": r.entity_id,
+            "entity_summary": r.entity_summary,
+            "requested_by": r.requested_by,
+            "requested_by_name": users_map.get(str(r.requested_by), "—"),
+            "status": r.status,
+            "current_step": r.current_step_index + 1,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "timeline": [
+                {
+                    "action": a.action,
+                    "actor_id": a.actor_id,
+                    "performed_by": users_map.get(str(a.actor_id), "—"),
+                    "comment": a.comment,
+                    "created_at": a.created_at.isoformat() if a.created_at else None,
+                }
+                for a in (r.actions or [])
+            ],
+        })
+
+    return {"total": total, "page": page, "page_size": page_size, "items": items}
+
+
+@router.patch("/admin/incidents/{incident_id}")
+async def update_incident(
+    incident_id: str,
+    body: dict,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update incident status, add resolution notes, or close it."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Only SUPER_ADMIN can update incidents")
+
+    inc = await db.get(Incident, incident_id)
+    if not inc:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    from datetime import timezone
+    if "status" in body:
+        inc.status = body["status"]
+    if "title" in body:
+        inc.title = body["title"]
+    if "severity" in body:
+        inc.severity = body["severity"]
+    if "description" in body:
+        inc.description = body["description"]
+    if "resolution_notes" in body:
+        inc.resolution_notes = body["resolution_notes"]
+    if body.get("status") in ("resolved", "closed") and not inc.resolved_at:
+        inc.resolved_at = datetime.now(timezone.utc)
+        if inc.started_at:
+            delta = inc.resolved_at - inc.started_at.replace(tzinfo=timezone.utc) if inc.started_at.tzinfo is None else inc.resolved_at - inc.started_at
+            inc.duration_minutes = int(delta.total_seconds() / 60)
+
+    await db.commit()
+    await log_audit(db, current_user.id, "SUPER_ADMIN", "incident_updated", "admin", inc.id,
+                    f"Incident updated: {inc.status} — {inc.title}", module="admin")
+    return {
+        "id": inc.id, "component": inc.component, "severity": inc.severity, "title": inc.title,
+        "status": inc.status, "started_at": inc.started_at.isoformat() if inc.started_at else None,
+        "resolved_at": inc.resolved_at.isoformat() if inc.resolved_at else None,
+        "duration_minutes": inc.duration_minutes, "resolution_notes": inc.resolution_notes,
+    }
 
 
 # ═══════════════════════════════════════════════════════════════════

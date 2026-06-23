@@ -585,6 +585,27 @@ async def update_column_config(
     )
 
 
+@router.delete("/ui-config/columns")
+async def reset_column_config(
+    table: str = Query(..., description="Table name to reset"),
+    mill_id: str = Query(..., description="Mill ID whose config to delete"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete saved column config for a mill+table so defaults are served on next fetch."""
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Only SUPER_ADMIN can reset column config")
+    await db.execute(
+        delete(ColumnConfig).where(
+            ColumnConfig.mill_id == mill_id,
+            ColumnConfig.table_key == table,
+        )
+    )
+    await db.commit()
+    return {"success": True, "table": table, "mill_id": mill_id}
+
+
 @router.get("/ui-config/dropdown-options", response_model=dict)
 async def get_dropdown_options(
     table: str = Query(...),

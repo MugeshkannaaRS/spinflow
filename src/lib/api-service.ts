@@ -782,9 +782,12 @@ export const adminApi = {
     api.get("/admin/health/history", { params: { days: days ?? 7 } }).then((r) => r.data),
   getIncidents: (params?: any) => api.get("/admin/incidents", { params }).then((r) => r.data),
   createIncident: (data: any) => api.post("/admin/incidents", data).then((r) => r.data),
+  updateIncident: (id: string, data: any) => api.patch(`/admin/incidents/${id}`, data).then((r) => r.data),
   getBackups: () => api.get("/admin/backups").then((r) => r.data),
   triggerBackup: () => api.post("/admin/backup").then((r) => r.data),
   restoreBackup: (id: string) => api.post(`/admin/backup/${id}/restore`).then((r) => r.data),
+  resetColumnConfig: (table: string, millId: string) =>
+    api.delete("/ui-config/columns", { params: { table, mill_id: millId } }).then((r) => r.data),
   getCompanyGrowth: (params?: any) =>
     api.get("/admin/analytics/company-growth", { params }).then((r) => r.data),
   getModuleAdoption: () => api.get("/admin/analytics/module-adoption").then((r) => r.data),

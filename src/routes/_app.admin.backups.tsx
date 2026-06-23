@@ -295,15 +295,20 @@ function BackupCenterPage() {
                       </a>
                     </Button>
                   )}
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    className="flex-1"
-                    onClick={() => restoreMutation.mutate(selectedBackup.id)}
-                    disabled={restoreMutation.isPending}
-                  >
-                    <Upload className="size-3.5 mr-1" /> Restore
-                  </Button>
+                  <div className="flex-1 group relative">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full text-gray-400 border-gray-200 cursor-not-allowed opacity-60"
+                      disabled
+                      title="Restore is not yet available — contact engineering to perform a manual restore"
+                    >
+                      <Upload className="size-3.5 mr-1" /> Restore
+                    </Button>
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-[10px] text-white shadow z-10">
+                      Restore not yet available — contact engineering
+                    </span>
+                  </div>
                 </div>
               </CardContent>
             </Card>

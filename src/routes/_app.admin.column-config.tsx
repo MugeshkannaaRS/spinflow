@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { mastersApi } from "@/lib/api-service";
+import { mastersApi, adminApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
 import { AccessGuard } from "@/components/AccessGuard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -204,6 +204,18 @@ function ColumnConfigPage() {
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.detail ?? "Failed to save");
+    },
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: () => adminApi.resetColumnConfig(selectedTable, selectedMillId),
+    onSuccess: () => {
+      toast.success("Reset to defaults — config deleted from DB");
+      setColumns([]);
+      qc.invalidateQueries({ queryKey: ["column-config-admin"] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.detail ?? "Reset failed");
     },
   });
 
@@ -491,12 +503,14 @@ function ColumnConfigPage() {
                     size="sm"
                     className="h-7 text-xs text-amber-600 border-amber-200 hover:bg-amber-50"
                     onClick={() => {
-                      setColumns([]);
-                      qc.invalidateQueries({ queryKey: ["column-config-admin"] });
+                      if (!selectedMillId) { toast.error("Select a mill first"); return; }
+                      if (!window.confirm("Reset to system defaults? This will delete the custom config from the database.")) return;
+                      resetMutation.mutate();
                     }}
-                    disabled={columns.length === 0}
+                    disabled={!selectedMillId || resetMutation.isPending}
                   >
-                    <RotateCcw className="size-3 mr-1" /> Reset to Defaults
+                    <RotateCcw className="size-3 mr-1" />
+                    {resetMutation.isPending ? "Resetting…" : "Reset to Defaults"}
                   </Button>
                   <div className="ml-auto">
                     <Button size="sm" className="h-7 text-xs" onClick={() => setAddFieldOpen(true)}>
