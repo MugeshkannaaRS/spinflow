@@ -332,6 +332,7 @@ async def create_waste_entries_bulk(
                 shift=req.shift,
                 department=req.department,
                 machine_code=item.machine_code,
+                entry_type=item.entry_type,
                 lot_no=item.lot_no,
                 ratio=item.ratio,
                 target_kg=item.target_kg,

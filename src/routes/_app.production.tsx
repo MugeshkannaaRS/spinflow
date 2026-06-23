@@ -1315,35 +1315,28 @@ function WasteGrid() {
         };
         await productionApi.upsertWasteTypeTemplate(templatePayload).catch(() => {/* non-blocking */});
 
-        // Create entries: each machine × each active waste type row
-        const calls = machineCodes.flatMap((mc: string) =>
-          activeGroupRows.map((gr) =>
-            productionApi.createWasteBulk(
-              {
-                date,
-                shift,
-                department,
-                entries: [
-                  {
-                    machine_code: mc,
-                    waste_type: gr.wasteType || undefined,
-                    lot_no: gr.lotNo || undefined,
-                    ratio: gr.ratio || undefined,
-                    waste_kg: Number(gr.wasteKg),
-                    remarks: gr.remarks || undefined,
-                    custom_fields: wasteCustomFields ?? {},
-                  },
-                ],
-              },
-              millId ?? undefined,
-            ),
-          ),
+        // Department/section mode: one entry per waste type for the whole section (not per machine)
+        // machine_code = "ALL", entry_type = "department"
+        const result = await productionApi.createWasteBulk(
+          {
+            date,
+            shift,
+            department,
+            entries: activeGroupRows.map((gr) => ({
+              machine_code: "ALL",
+              entry_type: "department",
+              waste_type: gr.wasteType || undefined,
+              lot_no: gr.lotNo || undefined,
+              ratio: gr.ratio || undefined,
+              waste_kg: Number(gr.wasteKg),
+              remarks: gr.remarks || undefined,
+              custom_fields: wasteCustomFields ?? {},
+            })),
+          },
+          millId ?? undefined,
         );
-        const results = await Promise.allSettled(calls);
-        const succeeded = results.filter((r) => r.status === "fulfilled").length;
-        if (succeeded === 0) throw new Error("All submissions failed");
-        toast.success(`Waste logged: ${activeGroupRows.length} type(s) × ${machineCodes.length} machines`);
-        return { created: succeeded };
+        toast.success(`Section waste logged: ${activeGroupRows.length} type(s) for ${department}`);
+        return result;
       } else {
         // Individual mode: per-machine multi-entry table
         const flatEntries: any[] = [];
@@ -1353,6 +1346,7 @@ function WasteGrid() {
             if (Number(e.wasteKg) > 0) {
               flatEntries.push({
                 machine_code: row.machineCode,
+                entry_type: "machine",
                 waste_type: e.wasteType || undefined,
                 lot_no: e.lotNo || undefined,
                 ratio: e.ratio || undefined,
@@ -4248,6 +4242,7 @@ const PROD_REPORT_COLS: Record<ReportRecordType, { key: string; label: string }[
     { key: "date", label: "Date" },
     { key: "shift", label: "Shift" },
     { key: "department", label: "Dept" },
+    { key: "entry_type", label: "Type" },
     { key: "machine_code", label: "Machine" },
     { key: "waste_type", label: "Waste Type" },
     { key: "waste_kg", label: "Waste (kg)" },
@@ -4607,15 +4602,58 @@ function ProductionReportsTab() {
               </span>
             )}
           </CardTitle>
-          {activeRows.length > 0 && (
-            <ExportMenu
-              filename={`${recordType}_${dateFrom}_${dateTo}`}
-              title={`${PROD_REPORT_TYPES.find((r) => r.value === recordType)?.label} Report`}
-              subtitle={`${dateFrom} to ${dateTo}${shift !== "_all" ? `  Shift ${shift}` : ""}${department ? `  ${department}` : ""}`}
-              columns={cols}
-              rows={activeRows}
-            />
-          )}
+          <div className="flex items-center gap-2">
+            {recordType === "manpower" && shift !== "_all" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs gap-1.5"
+                onClick={async () => {
+                  try {
+                    const { api: axiosApi } = await import("@/lib/api");
+                    // Generate one PDF per date in range
+                    const dates: string[] = [];
+                    const cur = new Date(dateFrom);
+                    const end = new Date(dateTo);
+                    while (cur <= end) {
+                      dates.push(cur.toISOString().split("T")[0]);
+                      cur.setDate(cur.getDate() + 1);
+                    }
+                    // For single date use existing endpoint; for range use first date
+                    const targetDate = dates[0];
+                    const params: Record<string, string> = { date: targetDate, shift };
+                    if (millId) params.mill_id = millId;
+                    const res = await axiosApi.get("/production/rf-manpower/pdf", {
+                      params,
+                      responseType: "blob",
+                    });
+                    const url = URL.createObjectURL(
+                      new Blob([res.data], { type: "application/pdf" }),
+                    );
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `learner_allocation_${targetDate}_${shift}.pdf`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch {
+                    toast.error("Could not generate Learner Allocation PDF");
+                  }
+                }}
+              >
+                <FileDown className="size-3.5" />
+                Learner Allocation Sheet
+              </Button>
+            )}
+            {activeRows.length > 0 && (
+              <ExportMenu
+                filename={`${recordType}_${dateFrom}_${dateTo}`}
+                title={`${PROD_REPORT_TYPES.find((r) => r.value === recordType)?.label} Report`}
+                subtitle={`${dateFrom} to ${dateTo}${shift !== "_all" ? `  Shift ${shift}` : ""}${department ? `  ${department}` : ""}`}
+                columns={cols}
+                rows={activeRows}
+              />
+            )}
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (

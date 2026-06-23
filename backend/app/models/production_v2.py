@@ -37,6 +37,8 @@ class WasteEntry(Base):
     shift: Mapped[str] = mapped_column(String(20), nullable=False)
     department: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     machine_code: Mapped[str] = mapped_column(String(50), nullable=False)
+    # 'machine' = individual machine waste, 'department' = section/overhead waste (machine_code='ALL')
+    entry_type: Mapped[str] = mapped_column(String(20), nullable=False, default="machine")
     lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     ratio: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     target_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)

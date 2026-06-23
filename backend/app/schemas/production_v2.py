@@ -42,6 +42,7 @@ class WasteEntryCreate(BaseModel):
     shift: str
     department: str
     machine_code: str
+    entry_type: str = "machine"   # 'machine' | 'department'
     waste_type: Optional[str] = None
     lot_no: Optional[str] = None
     ratio: Optional[str] = None
@@ -54,6 +55,7 @@ class WasteEntryCreate(BaseModel):
 
 class WasteEntryBulkItem(BaseModel):
     machine_code: str
+    entry_type: str = "machine"   # 'machine' | 'department'
     waste_type: Optional[str] = None
     lot_no: Optional[str] = None
     ratio: Optional[str] = None
@@ -77,6 +79,7 @@ class WasteEntryOut(BaseModel):
     shift: str
     department: str
     machine_code: str
+    entry_type: str = "machine"
     waste_type: Optional[str] = None
     lot_no: Optional[str] = None
     ratio: Optional[str] = None
