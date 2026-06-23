@@ -11,6 +11,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRBAC } from "@/hooks/useRBAC";
+import { useLocalDraft, isDraftEmpty } from "@/hooks/useDraft";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { DataTable } from "@/components/ui/DataTable";
@@ -1792,19 +1793,32 @@ function QmGridDialog({
     return d;
   }, [formFields, today]);
 
+  const draftKey = `sf_qm::${endpoint}::${department ?? ""}`;
+  const draft = useLocalDraft<Record<string, any>>(draftKey);
+
   const [form, setForm] = useState<Record<string, any>>(makeDefault);
   const [saving, setSaving] = useState(false);
 
-  // Pre-fill when editing
+  // Pre-fill when editing; for new records restore draft if present
   useEffect(() => {
     if (editRecord) {
       const d: Record<string, any> = {};
       formFields.forEach((f) => { d[f.key] = editRecord[f.key] ?? ""; });
       setForm(d);
     } else {
-      setForm(makeDefault());
+      const saved = draft.restoreDraft();
+      setForm(saved ?? makeDefault());
     }
-  }, [editRecord, open, makeDefault, formFields]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editRecord, open]);
+
+  // Auto-save draft on every change (new records only)
+  useEffect(() => {
+    if (editRecord) return;
+    const isEmpty = isDraftEmpty([form]);
+    draft.saveDraft(form, isEmpty);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form]);
 
   const setField = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
 
@@ -1918,6 +1932,9 @@ function QmSheetDialog({
     ok_input: "", remarks: "",
   });
 
+  const sheetDraftKey = `sf_qm::${endpoint}::${department ?? ""}::sheet`;
+  const sheetDraft = useLocalDraft<Record<string, any>>(sheetDraftKey);
+
   const [form, setForm] = useState<Record<string, any>>(makeDefault);
   const [saving, setSaving] = useState(false);
   const setF = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
@@ -1940,10 +1957,19 @@ function QmSheetDialog({
         remarks: editRecord.remarks ?? "",
       });
     } else {
-      setForm(makeDefault());
+      const saved = sheetDraft.restoreDraft();
+      setForm(saved ?? makeDefault());
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editRecord, open]);
+
+  // Auto-save draft on change (new records only)
+  useEffect(() => {
+    if (editRecord) return;
+    const isEmpty = !Object.values(form).some((v) => v !== "" && v !== null && v !== undefined);
+    sheetDraft.saveDraft(form, isEmpty);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form]);
 
   const stdHankNum = parseFloat(form[hankField]) || null;
   const { avgWt, hank, cv } = useMemo(() => computeReadings(form, hankField), [form, hankField]);
@@ -1978,6 +2004,7 @@ function QmSheetDialog({
         toast.success("Updated");
       } else {
         await api.post(`${endpoint}`, payload);
+        sheetDraft.discardDraft();
         toast.success("Saved");
       }
       qc.invalidateQueries({ queryKey: ["qm-tab", endpoint] });
@@ -1993,7 +2020,14 @@ function QmSheetDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-base">{editRecord ? `Edit — ${title}` : `Add Record — ${title}`}</DialogTitle>
+          <DialogTitle className="text-base flex items-center gap-2">
+            {editRecord ? `Edit — ${title}` : `Add Record — ${title}`}
+            {!editRecord && sheetDraft.hasDraft && (
+              <span className="text-xs font-normal text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                unsaved draft restored
+              </span>
+            )}
+          </DialogTitle>
         </DialogHeader>
 
         {/* Header section — shared fields (mirrors top of paper form) */}

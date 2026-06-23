@@ -87,6 +87,43 @@ export function useDraft<T>(key: string): UseDraftReturn<T> {
 }
 
 /**
+ * useLocalDraft — same API as useDraft but backed by localStorage.
+ * Use for dialog forms where data should survive page reloads.
+ */
+export function useLocalDraft<T>(key: string): UseDraftReturn<T> {
+  const [hasDraft, setHasDraft] = useState<boolean>(() => {
+    try { return !!localStorage.getItem(key); } catch { return false; }
+  });
+
+  useEffect(() => {
+    try { setHasDraft(!!localStorage.getItem(key)); } catch { setHasDraft(false); }
+  }, [key]);
+
+  const saveDraft = useCallback(
+    (state: T, isEmpty?: boolean) => {
+      if (isEmpty) return;
+      try { localStorage.setItem(key, JSON.stringify(state)); setHasDraft(true); } catch { /* quota */ }
+    },
+    [key],
+  );
+
+  const restoreDraft = useCallback((): T | null => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      return JSON.parse(raw) as T;
+    } catch { return null; }
+  }, [key]);
+
+  const discardDraft = useCallback(() => {
+    try { localStorage.removeItem(key); } catch { /* ignore */ }
+    setHasDraft(false);
+  }, [key]);
+
+  return { hasDraft, saveDraft, restoreDraft, discardDraft };
+}
+
+/**
  * Default "is empty" check — returns true when no row has any user-typed value.
  * Works for both row arrays and plain objects.
  */

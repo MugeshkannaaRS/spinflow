@@ -3241,17 +3241,17 @@ function ManpowerGrid() {
   ) as { id: string; category: string; label: string }[];
 
   // ── Draft persistence via useDraft hook ──────────────────────────────────
+  // Draft key includes department so each dept has its own draft.
+  // Does NOT include machine/group selection — those are filters, not content.
   const mpDraftKey = useMemo(
-    () =>
-      `sf_mp::${date}::${shift}::${department}::${manpowerMode}::${
-        manpowerMode === "group" ? selectedGroupId : `${selectedMachineFrom}~${selectedMachineTo}`
-      }`,
-    [date, shift, department, manpowerMode, selectedGroupId, selectedMachineFrom, selectedMachineTo],
+    () => `sf_mp::${date}::${shift}::${department}`,
+    [date, shift, department],
   );
   const mpDraft = useDraft<ManpowerRow[]>(mpDraftKey);
 
   const [rows, setRows] = useState<ManpowerRow[]>(() => buildManpowerRows(RF_DEFAULT_CATEGORIES));
 
+  // Auto-save rows to draft on every change (keeps data safe during navigation)
   useEffect(() => {
     const isEmpty = !rows.some(
       (r) => r.headcount !== "" || r.machinesPerPerson !== "" || r.supervisor !== "" || r.assignments.length > 0,
@@ -3260,11 +3260,21 @@ function ManpowerGrid() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, mpDraftKey]);
 
-  // Rebuild rows when dept categories change
+  // When dept categories load, restore draft if one exists — otherwise build fresh rows
   const deptCatKey = deptCategories.map((c) => c.category).join(",");
   useEffect(() => {
-    setRows(buildManpowerRows(deptCategories));
-    mpDraft.discardDraft();
+    if (!deptCatKey) return;
+    const saved = mpDraft.restoreDraft();
+    if (saved && saved.length > 0) {
+      // Merge saved data onto new category structure (handles category list changes)
+      const base = buildManpowerRows(deptCategories);
+      setRows(base.map((r) => {
+        const match = saved.find((s: ManpowerRow) => s.category === r.category);
+        return match ? { ...r, ...match, categoryLabel: r.categoryLabel } : r;
+      }));
+    } else {
+      setRows(buildManpowerRows(deptCategories));
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deptCatKey]);
 
@@ -3761,20 +3771,21 @@ function ManpowerGrid() {
         </CardContent>
       </Card>
 
-      {/* ── Draft recovery banner ── */}
+      {/* ── Unsaved indicator (auto-restored on load, no manual action needed) ── */}
       {mpDraft.hasDraft && (
-        <DraftBanner
-          message="You have unsaved manpower data for this shift. Restore it?"
-          onRestore={() => {
-            const saved = mpDraft.restoreDraft();
-            if (saved) { setRows(saved); toast.success("Draft restored"); }
-            mpDraft.discardDraft();
-          }}
-          onDiscard={() => {
-            mpDraft.discardDraft();
-            setRows(buildManpowerRows(deptCategories));
-          }}
-        />
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+          <span className="text-base">📋</span>
+          <span>Unsaved changes — data is preserved until you save or discard.</span>
+          <button
+            className="ml-auto text-xs underline text-amber-700 hover:text-amber-900"
+            onClick={() => {
+              mpDraft.discardDraft();
+              setRows(buildManpowerRows(deptCategories));
+            }}
+          >
+            Discard
+          </button>
+        </div>
       )}
 
       {/* ── Category table — always visible once dept selected ── */}
