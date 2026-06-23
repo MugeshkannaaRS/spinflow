@@ -1446,9 +1446,10 @@ async def get_all_masters(
         ]
 
     async def _fetch_shifts():
+        from sqlalchemy import or_ as _or_
         stmt = select(Shift)
         if mill_id:
-            stmt = stmt.where(Shift.mill_id == mill_id)
+            stmt = stmt.where(_or_(Shift.mill_id == mill_id, Shift.mill_id.is_(None)))
         r = await db.execute(stmt.order_by(Shift.start_time))
         return [
             {"id": str(x.id), "code": x.code, "name": x.name,

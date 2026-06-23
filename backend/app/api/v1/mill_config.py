@@ -185,9 +185,10 @@ async def get_all_masters(
     # ── Shifts from shifts table ──────────────────────────────────────────
     try:
         from app.models.production import Shift
+        from sqlalchemy import or_ as _or_
         shift_res = await db.execute(
             select(Shift.code, Shift.name, Shift.start_time, Shift.end_time)
-            .where(Shift.mill_id == mill_id)
+            .where(_or_(Shift.mill_id == mill_id, Shift.mill_id.is_(None)))
             .order_by(Shift.start_time)
         )
         shifts = shift_res.all()
