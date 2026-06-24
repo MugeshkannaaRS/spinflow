@@ -68,6 +68,7 @@ import { Route as AppAdminAnalyticsRouteImport } from './routes/_app.admin.analy
 import { Route as AppAdminAlertsRouteImport } from './routes/_app.admin.alerts'
 import { Route as AppAdminAlertOpsRouteImport } from './routes/_app.admin.alert-ops'
 import { Route as AppProductionLearnerAllocationIdRouteImport } from './routes/_app.production.learner-allocation.$id'
+import { Route as AppProductionLearnerAllocationViewIdRouteImport } from './routes/_app.production.learner-allocation-view.$id'
 import { Route as AppAdminCompaniesOnboardRouteImport } from './routes/_app.admin.companies.onboard'
 import { Route as AppAdminCompaniesCompanyIdRouteImport } from './routes/_app.admin.companies.$companyId'
 import { Route as AppAdminBillingUpgradeRequestsRouteImport } from './routes/_app.admin.billing.upgrade-requests'
@@ -375,6 +376,12 @@ const AppProductionLearnerAllocationIdRoute =
     path: '/$id',
     getParentRoute: () => AppProductionLearnerAllocationRoute,
   } as any)
+const AppProductionLearnerAllocationViewIdRoute =
+  AppProductionLearnerAllocationViewIdRouteImport.update({
+    id: '/learner-allocation-view/$id',
+    path: '/learner-allocation-view/$id',
+    getParentRoute: () => AppProductionRoute,
+  } as any)
 const AppAdminCompaniesOnboardRoute =
   AppAdminCompaniesOnboardRouteImport.update({
     id: '/onboard',
@@ -494,6 +501,7 @@ export interface FileRoutesByFullPath {
   '/admin/billing/upgrade-requests': typeof AppAdminBillingUpgradeRequestsRoute
   '/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
   '/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
+  '/production/learner-allocation-view/$id': typeof AppProductionLearnerAllocationViewIdRoute
   '/production/learner-allocation/$id': typeof AppProductionLearnerAllocationIdRoute
 }
 export interface FileRoutesByTo {
@@ -563,6 +571,7 @@ export interface FileRoutesByTo {
   '/admin/billing/upgrade-requests': typeof AppAdminBillingUpgradeRequestsRoute
   '/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
   '/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
+  '/production/learner-allocation-view/$id': typeof AppProductionLearnerAllocationViewIdRoute
   '/production/learner-allocation/$id': typeof AppProductionLearnerAllocationIdRoute
 }
 export interface FileRoutesById {
@@ -634,6 +643,7 @@ export interface FileRoutesById {
   '/_app/admin/billing/upgrade-requests': typeof AppAdminBillingUpgradeRequestsRoute
   '/_app/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
   '/_app/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
+  '/_app/production/learner-allocation-view/$id': typeof AppProductionLearnerAllocationViewIdRoute
   '/_app/production/learner-allocation/$id': typeof AppProductionLearnerAllocationIdRoute
 }
 export interface FileRouteTypes {
@@ -705,6 +715,7 @@ export interface FileRouteTypes {
     | '/admin/billing/upgrade-requests'
     | '/admin/companies/$companyId'
     | '/admin/companies/onboard'
+    | '/production/learner-allocation-view/$id'
     | '/production/learner-allocation/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -774,6 +785,7 @@ export interface FileRouteTypes {
     | '/admin/billing/upgrade-requests'
     | '/admin/companies/$companyId'
     | '/admin/companies/onboard'
+    | '/production/learner-allocation-view/$id'
     | '/production/learner-allocation/$id'
   id:
     | '__root__'
@@ -844,6 +856,7 @@ export interface FileRouteTypes {
     | '/_app/admin/billing/upgrade-requests'
     | '/_app/admin/companies/$companyId'
     | '/_app/admin/companies/onboard'
+    | '/_app/production/learner-allocation-view/$id'
     | '/_app/production/learner-allocation/$id'
   fileRoutesById: FileRoutesById
 }
@@ -1270,6 +1283,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProductionLearnerAllocationIdRouteImport
       parentRoute: typeof AppProductionLearnerAllocationRoute
     }
+    '/_app/production/learner-allocation-view/$id': {
+      id: '/_app/production/learner-allocation-view/$id'
+      path: '/learner-allocation-view/$id'
+      fullPath: '/production/learner-allocation-view/$id'
+      preLoaderRoute: typeof AppProductionLearnerAllocationViewIdRouteImport
+      parentRoute: typeof AppProductionRoute
+    }
     '/_app/admin/companies/onboard': {
       id: '/_app/admin/companies/onboard'
       path: '/onboard'
@@ -1453,12 +1473,15 @@ const AppProductionLearnerAllocationRouteWithChildren =
 interface AppProductionRouteChildren {
   AppProductionLearnerAllocationRoute: typeof AppProductionLearnerAllocationRouteWithChildren
   AppProductionLearnerAllocationsRoute: typeof AppProductionLearnerAllocationsRoute
+  AppProductionLearnerAllocationViewIdRoute: typeof AppProductionLearnerAllocationViewIdRoute
 }
 
 const AppProductionRouteChildren: AppProductionRouteChildren = {
   AppProductionLearnerAllocationRoute:
     AppProductionLearnerAllocationRouteWithChildren,
   AppProductionLearnerAllocationsRoute: AppProductionLearnerAllocationsRoute,
+  AppProductionLearnerAllocationViewIdRoute:
+    AppProductionLearnerAllocationViewIdRoute,
 }
 
 const AppProductionRouteWithChildren = AppProductionRoute._addFileChildren(
