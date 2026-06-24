@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { productionApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
@@ -28,7 +28,6 @@ function ShiftPill({ shift }: { shift: string }) {
 
 function LearnerAllocationsPage() {
   const user = useAuth((s) => s.user);
-  const navigate = useNavigate();
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [shiftFilter, setShiftFilter] = useState("");
@@ -124,7 +123,7 @@ function LearnerAllocationsPage() {
               <div
                 key={item.id}
                 className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-3.5 flex items-center gap-4 hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => navigate({ to: "/production/learner-allocation/$id", params: { id: item.id } })}
+                onClick={() => window.location.href = `/production/learner-allocation/${item.id}`}
               >
                 <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
                   <FileText className="size-5 text-blue-500" />

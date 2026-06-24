@@ -63,6 +63,7 @@ import {
   FileDown,
   Settings2,
   X,
+  ClipboardCheck,
 } from "lucide-react";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { DraftBanner } from "@/components/ui/DraftBanner";
@@ -5615,6 +5616,15 @@ function ProductionPage() {
             </TabsContent>
 
             <TabsContent value="manpower">
+              <div className="flex justify-end px-4 pt-3 pb-0">
+                <button
+                  onClick={() => window.location.href = "/production/learner-allocations"}
+                  className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 border border-blue-200 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <ClipboardCheck className="size-3.5" />
+                  Allocation Sheets
+                </button>
+              </div>
               <ErrorBoundary key={`manpower-${activeTab}`} inline label="Shift Planning">
                 {canEdit ? (
                   <ManpowerGrid />
