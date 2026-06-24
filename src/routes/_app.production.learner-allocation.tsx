@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Printer, Save, ChevronLeft, Plus, Trash2, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/production/learner-allocation")({
-  head: () => ({ meta: [{ title: "Learner Allocation — SpinFlow ERP" }] }),
+  head: () => ({ meta: [{ title: "Manpower Allocation — SpinFlow ERP" }] }),
   component: LearnerAllocationForm,
 });
 
@@ -348,7 +348,7 @@ function LearnerAllocationForm() {
             >
               <ChevronLeft className="size-4" /> Back
             </button>
-            <h1 className="text-base font-bold text-gray-900">Learner Allocation Sheet</h1>
+            <h1 className="text-base font-bold text-gray-900">Manpower Allocation Sheet</h1>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handlePrint}>

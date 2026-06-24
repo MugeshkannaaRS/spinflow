@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Plus, FileText, Calendar, Clock, Users, Eye } from "lucide-react";
 
 export const Route = createFileRoute("/_app/production/learner-allocations")({
-  head: () => ({ meta: [{ title: "Learner Allocations — SpinFlow ERP" }] }),
+  head: () => ({ meta: [{ title: "Manpower Allocation — SpinFlow ERP" }] }),
   component: LearnerAllocationsPage,
 });
 
@@ -55,7 +55,7 @@ function LearnerAllocationsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Learner Allocation</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Manpower Allocation</h1>
             <p className="text-sm text-gray-500 mt-1">{total} records</p>
           </div>
           <Button size="sm" onClick={() => window.location.href = "/production/learner-allocation"}>
