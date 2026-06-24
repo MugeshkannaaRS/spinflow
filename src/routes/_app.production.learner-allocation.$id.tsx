@@ -47,7 +47,6 @@ function ViewLearnerAllocation() {
   const alloc = q.data;
   const entries: any[] = alloc.entries ?? [];
 
-  // Group entries by section
   const bySection: Record<string, any[]> = {};
   for (const e of entries) {
     if (!bySection[e.section]) bySection[e.section] = [];
@@ -119,7 +118,6 @@ function ViewLearnerAllocation() {
       `}</style>
 
       <div className="min-h-screen bg-gray-50/50">
-        {/* Toolbar */}
         <div className="print:hidden sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
@@ -138,10 +136,7 @@ function ViewLearnerAllocation() {
           </Button>
         </div>
 
-        {/* Sheet body */}
         <div id="learner-view-area" className="max-w-4xl mx-auto px-4 py-6 bg-white print:px-0 print:py-0 print:max-w-none">
-
-          {/* Header */}
           <div className="text-center mb-4 border-b-2 border-gray-800 pb-3">
             <div className="flex items-center justify-between">
               <div className="text-left text-xs text-gray-500 print:text-black">
@@ -160,13 +155,11 @@ function ViewLearnerAllocation() {
             </div>
           </div>
 
-          {/* Two-column layout */}
           <div className="grid grid-cols-2 gap-4 print:gap-2">
             <div>{leftSections.map(s => <SectionBlock key={s} sectionKey={s} />)}</div>
             <div>{rightSections.map(s => <SectionBlock key={s} sectionKey={s} />)}</div>
           </div>
 
-          {/* Footer */}
           <div className="mt-4 pt-3 border-t-2 border-gray-800 space-y-2">
             <p className="text-sm font-bold text-gray-800 print:text-black">
               Ring manpower total setup = <span className="underline">{alloc.total_persons ?? totalPersons}</span> persons

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productionApi, exportApi } from "@/lib/api-service";
 import { api } from "@/lib/api";
@@ -5206,6 +5206,12 @@ function PackingGrid() {
 }
 
 function ProductionPage() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // Render child routes (learner-allocation, etc.) via Outlet
+  if (pathname.startsWith("/production/learner-allocation") || pathname.startsWith("/production/learner-allocations")) {
+    return <Outlet />;
+  }
+
   const user = useAuth((s) => s.user);
   const { canAccess } = useRBAC();
   const canEdit = canAccess("production", true);
