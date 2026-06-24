@@ -123,7 +123,7 @@ function LearnerAllocationsPage() {
               <div
                 key={item.id}
                 className="bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-3.5 flex items-center gap-4 hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => window.location.href = `/production/learner-allocation/${item.id}`}
+                onClick={() => window.location.href = `/production/learner-allocation-view/${item.id}`}
               >
                 <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
                   <FileText className="size-5 text-blue-500" />

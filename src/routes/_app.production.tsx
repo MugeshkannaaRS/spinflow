@@ -76,7 +76,7 @@ import { CustomFieldsSection } from "@/components/ui/CustomFieldsSection";
 
 function ProductionLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  if (pathname.startsWith("/production/learner-allocation") || pathname.startsWith("/production/learner-allocations")) {
+  if (pathname.startsWith("/production/learner-allocation") || pathname.startsWith("/production/learner-allocations") || pathname.startsWith("/production/learner-allocation-view")) {
     return <Outlet />;
   }
   return <ProductionPage />;
