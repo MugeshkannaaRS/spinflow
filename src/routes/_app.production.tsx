@@ -67,7 +67,7 @@ import {
 } from "lucide-react";
 import { ExportMenu } from "@/components/ui/ExportMenu";
 import { DraftBanner } from "@/components/ui/DraftBanner";
-import { useDraft, isDraftEmpty } from "@/hooks/useDraft";
+import { useDraft, useLocalDraft, isDraftEmpty } from "@/hooks/useDraft";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { useMillMasters, useMillMasterCategory } from "@/hooks/useMillConfig";
@@ -154,10 +154,10 @@ function ShiftGrid() {
   const [department, setDepartment] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string | null>(null);
 
-  // Operator identification — free text, persisted per session
+  // Operator identification — free text, persisted across navigations
   const [operatorName, setOperatorName] = useState<string>(() => {
     try {
-      return sessionStorage.getItem("sf_operator") ?? "";
+      return localStorage.getItem("sf_operator") ?? "";
     } catch {
       return "";
     }
@@ -166,7 +166,7 @@ function ShiftGrid() {
   // Machine Groups — selected group IDs (supports multi-group mixing)
   const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(() => {
     try {
-      const raw = sessionStorage.getItem("sf_machine_groups");
+      const raw = localStorage.getItem("sf_machine_groups");
       return raw ? JSON.parse(raw) : [];
     } catch {
       return [];
@@ -189,7 +189,7 @@ function ShiftGrid() {
     const next = [...selectedGroupIds, id];
     setSelectedGroupIds(next);
     try {
-      sessionStorage.setItem("sf_machine_groups", JSON.stringify(next));
+      localStorage.setItem("sf_machine_groups", JSON.stringify(next));
     } catch {
       /* quota exceeded - safe to ignore */
     }
@@ -198,7 +198,7 @@ function ShiftGrid() {
     const next = selectedGroupIds.filter((x) => x !== id);
     setSelectedGroupIds(next);
     try {
-      sessionStorage.setItem("sf_machine_groups", JSON.stringify(next));
+      localStorage.setItem("sf_machine_groups", JSON.stringify(next));
     } catch {
       /* quota exceeded - safe to ignore */
     }
@@ -206,7 +206,7 @@ function ShiftGrid() {
   function clearGroups() {
     setSelectedGroupIds([]);
     try {
-      sessionStorage.removeItem("sf_machine_groups");
+      localStorage.removeItem("sf_machine_groups");
     } catch {
       /* quota exceeded - safe to ignore */
     }
@@ -286,13 +286,26 @@ function ShiftGrid() {
   );
   const [rows, setRows] = useState<GridRow[]>(() => buildRows(machines));
 
-  // Draft persistence
+  // Draft persistence — localStorage so data survives full page navigations
   const shiftDraftKey = `sf_shift::${date}::${shift}::${department}::${selectedGroupIds.join(",")}`;
-  const shiftDraft = useDraft<GridRow[]>(shiftDraftKey);
+  const shiftDraft = useLocalDraft<GridRow[]>(shiftDraftKey);
+  const groupTargetKey = `sf_grouptarget::${date}::${shift}::${department}::${selectedGroupIds.join(",")}`;
   useEffect(() => {
     shiftDraft.saveDraft(rows, isDraftEmpty(rows));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, shiftDraftKey]);
+  // Persist groupTarget across navigations
+  useEffect(() => {
+    try { localStorage.setItem(groupTargetKey, groupTarget); } catch { /* ignore */ }
+  }, [groupTarget, groupTargetKey]);
+  // Restore groupTarget when key changes (date/shift/group changed)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(groupTargetKey);
+      if (saved !== null) setGroupTarget(saved);
+      else setGroupTarget("");
+    } catch { /* ignore */ }
+  }, [groupTargetKey]);
 
   useEffect(() => {
     setRows(buildRows(machines).map((r) => ({ ...r, operator: operatorName })));
@@ -302,7 +315,7 @@ function ShiftGrid() {
   useEffect(() => {
     setRows((prev) => prev.map((r) => ({ ...r, operator: operatorName })));
     try {
-      sessionStorage.setItem("sf_operator", operatorName);
+      localStorage.setItem("sf_operator", operatorName);
     } catch {
       /* quota exceeded - safe to ignore */
     }

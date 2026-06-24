@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy import select, func, text
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.db.base import Base
 from app.models.user import User, Role
 from app.models.masters import Company, CompanyModule, Mill, Department

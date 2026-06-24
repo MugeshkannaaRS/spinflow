@@ -14,7 +14,7 @@ import subprocess
 from pathlib import Path
 
 
-def check(label: str, condition: bool, failures: list[str] | None = None) -> None:
+def check(label: str, condition: bool, failures = None) -> None:
     if condition:
         print(f"  ✓ {label}")
     else:
