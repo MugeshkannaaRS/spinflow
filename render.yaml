@@ -15,8 +15,8 @@ services:
   - type: web
     name: spinflow-staging-backend
     env: python
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --loop asyncio
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn wsgi:app --host 0.0.0.0 --port $PORT --workers 1 --loop asyncio
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
