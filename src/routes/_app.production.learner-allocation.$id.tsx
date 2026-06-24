@@ -111,9 +111,15 @@ function ViewLearnerAllocation() {
         @media print {
           body * { visibility: hidden; }
           #learner-view-area, #learner-view-area * { visibility: visible; }
-          #learner-view-area { position: fixed; top: 0; left: 0; width: 100%; }
+          #learner-view-area {
+            position: absolute; top: 0; left: 0; width: 100%;
+            font-size: 9pt;
+          }
+          #learner-view-area table { font-size: 8pt; }
+          #learner-view-area th, #learner-view-area td { padding: 1px 3px !important; }
+          #learner-view-area h3 { font-size: 7.5pt !important; }
           .print\\:hidden { display: none !important; }
-          @page { size: A4; margin: 10mm; }
+          @page { size: A4 portrait; margin: 8mm 8mm 8mm 8mm; }
         }
       `}</style>
 

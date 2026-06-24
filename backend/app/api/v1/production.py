@@ -9,7 +9,7 @@ from app.db.session import get_db
 logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
-from app.models.production import Machine, Shift, ProductionEntry, DowntimeLog, OperatorGroup, MachineGroup
+from app.models.production import Machine, Shift, ProductionEntry, DowntimeLog, OperatorGroup, MachineGroup, LearnerAllocation, LearnerAllocationEntry
 from app.models.masters import Mill, Department, YarnCount
 from app.models.mill_config import MillCustomField, MillRecordValue
 from app.schemas.production import (
@@ -1021,7 +1021,6 @@ async def delete_machine_group(
 
 # ─── Learner Allocation ────────────────────────────────────────────────────────
 
-from app.models.production import LearnerAllocation, LearnerAllocationEntry
 from sqlalchemy.orm import selectinload
 from datetime import date as date_type
 
@@ -1036,6 +1035,17 @@ async def create_learner_allocation(
     scope = await get_mill_scope(current_user, db)
     mill_id = scope.get("mill_id")
     company_id = scope.get("company_id")
+    # MILL_OWNER has mill_id=None — resolve from body or first mill in company
+    if not mill_id:
+        body_mill_id = body.get("mill_id")
+        if body_mill_id:
+            mill_id = body_mill_id
+        elif company_id:
+            from app.models.masters import Mill as MillModel
+            first_mill = (await db.execute(
+                select(MillModel.id).where(MillModel.company_id == company_id).limit(1)
+            )).scalar_one_or_none()
+            mill_id = str(first_mill) if first_mill else None
     if not mill_id:
         raise HTTPException(status_code=400, detail="Mill scope required")
 

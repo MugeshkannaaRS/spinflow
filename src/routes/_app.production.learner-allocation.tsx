@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { productionApi } from "@/lib/api-service";
 import { useAuth } from "@/stores/auth";
+import { useActiveMill } from "@/hooks/useActiveMill";
 import { Button } from "@/components/ui/button";
 import { useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
@@ -257,6 +258,7 @@ function SectionTable({
 // ── Main form ─────────────────────────────────────────────────────────────────
 function LearnerAllocationForm() {
   const user = useAuth((s) => s.user);
+  const { millId } = useActiveMill();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const printRef = useRef<HTMLDivElement>(null);
@@ -308,6 +310,7 @@ function LearnerAllocationForm() {
       allocation_type: allocationType,
       total_persons: totalPersons,
       notes: notes || null,
+      mill_id: millId ?? null,
       entries,
     });
   };
@@ -323,9 +326,15 @@ function LearnerAllocationForm() {
         @media print {
           body * { visibility: hidden; }
           #learner-print-area, #learner-print-area * { visibility: visible; }
-          #learner-print-area { position: fixed; top: 0; left: 0; width: 100%; }
+          #learner-print-area {
+            position: absolute; top: 0; left: 0; width: 100%;
+            font-size: 9pt;
+          }
+          #learner-print-area table { font-size: 8pt; }
+          #learner-print-area th, #learner-print-area td { padding: 1px 3px !important; }
+          #learner-print-area h3 { font-size: 7.5pt !important; }
           .print\\:hidden { display: none !important; }
-          @page { size: A4; margin: 10mm; }
+          @page { size: A4 portrait; margin: 8mm 8mm 8mm 8mm; }
         }
       `}</style>
 
