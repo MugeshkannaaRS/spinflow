@@ -2538,10 +2538,11 @@ async def get_system_health(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Aggregate ERP health — all queries fired in parallel via asyncio.gather."""
-    import asyncio
+    """Aggregate ERP health for single-mill SUPER_ADMIN dashboard.
+    Uses sequential awaits — SQLAlchemy AsyncSession is not concurrent-safe.
+    Query count kept low via GROUP BY (alerts, machines, modules).
+    """
     from datetime import date, timedelta, timezone as _tz
-    from sqlalchemy import case, literal_column, text
     from app.models.production import ProductionEntry, Machine
     from app.models.maintenance import MaintenanceLog
     from app.models.alerts import AlertEvent
@@ -2555,109 +2556,116 @@ async def get_system_health(
     week_ago = datetime.now(_tz.utc) - timedelta(days=7)
     MODULE_LIST = ["production", "hr", "payroll", "quality", "dispatch", "maintenance", "purchase", "inventory"]
 
-    # ── Helper: safe scalar ───────────────────────────────────────────────
-    async def _scalar(stmt, default=0):
-        try:
-            return (await db.execute(stmt)).scalar() or default
-        except Exception:
-            return default
+    def _s(val, default=0):
+        return val or default
 
-    async def _all(stmt, default=None):
-        try:
-            return (await db.execute(stmt)).all()
-        except Exception:
-            return default or []
-
-    # ── Fire all independent queries in parallel ───────────────────────────
-    (
-        role_rows,
-        machine_rows,
-        prod_today,
-        maint_open,
-        alert_rows,           # (status, severity, count) grouped
-        pending_approvals,
-        open_incidents,
-        audit_rows,
-        module_rows,          # single GROUP BY query replaces 8 serial queries
-    ) = await asyncio.gather(
-        # 1. Users by role
-        _all(
+    try:
+        # 1. Users by role (one query)
+        role_rows = (await db.execute(
             select(Role.code, func.count(User.id).label("cnt"))
             .join(User, User.role_id == Role.id)
             .where(User.deleted_at.is_(None), User.is_active == True)
             .group_by(Role.code)
-        ),
-        # 2. Machines by current_status
-        _all(
+        )).all()
+        users_by_role = {r.code: r.cnt for r in role_rows}
+        total_users = sum(users_by_role.values())
+    except Exception:
+        users_by_role, total_users = {}, 0
+
+    try:
+        # 2. Machines by status (one GROUP BY)
+        machine_rows = (await db.execute(
             select(Machine.current_status, func.count(Machine.id).label("cnt"))
             .where(Machine.status == True)
             .group_by(Machine.current_status)
-        ),
+        )).all()
+        machines_by_status = {r.current_status: r.cnt for r in machine_rows}
+        total_machines = sum(machines_by_status.values())
+        machines_running = machines_by_status.get("running", 0)
+    except Exception:
+        machines_by_status, total_machines, machines_running = {}, 0, 0
+
+    try:
         # 3. Production entries today
-        _scalar(
+        prod_today = _s((await db.execute(
             select(func.count(ProductionEntry.id))
             .where(func.date(ProductionEntry.created_at) == today)
-        ),
+        )).scalar())
+    except Exception:
+        prod_today = 0
+
+    try:
         # 4. Open maintenance logs
-        _scalar(
+        maint_open = _s((await db.execute(
             select(func.count(MaintenanceLog.id))
             .where(MaintenanceLog.status == "open")
-        ),
-        # 5. Alerts grouped by (status, severity) — one query instead of two
-        _all(
-            select(AlertEvent.status, AlertEvent.severity, func.count(AlertEvent.id).label("cnt"))
+        )).scalar())
+    except Exception:
+        maint_open = 0
+
+    try:
+        # 5. Alerts — one GROUP BY (status, severity) replaces two queries
+        alert_rows = (await db.execute(
+            select(AlertEvent.severity, func.count(AlertEvent.id).label("cnt"))
             .where(AlertEvent.status == "active")
-            .group_by(AlertEvent.status, AlertEvent.severity)
-        ),
+            .group_by(AlertEvent.severity)
+        )).all()
+        alerts_active = sum(r.cnt for r in alert_rows)
+        alerts_critical = sum(r.cnt for r in alert_rows if r.severity == "critical")
+    except Exception:
+        alerts_active, alerts_critical = 0, 0
+
+    try:
         # 6. Pending approvals
-        _scalar(
+        pending_approvals = _s((await db.execute(
             select(func.count(ApprovalRequest.id))
             .where(ApprovalRequest.status == "pending")
-        ),
+        )).scalar())
+    except Exception:
+        pending_approvals = 0
+
+    try:
         # 7. Open incidents
-        _scalar(
+        open_incidents = _s((await db.execute(
             select(func.count(Incident.id))
             .where(Incident.status == "open")
-        ),
+        )).scalar())
+    except Exception:
+        open_incidents = 0
+
+    try:
         # 8. Recent audit (last 10)
-        _all(
+        audit_rows = (await db.execute(
             select(AuditLog.action, AuditLog.entity, AuditLog.role,
                    AuditLog.created_at, AuditLog.details, AuditLog.severity)
             .order_by(AuditLog.created_at.desc())
             .limit(10)
-        ),
-        # 9. Module last-activity — one GROUP BY replaces N serial queries
-        _all(
+        )).all()
+        recent_audit = [
+            {
+                "action": r.action,
+                "entity": r.entity,
+                "role": r.role,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "details": r.details,
+                "severity": r.severity or "INFO",
+            }
+            for r in audit_rows
+        ]
+    except Exception:
+        recent_audit = []
+
+    try:
+        # 9. Module activity — one GROUP BY replaces 8 serial queries
+        module_rows = (await db.execute(
             select(AuditLog.module, func.max(AuditLog.created_at).label("last_at"))
             .where(AuditLog.module.in_(MODULE_LIST))
             .group_by(AuditLog.module)
-        ),
-    )
+        )).all()
+        module_last: dict = {r.module: r.last_at for r in module_rows}
+    except Exception:
+        module_last = {}
 
-    # ── Process results ───────────────────────────────────────────────────
-    users_by_role = {r.code: r.cnt for r in role_rows}
-    total_users = sum(users_by_role.values())
-
-    machines_by_status = {r.current_status: r.cnt for r in machine_rows}
-    total_machines = sum(machines_by_status.values())
-    machines_running = machines_by_status.get("running", 0)
-
-    alerts_active = sum(r.cnt for r in alert_rows)
-    alerts_critical = sum(r.cnt for r in alert_rows if r.severity == "critical")
-
-    recent_audit = [
-        {
-            "action": r.action,
-            "entity": r.entity,
-            "role": r.role,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
-            "details": r.details,
-            "severity": r.severity or "INFO",
-        }
-        for r in audit_rows
-    ]
-
-    module_last: dict[str, Optional[datetime]] = {r.module: r.last_at for r in module_rows}
     module_status = {}
     for mod in MODULE_LIST:
         last = module_last.get(mod)
