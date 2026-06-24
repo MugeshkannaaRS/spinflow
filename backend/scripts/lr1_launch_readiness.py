@@ -721,6 +721,14 @@ async def verify_permission_guards(db: AsyncSession, company_ids: list[str], rol
     op_role = await db.get(Role, role_ids["MACHINE_OPERATOR"])
     gm_role = await db.get(Role, role_ids["GENERAL_MANAGER"])
 
+    # Look up a real mill UUID belonging to co (FK requires valid UUID)
+    from sqlalchemy import select as _select
+    from app.models.masters import Mill as _Mill
+    _mill_row = (await db.execute(
+        _select(_Mill.id).where(_Mill.company_id == co.id).limit(1)
+    )).scalar_one_or_none()
+    op_mill_id = str(_mill_row) if _mill_row else None
+
     # Create test users
     mo_user = User(
         id=str(uuid.uuid4()), name="LR-MO", email=f"lr-mo-{uuid.uuid4().hex[:4]}@test.com",
@@ -730,7 +738,7 @@ async def verify_permission_guards(db: AsyncSession, company_ids: list[str], rol
 
     op_user = User(
         id=str(uuid.uuid4()), name="LR-OP", email=f"lr-op-{uuid.uuid4().hex[:4]}@test.com",
-        password_hash="hash", role_id=op_role.id, company_id=co.id, mill_id="m1", is_active=True,
+        password_hash="hash", role_id=op_role.id, company_id=co.id, mill_id=op_mill_id, is_active=True,
     )
     db.add(op_user)
 

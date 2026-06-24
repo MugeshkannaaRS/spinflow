@@ -2,7 +2,8 @@
 Pre-deployment validation script.
 
 Usage:
-    python backend/scripts/deploy_check.py
+    python backend/scripts/deploy_check.py           # full check
+    python backend/scripts/deploy_check.py --quick   # skip DB autogenerate diff (fast)
 
 Exits with code 0 if all checks pass, 1 otherwise.
 Run this BEFORE deploying to staging/production.
@@ -10,6 +11,7 @@ Run this BEFORE deploying to staging/production.
 
 import os
 import sys
+import argparse
 import subprocess
 from pathlib import Path
 
@@ -27,7 +29,13 @@ _failures: list[str] = []
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="SpinFlow pre-deployment validation")
+    parser.add_argument("--quick", action="store_true", help="Skip DB autogenerate diff (no live DB needed)")
+    args, _ = parser.parse_known_args()
+
     print("SpinFlow ERP — Pre-Deployment Validation")
+    if args.quick:
+        print("  (quick mode — skipping DB autogenerate diff)")
     print()
 
     # ── 1. Required env vars ────────────────────────────────────────────
@@ -55,15 +63,23 @@ def main() -> int:
         _failures.append(f"SECRET_KEY too short ({len(sk)} chars, min 32)")
     print(f"  {'✓' if ok else '✗'} SECRET_KEY length: {len(sk)} chars {'(≥32)' if ok else '(<32)'}")
 
-    # ── 3. Alembic can load ────────────────────────────────────────────
+    # ── 3. Alembic migration check ─────────────────────────────────────
     print("\nAlembic migration check:")
     try:
         from alembic.config import Config as AlembicConfig
-        from alembic import command as alembic_command
+        from alembic.script import ScriptDirectory
         ini = Path(__file__).parent.parent / "alembic.ini"
         cfg = AlembicConfig(str(ini))
-        alembic_command.check(cfg)
-        print("  ✓ Alembic config loads successfully")
+        script = ScriptDirectory.from_config(cfg)
+        head = script.get_current_head()
+        print(f"  ✓ Alembic config loads — head revision: {head}")
+        if not args.quick:
+            # Full autogenerate diff against live DB (slow — needs DATABASE_URL)
+            from alembic import command as alembic_command
+            alembic_command.check(cfg)
+            print("  ✓ No pending migrations detected")
+        else:
+            print("  ⏭  Skipped live DB diff (--quick mode)")
     except Exception as e:
         _failures.append(f"Alembic check failed: {e}")
         print(f"  ✗ Alembic check failed: {e}")
