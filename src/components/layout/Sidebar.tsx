@@ -5,6 +5,7 @@ import { useRBAC } from "@/hooks/useRBAC";
 import {
   LayoutDashboard,
   Factory,
+  ClipboardCheck,
   BadgeCheck,
   Wrench,
   Users,
@@ -63,6 +64,7 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
     label: "Operations",
     items: [
       { to: "/production", label: "Production", icon: Factory, module: "production" },
+      { to: "/production/learner-allocations", label: "Learner Allocation", icon: ClipboardCheck, module: "production" },
       { to: "/quality", label: "Quality", icon: BadgeCheck, module: "quality" },
       { to: "/maintenance", label: "Maintenance", icon: Wrench, module: "maintenance" },
       { to: "/alerts", label: "Alerts", icon: Siren, module: "alerts" },

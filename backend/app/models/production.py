@@ -1,5 +1,5 @@
 from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Date, func, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime, date
 from typing import Optional
@@ -185,3 +185,42 @@ class DowntimeLog(TimestampMixin, Base):
     datalog_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     stop_from: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
     stop_to: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
+
+
+
+# ─── Learner Allocation ────────────────────────────────────────────────────────
+
+class LearnerAllocation(TimestampMixin, Base):
+    """One allocation sheet per shift per mill."""
+    __tablename__ = "learner_allocations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id", ondelete="CASCADE"), nullable=False, index=True)
+    company_id: Mapped[str] = mapped_column(String(36), ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    allocation_date: Mapped[date] = mapped_column(Date, nullable=False)
+    shift: Mapped[str] = mapped_column(String(10), nullable=False)        # morning / evening / night
+    allocation_type: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)   # P/c, R/c
+    total_persons: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    submitted_by: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    entries = relationship(
+        "LearnerAllocationEntry", back_populates="allocation",
+        cascade="all, delete-orphan", order_by="LearnerAllocationEntry.display_order"
+    )
+
+
+class LearnerAllocationEntry(Base):
+    """One row per machine in any section of the allocation sheet."""
+    __tablename__ = "learner_allocation_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    allocation_id: Mapped[str] = mapped_column(String(36), ForeignKey("learner_allocations.id", ondelete="CASCADE"), nullable=False, index=True)
+    section: Mapped[str] = mapped_column(String(50), nullable=False)      # carding / drawing / simplex / ring / mc / floor_cleaner / finishing / extra
+    machine_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    card_no_a: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # primary / R/A
+    card_no_b: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # R/B (ring unit only)
+    sub_label: Mapped[Optional[str]] = mapped_column(String(100), nullable=True) # House keeper, Oiling…
+    display_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    allocation = relationship("LearnerAllocation", back_populates="entries")

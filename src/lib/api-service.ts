@@ -169,6 +169,10 @@ export const productionApi = {
   deleteDowntime: (id: string) => api.delete(`/production/downtime/${id}`).then((r) => r.data),
   deleteWasteEntry: (id: string) => api.delete(`/production/waste-entries/${id}`),
   deleteRFManpower: (id: string) => api.delete(`/production/rf-manpower/${id}`),
+  // Learner Allocation
+  createLearnerAllocation: (data: any) => api.post("/production/learner-allocation", data).then((r) => r.data),
+  getLearnerAllocations: (params?: any) => api.get("/production/learner-allocations", { params }).then((r) => r.data),
+  getLearnerAllocation: (id: string) => api.get(`/production/learner-allocations/${id}`).then((r) => r.data),
 };
 
 // Quality

@@ -42,6 +42,8 @@ import { Route as AppAuditRouteImport } from './routes/_app.audit'
 import { Route as AppAlertsRouteImport } from './routes/_app.alerts'
 import { Route as AppAdminRouteImport } from './routes/_app.admin'
 import { Route as AppAccountsRouteImport } from './routes/_app.accounts'
+import { Route as AppProductionLearnerAllocationsRouteImport } from './routes/_app.production.learner-allocations'
+import { Route as AppProductionLearnerAllocationRouteImport } from './routes/_app.production.learner-allocation'
 import { Route as AppDashboardOwnerRouteImport } from './routes/_app.dashboard.owner'
 import { Route as AppCompanySettingsRouteImport } from './routes/_app.company.settings'
 import { Route as AppCompanyBillingRouteImport } from './routes/_app.company.billing'
@@ -65,6 +67,7 @@ import { Route as AppAdminApprovalsRouteImport } from './routes/_app.admin.appro
 import { Route as AppAdminAnalyticsRouteImport } from './routes/_app.admin.analytics'
 import { Route as AppAdminAlertsRouteImport } from './routes/_app.admin.alerts'
 import { Route as AppAdminAlertOpsRouteImport } from './routes/_app.admin.alert-ops'
+import { Route as AppProductionLearnerAllocationIdRouteImport } from './routes/_app.production.learner-allocation.$id'
 import { Route as AppAdminCompaniesOnboardRouteImport } from './routes/_app.admin.companies.onboard'
 import { Route as AppAdminCompaniesCompanyIdRouteImport } from './routes/_app.admin.companies.$companyId'
 import { Route as AppAdminBillingUpgradeRequestsRouteImport } from './routes/_app.admin.billing.upgrade-requests'
@@ -239,6 +242,18 @@ const AppAccountsRoute = AppAccountsRouteImport.update({
   path: '/accounts',
   getParentRoute: () => AppRoute,
 } as any)
+const AppProductionLearnerAllocationsRoute =
+  AppProductionLearnerAllocationsRouteImport.update({
+    id: '/learner-allocations',
+    path: '/learner-allocations',
+    getParentRoute: () => AppProductionRoute,
+  } as any)
+const AppProductionLearnerAllocationRoute =
+  AppProductionLearnerAllocationRouteImport.update({
+    id: '/learner-allocation',
+    path: '/learner-allocation',
+    getParentRoute: () => AppProductionRoute,
+  } as any)
 const AppDashboardOwnerRoute = AppDashboardOwnerRouteImport.update({
   id: '/owner',
   path: '/owner',
@@ -354,6 +369,12 @@ const AppAdminAlertOpsRoute = AppAdminAlertOpsRouteImport.update({
   path: '/alert-ops',
   getParentRoute: () => AppAdminRoute,
 } as any)
+const AppProductionLearnerAllocationIdRoute =
+  AppProductionLearnerAllocationIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AppProductionLearnerAllocationRoute,
+  } as any)
 const AppAdminCompaniesOnboardRoute =
   AppAdminCompaniesOnboardRouteImport.update({
     id: '/onboard',
@@ -428,7 +449,7 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof AppNotificationsRoute
   '/onboarding': typeof AppOnboardingRoute
   '/payroll': typeof AppPayrollRoute
-  '/production': typeof AppProductionRoute
+  '/production': typeof AppProductionRouteWithChildren
   '/profile': typeof AppProfileRoute
   '/purchase': typeof AppPurchaseRoute
   '/quality': typeof AppQualityRoute
@@ -462,6 +483,8 @@ export interface FileRoutesByFullPath {
   '/company/billing': typeof AppCompanyBillingRoute
   '/company/settings': typeof AppCompanySettingsRoute
   '/dashboard/owner': typeof AppDashboardOwnerRoute
+  '/production/learner-allocation': typeof AppProductionLearnerAllocationRouteWithChildren
+  '/production/learner-allocations': typeof AppProductionLearnerAllocationsRoute
   '/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
   '/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
   '/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
@@ -471,6 +494,7 @@ export interface FileRoutesByFullPath {
   '/admin/billing/upgrade-requests': typeof AppAdminBillingUpgradeRequestsRoute
   '/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
   '/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
+  '/production/learner-allocation/$id': typeof AppProductionLearnerAllocationIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -494,7 +518,7 @@ export interface FileRoutesByTo {
   '/notifications': typeof AppNotificationsRoute
   '/onboarding': typeof AppOnboardingRoute
   '/payroll': typeof AppPayrollRoute
-  '/production': typeof AppProductionRoute
+  '/production': typeof AppProductionRouteWithChildren
   '/profile': typeof AppProfileRoute
   '/purchase': typeof AppPurchaseRoute
   '/quality': typeof AppQualityRoute
@@ -528,6 +552,8 @@ export interface FileRoutesByTo {
   '/company/billing': typeof AppCompanyBillingRoute
   '/company/settings': typeof AppCompanySettingsRoute
   '/dashboard/owner': typeof AppDashboardOwnerRoute
+  '/production/learner-allocation': typeof AppProductionLearnerAllocationRouteWithChildren
+  '/production/learner-allocations': typeof AppProductionLearnerAllocationsRoute
   '/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
   '/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
   '/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
@@ -537,6 +563,7 @@ export interface FileRoutesByTo {
   '/admin/billing/upgrade-requests': typeof AppAdminBillingUpgradeRequestsRoute
   '/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
   '/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
+  '/production/learner-allocation/$id': typeof AppProductionLearnerAllocationIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -562,7 +589,7 @@ export interface FileRoutesById {
   '/_app/notifications': typeof AppNotificationsRoute
   '/_app/onboarding': typeof AppOnboardingRoute
   '/_app/payroll': typeof AppPayrollRoute
-  '/_app/production': typeof AppProductionRoute
+  '/_app/production': typeof AppProductionRouteWithChildren
   '/_app/profile': typeof AppProfileRoute
   '/_app/purchase': typeof AppPurchaseRoute
   '/_app/quality': typeof AppQualityRoute
@@ -596,6 +623,8 @@ export interface FileRoutesById {
   '/_app/company/billing': typeof AppCompanyBillingRoute
   '/_app/company/settings': typeof AppCompanySettingsRoute
   '/_app/dashboard/owner': typeof AppDashboardOwnerRoute
+  '/_app/production/learner-allocation': typeof AppProductionLearnerAllocationRouteWithChildren
+  '/_app/production/learner-allocations': typeof AppProductionLearnerAllocationsRoute
   '/_app/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
   '/_app/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
   '/_app/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
@@ -605,6 +634,7 @@ export interface FileRoutesById {
   '/_app/admin/billing/upgrade-requests': typeof AppAdminBillingUpgradeRequestsRoute
   '/_app/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
   '/_app/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
+  '/_app/production/learner-allocation/$id': typeof AppProductionLearnerAllocationIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -664,6 +694,8 @@ export interface FileRouteTypes {
     | '/company/billing'
     | '/company/settings'
     | '/dashboard/owner'
+    | '/production/learner-allocation'
+    | '/production/learner-allocations'
     | '/admin/billing/analytics'
     | '/admin/billing/command-center'
     | '/admin/billing/invoices'
@@ -673,6 +705,7 @@ export interface FileRouteTypes {
     | '/admin/billing/upgrade-requests'
     | '/admin/companies/$companyId'
     | '/admin/companies/onboard'
+    | '/production/learner-allocation/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -730,6 +763,8 @@ export interface FileRouteTypes {
     | '/company/billing'
     | '/company/settings'
     | '/dashboard/owner'
+    | '/production/learner-allocation'
+    | '/production/learner-allocations'
     | '/admin/billing/analytics'
     | '/admin/billing/command-center'
     | '/admin/billing/invoices'
@@ -739,6 +774,7 @@ export interface FileRouteTypes {
     | '/admin/billing/upgrade-requests'
     | '/admin/companies/$companyId'
     | '/admin/companies/onboard'
+    | '/production/learner-allocation/$id'
   id:
     | '__root__'
     | '/'
@@ -797,6 +833,8 @@ export interface FileRouteTypes {
     | '/_app/company/billing'
     | '/_app/company/settings'
     | '/_app/dashboard/owner'
+    | '/_app/production/learner-allocation'
+    | '/_app/production/learner-allocations'
     | '/_app/admin/billing/analytics'
     | '/_app/admin/billing/command-center'
     | '/_app/admin/billing/invoices'
@@ -806,6 +844,7 @@ export interface FileRouteTypes {
     | '/_app/admin/billing/upgrade-requests'
     | '/_app/admin/companies/$companyId'
     | '/_app/admin/companies/onboard'
+    | '/_app/production/learner-allocation/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1049,6 +1088,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAccountsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/production/learner-allocations': {
+      id: '/_app/production/learner-allocations'
+      path: '/learner-allocations'
+      fullPath: '/production/learner-allocations'
+      preLoaderRoute: typeof AppProductionLearnerAllocationsRouteImport
+      parentRoute: typeof AppProductionRoute
+    }
+    '/_app/production/learner-allocation': {
+      id: '/_app/production/learner-allocation'
+      path: '/learner-allocation'
+      fullPath: '/production/learner-allocation'
+      preLoaderRoute: typeof AppProductionLearnerAllocationRouteImport
+      parentRoute: typeof AppProductionRoute
+    }
     '/_app/dashboard/owner': {
       id: '/_app/dashboard/owner'
       path: '/owner'
@@ -1209,6 +1262,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/alert-ops'
       preLoaderRoute: typeof AppAdminAlertOpsRouteImport
       parentRoute: typeof AppAdminRoute
+    }
+    '/_app/production/learner-allocation/$id': {
+      id: '/_app/production/learner-allocation/$id'
+      path: '/$id'
+      fullPath: '/production/learner-allocation/$id'
+      preLoaderRoute: typeof AppProductionLearnerAllocationIdRouteImport
+      parentRoute: typeof AppProductionLearnerAllocationRoute
     }
     '/_app/admin/companies/onboard': {
       id: '/_app/admin/companies/onboard'
@@ -1375,6 +1435,36 @@ const AppDashboardRouteWithChildren = AppDashboardRoute._addFileChildren(
   AppDashboardRouteChildren,
 )
 
+interface AppProductionLearnerAllocationRouteChildren {
+  AppProductionLearnerAllocationIdRoute: typeof AppProductionLearnerAllocationIdRoute
+}
+
+const AppProductionLearnerAllocationRouteChildren: AppProductionLearnerAllocationRouteChildren =
+  {
+    AppProductionLearnerAllocationIdRoute:
+      AppProductionLearnerAllocationIdRoute,
+  }
+
+const AppProductionLearnerAllocationRouteWithChildren =
+  AppProductionLearnerAllocationRoute._addFileChildren(
+    AppProductionLearnerAllocationRouteChildren,
+  )
+
+interface AppProductionRouteChildren {
+  AppProductionLearnerAllocationRoute: typeof AppProductionLearnerAllocationRouteWithChildren
+  AppProductionLearnerAllocationsRoute: typeof AppProductionLearnerAllocationsRoute
+}
+
+const AppProductionRouteChildren: AppProductionRouteChildren = {
+  AppProductionLearnerAllocationRoute:
+    AppProductionLearnerAllocationRouteWithChildren,
+  AppProductionLearnerAllocationsRoute: AppProductionLearnerAllocationsRoute,
+}
+
+const AppProductionRouteWithChildren = AppProductionRoute._addFileChildren(
+  AppProductionRouteChildren,
+)
+
 interface AppRouteChildren {
   AppAccountsRoute: typeof AppAccountsRoute
   AppAdminRoute: typeof AppAdminRouteWithChildren
@@ -1393,7 +1483,7 @@ interface AppRouteChildren {
   AppNotificationsRoute: typeof AppNotificationsRoute
   AppOnboardingRoute: typeof AppOnboardingRoute
   AppPayrollRoute: typeof AppPayrollRoute
-  AppProductionRoute: typeof AppProductionRoute
+  AppProductionRoute: typeof AppProductionRouteWithChildren
   AppProfileRoute: typeof AppProfileRoute
   AppPurchaseRoute: typeof AppPurchaseRoute
   AppQualityRoute: typeof AppQualityRoute
@@ -1426,7 +1516,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppNotificationsRoute: AppNotificationsRoute,
   AppOnboardingRoute: AppOnboardingRoute,
   AppPayrollRoute: AppPayrollRoute,
-  AppProductionRoute: AppProductionRoute,
+  AppProductionRoute: AppProductionRouteWithChildren,
   AppProfileRoute: AppProfileRoute,
   AppPurchaseRoute: AppPurchaseRoute,
   AppQualityRoute: AppQualityRoute,

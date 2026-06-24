@@ -1017,3 +1017,161 @@ async def delete_machine_group(
         raise HTTPException(status_code=404, detail="Machine group not found")
     await db.delete(group)
     await db.commit()
+
+
+# ─── Learner Allocation ────────────────────────────────────────────────────────
+
+from app.models.production import LearnerAllocation, LearnerAllocationEntry
+from sqlalchemy.orm import selectinload
+from datetime import date as date_type
+
+
+@router.post("/production/learner-allocation", status_code=201)
+async def create_learner_allocation(
+    body: dict,
+    current_user: User = Depends(require_module("production", write=True)),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new learner allocation sheet for a shift."""
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id")
+    company_id = scope.get("company_id")
+    if not mill_id:
+        raise HTTPException(status_code=400, detail="Mill scope required")
+
+    alloc = LearnerAllocation(
+        mill_id=mill_id,
+        company_id=company_id,
+        allocation_date=date_type.fromisoformat(body["allocation_date"]),
+        shift=body["shift"],
+        allocation_type=body.get("allocation_type"),
+        total_persons=body.get("total_persons"),
+        notes=body.get("notes"),
+        submitted_by=current_user.id,
+    )
+    db.add(alloc)
+    await db.flush()  # get alloc.id
+
+    entries_data = body.get("entries", [])
+    for i, e in enumerate(entries_data):
+        if not e.get("machine_no") and not e.get("card_no_a") and not e.get("sub_label"):
+            continue  # skip fully blank rows
+        entry = LearnerAllocationEntry(
+            allocation_id=alloc.id,
+            section=e["section"],
+            machine_no=e.get("machine_no"),
+            card_no_a=e.get("card_no_a"),
+            card_no_b=e.get("card_no_b"),
+            sub_label=e.get("sub_label"),
+            display_order=e.get("display_order", i),
+        )
+        db.add(entry)
+
+    await db.commit()
+    return {"success": True, "id": alloc.id}
+
+
+@router.get("/production/learner-allocations")
+async def list_learner_allocations(
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    shift: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 30,
+    current_user: User = Depends(require_module("production")),
+    db: AsyncSession = Depends(get_db),
+):
+    """List learner allocation sheets for the mill, newest first."""
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id")
+    company_id = scope.get("company_id")
+
+    conditions = []
+    if mill_id:
+        conditions.append(LearnerAllocation.mill_id == mill_id)
+    elif company_id:
+        conditions.append(LearnerAllocation.company_id == company_id)
+
+    if date_from:
+        conditions.append(LearnerAllocation.allocation_date >= date_type.fromisoformat(date_from))
+    if date_to:
+        conditions.append(LearnerAllocation.allocation_date <= date_type.fromisoformat(date_to))
+    if shift:
+        conditions.append(LearnerAllocation.shift == shift)
+
+    total = (await db.execute(select(func.count(LearnerAllocation.id)).where(*conditions))).scalar_one()
+    rows = (await db.execute(
+        select(LearnerAllocation)
+        .where(*conditions)
+        .order_by(LearnerAllocation.allocation_date.desc(), LearnerAllocation.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )).scalars().all()
+
+    return {
+        "total": total, "page": page, "page_size": page_size,
+        "items": [
+            {
+                "id": r.id,
+                "allocation_date": str(r.allocation_date),
+                "shift": r.shift,
+                "allocation_type": r.allocation_type,
+                "total_persons": r.total_persons,
+                "notes": r.notes,
+                "submitted_by": r.submitted_by,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.get("/production/learner-allocations/{allocation_id}")
+async def get_learner_allocation(
+    allocation_id: str,
+    current_user: User = Depends(require_module("production")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get a single allocation sheet with all entries."""
+    scope = await get_mill_scope(current_user, db)
+    result = await db.execute(
+        select(LearnerAllocation)
+        .where(LearnerAllocation.id == allocation_id)
+        .options(selectinload(LearnerAllocation.entries))
+    )
+    alloc = result.scalar_one_or_none()
+    if not alloc:
+        raise HTTPException(status_code=404, detail="Allocation not found")
+
+    # Tenant check
+    mill_id = scope.get("mill_id")
+    company_id = scope.get("company_id")
+    role_code = current_user.role_rel.code if current_user.role_rel else ""
+    if role_code != "SUPER_ADMIN":
+        if mill_id and str(alloc.mill_id) != mill_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+        elif company_id and str(alloc.company_id) != company_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    return {
+        "id": alloc.id,
+        "allocation_date": str(alloc.allocation_date),
+        "shift": alloc.shift,
+        "allocation_type": alloc.allocation_type,
+        "total_persons": alloc.total_persons,
+        "notes": alloc.notes,
+        "submitted_by": alloc.submitted_by,
+        "created_at": alloc.created_at.isoformat() if alloc.created_at else None,
+        "entries": [
+            {
+                "id": e.id,
+                "section": e.section,
+                "machine_no": e.machine_no,
+                "card_no_a": e.card_no_a,
+                "card_no_b": e.card_no_b,
+                "sub_label": e.sub_label,
+                "display_order": e.display_order,
+            }
+            for e in alloc.entries
+        ],
+    }
