@@ -269,14 +269,8 @@ async def create_employee(
     if total_sal is None:
         total_sal = (req.basic or 0) + (req.house_rent or 0) + (req.medical or 0) + (req.conveyance or 0) + (req.food_allowance or 0) + (req.wages or 0) + (req.increment or 0) + (req.mobile_bill or 0) + (req.shift_benefit or 0)
 
-    # Enforce employee limit via subscription plan
+    # Single-mill build: no employee limit enforced
     mill = await db.get(Mill, mill_id)
-    if mill:
-        from app.services.pricing_service import PricingService
-        svc = PricingService(db)
-        ok, msg = await svc.can_create_employee(str(mill.company_id))
-        if not ok:
-            raise HTTPException(status_code=403, detail=msg)
 
     # Auto-generate employee code if not provided
     emp_code = (req.employee_code or "").strip()

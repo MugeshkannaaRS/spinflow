@@ -430,10 +430,6 @@ async def update_currency(
             sub.currency_code = code
         else:
             # Auto-create subscription row if none exists
-            from app.services.pricing_service import PricingService
-            plans_res = await db.execute(
-                select(CompanySubscription.__class__).limit(0)  # just check table exists
-            )
             db.add(CompanySubscription(
                 company_id=company_id,
                 plan_id=None,

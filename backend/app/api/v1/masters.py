@@ -167,11 +167,7 @@ async def create_mill(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),
 ):
-    from app.services.pricing_service import PricingService
-    svc = PricingService(db)
-    ok, msg = await svc.can_create_mill(req.company_id)
-    if not ok:
-        raise HTTPException(status_code=403, detail=msg)
+    # Single-mill build: no mill limit enforced
     service = MastersService(db, current_user)
     return await service.create_mill(req, created_by=current_user.id)
 
@@ -1206,27 +1202,19 @@ async def mill_owner_create_mill(
     MILL_OWNER and SUPER_ADMIN only.
     """
     from app.core.deps import get_mill_scope
-    from app.services.pricing_service import PricingService
-
     role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
     if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
         raise HTTPException(status_code=403, detail="Mill Owner or Super Admin only")
 
     company_id = str(current_user.company_id) if current_user.company_id else None
     if not company_id:
-        # Fallback: derive from mill_id
         if current_user.mill_id:
             m = await db.get(Mill, current_user.mill_id)
             if m:
                 company_id = str(m.company_id)
     if not company_id:
         raise HTTPException(status_code=400, detail="No company associated with this user")
-
-    # Pricing / plan limit check
-    svc = PricingService(db)
-    ok, msg = await svc.can_create_mill(company_id)
-    if not ok:
-        raise HTTPException(status_code=403, detail=msg)
+    # Single-mill build: no mill limit enforced
 
     # Unique code check
     existing = await db.execute(select(Mill).where(Mill.code == req.code.strip()))

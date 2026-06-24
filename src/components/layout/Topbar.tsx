@@ -5,7 +5,7 @@ import { useSidebar } from "@/components/layout/SidebarContext";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useNavigate, Link, useLocation } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
+
 import {
   Bell,
   BellOff,
@@ -14,13 +14,10 @@ import {
   Sun,
   LogOut,
   User,
-  Building2,
-  ChevronDown,
-  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/utils/time";
-import { useActiveMill } from "@/hooks/useActiveMill";
+
 
 // Role → badge color (matches Sidebar)
 const ROLE_BADGE_COLORS: Record<string, string> = {
@@ -203,32 +200,13 @@ export function Topbar({
   subtitle?: string;
   children?: React.ReactNode;
 }) {
-  const { user, logout, activeMill, setActiveMill } = useAuth();
-  const { mills } = useActiveMill();
+  const { user, logout } = useAuth();
   const { toggle } = useSidebar();
   const { theme, toggle: toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const qc = useQueryClient();
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [millDropdownOpen, setMillDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const millDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close mill dropdown on outside click
-  useEffect(() => {
-    if (!millDropdownOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (millDropdownRef.current && !millDropdownRef.current.contains(e.target as Node)) {
-        setMillDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [millDropdownOpen]);
-
-  const showMillSwitcher =
-    (user?.role === "MILL_OWNER" || user?.role === "GENERAL_MANAGER") && mills.length > 1;
 
   // Derive page title from route path, falling back to the prop or default
   const pagePath = location.pathname;
@@ -294,55 +272,7 @@ export function Topbar({
 
       {/* Right cluster */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        {/* Mill switcher — only for MILL_OWNER / GM with 2+ mills */}
-        {showMillSwitcher && (
-          <div className="relative hidden sm:block" ref={millDropdownRef}>
-            <button
-              onClick={() => setMillDropdownOpen((v) => !v)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-[#e2e8f0] bg-white hover:bg-[#f8fafc] transition-colors"
-            >
-              <Building2 className="w-4 h-4 text-[#64748b] shrink-0" />
-              <span className="text-[13px] font-medium text-[#0f172a] max-w-[120px] truncate">
-                {activeMill?.name ?? "Select Mill"}
-              </span>
-              <ChevronDown className="w-4 h-4 text-[#94a3b8] shrink-0" />
-            </button>
-            {millDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-white border border-[#e2e8f0] rounded-xl shadow-lg overflow-hidden min-w-[200px]">
-                <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[#94a3b8] border-b border-[#f1f5f9]">
-                  Switch Mill
-                </div>
-                {mills.map((m) => {
-                  const isActive = activeMill?.id === m.id;
-                  return (
-                    <button
-                      key={m.id}
-                      onClick={() => {
-                        setActiveMill(m);
-                        qc.invalidateQueries();
-                        setMillDropdownOpen(false);
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-[#f8fafc] transition-colors text-left"
-                    >
-                      <span className="font-mono text-[11px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-semibold shrink-0">
-                        {m.code || m.name.slice(0, 3).toUpperCase()}
-                      </span>
-                      <span
-                        className={cn(
-                          "flex-1 text-[13px] truncate",
-                          isActive ? "font-semibold text-[#0f172a]" : "text-[#374151]",
-                        )}
-                      >
-                        {m.name}
-                      </span>
-                      {isActive && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+        {/* Mill switcher removed — single-mill build */}
 
         <NotificationsDropdown />
 

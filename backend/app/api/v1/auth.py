@@ -42,7 +42,7 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
         path="/api/v1/auth/refresh",
     )
 from app.models.masters import Company, CompanyModule, MillSettings, Mill
-from app.services.pricing_service import PricingService
+
 from app.models.ui_config import ColumnConfig
 from pydantic import BaseModel, Field
 
@@ -567,12 +567,7 @@ async def create_user(
         )
     )
     current_count = user_count_result.scalar() or 0
-    company = await db.get(Company, company_id)
-    svc = PricingService(db)
-    limits = await svc.get_effective_limits(company)
-    max_users = limits.user_limit
-    if current_count >= max_users:
-        raise HTTPException(status_code=403, detail=f"User limit reached ({current_count}/{max_users}). Upgrade your plan to add more users.")
+    # Single-mill build: no user limit enforced
     user = User(
         name=req.name,
         email=req.email,

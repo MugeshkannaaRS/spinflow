@@ -106,22 +106,18 @@ const NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
 // Admin sub-items shown inside the collapsible Admin group (SUPER_ADMIN only)
 const ADMIN_SUB_ITEMS = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { to: "/admin/companies", label: "Companies", icon: Building2, exact: false },
   { to: "/admin/users", label: "Users", icon: Users, exact: false },
   { to: "/admin/roles", label: "Role Permissions", icon: Shield, exact: false },
-  { to: "/admin/analytics", label: "Analytics", icon: BarChart3, exact: false },
-  { to: "/admin/billing", label: "Billing", icon: CreditCard, exact: false },
   { to: "/admin/approvals", label: "Approvals", icon: CheckSquare, exact: false },
   { to: "/admin/alert-ops", label: "Alert Ops", icon: Bell, exact: false },
   { to: "/admin/incidents", label: "Incidents", icon: Flag, exact: false },
   { to: "/admin/backups", label: "Backups", icon: Database, exact: false },
   { to: "/admin/health", label: "Health", icon: Activity, exact: false },
-  { to: "/admin/archive", label: "Archive", icon: Archive, exact: false },
   { to: "/admin/column-config", label: "Column Config", icon: SlidersHorizontal, exact: false },
-  { to: "/admin/sales", label: "Sales Center", icon: TrendUpIcon, exact: false },
+  { to: "/admin/audit", label: "Audit Logs", icon: Archive, exact: false },
 ];
 
-const COMPANY_OWNER_ROLES = new Set(["MILL_OWNER", "SUPER_ADMIN"]);
+// Single-mill: no owner-level role gates needed
 
 // Role → badge color
 const ROLE_BADGE_COLORS: Record<string, string> = {
@@ -244,10 +240,6 @@ function SidebarContent({
     }),
   })).filter((group) => group.items.length > 0);
 
-  // CATEGORY B: ownership gates — billing and owner dashboard are company-level features,
-  // not module-access decisions. Only the mill owner sees them regardless of module overrides.
-  const showBilling = user.role === "MILL_OWNER" && !isDashboardOnly();
-  const showOwnerDashboard = user.role === "MILL_OWNER" && !isDashboardOnly();
 
   return (
     <div className="flex flex-col h-full" style={{ backgroundColor: "#0f172a" }}>
@@ -272,7 +264,7 @@ function SidebarContent({
                 SpinFlow ERP
               </div>
               <div className="text-[#94a3b8] text-xs mt-0.5 truncate">
-                {user?.role === "SUPER_ADMIN" ? "Vendor" : (user?.millName ?? "Your mill")}
+                {user?.millName ?? "AA Coarse Spun"}
               </div>
             </div>
           </Link>
@@ -390,8 +382,8 @@ function SidebarContent({
           </div>
         ))}
 
-        {/* ── Group Dashboard (MILL_OWNER only) ─────────────────── */}
-        {showOwnerDashboard && (
+        {/* ── Group Dashboard (removed — single-mill) ── */}
+        {false && (
           <div className="mb-1">
             {!collapsed && (
               <div
@@ -612,8 +604,8 @@ function SidebarContent({
           </div>
         )}
 
-        {/* Billing */}
-        {showBilling && (
+        {/* Billing — removed in single-mill build */}
+        {false && (
           <div className="mb-1">
             {!collapsed && (
               <div

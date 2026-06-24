@@ -173,12 +173,7 @@ async def create_user(
         if existing.scalar_one_or_none():
             raise HTTPException(400, f"Email {email} is already in use")
 
-        from app.services.pricing_service import PricingService
-        pricing_svc = PricingService(db)
-        ok, msg = await pricing_svc.can_create_user(company_id)
-        if not ok:
-            raise HTTPException(status_code=403, detail=msg)
-
+        # Single-mill build: no user limit enforced
         # Use SELECT FOR UPDATE to prevent race condition on user limit check
         company_result = await db.execute(
             select(Company).where(Company.id == company_id).with_for_update()
@@ -693,9 +688,8 @@ async def get_company_detail(
                 "expires_at": str(sub.expires_at) if sub.expires_at else None,
             }
 
-        from app.services.pricing_service import PricingService
-        svc = PricingService(db)
-        effective = await svc.get_effective_limits(company)
+        # Single-mill: no subscription limits
+        effective = None
 
         audit_result = await db.execute(
             select(AuditLog)
@@ -735,11 +729,6 @@ async def get_company_detail(
             "employee_count": employee_count,
             "enabled_modules_count": len(enabled_modules),
             "enabled_modules": enabled_modules,
-            "user_limit": effective.user_limit,
-            "mill_limit": effective.mill_limit,
-            "employee_limit": effective.employee_limit,
-            "included_users": effective.included_users,
-            "included_mills": effective.included_mills,
         },
         "subscription": subscription,
         "recent_audit": recent_audit,
@@ -2540,3 +2529,153 @@ async def create_incident(body: dict, current_user: User = Depends(get_current_u
     await log_audit(db, current_user.id, "SUPER_ADMIN", "incident_created", "admin", inc.id,
                     f"Incident: {inc.severity} - {inc.title}", module="admin")
     return {"success": True, "id": inc.id}
+
+
+# ── Single-Mill System Health ──────────────────────────────────────────────────
+
+@router.get("/admin/system-health")
+async def get_system_health(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Aggregate ERP health — all queries fired in parallel via asyncio.gather."""
+    import asyncio
+    from datetime import date, timedelta, timezone as _tz
+    from sqlalchemy import case, literal_column, text
+    from app.models.production import ProductionEntry, Machine
+    from app.models.maintenance import MaintenanceLog
+    from app.models.alerts import AlertEvent
+    from app.models.governance import ApprovalRequest
+
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code != "SUPER_ADMIN":
+        raise HTTPException(status_code=403, detail="Super Admin only")
+
+    today = date.today()
+    week_ago = datetime.now(_tz.utc) - timedelta(days=7)
+    MODULE_LIST = ["production", "hr", "payroll", "quality", "dispatch", "maintenance", "purchase", "inventory"]
+
+    # ── Helper: safe scalar ───────────────────────────────────────────────
+    async def _scalar(stmt, default=0):
+        try:
+            return (await db.execute(stmt)).scalar() or default
+        except Exception:
+            return default
+
+    async def _all(stmt, default=None):
+        try:
+            return (await db.execute(stmt)).all()
+        except Exception:
+            return default or []
+
+    # ── Fire all independent queries in parallel ───────────────────────────
+    (
+        role_rows,
+        machine_rows,
+        prod_today,
+        maint_open,
+        alert_rows,           # (status, severity, count) grouped
+        pending_approvals,
+        open_incidents,
+        audit_rows,
+        module_rows,          # single GROUP BY query replaces 8 serial queries
+    ) = await asyncio.gather(
+        # 1. Users by role
+        _all(
+            select(Role.code, func.count(User.id).label("cnt"))
+            .join(User, User.role_id == Role.id)
+            .where(User.deleted_at.is_(None), User.is_active == True)
+            .group_by(Role.code)
+        ),
+        # 2. Machines by current_status
+        _all(
+            select(Machine.current_status, func.count(Machine.id).label("cnt"))
+            .where(Machine.status == True)
+            .group_by(Machine.current_status)
+        ),
+        # 3. Production entries today
+        _scalar(
+            select(func.count(ProductionEntry.id))
+            .where(func.date(ProductionEntry.created_at) == today)
+        ),
+        # 4. Open maintenance logs
+        _scalar(
+            select(func.count(MaintenanceLog.id))
+            .where(MaintenanceLog.status == "open")
+        ),
+        # 5. Alerts grouped by (status, severity) — one query instead of two
+        _all(
+            select(AlertEvent.status, AlertEvent.severity, func.count(AlertEvent.id).label("cnt"))
+            .where(AlertEvent.status == "active")
+            .group_by(AlertEvent.status, AlertEvent.severity)
+        ),
+        # 6. Pending approvals
+        _scalar(
+            select(func.count(ApprovalRequest.id))
+            .where(ApprovalRequest.status == "pending")
+        ),
+        # 7. Open incidents
+        _scalar(
+            select(func.count(Incident.id))
+            .where(Incident.status == "open")
+        ),
+        # 8. Recent audit (last 10)
+        _all(
+            select(AuditLog.action, AuditLog.entity, AuditLog.role,
+                   AuditLog.created_at, AuditLog.details, AuditLog.severity)
+            .order_by(AuditLog.created_at.desc())
+            .limit(10)
+        ),
+        # 9. Module last-activity — one GROUP BY replaces N serial queries
+        _all(
+            select(AuditLog.module, func.max(AuditLog.created_at).label("last_at"))
+            .where(AuditLog.module.in_(MODULE_LIST))
+            .group_by(AuditLog.module)
+        ),
+    )
+
+    # ── Process results ───────────────────────────────────────────────────
+    users_by_role = {r.code: r.cnt for r in role_rows}
+    total_users = sum(users_by_role.values())
+
+    machines_by_status = {r.current_status: r.cnt for r in machine_rows}
+    total_machines = sum(machines_by_status.values())
+    machines_running = machines_by_status.get("running", 0)
+
+    alerts_active = sum(r.cnt for r in alert_rows)
+    alerts_critical = sum(r.cnt for r in alert_rows if r.severity == "critical")
+
+    recent_audit = [
+        {
+            "action": r.action,
+            "entity": r.entity,
+            "role": r.role,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "details": r.details,
+            "severity": r.severity or "INFO",
+        }
+        for r in audit_rows
+    ]
+
+    module_last: dict[str, Optional[datetime]] = {r.module: r.last_at for r in module_rows}
+    module_status = {}
+    for mod in MODULE_LIST:
+        last = module_last.get(mod)
+        if last is None:
+            module_status[mod] = {"status": "no_data", "last_activity": None}
+        elif last >= week_ago:
+            module_status[mod] = {"status": "active", "last_activity": last.isoformat()}
+        else:
+            module_status[mod] = {"status": "idle", "last_activity": last.isoformat()}
+
+    return {
+        "users":             {"total": total_users, "by_role": users_by_role},
+        "machines":          {"total": total_machines, "running": machines_running, "by_status": machines_by_status},
+        "production_today":  prod_today,
+        "maintenance_open":  maint_open,
+        "alerts":            {"active": alerts_active, "critical": alerts_critical},
+        "pending_approvals": pending_approvals,
+        "open_incidents":    open_incidents,
+        "module_status":     module_status,
+        "recent_audit":      recent_audit,
+    }

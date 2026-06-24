@@ -28,14 +28,11 @@ _app_init_error: Optional[str] = None
 from app.api.v1 import auth, production, quality, inventory, dispatch, purchase, stores, hr, accounts, maintenance, dashboard, qr_system, reports, users, audit, masters, stock as stock_router, sales as sales_router, lotrac as lotrac_router, payroll as payroll_router, uploads as uploads_router, exports as exports_router, ui_config as ui_config_router, imports as imports_router
 from app.api.v1.quality_forms import router as quality_forms_router
 from app.api.v1.admin import router as admin_router
-from app.api.v1.billing import router as billing_router
 from app.api.v1.mill_config import router as mill_config_router
 from app.api.v1.mixing import router as mixing_router
 from app.api.v1.production_v2 import router as production_v2_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.alerts import router as alerts_router
-from app.api.v1.customer_success import router as customer_success_router
-from app.api.v1.demo import router as demo_router
 from app.api.v1.custom_fields import router as custom_fields_router
 from app.ws.notifications import router as ws_router
 
@@ -230,24 +227,14 @@ async def _background_init():
         logger.info("END step 1b: migration 040 DDL confirmed")
 
         from app.db.session import get_db
-        from app.services.pricing_service import PricingService
         from app.services.alert_service import seed_default_rules, seed_escalation_policies
-        from app.services.customer_success_service import seed_help_content
-        from app.services.demo_service import TourService, NudgeService
         from app.models.masters import Company
         from sqlalchemy import select
 
         async for session in get_db():
             try:
-                # ── Step 2: Seed plans + addons ─────────────────────────
-                logger.info("START step 2: Seed plans/addons")
-                ps = PricingService(session)
-                await ps.seed_default_plans()
-                await ps.seed_default_addons()
-                logger.info("END step 2: Seed plans/addons")
-
-                # ── Step 3: Seed alert rules ────────────────────────────
-                logger.info("START step 3: Seed alert rules/policies")
+                # ── Step 2: Seed alert rules ────────────────────────────
+                logger.info("START step 2: Seed alert rules/policies")
                 n_esc = await seed_escalation_policies(session, company_id=None)
                 if n_esc:
                     await session.commit()
@@ -262,90 +249,22 @@ async def _background_init():
                     total_esc += await seed_escalation_policies(session, company_id=cid)
                 if total_rules or total_esc:
                     await session.commit()
-                    logger.info("W4B seed: %d rules + %d policies", total_rules, total_esc)
-                logger.info("END step 3: Seed alert rules/policies")
-
-                # ── Step 4: Seed help content ──────────────────────────
-                logger.info("START step 4: Seed help content")
-                n = await seed_help_content(session)
-                if n:
-                    await session.commit()
-                    logger.info("W5.3: seeded %d help articles + categories", n)
-                logger.info("END step 4: Seed help content")
-
-                # ── Step 5: Seed tours + nudges ────────────────────────
-                logger.info("START step 5: Seed tours/nudges")
-                n_tours = await TourService(session).seed_default_tours()
-                n_nudges = await NudgeService(session).seed_default_nudges()
-                if n_tours or n_nudges:
-                    await session.commit()
-                    logger.info("W5.4: seeded %d tours + %d nudges", n_tours, n_nudges)
-                logger.info("END step 5: Seed tours/nudges")
+                    logger.info("Seed: %d rules + %d policies", total_rules, total_esc)
+                logger.info("END step 2: Seed alert rules/policies")
             except Exception as exc:
                 logger.error("Non-fatal seed error (continuing): %s", exc, exc_info=True)
             break
 
-        # ── Step 6: Start background loops ─────────────────────────────
-        logger.info("START step 6: Background loops")
-        expiry_task = asyncio.create_task(_expiry_loop())
-        billing_task = asyncio.create_task(_billing_loop())
+        # ── Step 3: Start background loop ──────────────────────────────
+        logger.info("START step 3: Background loop")
         enterprise_task = asyncio.create_task(_enterprise_loop())
-        logger.info("END step 6: Background loops (expiry, billing, enterprise)")
+        logger.info("END step 3: Background loop started")
 
         _app_started = True
         logger.info("Application startup complete — all initialization done")
     except Exception as exc:
         _app_init_error = str(exc)
         logger.critical("FATAL: App init failed: %s", exc, exc_info=True)
-
-
-async def _expiry_loop():
-    from app.db.session import get_db
-    from app.services.pricing_service import PricingService
-    while True:
-        try:
-            async for session in get_db():
-                await PricingService(session).process_expirations()
-                await session.commit()
-                break
-        except Exception as exc:
-            logger.error("Expiry check failed: %s", exc, exc_info=True)
-        await asyncio.sleep(3600)
-
-
-async def _billing_loop():
-    from app.db.session import get_db
-    from datetime import datetime, timezone
-    _PS = _OS = _IS = None
-    while True:
-        now_dt = datetime.now(timezone.utc)
-        try:
-            async for session in get_db():
-                if _PS is None:
-                    from app.services.pricing_service import PricingService
-                    _PS = PricingService
-                    from app.services.overdue_service import OverdueService
-                    _OS = OverdueService
-                    from app.services.billing_invoice_service import InvoiceService
-                    _IS = InvoiceService
-
-                await _PS(session).process_expirations()
-                await session.commit()
-                await _OS(session).process_overdue_workflow()
-                await session.commit()
-
-                if now_dt.day == 1 and now_dt.hour == 2:
-                    result = await _IS(session).generate_all_monthly_invoices()
-                    await session.commit()
-                    if result.get("generated", 0):
-                        logger.info("Monthly billing: %d invoices generated", result["generated"])
-
-                await _IS(session).generate_past_due_invoices()
-                await session.commit()
-                break
-        except Exception as exc:
-            logger.error("Billing scheduler: %s", exc, exc_info=True)
-        await asyncio.sleep(3600)
 
 
 async def _enterprise_loop():
@@ -415,12 +334,7 @@ async def _enterprise_loop():
         if now - last_snapshot >= snapshot_interval:
             try:
                 async for session in get_db():
-                    from app.services.alert_service import take_usage_snapshot, check_and_fire_billing_alerts, check_maintenance_due_alerts
-                    n = await take_usage_snapshot(session)
-                    logger.info("Usage snapshot taken for %d companies", n)
-                    n = await check_and_fire_billing_alerts(session)
-                    if n:
-                        logger.info("Fired %d billing alerts", n)
+                    from app.services.alert_service import check_maintenance_due_alerts
                     n = await check_maintenance_due_alerts(session)
                     if n:
                         logger.info("Fired %d maintenance due alerts", n)
@@ -506,14 +420,11 @@ app.include_router(exports_router.router, prefix=API_PREFIX, tags=["Exports"])
 app.include_router(ui_config_router.router, prefix=API_PREFIX, tags=["UI Config"])
 app.include_router(imports_router.router, prefix=API_PREFIX, tags=["Imports"])
 app.include_router(admin_router, prefix=API_PREFIX, tags=["Admin"])
-app.include_router(billing_router, prefix=API_PREFIX, tags=["Billing"])
 app.include_router(mill_config_router, prefix=API_PREFIX, tags=["Mill Config"])
 app.include_router(mixing_router, prefix=API_PREFIX, tags=["Mixing & JCP"])
 app.include_router(production_v2_router, prefix=API_PREFIX, tags=["Production v2"])
 app.include_router(notifications_router, prefix=API_PREFIX, tags=["Notifications"])
 app.include_router(alerts_router, prefix=API_PREFIX, tags=["Alerts"])
-app.include_router(customer_success_router, prefix=API_PREFIX, tags=["Customer Success"])
-app.include_router(demo_router, prefix=API_PREFIX, tags=["Demo & Trial"])
 app.include_router(custom_fields_router, prefix=API_PREFIX, tags=["Custom Fields"])
 app.include_router(ws_router)
 
