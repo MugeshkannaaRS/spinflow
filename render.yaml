@@ -1,52 +1,26 @@
-# =============================================================================
-# SpinFlow ERP — Render Blueprint (Infrastructure as Code)
-# =============================================================================
-# Deploy with:
-#   render blueprint launch
-#
-# Or manually create:
-#   1. Supabase project (free tier)
-#   2. Render Web Service (backend) from this yaml
-#   3. Render Static Site (frontend) from this yaml
-# =============================================================================
-
 services:
-  # ── Backend API ───────────────────────────────────────────────────────
   - type: web
-    name: spinflow-staging-backend
-    env: python
+    name: spinflow-backend
+    runtime: python
+    rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn wsgi:app --host 0.0.0.0 --port $PORT --workers 1 --loop asyncio
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --loop asyncio
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
-        sync: false
-      - key: DATABASE_SYNC_URL
         sync: false
       - key: SECRET_KEY
         sync: false
       - key: REFRESH_SECRET_KEY
         sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: QR_SECRET_KEY
-        sync: false
       - key: DEBUG
         value: "false"
-      - key: CORS_ORIGINS
-        # List ALL legitimate frontend origins explicitly. No wildcards.
-        value: "https://spinflow-staging-frontend.onrender.com,https://spinflow.onrender.com,https://spinflow-f.onrender.com"
-      - key: CORS_ORIGIN_REGEX
-        # Restricted to ngrok dev tunnels only — NOT all of onrender.com
-        value: "^https://.*\\.ngrok(?:-free)?\\.dev$"
-      - key: RAZORPAY_WEBHOOK_SECRET
-        sync: false
 
-  # ── Frontend Static Site ──────────────────────────────────────────────
-  - type: static_site
-    name: spinflow-staging-frontend
-    buildCommand: npm ci && npm run build
+  - type: web
+    name: spinflow-frontend
+    runtime: static
+    buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     envVars:
       - key: VITE_API_BASE_URL
-        value: https://spinflow-staging-backend.onrender.com
+        sync: false
