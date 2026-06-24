@@ -3544,13 +3544,22 @@ function ManpowerGrid() {
       )}
       {/* ── Header card: date / shift / dept ── */}
       <Card>
-        <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
+        <CardHeader className="py-3 px-4 flex flex-row items-center justify-between gap-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Users2 className="size-4 text-muted-foreground" />
             Manpower Plan
           </CardTitle>
-          {/* Mode toggle */}
-          <div className="flex rounded-md border overflow-hidden text-xs">
+          <div className="flex items-center gap-2 ml-auto">
+            {/* Allocation Sheets shortcut */}
+            <button
+              onClick={() => window.location.href = "/production/learner-allocations"}
+              className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-md transition-colors"
+            >
+              <ClipboardCheck className="size-3.5" />
+              Allocation Sheets
+            </button>
+            {/* Mode toggle */}
+            <div className="flex rounded-md border overflow-hidden text-xs">
             <button
               className={`px-3 py-1.5 font-medium transition-colors ${manpowerMode === "individual" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`}
               onClick={() => {
@@ -3573,6 +3582,7 @@ function ManpowerGrid() {
             >
               Machine Group
             </button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="px-4 pb-4 space-y-4">
@@ -5629,15 +5639,6 @@ function ProductionPage() {
             </TabsContent>
 
             <TabsContent value="manpower">
-              <div className="flex justify-end px-4 pt-3 pb-0">
-                <button
-                  onClick={() => window.location.href = "/production/learner-allocations"}
-                  className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 border border-blue-200 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
-                >
-                  <ClipboardCheck className="size-3.5" />
-                  Allocation Sheets
-                </button>
-              </div>
               <ErrorBoundary key={`manpower-${activeTab}`} inline label="Shift Planning">
                 {canEdit ? (
                   <ManpowerGrid />
