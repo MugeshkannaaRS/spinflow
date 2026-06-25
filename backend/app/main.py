@@ -214,14 +214,10 @@ async def _background_init():
     global _app_started, _app_init_error
     try:
         # ── Step 1: Alembic migration ───────────────────────────────────
-        logger.info("START step 1: Alembic migration")
-        try:
-            await asyncio.to_thread(_run_alembic_upgrade)
-            logger.info("END step 1: Alembic migration OK")
-        except Exception as alembic_exc:
-            logger.error("Alembic upgrade failed (%s) — will apply raw SQL fallback", alembic_exc)
+        # DISABLED: Supabase pooler transaction-mode hangs Alembic advisory locks.
+        # Schema is already at head in Supabase. Re-enable once session-mode pooler confirmed.
+        logger.info("SKIP step 1: Alembic migration (disabled — schema already at head)")
         # Always run raw DDL for migration 040 — fully idempotent (IF NOT EXISTS).
-        # Handles case where Alembic reports "already at head" but DDL never actually ran.
         logger.info("START step 1b: ensure migration 040 DDL")
         await _apply_migration_040_raw()
         logger.info("END step 1b: migration 040 DDL confirmed")
