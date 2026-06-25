@@ -35,8 +35,13 @@ def do_run_migrations(connection: Connection) -> None:
 
 async def run_async_migrations() -> None:
     from sqlalchemy.ext.asyncio import create_async_engine
+    # Supabase pooler port 5432 = transaction mode (breaks Alembic advisory locks).
+    # Port 6543 = session mode — required for migrations. Swap here only.
+    migration_url = settings.DATABASE_URL.replace(
+        "pooler.supabase.com:5432", "pooler.supabase.com:6543"
+    )
     connectable = create_async_engine(
-        settings.DATABASE_URL, poolclass=pool.NullPool, connect_args={"timeout": 10}
+        migration_url, poolclass=pool.NullPool, connect_args={"timeout": 30}
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
