@@ -360,13 +360,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=[
-        "localhost",
-        "127.0.0.1",
-        "::1",
-        "spinflow.onrender.com",
-        "*.onrender.com",
-    ],
+    allowed_hosts=["*"],  # Railway health checker uses internal IP as Host; wildcard avoids 400s
 )
 
 # CORS must be outermost middleware (added last) so it wraps all errors
