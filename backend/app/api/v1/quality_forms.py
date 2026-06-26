@@ -790,9 +790,9 @@ async def _v2_create(slug: str, payload: Dict[str, Any],
     kwargs.setdefault("status", "draft")
 
     # Validate required NOT NULL fields before attempting insert
-    for req_field in ("lot_no", "machine_no", "date"):
+    for req_field in ("lot_no", "machine_no", "date", "shift_code"):
         if req_field in allowed and not kwargs.get(req_field):
-            label = {"lot_no": "Process/Lot No", "machine_no": "Machine No", "date": "Date"}.get(req_field, req_field)
+            label = {"lot_no": "Process/Lot No", "machine_no": "Machine No", "date": "Date", "shift_code": "Shift"}.get(req_field, req_field)
             raise HTTPException(status_code=400, detail=f"{label} is required.")
 
     try:

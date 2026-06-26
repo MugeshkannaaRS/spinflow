@@ -2215,6 +2215,528 @@ function QmSheetDialog({
   );
 }
 
+// ── Bag Weight Dialog — individual cone weight entry ─────────────────────────
+function BagWeightDialog({ open, onClose, editRecord, millId, endpoint }: {
+  open: boolean; onClose: () => void; editRecord: any | null;
+  millId: string | null | undefined; endpoint: string;
+}) {
+  const qc = useQueryClient();
+  const shiftOptions = useShifts();
+  const today = new Date().toISOString().slice(0, 10);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    date: today, shift_code: "", lot_no: "", count_ne: "", cone_tip_type: "",
+    inspector: "", target_weight: "", remarks: "", status: "draft",
+  });
+  const [weights, setWeights] = useState<string[]>(Array(20).fill(""));
+
+  useEffect(() => {
+    if (editRecord) {
+      setForm({
+        date: editRecord.date ?? today, shift_code: editRecord.shift_code ?? "",
+        lot_no: editRecord.lot_no ?? "", count_ne: editRecord.count_ne ?? "",
+        cone_tip_type: editRecord.cone_tip_type ?? "", inspector: editRecord.inspector ?? "",
+        target_weight: editRecord.target_weight ?? "", remarks: editRecord.remarks ?? "",
+        status: editRecord.status ?? "draft",
+      });
+      const samples: any[] = editRecord.samples_json?.samples ?? [];
+      const ws = samples.map((s: any) => String(s.net_wt ?? ""));
+      setWeights([...ws, ...Array(Math.max(0, 20 - ws.length)).fill("")]);
+    } else {
+      setForm({ date: today, shift_code: "", lot_no: "", count_ne: "", cone_tip_type: "", inspector: "", target_weight: "", remarks: "", status: "draft" });
+      setWeights(Array(20).fill(""));
+    }
+  }, [editRecord, open]);
+
+  const nums = weights.map((w) => parseFloat(w)).filter((n) => !isNaN(n));
+  const avgWt = nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
+  const minWt = nums.length ? Math.min(...nums) : null;
+  const maxWt = nums.length ? Math.max(...nums) : null;
+  const stdDev = nums.length > 1 && avgWt != null
+    ? Math.sqrt(nums.reduce((s, v) => s + (v - avgWt) ** 2, 0) / nums.length)
+    : null;
+  const target = parseFloat(form.target_weight);
+  const under = !isNaN(target) && nums.length ? nums.filter((w) => w < target).length : 0;
+  const over  = !isNaN(target) && nums.length ? nums.filter((w) => w > target).length : 0;
+  const pass  = nums.length - under - over;
+  const passPct = nums.length ? (pass / nums.length) * 100 : null;
+  const devPct = !isNaN(target) && target > 0 && avgWt != null
+    ? ((avgWt - target) / target) * 100 : null;
+
+  // Use the dedicated endpoint (with server-side avg/min/max/pass% calculation)
+  const dedicatedEndpoint = "/api/v1/quality-forms/bag-weight";
+
+  const handleSave = async () => {
+    if (!form.date || !form.lot_no || !form.shift_code) {
+      toast.error("Date, Shift and Lot No are required"); return;
+    }
+    setSaving(true);
+    try {
+      const samples_json = nums.map((w) => ({ net_wt: w }));
+      const payload = {
+        date: form.date, shift_code: form.shift_code, lot_no: form.lot_no,
+        count_ne: form.count_ne !== "" ? parseFloat(form.count_ne) : null,
+        cone_tip_type: form.cone_tip_type || null,
+        inspector: form.inspector || null,
+        target_weight: !isNaN(target) ? target : null,
+        samples_json,
+        remarks: form.remarks || null,
+      };
+      if (editRecord?.id) {
+        await api.patch(`${dedicatedEndpoint}/${editRecord.id}`, payload);
+        toast.success("Updated");
+      } else {
+        await api.post(dedicatedEndpoint, payload);
+        toast.success("Saved");
+      }
+      qc.invalidateQueries({ queryKey: ["qm-tab", endpoint] });
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? "Failed to save");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-base">{editRecord ? "Edit" : "Add Record"} — Bag Weight Checking</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Date</label>
+            <input type="date" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Shift</label>
+            <select value={form.shift_code} onChange={(e) => setForm((p) => ({ ...p, shift_code: e.target.value }))}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+              <option value="">Select shift…</option>
+              {shiftOptions.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Lot No</label>
+            <input value={form.lot_no} onChange={(e) => setForm((p) => ({ ...p, lot_no: e.target.value }))} placeholder="e.g. P-1916"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Count Ne</label>
+            <input type="number" step="0.1" value={form.count_ne} onChange={(e) => setForm((p) => ({ ...p, count_ne: e.target.value }))} placeholder="26"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Cone Tip</label>
+            <input value={form.cone_tip_type} onChange={(e) => setForm((p) => ({ ...p, cone_tip_type: e.target.value }))} placeholder="e.g. Green"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Inspector</label>
+            <input value={form.inspector} onChange={(e) => setForm((p) => ({ ...p, inspector: e.target.value }))} placeholder="Name"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Target Wt (g)</label>
+            <input type="number" step="0.01" value={form.target_weight} onChange={(e) => setForm((p) => ({ ...p, target_weight: e.target.value }))} placeholder="51.80"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1 col-span-2">
+            <label className="text-xs font-medium text-muted-foreground">Remarks</label>
+            <input value={form.remarks} onChange={(e) => setForm((p) => ({ ...p, remarks: e.target.value }))} placeholder="Optional"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+        </div>
+
+        {/* Individual cone weights grid */}
+        <div className="space-y-2 pt-2 border-t border-border">
+          <label className="text-xs font-medium text-muted-foreground">
+            Individual Cone Weights (g) — enter each cone net weight
+          </label>
+          <div className="grid grid-cols-5 gap-1.5">
+            {weights.map((w, i) => (
+              <div key={i} className="space-y-0.5">
+                <label className="text-[10px] text-muted-foreground text-center block">{i + 1}</label>
+                <input type="number" step="0.01" value={w}
+                  onChange={(e) => { const nw = [...weights]; nw[i] = e.target.value; setWeights(nw); }}
+                  placeholder="—"
+                  className={`flex h-8 w-full rounded border bg-background px-1.5 text-xs text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring ${
+                    !isNaN(parseFloat(w)) && !isNaN(target) && parseFloat(w) < target ? "border-red-300 text-red-600" :
+                    !isNaN(parseFloat(w)) && !isNaN(target) && parseFloat(w) > target ? "border-amber-300 text-amber-600" :
+                    "border-input"}`} />
+              </div>
+            ))}
+          </div>
+          <button onClick={() => setWeights((w) => [...w, ""])}
+            className="text-xs text-primary underline">+ Add more</button>
+        </div>
+
+        {/* Auto-computed summary */}
+        {avgWt != null && (
+          <div className="grid grid-cols-4 gap-2 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 text-center text-xs">
+            <div><p className="text-[10px] text-muted-foreground">Avg Net Wt</p><p className="font-semibold text-emerald-700">{avgWt.toFixed(2)} g</p></div>
+            <div><p className="text-[10px] text-muted-foreground">Min / Max</p><p className="font-semibold">{minWt?.toFixed(2)} / {maxWt?.toFixed(2)}</p></div>
+            <div><p className="text-[10px] text-muted-foreground">Std Dev</p><p className="font-semibold">{stdDev?.toFixed(3) ?? "—"}</p></div>
+            <div><p className="text-[10px] text-muted-foreground">Pass% (Under/Over)</p>
+              <p className={`font-semibold ${passPct != null && passPct < 90 ? "text-red-600" : "text-emerald-700"}`}>
+                {passPct?.toFixed(1) ?? "—"}% ({under}↓/{over}↑)
+              </p>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? "Saving…" : editRecord ? "Update record" : "Save record"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Paper Cone Dialog — individual cone weight entry ──────────────────────────
+function PaperConeDialog({ open, onClose, editRecord, millId, endpoint }: {
+  open: boolean; onClose: () => void; editRecord: any | null;
+  millId: string | null | undefined; endpoint: string;
+}) {
+  const qc = useQueryClient();
+  const today = new Date().toISOString().slice(0, 10);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    date: today, supplier_name: "", batch_no: "", inspector: "", remarks: "", status: "draft",
+  });
+  const [weights, setWeights] = useState<string[]>(Array(20).fill(""));
+
+  useEffect(() => {
+    if (editRecord) {
+      setForm({
+        date: editRecord.date ?? today, supplier_name: editRecord.supplier_name ?? "",
+        batch_no: editRecord.batch_no ?? "", inspector: editRecord.inspector ?? "",
+        remarks: editRecord.remarks ?? "", status: editRecord.status ?? "draft",
+      });
+      const samples: any[] = editRecord.samples_json?.samples ?? [];
+      const ws = samples.map((s: any) => String(s.cone_weight_g ?? ""));
+      setWeights([...ws, ...Array(Math.max(0, 20 - ws.length)).fill("")]);
+    } else {
+      setForm({ date: today, supplier_name: "", batch_no: "", inspector: "", remarks: "", status: "draft" });
+      setWeights(Array(20).fill(""));
+    }
+  }, [editRecord, open]);
+
+  const nums = weights.map((w) => parseFloat(w)).filter((n) => !isNaN(n));
+  const avgWt = nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
+
+  const dedicatedEndpoint = "/api/v1/quality-forms/paper-cone";
+
+  const handleSave = async () => {
+    if (!form.date) { toast.error("Date is required"); return; }
+    setSaving(true);
+    try {
+      const payload = {
+        date: form.date, supplier_name: form.supplier_name || null,
+        batch_no: form.batch_no || null, inspector: form.inspector || null,
+        samples_json: nums.map((w) => ({ cone_weight_g: w })),
+        remarks: form.remarks || null,
+      };
+      if (editRecord?.id) {
+        await api.patch(`${dedicatedEndpoint}/${editRecord.id}`, payload);
+        toast.success("Updated");
+      } else {
+        await api.post(dedicatedEndpoint, payload);
+        toast.success("Saved");
+      }
+      qc.invalidateQueries({ queryKey: ["qm-tab", endpoint] });
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? "Failed to save");
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-base">{editRecord ? "Edit" : "Add Record"} — Paper Cone Check</DialogTitle>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Date</label>
+            <input type="date" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Supplier</label>
+            <input value={form.supplier_name} onChange={(e) => setForm((p) => ({ ...p, supplier_name: e.target.value }))} placeholder="NR"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Batch No</label>
+            <input value={form.batch_no} onChange={(e) => setForm((p) => ({ ...p, batch_no: e.target.value }))} placeholder="Optional"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Remarks</label>
+            <input value={form.remarks} onChange={(e) => setForm((p) => ({ ...p, remarks: e.target.value }))} placeholder="Optional"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+        </div>
+
+        <div className="space-y-2 pt-2 border-t border-border">
+          <label className="text-xs font-medium text-muted-foreground">Individual Cone Weights (g)</label>
+          <div className="grid grid-cols-5 gap-1.5">
+            {weights.map((w, i) => (
+              <div key={i} className="space-y-0.5">
+                <label className="text-[10px] text-muted-foreground text-center block">{i + 1}</label>
+                <input type="number" step="0.01" value={w}
+                  onChange={(e) => { const nw = [...weights]; nw[i] = e.target.value; setWeights(nw); }}
+                  placeholder="—"
+                  className="flex h-8 w-full rounded border border-input bg-background px-1.5 text-xs text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
+              </div>
+            ))}
+          </div>
+          <button onClick={() => setWeights((w) => [...w, ""])} className="text-xs text-primary underline">+ Add more</button>
+        </div>
+
+        {avgWt != null && (
+          <div className="p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 text-xs">
+            <span className="text-muted-foreground">Avg Cone Weight: </span>
+            <span className="font-semibold text-emerald-700">{avgWt.toFixed(3)} g</span>
+            <span className="text-muted-foreground ml-3">({nums.length} cones weighed)</span>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? "Saving…" : editRecord ? "Update record" : "Save record"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── A% Check Dialog — N+1 / N / N-1 three-column reading grid ────────────────
+function ACheckDialog({ open, onClose, editRecord, millId, endpoint, department }: {
+  open: boolean; onClose: () => void; editRecord: any | null;
+  millId: string | null | undefined; endpoint: string; department?: string;
+}) {
+  const qc = useQueryClient();
+  const { data: machines = [] } = useMachines(millId, department);
+  const today = new Date().toISOString().slice(0, 10);
+  const [saving, setSaving] = useState(false);
+  const makeDefault = () => ({
+    date: today, machine_no: "", lot_no: "", cotton_type: "", process: "",
+    feed_hank: "", delivery_hank: "", doubling: "",
+    levelling_action_point: "", levelling_intensity: "",
+    remarks: "", status: "draft",
+  });
+  const [form, setForm] = useState<Record<string, string>>(makeDefault);
+  // 3 columns × 5 rows: nplus[0..4], n[0..4], nminus[0..4]
+  const [nplus, setNplus] = useState<string[]>(Array(5).fill(""));
+  const [n, setN] = useState<string[]>(Array(5).fill(""));
+  const [nminus, setNminus] = useState<string[]>(Array(5).fill(""));
+
+  useEffect(() => {
+    if (editRecord) {
+      setForm({
+        date: editRecord.date ?? today, machine_no: editRecord.machine_no ?? "",
+        lot_no: editRecord.lot_no ?? "", cotton_type: editRecord.cotton_type ?? "",
+        process: editRecord.process ?? "",
+        feed_hank: editRecord.feed_hank ?? "", delivery_hank: editRecord.delivery_hank ?? "",
+        doubling: editRecord.doubling ?? "",
+        levelling_action_point: editRecord.levelling_action_point ?? "",
+        levelling_intensity: editRecord.levelling_intensity ?? "",
+        remarks: editRecord.remarks ?? "", status: editRecord.status ?? "draft",
+      });
+      const rd = editRecord.readings_json ?? {};
+      setNplus((rd.nplus ?? []).concat(Array(5).fill("")).slice(0, 5).map(String));
+      setN((rd.n ?? []).concat(Array(5).fill("")).slice(0, 5).map(String));
+      setNminus((rd.nminus ?? []).concat(Array(5).fill("")).slice(0, 5).map(String));
+    } else {
+      setForm(makeDefault());
+      setNplus(Array(5).fill(""));
+      setN(Array(5).fill(""));
+      setNminus(Array(5).fill(""));
+    }
+  }, [editRecord, open]);
+
+  const avgArr = (arr: string[]) => {
+    const nums = arr.map(parseFloat).filter((x) => !isNaN(x));
+    return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
+  };
+  const avgN = avgArr(n);
+  const avgNplus = avgArr(nplus);
+  const avgNminus = avgArr(nminus);
+  const delivHank = parseFloat(form.delivery_hank) || null;
+  // A% = (AvgHank - NomHank) / NomHank × 100 for each column
+  const aPctNplus = avgNplus != null && delivHank ? ((avgNplus - delivHank) / delivHank) * 100 : null;
+  const aPctNminus = avgNminus != null && delivHank ? ((avgNminus - delivHank) / delivHank) * 100 : null;
+
+  const handleSave = async () => {
+    if (!form.date || !form.machine_no || !form.lot_no) {
+      toast.error("Date, Machine No and Lot No are required"); return;
+    }
+    setSaving(true);
+    try {
+      const nplusNums = nplus.map(parseFloat).filter((x) => !isNaN(x));
+      const nNums = n.map(parseFloat).filter((x) => !isNaN(x));
+      const nminusNums = nminus.map(parseFloat).filter((x) => !isNaN(x));
+      // Store flat r1-r10 as N column readings (main set)
+      const rFields: Record<string, number | null> = {};
+      ["r1","r2","r3","r4","r5"].forEach((k, i) => { rFields[k] = nNums[i] ?? null; });
+      ["r6","r7","r8","r9","r10"].forEach((k, i) => { rFields[k] = null; });
+      const payload = {
+        date: form.date, machine_no: form.machine_no, lot_no: form.lot_no,
+        cotton_type: form.cotton_type || null, process: form.process || null,
+        feed_hank: form.feed_hank !== "" ? parseFloat(form.feed_hank) : null,
+        delivery_hank: form.delivery_hank !== "" ? parseFloat(form.delivery_hank) : null,
+        doubling: form.doubling !== "" ? parseInt(form.doubling) : null,
+        levelling_action_point: form.levelling_action_point !== "" ? parseFloat(form.levelling_action_point) : null,
+        levelling_intensity: form.levelling_intensity !== "" ? parseFloat(form.levelling_intensity) : null,
+        readings_json: { nplus: nplusNums, n: nNums, nminus: nminusNums },
+        avg_hank: avgN != null ? parseFloat(avgN.toFixed(4)) : null,
+        a_pct_n_plus: aPctNplus != null ? parseFloat(aPctNplus.toFixed(3)) : null,
+        a_pct_n_minus: aPctNminus != null ? parseFloat(aPctNminus.toFixed(3)) : null,
+        within_spec: aPctNplus != null && aPctNminus != null
+          ? (Math.abs(aPctNplus) <= 0.5 && Math.abs(aPctNminus) <= 0.5) : null,
+        remarks: form.remarks || null,
+        ...rFields,
+      };
+      if (editRecord?.id) {
+        await api.patch(`${endpoint}/${editRecord.id}`, payload);
+        toast.success("Updated");
+      } else {
+        await api.post(endpoint, payload);
+        toast.success("Saved");
+      }
+      qc.invalidateQueries({ queryKey: ["qm-tab", endpoint] });
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? "Failed to save");
+    } finally { setSaving(false); }
+  };
+
+  const listId = useMemo(() => `acheck-mc-${Math.random().toString(36).slice(2)}`, []);
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-base">{editRecord ? "Edit" : "Add Record"} — A% Check (Auto-Leveller)</DialogTitle>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Date</label>
+            <input type="date" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Machine No</label>
+            {machines.length > 0 ? (
+              <><datalist id={listId}>{machines.map((m: any) => <option key={m.id} value={m.code} />)}</datalist>
+                <input list={listId} value={form.machine_no} onChange={(e) => setForm((p) => ({ ...p, machine_no: e.target.value }))} placeholder="e.g. BD_005"
+                  className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" /></>
+            ) : (
+              <input value={form.machine_no} onChange={(e) => setForm((p) => ({ ...p, machine_no: e.target.value }))} placeholder="e.g. BD_005"
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+            )}
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Lot No</label>
+            <input value={form.lot_no} onChange={(e) => setForm((p) => ({ ...p, lot_no: e.target.value }))} placeholder="e.g. CR-80/20"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Process</label>
+            <select value={form.process} onChange={(e) => setForm((p) => ({ ...p, process: e.target.value }))}
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+              <option value="">—</option>
+              <option value="80/20">80/20</option>
+              <option value="BD">BD</option>
+              <option value="FD">FD</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Doubling</label>
+            <input type="number" step="1" value={form.doubling} onChange={(e) => setForm((p) => ({ ...p, doubling: e.target.value }))} placeholder="6"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Delivery Hank</label>
+            <input type="number" step="0.0001" value={form.delivery_hank} onChange={(e) => setForm((p) => ({ ...p, delivery_hank: e.target.value }))} placeholder="0.1100"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Levelling Action Pt</label>
+            <input type="number" step="1" value={form.levelling_action_point} onChange={(e) => setForm((p) => ({ ...p, levelling_action_point: e.target.value }))} placeholder="942"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Levelling Intensity</label>
+            <input type="number" step="0.1" value={form.levelling_intensity} onChange={(e) => setForm((p) => ({ ...p, levelling_intensity: e.target.value }))} placeholder="99.3"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Remarks</label>
+            <input value={form.remarks} onChange={(e) => setForm((p) => ({ ...p, remarks: e.target.value }))} placeholder="Optional"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+        </div>
+
+        {/* N+1 / N / N-1 reading grid */}
+        <div className="space-y-2 pt-2 border-t border-border">
+          <label className="text-xs font-medium text-muted-foreground">Readings (g) — enter 5 samples per column</label>
+          <div className="grid grid-cols-3 gap-3">
+            {([["N+1", nplus, setNplus], ["N", n, setN], ["N-1", nminus, setNminus]] as const).map(([label, vals, setter]) => (
+              <div key={label} className="space-y-1">
+                <div className="text-[10px] font-semibold text-center text-muted-foreground bg-muted/40 py-1 rounded">{label}</div>
+                {(vals as string[]).map((v, i) => (
+                  <input key={i} type="number" step="0.01" value={v}
+                    onChange={(e) => { const nw = [...(vals as string[])]; nw[i] = e.target.value; (setter as any)(nw); }}
+                    placeholder="—"
+                    className="flex h-8 w-full rounded border border-input bg-background px-2 text-xs text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
+                ))}
+                {avgArr(vals as string[]) != null && (
+                  <div className="text-center text-[10px] font-semibold text-emerald-700 bg-emerald-50 rounded py-0.5">
+                    Avg: {avgArr(vals as string[])?.toFixed(4)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Auto-computed A% results */}
+        {(aPctNplus != null || aPctNminus != null) && (
+          <div className="flex gap-4 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 text-xs">
+            <div><p className="text-[10px] text-muted-foreground">Avg Hank (N)</p><p className="font-semibold text-emerald-700">{avgN?.toFixed(4)}</p></div>
+            <div><p className="text-[10px] text-muted-foreground">A% N+</p>
+              <p className={`font-semibold ${aPctNplus != null && Math.abs(aPctNplus) > 0.5 ? "text-red-600" : "text-emerald-700"}`}>
+                {aPctNplus?.toFixed(2)}%
+              </p>
+            </div>
+            <div><p className="text-[10px] text-muted-foreground">A% N-</p>
+              <p className={`font-semibold ${aPctNminus != null && Math.abs(aPctNminus) > 0.5 ? "text-red-600" : "text-emerald-700"}`}>
+                {aPctNminus?.toFixed(2)}%
+              </p>
+            </div>
+            <div><p className="text-[10px] text-muted-foreground">Within Spec?</p>
+              <p className={`font-semibold ${aPctNplus != null && aPctNminus != null && Math.abs(aPctNplus) <= 0.5 && Math.abs(aPctNminus) <= 0.5 ? "text-emerald-700" : "text-red-600"}`}>
+                {aPctNplus != null && aPctNminus != null ? (Math.abs(aPctNplus) <= 0.5 && Math.abs(aPctNminus) <= 0.5 ? "OK" : "NG") : "—"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? "Saving…" : editRecord ? "Update record" : "Save record"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Main QmFormsTab: table + popup ──────────────────────────────────────────
 function QmFormsTab({
   title, endpoint, columns, millId, millName, canEdit, layout = "grid",
@@ -2424,8 +2946,14 @@ function QmFormsTab({
         )}
       </CardContent>
 
-      {/* Dialog — grid (most forms) or sheet (wrapping/hank) */}
-      {layout === "sheet" ? (
+      {/* Dialog — specialised for bag weight, paper cone, A% check; sheet/grid for others */}
+      {endpoint.includes("bag-weight") ? (
+        <BagWeightDialog open={dialogOpen} onClose={closeDialog} editRecord={editRecord} millId={millId} endpoint={endpoint} />
+      ) : endpoint.includes("paper-cone") ? (
+        <PaperConeDialog open={dialogOpen} onClose={closeDialog} editRecord={editRecord} millId={millId} endpoint={endpoint} />
+      ) : endpoint.includes("a-pct") || endpoint.includes("a_pct_check") ? (
+        <ACheckDialog open={dialogOpen} onClose={closeDialog} editRecord={editRecord} millId={millId} endpoint={endpoint} department={department} />
+      ) : layout === "sheet" ? (
         <QmSheetDialog
           open={dialogOpen} onClose={closeDialog}
           title={title} endpoint={endpoint}
