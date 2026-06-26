@@ -41,7 +41,8 @@ async def run_async_migrations() -> None:
         "pooler.supabase.com:5432", "pooler.supabase.com:6543"
     )
     connectable = create_async_engine(
-        migration_url, poolclass=pool.NullPool, connect_args={"timeout": 30}
+        migration_url, poolclass=pool.NullPool,
+        connect_args={"timeout": 30, "statement_cache_size": 0},
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
