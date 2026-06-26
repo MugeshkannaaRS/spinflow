@@ -2264,7 +2264,7 @@ function BagWeightDialog({ open, onClose, editRecord, millId, endpoint }: {
     ? ((avgWt - target) / target) * 100 : null;
 
   // Use the dedicated endpoint (with server-side avg/min/max/pass% calculation)
-  const dedicatedEndpoint = "/api/v1/quality-forms/bag-weight";
+  const dedicatedEndpoint = "/quality-forms/bag-weight";
 
   const handleSave = async () => {
     if (!form.date || !form.lot_no || !form.shift_code) {
@@ -2426,7 +2426,7 @@ function PaperConeDialog({ open, onClose, editRecord, millId, endpoint }: {
   const nums = weights.map((w) => parseFloat(w)).filter((n) => !isNaN(n));
   const avgWt = nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
 
-  const dedicatedEndpoint = "/api/v1/quality-forms/paper-cone";
+  const dedicatedEndpoint = "/quality-forms/paper-cone";
 
   const handleSave = async () => {
     if (!form.date) { toast.error("Date is required"); return; }

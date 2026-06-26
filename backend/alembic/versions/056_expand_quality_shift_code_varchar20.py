@@ -5,6 +5,7 @@ Revises: 055
 Create Date: 2026-06-26
 """
 from alembic import op
+from sqlalchemy import text
 
 revision = "056"
 down_revision = "055"
@@ -12,7 +13,6 @@ branch_labels = None
 depends_on = None
 
 
-# All quality form tables that have shift_code VARCHAR(5)
 TABLES = [
     "qm_carding_cv",
     "qm_drawing_cv",
@@ -54,20 +54,33 @@ TABLES = [
 
 
 def upgrade() -> None:
+    conn = op.get_bind()
     for table in TABLES:
-        try:
-            op.execute(
-                f"ALTER TABLE {table} ALTER COLUMN shift_code TYPE VARCHAR(20)"
+        # Check table exists first, then alter — each in autocommit to avoid txn abort
+        exists = conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_name = :t AND column_name = 'shift_code'"
+            ),
+            {"t": table},
+        ).fetchone()
+        if exists:
+            conn.execute(
+                text(f"ALTER TABLE {table} ALTER COLUMN shift_code TYPE VARCHAR(20)")
             )
-        except Exception:
-            pass  # table may not exist in all deployments
 
 
 def downgrade() -> None:
+    conn = op.get_bind()
     for table in TABLES:
-        try:
-            op.execute(
-                f"ALTER TABLE {table} ALTER COLUMN shift_code TYPE VARCHAR(5)"
+        exists = conn.execute(
+            text(
+                "SELECT 1 FROM information_schema.columns "
+                "WHERE table_name = :t AND column_name = 'shift_code'"
+            ),
+            {"t": table},
+        ).fetchone()
+        if exists:
+            conn.execute(
+                text(f"ALTER TABLE {table} ALTER COLUMN shift_code TYPE VARCHAR(5)")
             )
-        except Exception:
-            pass

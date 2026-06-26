@@ -789,11 +789,11 @@ async def _v2_create(slug: str, payload: Dict[str, Any],
         kwargs["company_id"] = scope["company_id"]
     kwargs.setdefault("status", "draft")
 
-    # Validate required NOT NULL fields before attempting insert
-    for req_field in ("lot_no", "machine_no", "date", "shift_code"):
-        if req_field in allowed and not kwargs.get(req_field):
-            label = {"lot_no": "Process/Lot No", "machine_no": "Machine No", "date": "Date", "shift_code": "Shift"}.get(req_field, req_field)
-            raise HTTPException(status_code=400, detail=f"{label} is required.")
+    # Validate only date (always required) before attempting insert
+    # Other NOT NULL fields (lot_no, machine_no, shift_code) are form-specific;
+    # the DB will reject nulls with a clear error caught below
+    if not kwargs.get("date"):
+        raise HTTPException(status_code=400, detail="Date is required.")
 
     try:
         record = model(**kwargs)
@@ -809,8 +809,15 @@ async def _v2_create(slug: str, payload: Dict[str, Any],
         raise
     except Exception as e:
         await db.rollback()
-        logger.error(f"_v2_create {slug} error: {e}", exc_info=True)
-        raise HTTPException(status_code=400, detail=f"Save failed [{slug}]: {str(e)}")
+        err = str(e)
+        logger.error(f"_v2_create {slug} error: {err}", exc_info=True)
+        # Surface human-readable constraint violations
+        if "not-null constraint" in err or "null value in column" in err:
+            import re
+            col = re.search(r'column "([^"]+)"', err)
+            field = col.group(1) if col else "a required field"
+            raise HTTPException(status_code=400, detail=f"{field.replace('_', ' ').title()} is required.")
+        raise HTTPException(status_code=400, detail=f"Save failed: {err}")
 
 
 async def _v2_update(slug: str, record_id: str, payload: Dict[str, Any],
