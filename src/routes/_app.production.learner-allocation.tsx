@@ -328,13 +328,21 @@ function LearnerAllocationForm() {
           #learner-print-area, #learner-print-area * { visibility: visible; }
           #learner-print-area {
             position: absolute; top: 0; left: 0; width: 100%;
-            font-size: 9pt;
+            font-size: 8.5pt;
           }
-          #learner-print-area table { font-size: 8pt; }
-          #learner-print-area th, #learner-print-area td { padding: 1px 3px !important; }
-          #learner-print-area h3 { font-size: 7.5pt !important; }
+          #learner-print-area table { font-size: 7.5pt; }
+          #learner-print-area th, #learner-print-area td { padding: 0.5px 2px !important; line-height: 1.25 !important; }
+          #learner-print-area h3 { font-size: 7pt !important; margin-bottom: 1px !important; }
+          #learner-print-area .section-gap { margin-bottom: 4px !important; }
+          /* Keep footer on same page — never break before signature */
+          #learner-footer {
+            page-break-inside: avoid;
+            break-inside: avoid;
+            page-break-before: avoid;
+            break-before: avoid;
+          }
           .print\\:hidden { display: none !important; }
-          @page { size: A4 portrait; margin: 8mm 8mm 8mm 8mm; }
+          @page { size: A4 portrait; margin: 6mm 7mm 6mm 7mm; }
         }
       `}</style>
 
@@ -501,12 +509,12 @@ function LearnerAllocationForm() {
               {notes && <p className="hidden print:block text-xs">{notes}</p>}
             </div>
 
-            {/* Signature row */}
-            <div className="grid grid-cols-6 gap-4 mt-6 pt-4">
+            {/* Signature row — must stay on same page as content */}
+            <div id="learner-footer" className="grid grid-cols-6 gap-3 mt-3 pt-2 border-t border-gray-300">
               {["Prepared by", "APO(T)/DPO(T)", "DM(P)", "M(P)", "Sr.M(P)", "AGM"].map((sig) => (
                 <div key={sig} className="text-center">
-                  <div className="border-b border-gray-400 h-8 mb-1" />
-                  <p className="text-[9px] text-gray-500 print:text-black">{sig}</p>
+                  <div className="border-b border-gray-400 h-5 mb-0.5" />
+                  <p className="text-[8px] text-gray-500 print:text-black leading-tight">{sig}</p>
                 </div>
               ))}
             </div>
