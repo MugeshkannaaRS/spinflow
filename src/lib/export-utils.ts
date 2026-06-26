@@ -248,6 +248,18 @@ export async function exportToCsv(opts: ExportOptions): Promise<void> {
 export interface LetterheadOptions extends ExportOptions {
   /** Mill / company name to show in the letterhead header */
   millName?: string;
+  /**
+   * Optional custom body renderer for specialised forms (A% Check, CSP, etc).
+   * When provided it completely replaces the generic field-pairs section.
+   * Receives the jsPDF doc, the data row, the y-start position, and page dims.
+   * Must return the y position after its last drawn element.
+   */
+  drawCustomBody?: (
+    doc: any,
+    row: any,
+    yStart: number,
+    ctx: { pageW: number; margin: number; pageH: number },
+  ) => number;
 }
 
 
@@ -287,72 +299,78 @@ async function _buildLetterheadPdf(opts: LetterheadOptions): Promise<any> {
     doc.setLineWidth(0.4);
     doc.line(margin, 24, pageW - margin, 24);
 
-    // ── Field pairs ────────────────────────────────────────────────────────
-    const leftCols = visibleCols.filter((_, i) => i % 2 === 0);
-    const rightCols = visibleCols.filter((_, i) => i % 2 === 1);
-    const maxPairs = Math.max(leftCols.length, rightCols.length);
-    const labelW = 46;
+    // ── Body: custom renderer OR generic field pairs ───────────────────────
     let y = 31;
 
-    for (let i = 0; i < maxPairs; i++) {
-      const lc = leftCols[i];
-      const rc = rightCols[i];
-      const bg = i % 2 === 0 ? [252, 253, 255] : [246, 248, 252];
-      doc.setFillColor(...bg as [number, number, number]);
-      doc.rect(margin - 1, y - 5, pageW - margin * 2 + 2, rowH, "F");
+    if (opts.drawCustomBody) {
+      // Specialised forms (A% Check, CSP, etc.) draw their own table
+      y = opts.drawCustomBody(doc, row, y, { pageW, margin, pageH });
+    } else {
+      const leftCols = visibleCols.filter((_, i) => i % 2 === 0);
+      const rightCols = visibleCols.filter((_, i) => i % 2 === 1);
+      const maxPairs = Math.max(leftCols.length, rightCols.length);
+      const labelW = 46;
 
-      if (lc) {
+      for (let i = 0; i < maxPairs; i++) {
+        const lc = leftCols[i];
+        const rc = rightCols[i];
+        const bg = i % 2 === 0 ? [252, 253, 255] : [246, 248, 252];
+        doc.setFillColor(...bg as [number, number, number]);
+        doc.rect(margin - 1, y - 5, pageW - margin * 2 + 2, rowH, "F");
+
+        if (lc) {
+          doc.setFontSize(7.5);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(70, 80, 100);
+          doc.text(lc.label + ":", margin + 1, y);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(20, 20, 20);
+          const val = String(formatCell(lc, row) || "—");
+          doc.text(doc.splitTextToSize(val, colMid - margin - labelW - 4)[0], margin + labelW, y);
+        }
+        if (rc) {
+          const rx = colMid + 4;
+          doc.setFontSize(7.5);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(70, 80, 100);
+          doc.text(rc.label + ":", rx, y);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(20, 20, 20);
+          const val = String(formatCell(rc, row) || "—");
+          doc.text(doc.splitTextToSize(val, pageW - margin - rx - labelW)[0], rx + labelW, y);
+        }
+        y += rowH;
+
+        if (y > pageH - 50) break;
+      }
+
+      // ── Waste summary box ─────────────────────────────────────────────────
+      const wasteKeys = visibleCols.filter(
+        (c) => (c.key.includes("waste") || c.key.includes("pct") || c.key.includes("percent")),
+      );
+      if (wasteKeys.length > 0 && y < pageH - 55) {
+        y += 4;
+        const boxRows = Math.ceil(wasteKeys.length / 3);
+        const boxH = 8 + boxRows * 7;
+        doc.setFillColor(240, 244, 255);
+        doc.setDrawColor(150, 170, 230);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(margin, y, pageW - margin * 2, boxH, 2, 2, "FD");
         doc.setFontSize(7.5);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(70, 80, 100);
-        doc.text(lc.label + ":", margin + 1, y);
+        doc.setTextColor(30, 58, 138);
+        doc.text("Waste / % Breakdown", margin + 3, y + 6);
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(20, 20, 20);
-        const val = String(formatCell(lc, row) || "—");
-        doc.text(doc.splitTextToSize(val, colMid - margin - labelW - 4)[0], margin + labelW, y);
+        doc.setTextColor(40, 40, 60);
+        let wy2 = y + 13;
+        wasteKeys.forEach((c, ki) => {
+          const val = formatCell(c, row);
+          const col3 = ki % 3;
+          doc.text(`${c.label}: ${val || "—"}`, margin + 4 + col3 * 60, wy2);
+          if (col3 === 2) wy2 += 7;
+        });
+        y += boxH + 5;
       }
-      if (rc) {
-        const rx = colMid + 4;
-        doc.setFontSize(7.5);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(70, 80, 100);
-        doc.text(rc.label + ":", rx, y);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(20, 20, 20);
-        const val = String(formatCell(rc, row) || "—");
-        doc.text(doc.splitTextToSize(val, pageW - margin - rx - labelW)[0], rx + labelW, y);
-      }
-      y += rowH;
-
-      if (y > pageH - 50) break; // Safety: don't overflow into footer
-    }
-
-    // ── Waste summary box ─────────────────────────────────────────────────
-    const wasteKeys = visibleCols.filter(
-      (c) => (c.key.includes("waste") || c.key.includes("pct") || c.key.includes("percent")),
-    );
-    if (wasteKeys.length > 0 && y < pageH - 55) {
-      y += 4;
-      const boxRows = Math.ceil(wasteKeys.length / 3);
-      const boxH = 8 + boxRows * 7;
-      doc.setFillColor(240, 244, 255);
-      doc.setDrawColor(150, 170, 230);
-      doc.setLineWidth(0.3);
-      doc.roundedRect(margin, y, pageW - margin * 2, boxH, 2, 2, "FD");
-      doc.setFontSize(7.5);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(30, 58, 138);
-      doc.text("Waste / % Breakdown", margin + 3, y + 6);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(40, 40, 60);
-      let wy = y + 13;
-      wasteKeys.forEach((c, ki) => {
-        const val = formatCell(c, row);
-        const col3 = ki % 3;
-        doc.text(`${c.label}: ${val || "—"}`, margin + 4 + col3 * 60, wy);
-        if (col3 === 2) wy += 7;
-      });
-      y += boxH + 5;
     }
 
     // ── Status + signatures ────────────────────────────────────────────────

@@ -2574,12 +2574,34 @@ function CspDialog({ open, onClose, editRecord, millId, endpoint, department }: 
     }
   }, [editRecord, open]);
 
-  // Per-row CSP = Strength × (row Count if provided, else header Count)
+  // ── Auto-calculations ─────────────────────────────────────────────────────
+  // TPI = TM × √Ne  (computed from header TM + Count Ne; user can still override)
   const headerNe = parseFloat(form.count_ne);
+  const headerTm = parseFloat(form.tm);
+  const autoTpi  = isFinite(headerTm) && headerTm > 0 && isFinite(headerNe) && headerNe > 0
+    ? parseFloat((headerTm * Math.sqrt(headerNe)).toFixed(2)) : null;
+  // TPI field shows computed value when user hasn't manually entered one
+  const displayTpi = form.tpi !== "" ? form.tpi : (autoTpi != null ? String(autoTpi) : "");
+
+  // Per-row Count (Ne) auto-computed from Weight (g) using wrap-reel formula:
+  // Ne = (wrapYards × 453.592) / (840 × weight_g)
+  // Standard lea = 120 yards (CSP test uses a 120-yard lea, not quadrant reel)
+  const CSP_LEA_YARDS = 120;
+  const weightToNe = (wg: number) =>
+    wg > 0 ? (CSP_LEA_YARDS * 453.592) / (840 * wg) : null;
+
+  // Per-row Ne: use manually typed value if present, else auto from weight
+  const effectiveRowNe = weight.map((w, i) => {
+    if (rowCount[i] !== "") return parseFloat(rowCount[i]);
+    const wg = parseFloat(w);
+    return isFinite(wg) && wg > 0 ? weightToNe(wg) : null;
+  });
+
+  // Per-row CSP = Strength × effective Ne (row or header)
   const rowCsp = strength.map((s, i) => {
     const str = parseFloat(s);
-    const ne  = parseFloat(rowCount[i]) || (isFinite(headerNe) && headerNe > 0 ? headerNe : NaN);
-    return isFinite(str) && str > 0 && isFinite(ne) && ne > 0 ? str * ne : null;
+    const ne  = effectiveRowNe[i] ?? (isFinite(headerNe) && headerNe > 0 ? headerNe : null);
+    return isFinite(str) && str > 0 && ne != null && ne > 0 ? str * ne : null;
   });
 
   // Stats from non-null CSP values
@@ -2615,7 +2637,8 @@ function CspDialog({ open, onClose, editRecord, millId, endpoint, department }: 
         count_ne: sf(form.count_ne),
         ratio: form.ratio || null,
         tm: sf(form.tm),
-        tpi: sf(form.tpi),
+        // Save the manually typed TPI if given, otherwise the auto-computed value
+        tpi: form.tpi !== "" ? sf(form.tpi) : autoTpi,
         avg_csp: avgCsp != null ? parseFloat(avgCsp.toFixed(1)) : null,
         cv_pct: cvCsp  != null ? parseFloat(cvCsp.toFixed(3))  : null,
         max_csp: maxCsp,
@@ -2653,13 +2676,12 @@ function CspDialog({ open, onClose, editRecord, millId, endpoint, department }: 
         {/* Header fields */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { key: "date",     label: "Date",     type: "date" },
-            { key: "lot_no",   label: "Lot No",   placeholder: "e.g. CR-80/20" },
+            { key: "date",     label: "Date",       type: "date" },
+            { key: "lot_no",   label: "Lot No",     placeholder: "e.g. CR-80/20" },
             { key: "count_ne", label: "Count (Ne)", type: "number", step: "0.1", placeholder: "e.g. 24" },
-            { key: "ratio",    label: "Ratio",    placeholder: "e.g. 80/20" },
-            { key: "tm",       label: "TM",       type: "number", step: "0.01" },
-            { key: "tpi",      label: "TPI",      type: "number", step: "0.1" },
-            { key: "remarks",  label: "Remarks",  placeholder: "Optional" },
+            { key: "ratio",    label: "Ratio",      placeholder: "e.g. 80/20" },
+            { key: "tm",       label: "TM",         type: "number", step: "0.01", placeholder: "e.g. 3.6" },
+            { key: "remarks",  label: "Remarks",    placeholder: "Optional" },
           ].map(({ key, label, type = "text", step, placeholder }) => (
             <div key={key} className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">{label}</label>
@@ -2668,6 +2690,29 @@ function CspDialog({ open, onClose, editRecord, millId, endpoint, department }: 
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
             </div>
           ))}
+          {/* TPI — auto-computed from TM × √Ne; user can override */}
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+              TPI
+              {autoTpi != null && form.tpi === "" && (
+                <span className="text-[10px] text-emerald-600 font-normal">(auto)</span>
+              )}
+            </label>
+            <input
+              type="number" step="0.1"
+              value={displayTpi}
+              placeholder={autoTpi != null ? String(autoTpi) : "e.g. 21.6"}
+              onChange={(e) => setForm((p) => ({ ...p, tpi: e.target.value }))}
+              className={`flex h-9 w-full rounded-md border px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring ${
+                form.tpi === "" && autoTpi != null
+                  ? "border-emerald-300 bg-emerald-50/60 text-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300"
+                  : "border-input bg-background"
+              }`}
+            />
+            {autoTpi != null && (
+              <p className="text-[10px] text-muted-foreground">TM × √Ne = {autoTpi}</p>
+            )}
+          </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Machine No</label>
             {machines.length > 0 ? (
@@ -2686,6 +2731,9 @@ function CspDialog({ open, onClose, editRecord, millId, endpoint, department }: 
         <div className="space-y-2 pt-2 border-t border-border">
           <label className="text-xs font-medium text-muted-foreground">
             Readings — Strength (gf) × Count (Ne) = CSP &nbsp;·&nbsp; 10 samples
+            <span className="ml-2 text-[10px] text-emerald-600 font-normal">
+              Count (Ne) auto-fills from Weight · TPI auto-fills from TM × √Ne
+            </span>
           </label>
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
@@ -2713,11 +2761,14 @@ function CspDialog({ open, onClose, editRecord, millId, endpoint, department }: 
                         onChange={(e) => { const a = [...weight]; a[i] = e.target.value; setWeight(a); }}
                         className={inp} />
                     </td>
-                    <td className={cel}>
-                      <input type="number" step="0.1" value={rowCount[i]}
-                        placeholder={form.count_ne || "Ne"}
-                        onChange={(e) => { const a = [...rowCount]; a[i] = e.target.value; setRowCount(a); }}
-                        className={inp} />
+                    <td className={`${cel} ${rowCount[i] === "" && effectiveRowNe[i] != null ? "bg-emerald-50/40 dark:bg-emerald-950/10" : ""}`}>
+                      {/* Auto-computed from Weight if empty; user can type to override */}
+                      <div className="relative">
+                        <input type="number" step="0.01" value={rowCount[i]}
+                          placeholder={effectiveRowNe[i] != null ? effectiveRowNe[i]!.toFixed(2) : (form.count_ne || "Ne")}
+                          onChange={(e) => { const a = [...rowCount]; a[i] = e.target.value; setRowCount(a); }}
+                          className={`${inp} ${rowCount[i] === "" && effectiveRowNe[i] != null ? "placeholder:text-emerald-600 placeholder:font-semibold" : ""}`} />
+                      </div>
                     </td>
                     <td className={`${cel} bg-emerald-50/60 dark:bg-emerald-950/20`}>
                       <span className="block text-center font-semibold font-mono text-emerald-700 py-1">
@@ -3132,6 +3183,311 @@ function ACheckDialog({ open, onClose, editRecord, millId, endpoint, department 
   );
 }
 
+// ── Letterhead custom body renderers ────────────────────────────────────────
+// These draw a paper-matching table in jsPDF for specialised forms.
+// Each returns the y position after the last drawn element.
+
+/** A% Check — draws header fields + N+1/N/N-1 table + A% result box */
+function drawACheckBody(
+  doc: any, row: any, y: number,
+  { pageW, margin }: { pageW: number; margin: number; pageH: number },
+): number {
+  const f = (v: any, dp = 2) => (v != null && v !== "" ? Number(v).toFixed(dp) : "—");
+  const lw = pageW - margin * 2;
+
+  // ── Header meta fields (2-column pairs) ──────────────────────────────────
+  const headerFields = [
+    ["Lot No",     row.lot_no ?? "—",   "Process",    row.process ?? "—"],
+    ["Delivery Hank", f(row.delivery_hank, 4), "Doubling", row.doubling ?? "—"],
+    ["Levelling Action Pt", f(row.levelling_action_point, 0), "Levelling Intensity", f(row.levelling_intensity, 1)],
+    ["Remarks",    row.remarks ?? "—",  "Status",     (row.status ?? "—").toUpperCase()],
+  ];
+  const rh = 7;
+  headerFields.forEach(([lk, lv, rk, rv], i) => {
+    doc.setFillColor(...(i % 2 === 0 ? [252, 253, 255] : [246, 248, 252]) as [number,number,number]);
+    doc.rect(margin - 1, y - 5, lw + 2, rh, "F");
+    doc.setFontSize(7.5); doc.setFont("helvetica", "bold"); doc.setTextColor(70, 80, 100);
+    doc.text(lk + ":", margin + 1, y);
+    doc.setFont("helvetica", "normal"); doc.setTextColor(20, 20, 20);
+    doc.text(String(lv), margin + 42, y);
+    doc.setFont("helvetica", "bold"); doc.setTextColor(70, 80, 100);
+    doc.text(rk + ":", pageW / 2 + 4, y);
+    doc.setFont("helvetica", "normal"); doc.setTextColor(20, 20, 20);
+    doc.text(String(rv), pageW / 2 + 46, y);
+    y += rh;
+  });
+
+  y += 4;
+
+  // ── N+1 / N / N-1 table ─────────────────────────────────────────────────
+  const rd = row.readings_json ?? {};
+  const nplus:  number[] = (rd.nplus  ?? []);
+  const nArr:   number[] = (rd.n      ?? []);
+  const nminus: number[] = (rd.nminus ?? []);
+  const ROWS = Math.max(nplus.length, nArr.length, nminus.length, 5);
+
+  const avg = (arr: number[]) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+  const avgNplus  = avg(nplus.filter(Boolean));
+  const avgN      = avg(nArr.filter(Boolean));
+  const avgNminus = avg(nminus.filter(Boolean));
+
+  const WY = 6.55; // default quadrant reel yards — matches dialog default
+  const g2h = (g: number | null) => g && g > 0 ? (WY * 453.592) / (840 * g) : null;
+  const hN      = g2h(avgN);
+  const hNplus  = g2h(avgNplus);
+  const hNminus = g2h(avgNminus);
+
+  const colW   = (lw - 18) / 3;
+  const siW    = 18;
+  const tblRowH = 7.5;
+
+  // Draw table header
+  doc.setFillColor(30, 58, 138);
+  doc.rect(margin, y, lw, tblRowH, "F");
+  doc.setFontSize(7); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
+  doc.text("SI No", margin + siW / 2, y + 5, { align: "center" });
+  ["N+1", "N", "N-1"].forEach((h, ci) => {
+    doc.text(h, margin + siW + colW * ci + colW / 2, y + 5, { align: "center" });
+  });
+  y += tblRowH;
+
+  // Data rows
+  for (let i = 0; i < ROWS; i++) {
+    const bg = i % 2 === 0 ? [255, 255, 255] : [245, 247, 250];
+    doc.setFillColor(...bg as [number,number,number]);
+    doc.rect(margin, y, lw, tblRowH, "F");
+    doc.setDrawColor(210, 215, 225); doc.setLineWidth(0.2);
+    doc.rect(margin, y, lw, tblRowH);
+    doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(30, 30, 30);
+    doc.text(String(i + 1), margin + siW / 2, y + 5, { align: "center" });
+    const vals = [nplus[i], nArr[i], nminus[i]];
+    vals.forEach((v, ci) => {
+      const txt = v != null && !isNaN(Number(v)) ? Number(v).toFixed(2) : "—";
+      doc.text(txt, margin + siW + colW * ci + colW / 2, y + 5, { align: "center" });
+    });
+    y += tblRowH;
+  }
+
+  // AVG row
+  doc.setFillColor(235, 240, 250);
+  doc.rect(margin, y, lw, tblRowH, "F");
+  doc.setFontSize(7.5); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 58, 138);
+  doc.text("Avg", margin + siW / 2, y + 5, { align: "center" });
+  [avgNplus, avgN, avgNminus].forEach((v, ci) => {
+    doc.text(v != null ? v.toFixed(2) : "—", margin + siW + colW * ci + colW / 2, y + 5, { align: "center" });
+  });
+  y += tblRowH;
+
+  // Hank row
+  doc.setFillColor(209, 250, 229);
+  doc.rect(margin, y, lw, tblRowH, "F");
+  doc.setFont("helvetica", "bold"); doc.setTextColor(6, 95, 70);
+  doc.text("Hank", margin + siW / 2, y + 5, { align: "center" });
+  [hNplus, hN, hNminus].forEach((v, ci) => {
+    doc.text(v != null ? v.toFixed(4) : "—", margin + siW + colW * ci + colW / 2, y + 5, { align: "center" });
+  });
+  y += tblRowH + 5;
+
+  // ── A% result box ────────────────────────────────────────────────────────
+  const aNplus  = row.a_pct_n_plus  != null ? Number(row.a_pct_n_plus)  : null;
+  const aNminus = row.a_pct_n_minus != null ? Number(row.a_pct_n_minus) : null;
+  const ok = aNplus != null && aNminus != null && Math.abs(aNplus) <= 0.5 && Math.abs(aNminus) <= 0.5;
+
+  doc.setFillColor(ok ? 209 : 254, ok ? 250 : 226, ok ? 229 : 226);
+  doc.setDrawColor(ok ? 134 : 252, ok ? 239 : 165, ok ? 172 : 165);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(margin, y, lw, 22, 2, 2, "FD");
+  doc.setFontSize(7.5); doc.setFont("helvetica", "bold");
+  doc.setTextColor(ok ? 6 : 153, ok ? 95 : 27, ok ? 70 : 27);
+
+  const thirds = lw / 3;
+  const items = [
+    { label: "Hank N+1", val: hNplus  != null ? hNplus.toFixed(4)  : "—" },
+    { label: "Hank N (baseline)", val: hN != null ? hN.toFixed(4) : "—" },
+    { label: "Hank N-1", val: hNminus != null ? hNminus.toFixed(4) : "—" },
+  ];
+  items.forEach(({ label, val }, i) => {
+    const cx = margin + thirds * i + thirds / 2;
+    doc.setFontSize(6.5); doc.setFont("helvetica", "normal"); doc.setTextColor(80, 90, 100);
+    doc.text(label, cx, y + 7, { align: "center" });
+    doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); doc.setTextColor(20, 20, 20);
+    doc.text(val, cx, y + 14, { align: "center" });
+  });
+
+  const resultItems = [
+    { label: "A% (N+1 vs N)", val: aNplus  != null ? `${aNplus  >= 0 ? "+" : ""}${aNplus.toFixed(2)}%`  : "—" },
+    { label: "A% (N-1 vs N)", val: aNminus != null ? `${aNminus >= 0 ? "+" : ""}${aNminus.toFixed(2)}%` : "—" },
+    { label: "Auto-Leveller",  val: aNplus  != null && aNminus != null ? (ok ? "✓ OK" : "✗ NG") : "—" },
+  ];
+  y += 25;
+  doc.setFillColor(ok ? 236 : 255, ok ? 253 : 237, ok ? 243 : 237);
+  doc.setDrawColor(ok ? 167 : 253, ok ? 243 : 200, ok ? 208 : 200);
+  doc.roundedRect(margin, y, lw, 18, 2, 2, "FD");
+  resultItems.forEach(({ label, val }, i) => {
+    const cx = margin + thirds * i + thirds / 2;
+    doc.setFontSize(6.5); doc.setFont("helvetica", "normal"); doc.setTextColor(80, 90, 100);
+    doc.text(label, cx, y + 6, { align: "center" });
+    const isNg = val.includes("NG");
+    doc.setFontSize(9); doc.setFont("helvetica", "bold");
+    doc.setTextColor(isNg ? 153 : (ok ? 6 : 20), isNg ? 27 : (ok ? 95 : 20), isNg ? 27 : (ok ? 70 : 20));
+    doc.text(val, cx, y + 14, { align: "center" });
+  });
+  y += 22;
+
+  doc.setFontSize(6.5); doc.setFont("helvetica", "normal"); doc.setTextColor(130);
+  doc.text("A% = (Hank_col − Hank_N) / Hank_N × 100   Spec: ±0.5%", margin, y + 4);
+  return y + 8;
+}
+
+/** CSP Strength Report — draws header + 10-row strength/CSP table + summary */
+function drawCspBody(
+  doc: any, row: any, y: number,
+  { pageW, margin }: { pageW: number; margin: number; pageH: number },
+): number {
+  const f = (v: any, dp = 2) => (v != null && v !== "" ? Number(v).toFixed(dp) : "—");
+  const lw = pageW - margin * 2;
+
+  // ── Header meta ─────────────────────────────────────────────────────────
+  const headerFields = [
+    ["Lot No",    row.lot_no  ?? "—",  "Count (Ne)", f(row.count_ne, 1)],
+    ["Ratio",     row.ratio   ?? "—",  "TM",         f(row.tm, 3)],
+    ["TPI",       f(row.tpi, 2),       "Remarks",    row.remarks ?? "—"],
+  ];
+  const rh = 7;
+  headerFields.forEach(([lk, lv, rk, rv], i) => {
+    doc.setFillColor(...(i % 2 === 0 ? [252, 253, 255] : [246, 248, 252]) as [number,number,number]);
+    doc.rect(margin - 1, y - 5, lw + 2, rh, "F");
+    doc.setFontSize(7.5); doc.setFont("helvetica", "bold"); doc.setTextColor(70, 80, 100);
+    doc.text(lk + ":", margin + 1, y);
+    doc.setFont("helvetica", "normal"); doc.setTextColor(20, 20, 20);
+    doc.text(String(lv), margin + 36, y);
+    doc.setFont("helvetica", "bold"); doc.setTextColor(70, 80, 100);
+    doc.text(rk + ":", pageW / 2 + 4, y);
+    doc.setFont("helvetica", "normal"); doc.setTextColor(20, 20, 20);
+    doc.text(String(rv), pageW / 2 + 38, y);
+    y += rh;
+  });
+  y += 4;
+
+  // ── Reading table ────────────────────────────────────────────────────────
+  const ROWS = 10;
+  // Column widths: SI | Strength | Weight | Count | CSP | Remarks
+  const siW = 12; const strW = 28; const wtW = 24; const neW = 22; const cspW = 28;
+  const remW = lw - siW - strW - wtW - neW - cspW;
+  const tblRowH = 7;
+
+  // Header row
+  doc.setFillColor(30, 58, 138);
+  doc.rect(margin, y, lw, tblRowH, "F");
+  doc.setFontSize(6.5); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
+  let cx = margin;
+  [["SI No", siW], ["Strength (gf)", strW], ["Weight (g)", wtW], ["Count (Ne)", neW], ["CSP", cspW], ["Remarks", remW]]
+    .forEach(([h, w]) => {
+      doc.text(String(h), cx + Number(w) / 2, y + 5, { align: "center" });
+      cx += Number(w);
+    });
+  y += tblRowH;
+
+  for (let i = 0; i < ROWS; i++) {
+    const si = i + 1;
+    const str = row[`s${si}_strength`];
+    const wt  = row[`s${si}_weight`];
+    const ne  = row[`s${si}_count`];
+    const csp = row[`s${si}_csp`];
+    const bg  = i % 2 === 0 ? [255, 255, 255] : [245, 247, 250];
+    doc.setFillColor(...bg as [number,number,number]);
+    doc.rect(margin, y, lw, tblRowH, "F");
+    doc.setDrawColor(210, 215, 225); doc.setLineWidth(0.15);
+    doc.rect(margin, y, lw, tblRowH);
+
+    doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(30, 30, 30);
+    cx = margin;
+    const cells: [string, number][] = [
+      [String(si),               siW],
+      [f(str, 2),                strW],
+      [f(wt, 2),                 wtW],
+      [f(ne, 1),                 neW],
+      [csp != null ? String(Math.round(Number(csp))) : "—", cspW],
+      ["",                       remW],
+    ];
+    cells.forEach(([txt, w]) => {
+      if (txt) doc.text(txt, cx + w / 2, y + 5, { align: "center" });
+      cx += w;
+    });
+
+    // Highlight CSP cell green/red vs spec
+    if (csp != null) {
+      const cspNum = Number(csp);
+      const ok2 = cspNum >= 2200;
+      doc.setFillColor(ok2 ? 209 : 254, ok2 ? 250 : 226, ok2 ? 229 : 226);
+      const cspX = margin + siW + strW + wtW + neW;
+      doc.rect(cspX, y, cspW, tblRowH, "F");
+      doc.setDrawColor(210, 215, 225);
+      doc.rect(cspX, y, cspW, tblRowH);
+      doc.setFontSize(8); doc.setFont("helvetica", "bold");
+      doc.setTextColor(ok2 ? 6 : 153, ok2 ? 95 : 27, ok2 ? 70 : 27);
+      doc.text(String(Math.round(cspNum)), cspX + cspW / 2, y + 5, { align: "center" });
+    }
+    y += tblRowH;
+  }
+
+  // Summary rows: AVG / CV% / MAX / MIN
+  const summaryRows = [
+    ["AVG", row.avg_csp != null ? Math.round(Number(row.avg_csp)).toString() : "—"],
+    ["CV%", row.cv_pct  != null ? `${Number(row.cv_pct).toFixed(2)}%`        : "—"],
+    ["MAX", row.max_csp != null ? Math.round(Number(row.max_csp)).toString()  : "—"],
+    ["MIN", row.min_csp != null ? Math.round(Number(row.min_csp)).toString()  : "—"],
+  ];
+  summaryRows.forEach(([label, val]) => {
+    doc.setFillColor(235, 240, 250);
+    doc.rect(margin, y, lw, tblRowH, "F");
+    doc.setDrawColor(190, 200, 225); doc.setLineWidth(0.2);
+    doc.rect(margin, y, lw, tblRowH);
+    doc.setFontSize(7.5); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 58, 138);
+    doc.text(label, margin + siW / 2, y + 5, { align: "center" });
+    const cspX = margin + siW + strW + wtW + neW;
+    doc.setFont("helvetica", "bold"); doc.setTextColor(20, 20, 20);
+    doc.text(val, cspX + cspW / 2, y + 5, { align: "center" });
+    y += tblRowH;
+  });
+
+  y += 5;
+
+  // ── Summary box ──────────────────────────────────────────────────────────
+  const avgCsp = row.avg_csp != null ? Number(row.avg_csp) : null;
+  const cvPct  = row.cv_pct  != null ? Number(row.cv_pct)  : null;
+  const ok = avgCsp != null && avgCsp >= 2200;
+
+  doc.setFillColor(ok ? 209 : 254, ok ? 250 : 226, ok ? 229 : 226);
+  doc.setDrawColor(ok ? 134 : 252, ok ? 239 : 165, ok ? 172 : 165);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(margin, y, lw, 18, 2, 2, "FD");
+
+  const quarters = lw / 4;
+  [
+    { label: "Avg CSP",  val: avgCsp != null ? avgCsp.toFixed(0)          : "—" },
+    { label: "CV%",      val: cvPct  != null ? `${cvPct.toFixed(2)}%`     : "—" },
+    { label: "Max",      val: row.max_csp != null ? Math.round(Number(row.max_csp)).toString() : "—" },
+    { label: "Min",      val: row.min_csp != null ? Math.round(Number(row.min_csp)).toString() : "—" },
+  ].forEach(({ label, val }, i) => {
+    const qx = margin + quarters * i + quarters / 2;
+    doc.setFontSize(6.5); doc.setFont("helvetica", "normal"); doc.setTextColor(80, 90, 100);
+    doc.text(label, qx, y + 6, { align: "center" });
+    doc.setFontSize(9); doc.setFont("helvetica", "bold");
+    doc.setTextColor(ok ? 6 : 20, ok ? 95 : 20, ok ? 70 : 20);
+    doc.text(val, qx, y + 14, { align: "center" });
+  });
+  y += 22;
+
+  const resultTxt = avgCsp != null ? (ok ? "✓ PASS — Avg CSP ≥ 2200" : "✗ FAIL — Avg CSP < 2200") : "—";
+  doc.setFontSize(7.5); doc.setFont("helvetica", "bold");
+  doc.setTextColor(ok ? 6 : 153, ok ? 95 : 27, ok ? 70 : 27);
+  doc.text(resultTxt, margin, y + 4);
+  doc.setFontSize(6.5); doc.setFont("helvetica", "normal"); doc.setTextColor(130);
+  doc.text("CSP = Strength (gf) × Count (Ne)", pageW - margin, y + 4, { align: "right" });
+  return y + 10;
+}
+
 // ── Main QmFormsTab: table + popup ──────────────────────────────────────────
 function QmFormsTab({
   title, endpoint, columns, millId, millName, canEdit, layout = "grid",
@@ -3228,6 +3584,13 @@ function QmFormsTab({
                     subtitle: `${dateFrom}${dateTo !== dateFrom ? ` → ${dateTo}` : ""}`,
                     columns: tableCols.map((c) => ({ key: c.key, label: c.label })),
                     rows: records,
+                    // Specialised forms get a custom body renderer so the PDF
+                    // matches the paper form layout exactly.
+                    drawCustomBody: endpoint.includes("a-pct") || endpoint.includes("a_pct_check")
+                      ? drawACheckBody
+                      : endpoint.includes("csp-report") || endpoint.includes("csp_report")
+                        ? drawCspBody
+                        : undefined,
                   })
                 }
               >
