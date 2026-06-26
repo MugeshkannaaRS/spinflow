@@ -2518,6 +2518,302 @@ function PaperConeDialog({ open, onClose, editRecord, millId, endpoint }: {
   );
 }
 
+// ── CSP Strength Report Dialog — paper-style table ───────────────────────────
+// Paper form: SI No | Strength (gf) | Weight (g) | Count (Ne) | CSP | Remarks
+// CSP = Strength(gf) × Count(Ne)   [Count may differ per lea; entered per row]
+// Summary rows: AVG, CV%, MAX, MIN
+function CspDialog({ open, onClose, editRecord, millId, endpoint, department }: {
+  open: boolean; onClose: () => void; editRecord: any | null;
+  millId: string | null | undefined; endpoint: string; department?: string;
+}) {
+  const qc = useQueryClient();
+  const { data: machines = [] } = useMachines(millId, department);
+  const today = new Date().toISOString().slice(0, 10);
+  const [saving, setSaving] = useState(false);
+  const ROWS = 10;
+  const makeDefaultForm = () => ({
+    date: today, machine_no: "", lot_no: "", count_ne: "", ratio: "",
+    tm: "", tpi: "", remarks: "", status: "draft",
+  });
+  const [form, setForm] = useState<Record<string, string>>(makeDefaultForm);
+  // Per-row: strength (gf), weight (g), count (Ne — may vary), remarks
+  const [strength,  setStrength]  = useState<string[]>(Array(ROWS).fill(""));
+  const [weight,    setWeight]    = useState<string[]>(Array(ROWS).fill(""));
+  const [rowCount,  setRowCount]  = useState<string[]>(Array(ROWS).fill("")); // per-row Ne
+  const [rowRemark, setRowRemark] = useState<string[]>(Array(ROWS).fill(""));
+
+  useEffect(() => {
+    if (editRecord) {
+      setForm({
+        date: editRecord.date ?? today,
+        machine_no: editRecord.machine_no ?? "",
+        lot_no: editRecord.lot_no ?? "",
+        count_ne: editRecord.count_ne != null ? String(editRecord.count_ne) : "",
+        ratio: editRecord.ratio ?? "",
+        tm: editRecord.tm != null ? String(editRecord.tm) : "",
+        tpi: editRecord.tpi != null ? String(editRecord.tpi) : "",
+        remarks: editRecord.remarks ?? "",
+        status: editRecord.status ?? "draft",
+      });
+      // Load per-row arrays from s1_strength..s10_strength etc.
+      const pad = (arr: (number|null)[], len: number) =>
+        arr.concat(Array(len).fill(null)).slice(0, len).map((v) => v != null ? String(v) : "");
+      const sArr = Array.from({length: ROWS}, (_, i) => editRecord[`s${i+1}_strength`] ?? null);
+      const wArr = Array.from({length: ROWS}, (_, i) => editRecord[`s${i+1}_weight`]   ?? null);
+      const cArr = Array.from({length: ROWS}, (_, i) => editRecord[`s${i+1}_count`]    ?? null);
+      setStrength(pad(sArr, ROWS));
+      setWeight(pad(wArr, ROWS));
+      setRowCount(pad(cArr, ROWS));
+      setRowRemark(Array(ROWS).fill(""));
+    } else {
+      setForm(makeDefaultForm());
+      setStrength(Array(ROWS).fill(""));
+      setWeight(Array(ROWS).fill(""));
+      setRowCount(Array(ROWS).fill(""));
+      setRowRemark(Array(ROWS).fill(""));
+    }
+  }, [editRecord, open]);
+
+  // Per-row CSP = Strength × (row Count if provided, else header Count)
+  const headerNe = parseFloat(form.count_ne);
+  const rowCsp = strength.map((s, i) => {
+    const str = parseFloat(s);
+    const ne  = parseFloat(rowCount[i]) || (isFinite(headerNe) && headerNe > 0 ? headerNe : NaN);
+    return isFinite(str) && str > 0 && isFinite(ne) && ne > 0 ? str * ne : null;
+  });
+
+  // Stats from non-null CSP values
+  const validCsp = rowCsp.filter((v) => v != null) as number[];
+  const avgCsp = validCsp.length ? validCsp.reduce((a, b) => a + b, 0) / validCsp.length : null;
+  const maxCsp = validCsp.length ? Math.max(...validCsp) : null;
+  const minCsp = validCsp.length ? Math.min(...validCsp) : null;
+  const cvCsp = (() => {
+    if (validCsp.length < 2 || avgCsp == null) return null;
+    const variance = validCsp.reduce((s, v) => s + (v - avgCsp) ** 2, 0) / (validCsp.length - 1);
+    return (Math.sqrt(variance) / avgCsp) * 100;
+  })();
+
+  const sf = (v: string) => { const n = parseFloat(v); return isFinite(n) && n > 0 ? n : null; };
+
+  const handleSave = async () => {
+    if (!form.date || !form.machine_no) {
+      toast.error("Date and Machine No are required"); return;
+    }
+    setSaving(true);
+    try {
+      const rowFields: Record<string, number | null> = {};
+      for (let i = 0; i < ROWS; i++) {
+        rowFields[`s${i+1}_strength`] = sf(strength[i]);
+        rowFields[`s${i+1}_weight`]   = sf(weight[i]);
+        rowFields[`s${i+1}_count`]    = sf(rowCount[i]);
+        rowFields[`s${i+1}_csp`]      = rowCsp[i] != null ? parseFloat((rowCsp[i] as number).toFixed(1)) : null;
+      }
+      const payload = {
+        date: form.date,
+        machine_no: form.machine_no,
+        lot_no: form.lot_no || null,
+        count_ne: sf(form.count_ne),
+        ratio: form.ratio || null,
+        tm: sf(form.tm),
+        tpi: sf(form.tpi),
+        avg_csp: avgCsp != null ? parseFloat(avgCsp.toFixed(1)) : null,
+        cv_pct: cvCsp  != null ? parseFloat(cvCsp.toFixed(3))  : null,
+        max_csp: maxCsp,
+        min_csp: minCsp,
+        within_spec: avgCsp != null ? avgCsp >= 2200 : null, // typical min spec
+        remarks: form.remarks || null,
+        ...rowFields,
+      };
+      if (editRecord?.id) {
+        await api.patch(`${endpoint}/${editRecord.id}`, payload);
+        toast.success("Updated");
+      } else {
+        await api.post(endpoint, payload);
+        toast.success("Saved");
+      }
+      qc.invalidateQueries({ queryKey: ["qm-tab", endpoint] });
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.detail ?? "Failed to save");
+    } finally { setSaving(false); }
+  };
+
+  const listId = useMemo(() => `csp-mc-${Math.random().toString(36).slice(2)}`, []);
+  const inp = "w-full h-7 rounded border-0 bg-transparent px-1 text-xs text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring";
+  const hdr = "border border-border px-2 py-1.5 text-[10px] font-semibold text-center";
+  const cel = "border border-border p-0.5";
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-base">{editRecord ? "Edit" : "Add Record"} — CSP Strength Report</DialogTitle>
+        </DialogHeader>
+
+        {/* Header fields */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { key: "date",     label: "Date",     type: "date" },
+            { key: "lot_no",   label: "Lot No",   placeholder: "e.g. CR-80/20" },
+            { key: "count_ne", label: "Count (Ne)", type: "number", step: "0.1", placeholder: "e.g. 24" },
+            { key: "ratio",    label: "Ratio",    placeholder: "e.g. 80/20" },
+            { key: "tm",       label: "TM",       type: "number", step: "0.01" },
+            { key: "tpi",      label: "TPI",      type: "number", step: "0.1" },
+            { key: "remarks",  label: "Remarks",  placeholder: "Optional" },
+          ].map(({ key, label, type = "text", step, placeholder }) => (
+            <div key={key} className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">{label}</label>
+              <input type={type} step={step} value={form[key]} placeholder={placeholder}
+                onChange={(e) => setForm((p) => ({ ...p, [key]: e.target.value }))}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+            </div>
+          ))}
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Machine No</label>
+            {machines.length > 0 ? (
+              <><datalist id={listId}>{machines.map((m: any) => <option key={m.id} value={m.code} />)}</datalist>
+                <input list={listId} value={form.machine_no} onChange={(e) => setForm((p) => ({ ...p, machine_no: e.target.value }))}
+                  placeholder="e.g. RF_001" className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+              </>
+            ) : (
+              <input value={form.machine_no} onChange={(e) => setForm((p) => ({ ...p, machine_no: e.target.value }))}
+                placeholder="e.g. RF_001" className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+            )}
+          </div>
+        </div>
+
+        {/* Reading table — matches physical paper */}
+        <div className="space-y-2 pt-2 border-t border-border">
+          <label className="text-xs font-medium text-muted-foreground">
+            Readings — Strength (gf) × Count (Ne) = CSP &nbsp;·&nbsp; 10 samples
+          </label>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-muted/40">
+                  <th className={`${hdr} w-8`}>SI No</th>
+                  <th className={`${hdr}`}>Strength (gf)</th>
+                  <th className={`${hdr}`}>Weight (g)</th>
+                  <th className={`${hdr}`}>Count (Ne)</th>
+                  <th className={`${hdr} text-emerald-700`}>CSP</th>
+                  <th className={`${hdr}`}>Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({length: ROWS}, (_, i) => (
+                  <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-muted/10"}>
+                    <td className="border border-border px-2 py-1 text-center text-[10px] font-medium text-muted-foreground">{i + 1}</td>
+                    <td className={cel}>
+                      <input type="number" step="0.01" value={strength[i]} placeholder="—"
+                        onChange={(e) => { const a = [...strength]; a[i] = e.target.value; setStrength(a); }}
+                        className={inp} />
+                    </td>
+                    <td className={cel}>
+                      <input type="number" step="0.01" value={weight[i]} placeholder="—"
+                        onChange={(e) => { const a = [...weight]; a[i] = e.target.value; setWeight(a); }}
+                        className={inp} />
+                    </td>
+                    <td className={cel}>
+                      <input type="number" step="0.1" value={rowCount[i]}
+                        placeholder={form.count_ne || "Ne"}
+                        onChange={(e) => { const a = [...rowCount]; a[i] = e.target.value; setRowCount(a); }}
+                        className={inp} />
+                    </td>
+                    <td className={`${cel} bg-emerald-50/60 dark:bg-emerald-950/20`}>
+                      <span className="block text-center font-semibold font-mono text-emerald-700 py-1">
+                        {rowCsp[i] != null ? (rowCsp[i] as number).toFixed(0) : "—"}
+                      </span>
+                    </td>
+                    <td className={cel}>
+                      <input type="text" value={rowRemark[i]} placeholder=""
+                        onChange={(e) => { const a = [...rowRemark]; a[i] = e.target.value; setRowRemark(a); }}
+                        className={inp} />
+                    </td>
+                  </tr>
+                ))}
+                {/* AVG row */}
+                <tr className="bg-muted/30 font-semibold">
+                  <td className="border border-border px-2 py-1.5 text-[10px] text-center text-muted-foreground">AVG</td>
+                  <td className="border border-border px-2 py-1.5 text-center font-mono text-xs">
+                    {strength.map(parseFloat).filter(isFinite).length
+                      ? (strength.map(parseFloat).filter(isFinite).reduce((a,b)=>a+b,0)/strength.map(parseFloat).filter(isFinite).length).toFixed(2) : "—"}
+                  </td>
+                  <td className="border border-border px-2 py-1.5 text-center font-mono text-xs">—</td>
+                  <td className="border border-border px-2 py-1.5 text-center font-mono text-xs">—</td>
+                  <td className="border border-border px-2 py-1.5 text-center font-mono font-semibold text-emerald-700">
+                    {avgCsp != null ? avgCsp.toFixed(1) : "—"}
+                  </td>
+                  <td className="border border-border" />
+                </tr>
+                {/* CV% row */}
+                <tr className="bg-muted/20">
+                  <td className="border border-border px-2 py-1.5 text-[10px] text-center text-muted-foreground">CV%</td>
+                  <td className="border border-border px-2 py-1.5 text-center font-mono text-xs" colSpan={3}>—</td>
+                  <td className="border border-border px-2 py-1.5 text-center font-mono text-xs font-semibold">
+                    {cvCsp != null ? `${cvCsp.toFixed(2)}%` : "—"}
+                  </td>
+                  <td className="border border-border" />
+                </tr>
+                {/* MAX row */}
+                <tr className="bg-muted/10">
+                  <td className="border border-border px-2 py-1.5 text-[10px] text-center text-muted-foreground">MAX</td>
+                  <td className="border border-border px-2 py-1.5 text-center font-mono text-xs" colSpan={3}>—</td>
+                  <td className="border border-border px-2 py-1.5 text-center font-mono text-xs">
+                    {maxCsp != null ? maxCsp.toFixed(0) : "—"}
+                  </td>
+                  <td className="border border-border" />
+                </tr>
+                {/* MIN row */}
+                <tr className="bg-muted/10">
+                  <td className="border border-border px-2 py-1.5 text-[10px] text-center text-muted-foreground">MIN</td>
+                  <td className="border border-border px-2 py-1.5 text-center font-mono text-xs" colSpan={3}>—</td>
+                  <td className="border border-border px-2 py-1.5 text-center font-mono text-xs">
+                    {minCsp != null ? minCsp.toFixed(0) : "—"}
+                  </td>
+                  <td className="border border-border" />
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Summary panel */}
+        {avgCsp != null && (
+          <div className="p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 space-y-1.5">
+            <div className="flex gap-4 text-xs">
+              {[
+                { label: "Avg CSP", val: avgCsp?.toFixed(1) },
+                { label: "CV%",     val: cvCsp != null ? `${cvCsp.toFixed(2)}%` : "—" },
+                { label: "Max",     val: maxCsp?.toFixed(0) },
+                { label: "Min",     val: minCsp?.toFixed(0) },
+              ].map(({ label, val }) => (
+                <div key={label} className="flex-1 text-center">
+                  <p className="text-[10px] text-muted-foreground">{label}</p>
+                  <p className="font-semibold font-mono text-emerald-800">{val ?? "—"}</p>
+                </div>
+              ))}
+              <div className="flex-1 text-center">
+                <p className="text-[10px] text-muted-foreground">Result</p>
+                <p className={`font-semibold ${avgCsp >= 2200 ? "text-emerald-700" : "text-red-600"}`}>
+                  {avgCsp >= 2200 ? "✓ OK" : "✗ NG"}
+                </p>
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground border-t border-emerald-200 pt-1">
+              CSP = Strength (gf) × Count (Ne) · Spec: Avg CSP ≥ 2200
+            </p>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? "Saving…" : editRecord ? "Update record" : "Save record"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── A% Check Dialog — N+1 / N / N-1 three-column reading grid ────────────────
 function ACheckDialog({ open, onClose, editRecord, millId, endpoint, department }: {
   open: boolean; onClose: () => void; editRecord: any | null;
@@ -2534,6 +2830,11 @@ function ACheckDialog({ open, onClose, editRecord, millId, endpoint, department 
     remarks: "", status: "draft",
   });
   const [form, setForm] = useState<Record<string, string>>(makeDefault);
+  // Wrap reel length — mill-specific. Common values:
+  //   6.55 yards = quadrant balance short reel (AA Yarn Mills style)
+  //   120 yards  = standard hank reel
+  // Stored per-session; user can change if their mill uses a different reel.
+  const [wrapYards, setWrapYards] = useState<string>("6.55");
   // 3 columns × 5 rows: nplus[0..4], n[0..4], nminus[0..4]
   const [nplus, setNplus] = useState<string[]>(Array(5).fill(""));
   const [n, setN] = useState<string[]>(Array(5).fill(""));
@@ -2572,10 +2873,11 @@ function ACheckDialog({ open, onClose, editRecord, millId, endpoint, department 
   const avgNminus = avgArr(nminus);
 
   // Convert avg gram weight → actual hank (Ne)
-  // Formula: Hank = (120 yards × 453.592 g/lb) / (840 yards/hank × avg_weight_g)
-  // Standard wrap reel = 120 yards
+  // Formula: Hank = (wrapYards × 453.592 g/lb) / (840 yards/hank × avg_weight_g)
+  // wrapYards is mill-specific — AA Yarn Mills uses 6.55 yards quadrant reel
+  const wy = parseFloat(wrapYards);
   const gramsToHank = (avgG: number | null) =>
-    avgG && avgG > 0 ? (120 * 453.592) / (840 * avgG) : null;
+    avgG && avgG > 0 && wy > 0 ? (wy * 453.592) / (840 * avgG) : null;
 
   const hankN     = gramsToHank(avgN);
   const hankNplus = gramsToHank(avgNplus);
@@ -2693,6 +2995,12 @@ function ACheckDialog({ open, onClose, editRecord, millId, endpoint, department 
             <label className="text-xs font-medium text-muted-foreground">Levelling Intensity</label>
             <input type="number" step="0.1" value={form.levelling_intensity} onChange={(e) => setForm((p) => ({ ...p, levelling_intensity: e.target.value }))} placeholder="99.3"
               className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Wrap Reel (yards)</label>
+            <input type="number" step="0.01" min="0.1" value={wrapYards} onChange={(e) => setWrapYards(e.target.value)} placeholder="6.55"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+            <p className="text-[10px] text-muted-foreground">6.55 yd = quadrant reel · 120 yd = full hank reel</p>
           </div>
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Remarks</label>
@@ -3033,11 +3341,13 @@ function QmFormsTab({
         )}
       </CardContent>
 
-      {/* Dialog — specialised for bag weight, paper cone, A% check; sheet/grid for others */}
+      {/* Dialog — specialised per form type; falls back to sheet/grid */}
       {endpoint.includes("bag-weight") ? (
         <BagWeightDialog open={dialogOpen} onClose={closeDialog} editRecord={editRecord} millId={millId} endpoint={endpoint} />
       ) : endpoint.includes("paper-cone") ? (
         <PaperConeDialog open={dialogOpen} onClose={closeDialog} editRecord={editRecord} millId={millId} endpoint={endpoint} />
+      ) : endpoint.includes("csp-report") || endpoint.includes("csp_report") ? (
+        <CspDialog open={dialogOpen} onClose={closeDialog} editRecord={editRecord} millId={millId} endpoint={endpoint} department={department} />
       ) : endpoint.includes("a-pct") || endpoint.includes("a_pct_check") ? (
         <ACheckDialog open={dialogOpen} onClose={closeDialog} editRecord={editRecord} millId={millId} endpoint={endpoint} department={department} />
       ) : layout === "sheet" ? (
