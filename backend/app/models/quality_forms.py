@@ -351,7 +351,7 @@ class QmSliverWrapping(TimestampMixin, Base):
     machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
-    process: Mapped[str] = mapped_column(String(5), nullable=False)           # BD / FD
+    process: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # BD / FD
     side: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
     std_hank: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     readings_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)  # [r1..r5]

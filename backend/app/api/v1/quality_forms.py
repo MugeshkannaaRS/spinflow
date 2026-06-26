@@ -810,7 +810,7 @@ async def _v2_create(slug: str, payload: Dict[str, Any],
     except Exception as e:
         await db.rollback()
         logger.error(f"_v2_create {slug} error: {e}", exc_info=True)
-        raise HTTPException(status_code=400, detail=f"Save failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Save failed [{slug}]: {str(e)}")
 
 
 async def _v2_update(slug: str, record_id: str, payload: Dict[str, Any],
