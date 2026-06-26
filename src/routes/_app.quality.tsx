@@ -2564,16 +2564,28 @@ function ACheckDialog({ open, onClose, editRecord, millId, endpoint, department 
   }, [editRecord, open]);
 
   const avgArr = (arr: string[]) => {
-    const nums = arr.map(parseFloat).filter((x) => !isNaN(x));
+    const nums = arr.map(parseFloat).filter((x) => !isNaN(x) && x > 0);
     return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
   };
   const avgN = avgArr(n);
   const avgNplus = avgArr(nplus);
   const avgNminus = avgArr(nminus);
-  const delivHank = parseFloat(form.delivery_hank) || null;
-  // A% = (AvgHank - NomHank) / NomHank × 100 for each column
-  const aPctNplus = avgNplus != null && delivHank ? ((avgNplus - delivHank) / delivHank) * 100 : null;
-  const aPctNminus = avgNminus != null && delivHank ? ((avgNminus - delivHank) / delivHank) * 100 : null;
+
+  // Convert avg gram weight → actual hank (Ne)
+  // Formula: Hank = (120 yards × 453.592 g/lb) / (840 yards/hank × avg_weight_g)
+  // Standard wrap reel = 120 yards
+  const gramsToHank = (avgG: number | null) =>
+    avgG && avgG > 0 ? (120 * 453.592) / (840 * avgG) : null;
+
+  const hankN     = gramsToHank(avgN);
+  const hankNplus = gramsToHank(avgNplus);
+  const hankNminus = gramsToHank(avgNminus);
+
+  // A% = deviation of N+1 / N-1 column from the N column (the baseline)
+  // A%(n+1) = (hank_Nplus  - hank_N) / hank_N × 100
+  // A%(n-1) = (hank_Nminus - hank_N) / hank_N × 100
+  const aPctNplus  = hankNplus  != null && hankN ? ((hankNplus  - hankN) / hankN) * 100 : null;
+  const aPctNminus = hankNminus != null && hankN ? ((hankNminus - hankN) / hankN) * 100 : null;
 
   const handleSave = async () => {
     if (!form.date || !form.machine_no || !form.lot_no) {
@@ -2597,7 +2609,9 @@ function ACheckDialog({ open, onClose, editRecord, millId, endpoint, department 
         levelling_action_point: form.levelling_action_point !== "" ? parseFloat(form.levelling_action_point) : null,
         levelling_intensity: form.levelling_intensity !== "" ? parseFloat(form.levelling_intensity) : null,
         readings_json: { nplus: nplusNums, n: nNums, nminus: nminusNums },
-        avg_hank: avgN != null ? parseFloat(avgN.toFixed(4)) : null,
+        // avg_hank = actual hank of the N (baseline) column, derived from avg gram weight
+        avg_hank: hankN != null ? parseFloat(hankN.toFixed(4)) : null,
+        // A% = deviation of N+1/N-1 hank from N hank (auto-leveller effectiveness check)
         a_pct_n_plus: aPctNplus != null ? parseFloat(aPctNplus.toFixed(3)) : null,
         a_pct_n_minus: aPctNminus != null ? parseFloat(aPctNminus.toFixed(3)) : null,
         within_spec: aPctNplus != null && aPctNminus != null
@@ -2687,48 +2701,117 @@ function ACheckDialog({ open, onClose, editRecord, millId, endpoint, department 
           </div>
         </div>
 
-        {/* N+1 / N / N-1 reading grid */}
+        {/* N+1 / N / N-1 reading grid — matches physical paper form */}
         <div className="space-y-2 pt-2 border-t border-border">
-          <label className="text-xs font-medium text-muted-foreground">Readings (g) — enter 5 samples per column</label>
-          <div className="grid grid-cols-3 gap-3">
-            {([["N+1", nplus, setNplus], ["N", n, setN], ["N-1", nminus, setNminus]] as const).map(([label, vals, setter]) => (
-              <div key={label} className="space-y-1">
-                <div className="text-[10px] font-semibold text-center text-muted-foreground bg-muted/40 py-1 rounded">{label}</div>
-                {(vals as string[]).map((v, i) => (
-                  <input key={i} type="number" step="0.01" value={v}
-                    onChange={(e) => { const nw = [...(vals as string[])]; nw[i] = e.target.value; (setter as any)(nw); }}
-                    placeholder="—"
-                    className="flex h-8 w-full rounded border border-input bg-background px-2 text-xs text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
+          <label className="text-xs font-medium text-muted-foreground">
+            Readings (g) — weights from wrap reel, 5 samples per column
+          </label>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-muted/40">
+                  <th className="border border-border px-2 py-1.5 text-[10px] font-medium text-muted-foreground w-10">SI No</th>
+                  <th className="border border-border px-3 py-1.5 text-[10px] font-semibold text-center">N+1</th>
+                  <th className="border border-border px-3 py-1.5 text-[10px] font-semibold text-center">N</th>
+                  <th className="border border-border px-3 py-1.5 text-[10px] font-semibold text-center">N-1</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[0,1,2,3,4].map((i) => (
+                  <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-muted/10"}>
+                    <td className="border border-border px-2 py-1 text-center text-[10px] font-medium text-muted-foreground">{i + 1}</td>
+                    {([
+                      [nplus,  setNplus],
+                      [n,      setN],
+                      [nminus, setNminus],
+                    ] as const).map(([vals, setter], ci) => (
+                      <td key={ci} className="border border-border p-1">
+                        <input
+                          type="number" step="0.01"
+                          value={(vals as string[])[i]}
+                          onChange={(e) => {
+                            const nw = [...(vals as string[])];
+                            nw[i] = e.target.value;
+                            (setter as any)(nw);
+                          }}
+                          placeholder="—"
+                          className="w-full h-7 rounded border-0 bg-transparent px-1 text-xs text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                        />
+                      </td>
+                    ))}
+                  </tr>
                 ))}
-                {avgArr(vals as string[]) != null && (
-                  <div className="text-center text-[10px] font-semibold text-emerald-700 bg-emerald-50 rounded py-0.5">
-                    Avg: {avgArr(vals as string[])?.toFixed(4)}
-                  </div>
-                )}
-              </div>
-            ))}
+                {/* Average row */}
+                <tr className="bg-muted/30 font-semibold">
+                  <td className="border border-border px-2 py-1.5 text-[10px] text-center text-muted-foreground">Avg</td>
+                  {[
+                    [nplus,  avgNplus],
+                    [n,      avgN],
+                    [nminus, avgNminus],
+                  ].map(([, avg], ci) => (
+                    <td key={ci} className="border border-border px-3 py-1.5 text-center font-mono text-xs text-foreground">
+                      {(avg as number | null) != null ? (avg as number).toFixed(2) : "—"}
+                    </td>
+                  ))}
+                </tr>
+                {/* Hank row */}
+                <tr className="bg-emerald-50 dark:bg-emerald-950/20">
+                  <td className="border border-border px-2 py-1.5 text-[10px] text-center font-medium text-emerald-800">Hank</td>
+                  {[hankNplus, hankN, hankNminus].map((h, ci) => (
+                    <td key={ci} className="border border-border px-3 py-1.5 text-center font-mono text-xs font-semibold text-emerald-700">
+                      {h != null ? h.toFixed(4) : "—"}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
         {/* Auto-computed A% results */}
-        {(aPctNplus != null || aPctNminus != null) && (
-          <div className="flex gap-4 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 text-xs">
-            <div><p className="text-[10px] text-muted-foreground">Avg Hank (N)</p><p className="font-semibold text-emerald-700">{avgN?.toFixed(4)}</p></div>
-            <div><p className="text-[10px] text-muted-foreground">A% N+</p>
-              <p className={`font-semibold ${aPctNplus != null && Math.abs(aPctNplus) > 0.5 ? "text-red-600" : "text-emerald-700"}`}>
-                {aPctNplus?.toFixed(2)}%
-              </p>
+        {(hankN != null || aPctNplus != null || aPctNminus != null) && (
+          <div className="p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 space-y-2">
+            {/* Hank per column */}
+            <div className="flex gap-3 text-xs">
+              {[
+                { label: "Hank N+1", val: hankNplus },
+                { label: "Hank N (baseline)", val: hankN },
+                { label: "Hank N-1", val: hankNminus },
+              ].map(({ label, val }) => (
+                <div key={label} className="flex-1 text-center">
+                  <p className="text-[10px] text-muted-foreground">{label}</p>
+                  <p className="font-semibold font-mono text-emerald-800">
+                    {val != null ? val.toFixed(4) : "—"}
+                  </p>
+                </div>
+              ))}
             </div>
-            <div><p className="text-[10px] text-muted-foreground">A% N-</p>
-              <p className={`font-semibold ${aPctNminus != null && Math.abs(aPctNminus) > 0.5 ? "text-red-600" : "text-emerald-700"}`}>
-                {aPctNminus?.toFixed(2)}%
-              </p>
+            {/* A% values — deviation from N column */}
+            <div className="flex gap-3 text-xs border-t border-emerald-200 pt-2">
+              <div className="flex-1 text-center">
+                <p className="text-[10px] text-muted-foreground">A% (N+1 vs N)</p>
+                <p className={`font-semibold ${aPctNplus != null && Math.abs(aPctNplus) > 0.5 ? "text-red-600" : "text-emerald-700"}`}>
+                  {aPctNplus != null ? `${aPctNplus >= 0 ? "+" : ""}${aPctNplus.toFixed(2)}%` : "—"}
+                </p>
+              </div>
+              <div className="flex-1 text-center">
+                <p className="text-[10px] text-muted-foreground">A% (N-1 vs N)</p>
+                <p className={`font-semibold ${aPctNminus != null && Math.abs(aPctNminus) > 0.5 ? "text-red-600" : "text-emerald-700"}`}>
+                  {aPctNminus != null ? `${aPctNminus >= 0 ? "+" : ""}${aPctNminus.toFixed(2)}%` : "—"}
+                </p>
+              </div>
+              <div className="flex-1 text-center">
+                <p className="text-[10px] text-muted-foreground">Auto-Leveller</p>
+                <p className={`font-semibold ${aPctNplus != null && aPctNminus != null && Math.abs(aPctNplus) <= 0.5 && Math.abs(aPctNminus) <= 0.5 ? "text-emerald-700" : "text-red-600"}`}>
+                  {aPctNplus != null && aPctNminus != null
+                    ? (Math.abs(aPctNplus) <= 0.5 && Math.abs(aPctNminus) <= 0.5 ? "✓ OK" : "✗ NG")
+                    : "—"}
+                </p>
+              </div>
             </div>
-            <div><p className="text-[10px] text-muted-foreground">Within Spec?</p>
-              <p className={`font-semibold ${aPctNplus != null && aPctNminus != null && Math.abs(aPctNplus) <= 0.5 && Math.abs(aPctNminus) <= 0.5 ? "text-emerald-700" : "text-red-600"}`}>
-                {aPctNplus != null && aPctNminus != null ? (Math.abs(aPctNplus) <= 0.5 && Math.abs(aPctNminus) <= 0.5 ? "OK" : "NG") : "—"}
-              </p>
-            </div>
+            <p className="text-[10px] text-muted-foreground border-t border-emerald-200 pt-1">
+              A% = (Hank_col − Hank_N) / Hank_N × 100 · Spec: ±0.5%
+            </p>
           </div>
         )}
 
