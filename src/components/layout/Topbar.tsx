@@ -246,6 +246,7 @@ export function Topbar({
 
   return (
     <header
+      data-print-hide
       className="sticky top-0 z-30 bg-white border-b border-gray-200 flex items-center px-4 lg:px-6 gap-3"
       style={{ height: 56, minHeight: 56 }}
     >

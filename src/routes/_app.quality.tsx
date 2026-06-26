@@ -51,10 +51,13 @@ import {
   Save,
   ChevronDown,
   X,
+  Eye,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { QualityTest } from "@/lib/types";
 import { exportToLetterheadPdf } from "@/lib/export-utils";
+import { useTableKeyNav } from "@/lib/useTableKeyNav";
+import { LetterheadPreview } from "@/components/ui/LetterheadPreview";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
@@ -1940,6 +1943,8 @@ function QmSheetDialog({
   const shiftOptions = useShifts();
   const today = new Date().toISOString().slice(0, 10);
   const listId = useMemo(() => `mc-dl-sheet-${Math.random().toString(36).slice(2)}`, []);
+  // 1 row × 5 cols for r1–r5 reading inputs
+  const snav = useTableKeyNav({ rows: 1, cols: 5 });
 
   const makeDefault = () => ({
     date: today, shift_code: "", lot_no: "", process: "",
@@ -2149,7 +2154,9 @@ function QmSheetDialog({
             {["r1","r2","r3","r4","r5"].map((rk, i) => (
               <div key={rk} className="space-y-1">
                 <label className="text-[10px] text-muted-foreground text-center block">{i+1}</label>
-                <input type="number" step="0.01" value={form[rk] ?? ""} onChange={(e) => setF(rk, e.target.value)}
+                <input
+                  ref={snav.cellRef(0, i)} onKeyDown={snav.onKeyDown(0, i)}
+                  type="number" step="0.01" value={form[rk] ?? ""} onChange={(e) => setF(rk, e.target.value)}
                   placeholder="—"
                   className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
               </div>
@@ -2233,6 +2240,8 @@ function BagWeightDialog({ open, onClose, editRecord, millId, endpoint }: {
     inspector: "", target_weight: "", remarks: "", status: "draft",
   });
   const [weights, setWeights] = useState<string[]>(Array(20).fill(""));
+  // 5-col grid: rows = ceil(weights.length / 5)
+  const bwnav = useTableKeyNav({ rows: 4, cols: 5 });
 
   useEffect(() => {
     if (editRecord) {
@@ -2361,7 +2370,10 @@ function BagWeightDialog({ open, onClose, editRecord, millId, endpoint }: {
             {weights.map((w, i) => (
               <div key={i} className="space-y-0.5">
                 <label className="text-[10px] text-muted-foreground text-center block">{i + 1}</label>
-                <input type="number" step="0.01" value={w}
+                <input
+                  ref={bwnav.cellRef(Math.floor(i / 5), i % 5)}
+                  onKeyDown={bwnav.onKeyDown(Math.floor(i / 5), i % 5)}
+                  type="number" step="0.01" value={w}
                   onChange={(e) => { const nw = [...weights]; nw[i] = e.target.value; setWeights(nw); }}
                   placeholder="—"
                   className={`flex h-8 w-full rounded border bg-background px-1.5 text-xs text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring ${
@@ -2410,6 +2422,7 @@ function PaperConeDialog({ open, onClose, editRecord, millId, endpoint }: {
     date: today, supplier_name: "", batch_no: "", inspector: "", remarks: "", status: "draft",
   });
   const [weights, setWeights] = useState<string[]>(Array(20).fill(""));
+  const pcnav = useTableKeyNav({ rows: 4, cols: 5 });
 
   useEffect(() => {
     if (editRecord) {
@@ -2491,7 +2504,10 @@ function PaperConeDialog({ open, onClose, editRecord, millId, endpoint }: {
             {weights.map((w, i) => (
               <div key={i} className="space-y-0.5">
                 <label className="text-[10px] text-muted-foreground text-center block">{i + 1}</label>
-                <input type="number" step="0.01" value={w}
+                <input
+                  ref={pcnav.cellRef(Math.floor(i / 5), i % 5)}
+                  onKeyDown={pcnav.onKeyDown(Math.floor(i / 5), i % 5)}
+                  type="number" step="0.01" value={w}
                   onChange={(e) => { const nw = [...weights]; nw[i] = e.target.value; setWeights(nw); }}
                   placeholder="—"
                   className="flex h-8 w-full rounded border border-input bg-background px-1.5 text-xs text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
@@ -2665,6 +2681,8 @@ function CspDialog({ open, onClose, editRecord, millId, endpoint, department }: 
   const inp = "w-full h-7 rounded border-0 bg-transparent px-1 text-xs text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring";
   const hdr = "border border-border px-2 py-1.5 text-[10px] font-semibold text-center";
   const cel = "border border-border p-0.5";
+  // Excel-style nav: 10 rows × 5 cols (Str=0, Wt=1, Ne=2, CSP=3 skip, Remarks=4)
+  const cnav = useTableKeyNav({ rows: ROWS, cols: 5, skipCols: [3] });
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -2752,31 +2770,40 @@ function CspDialog({ open, onClose, editRecord, millId, endpoint, department }: 
                   <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-muted/10"}>
                     <td className="border border-border px-2 py-1 text-center text-[10px] font-medium text-muted-foreground">{i + 1}</td>
                     <td className={cel}>
-                      <input type="number" step="0.01" value={strength[i]} placeholder="—"
+                      <input
+                        ref={cnav.cellRef(i, 0)} onKeyDown={cnav.onKeyDown(i, 0)}
+                        type="number" step="0.01" value={strength[i]} placeholder="—"
                         onChange={(e) => { const a = [...strength]; a[i] = e.target.value; setStrength(a); }}
                         className={inp} />
                     </td>
                     <td className={cel}>
-                      <input type="number" step="0.01" value={weight[i]} placeholder="—"
+                      <input
+                        ref={cnav.cellRef(i, 1)} onKeyDown={cnav.onKeyDown(i, 1)}
+                        type="number" step="0.01" value={weight[i]} placeholder="—"
                         onChange={(e) => { const a = [...weight]; a[i] = e.target.value; setWeight(a); }}
                         className={inp} />
                     </td>
                     <td className={`${cel} ${rowCount[i] === "" && effectiveRowNe[i] != null ? "bg-emerald-50/40 dark:bg-emerald-950/10" : ""}`}>
                       {/* Auto-computed from Weight if empty; user can type to override */}
                       <div className="relative">
-                        <input type="number" step="0.01" value={rowCount[i]}
+                        <input
+                          ref={cnav.cellRef(i, 2)} onKeyDown={cnav.onKeyDown(i, 2)}
+                          type="number" step="0.01" value={rowCount[i]}
                           placeholder={effectiveRowNe[i] != null ? effectiveRowNe[i]!.toFixed(2) : (form.count_ne || "Ne")}
                           onChange={(e) => { const a = [...rowCount]; a[i] = e.target.value; setRowCount(a); }}
                           className={`${inp} ${rowCount[i] === "" && effectiveRowNe[i] != null ? "placeholder:text-emerald-600 placeholder:font-semibold" : ""}`} />
                       </div>
                     </td>
                     <td className={`${cel} bg-emerald-50/60 dark:bg-emerald-950/20`}>
+                      {/* col 3 = CSP, read-only, skipped by nav */}
                       <span className="block text-center font-semibold font-mono text-emerald-700 py-1">
                         {rowCsp[i] != null ? (rowCsp[i] as number).toFixed(0) : "—"}
                       </span>
                     </td>
                     <td className={cel}>
-                      <input type="text" value={rowRemark[i]} placeholder=""
+                      <input
+                        ref={cnav.cellRef(i, 4)} onKeyDown={cnav.onKeyDown(i, 4)}
+                        type="text" value={rowRemark[i]} placeholder=""
                         onChange={(e) => { const a = [...rowRemark]; a[i] = e.target.value; setRowRemark(a); }}
                         className={inp} />
                     </td>
@@ -2987,6 +3014,8 @@ function ACheckDialog({ open, onClose, editRecord, millId, endpoint, department 
   };
 
   const listId = useMemo(() => `acheck-mc-${Math.random().toString(36).slice(2)}`, []);
+  // Excel-style nav: 5 rows × 3 cols (N+1=0, N=1, N-1=2)
+  const anav = useTableKeyNav({ rows: 5, cols: 3 });
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -3086,6 +3115,8 @@ function ACheckDialog({ open, onClose, editRecord, millId, endpoint, department 
                     ] as const).map(([vals, setter], ci) => (
                       <td key={ci} className="border border-border p-1">
                         <input
+                          ref={anav.cellRef(i, ci)}
+                          onKeyDown={anav.onKeyDown(i, ci)}
                           type="number" step="0.01"
                           value={(vals as string[])[i]}
                           onChange={(e) => {
@@ -3488,6 +3519,150 @@ function drawCspBody(
   return y + 10;
 }
 
+// ── HTML Preview bodies (used in LetterheadPreview modal + Print) ────────────
+
+function ACheckPreviewBody({ row }: { row: any }) {
+  const rd = row.readings_json ?? {};
+  const nplus:  number[] = rd.nplus  ?? [];
+  const nArr:   number[] = rd.n      ?? [];
+  const nminus: number[] = rd.nminus ?? [];
+  const ROWS = Math.max(nplus.length, nArr.length, nminus.length, 5);
+  const avg = (arr: number[]) => arr.filter(Boolean).length ? arr.filter(Boolean).reduce((a, b) => a + b, 0) / arr.filter(Boolean).length : null;
+  const WY = 6.55;
+  const g2h = (g: number | null) => g && g > 0 ? (WY * 453.592) / (840 * g) : null;
+  const avgNplus = avg(nplus); const avgN = avg(nArr); const avgNminus = avg(nminus);
+  const hN = g2h(avgN); const hNp = g2h(avgNplus); const hNm = g2h(avgNminus);
+  const aNp = hNp != null && hN ? ((hNp - hN) / hN) * 100 : null;
+  const aNm = hNm != null && hN ? ((hNm - hN) / hN) * 100 : null;
+  const ok = aNp != null && aNm != null && Math.abs(aNp) <= 0.5 && Math.abs(aNm) <= 0.5;
+  const th = "border border-gray-200 px-3 py-1.5 text-center text-[11px] font-semibold bg-blue-900 text-white";
+  const td = "border border-gray-200 px-3 py-1.5 text-center text-[12px] font-mono";
+  return (
+    <div className="px-5 py-3 space-y-3">
+      {/* Meta */}
+      <div className="grid grid-cols-3 gap-2 text-xs">
+        {[["Lot No", row.lot_no],["Process", row.process],["Doubling", row.doubling],
+          ["Delivery Hank", row.delivery_hank],["Levelling Action Pt", row.levelling_action_point],["Levelling Intensity", row.levelling_intensity],
+        ].map(([l, v]) => (
+          <div key={String(l)} className="bg-slate-50 rounded px-2 py-1">
+            <div className="text-[10px] text-slate-500">{l}</div>
+            <div className="font-semibold text-slate-800">{v ?? "—"}</div>
+          </div>
+        ))}
+      </div>
+      {/* Reading table */}
+      <table className="w-full border-collapse text-xs">
+        <thead><tr><th className={th}>SI No</th><th className={th}>N+1</th><th className={th}>N</th><th className={th}>N-1</th></tr></thead>
+        <tbody>
+          {Array.from({length: ROWS}, (_, i) => (
+            <tr key={i} className={i%2===0 ? "bg-white" : "bg-slate-50"}>
+              <td className={`${td} text-slate-500`}>{i+1}</td>
+              {[nplus[i], nArr[i], nminus[i]].map((v, ci) => (
+                <td key={ci} className={td}>{v != null && !isNaN(Number(v)) ? Number(v).toFixed(2) : "—"}</td>
+              ))}
+            </tr>
+          ))}
+          <tr className="bg-slate-100 font-semibold">
+            <td className={`${td} text-slate-600`}>Avg</td>
+            {[avgNplus, avgN, avgNminus].map((v, i) => <td key={i} className={td}>{v != null ? v.toFixed(2) : "—"}</td>)}
+          </tr>
+          <tr className="bg-emerald-50 font-semibold">
+            <td className={`${td} text-emerald-700`}>Hank</td>
+            {[hNp, hN, hNm].map((v, i) => <td key={i} className={`${td} text-emerald-700`}>{v != null ? v.toFixed(4) : "—"}</td>)}
+          </tr>
+        </tbody>
+      </table>
+      {/* Results */}
+      <div className={`rounded-lg border p-3 grid grid-cols-3 gap-3 text-center ${ok ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+        {[["A% (N+1 vs N)", aNp != null ? `${aNp>=0?"+":""}${aNp.toFixed(2)}%` : "—"],
+          ["A% (N-1 vs N)", aNm != null ? `${aNm>=0?"+":""}${aNm.toFixed(2)}%` : "—"],
+          ["Auto-Leveller", aNp!=null&&aNm!=null ? (ok ? "✓ OK" : "✗ NG") : "—"],
+        ].map(([l, v]) => (
+          <div key={String(l)}>
+            <div className="text-[10px] text-slate-500">{l}</div>
+            <div className={`text-sm font-bold ${ok ? "text-emerald-700" : "text-red-700"}`}>{v}</div>
+          </div>
+        ))}
+        <p className="col-span-3 text-[10px] text-slate-400 border-t border-slate-200 pt-1 mt-1">
+          A% = (Hank_col − Hank_N) / Hank_N × 100 · Spec: ±0.5%
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function CspPreviewBody({ row }: { row: any }) {
+  const ROWS = 10;
+  const th = "border border-gray-200 px-2 py-1.5 text-center text-[11px] font-semibold bg-blue-900 text-white";
+  const td = "border border-gray-200 px-2 py-1.5 text-center text-[12px] font-mono";
+  const avgCsp = row.avg_csp != null ? Number(row.avg_csp) : null;
+  const ok = avgCsp != null && avgCsp >= 2200;
+  return (
+    <div className="px-5 py-3 space-y-3">
+      {/* Meta */}
+      <div className="grid grid-cols-4 gap-2 text-xs">
+        {[["Lot No", row.lot_no],["Count (Ne)", row.count_ne],["Ratio", row.ratio],["TM", row.tm],["TPI", row.tpi]].map(([l, v]) => (
+          <div key={String(l)} className="bg-slate-50 rounded px-2 py-1">
+            <div className="text-[10px] text-slate-500">{l}</div>
+            <div className="font-semibold text-slate-800">{v ?? "—"}</div>
+          </div>
+        ))}
+      </div>
+      {/* Reading table */}
+      <table className="w-full border-collapse text-xs">
+        <thead>
+          <tr><th className={th}>SI No</th><th className={th}>Strength (gf)</th><th className={th}>Weight (g)</th><th className={th}>Count (Ne)</th><th className={th}>CSP</th></tr>
+        </thead>
+        <tbody>
+          {Array.from({length: ROWS}, (_, i) => {
+            const si = i+1;
+            const csp = row[`s${si}_csp`];
+            const ok2 = csp != null && Number(csp) >= 2200;
+            return (
+              <tr key={i} className={i%2===0 ? "bg-white" : "bg-slate-50"}>
+                <td className={`${td} text-slate-500`}>{si}</td>
+                <td className={td}>{row[`s${si}_strength`] ?? "—"}</td>
+                <td className={td}>{row[`s${si}_weight`]   ?? "—"}</td>
+                <td className={td}>{row[`s${si}_count`]    != null ? Number(row[`s${si}_count`]).toFixed(1) : "—"}</td>
+                <td className={`${td} font-bold ${csp != null ? (ok2 ? "text-emerald-700 bg-emerald-50" : "text-red-700 bg-red-50") : ""}`}>
+                  {csp != null ? Math.round(Number(csp)) : "—"}
+                </td>
+              </tr>
+            );
+          })}
+          {[["AVG", avgCsp != null ? avgCsp.toFixed(0) : "—"],
+            ["CV%", row.cv_pct != null ? `${Number(row.cv_pct).toFixed(2)}%` : "—"],
+            ["MAX", row.max_csp != null ? Math.round(Number(row.max_csp)).toString() : "—"],
+            ["MIN", row.min_csp != null ? Math.round(Number(row.min_csp)).toString() : "—"],
+          ].map(([l, v]) => (
+            <tr key={String(l)} className="bg-slate-100 font-semibold">
+              <td className={`${td} text-blue-900`}>{l}</td>
+              <td className={td} colSpan={3}></td>
+              <td className={`${td} text-blue-900`}>{v}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {/* Summary */}
+      <div className={`rounded-lg border p-3 grid grid-cols-4 gap-3 text-center ${ok ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+        {[["Avg CSP", avgCsp != null ? avgCsp.toFixed(0) : "—"],
+          ["CV%", row.cv_pct != null ? `${Number(row.cv_pct).toFixed(2)}%` : "—"],
+          ["Max", row.max_csp != null ? Math.round(Number(row.max_csp)).toString() : "—"],
+          ["Min", row.min_csp != null ? Math.round(Number(row.min_csp)).toString() : "—"],
+        ].map(([l, v]) => (
+          <div key={String(l)}>
+            <div className="text-[10px] text-slate-500">{l}</div>
+            <div className={`text-sm font-bold ${ok ? "text-emerald-700" : "text-red-700"}`}>{v}</div>
+          </div>
+        ))}
+        <p className="col-span-4 text-[10px] text-slate-400 border-t pt-1 mt-1">
+          CSP = Strength (gf) × Count (Ne) · Spec: Avg CSP ≥ 2200
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Main QmFormsTab: table + popup ──────────────────────────────────────────
 function QmFormsTab({
   title, endpoint, columns, millId, millName, canEdit, layout = "grid",
@@ -3510,6 +3685,8 @@ function QmFormsTab({
     enabled: !!millId,
     staleTime: 30_000,
   });
+
+  const [previewRow, setPreviewRow] = useState<any | null>(null);
 
   const openAdd = () => { setEditRecord(null); setDialogOpen(true); };
   const openEdit = (row: any) => { setEditRecord(row); setDialogOpen(true); };
@@ -3678,21 +3855,31 @@ function QmFormsTab({
                         </td>
                       );
                     })}
-                    {canEdit && (
-                      <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-1">
-                          <button onClick={() => openEdit(row)}
-                            className="h-6 px-1.5 rounded border border-border text-muted-foreground hover:bg-muted text-[10px]">
-                            <Pencil className="size-3" />
-                          </button>
-                          <ConfirmDeleteButton
-                            onConfirm={() => handleDelete(row)}
-                            label={`Delete this ${title} record?`}
-                            successMessage="Deleted"
-                          />
-                        </div>
-                      </td>
-                    )}
+                    <td className="px-2 py-2" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-1">
+                        {/* Preview / Print button — always visible */}
+                        <button
+                          onClick={() => setPreviewRow(row)}
+                          title="Print with letterhead"
+                          className="h-6 px-1.5 rounded border border-border text-muted-foreground hover:bg-blue-50 hover:text-blue-600 hover:border-blue-300 text-[10px] transition-colors"
+                        >
+                          <Eye className="size-3" />
+                        </button>
+                        {canEdit && (
+                          <>
+                            <button onClick={() => openEdit(row)}
+                              className="h-6 px-1.5 rounded border border-border text-muted-foreground hover:bg-muted text-[10px]">
+                              <Pencil className="size-3" />
+                            </button>
+                            <ConfirmDeleteButton
+                              onConfirm={() => handleDelete(row)}
+                              label={`Delete this ${title} record?`}
+                              successMessage="Deleted"
+                            />
+                          </>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -3730,6 +3917,30 @@ function QmFormsTab({
           department={department}
         />
       )}
+
+      {/* ── Letterhead Print Preview — eye icon on any row opens this ── */}
+      <LetterheadPreview
+        open={!!previewRow}
+        onClose={() => setPreviewRow(null)}
+        row={previewRow}
+        columns={tableCols.map((c) => ({ key: c.key, label: c.label }))}
+        title={title}
+        millName={millName}
+        customBody={
+          previewRow && (endpoint.includes("a-pct") || endpoint.includes("a_pct_check"))
+            ? (row) => <ACheckPreviewBody row={row} />
+            : previewRow && (endpoint.includes("csp-report") || endpoint.includes("csp_report"))
+              ? (row) => <CspPreviewBody row={row} />
+              : undefined
+        }
+        customPdfBody={
+          endpoint.includes("a-pct") || endpoint.includes("a_pct_check")
+            ? drawACheckBody
+            : endpoint.includes("csp-report") || endpoint.includes("csp_report")
+              ? drawCspBody
+              : undefined
+        }
+      />
     </Card>
   );
 }

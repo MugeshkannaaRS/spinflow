@@ -867,6 +867,7 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
     <>
       {/* Desktop */}
       <aside
+        data-print-hide
         className={cn(
           "fixed top-0 left-0 h-screen flex flex-col overflow-hidden z-30 transition-all duration-200 ease-in-out hidden lg:flex",
           collapsed ? "w-16" : "w-60",
