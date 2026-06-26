@@ -34,6 +34,7 @@ from app.api.v1.production_v2 import router as production_v2_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.alerts import router as alerts_router
 from app.api.v1.custom_fields import router as custom_fields_router
+from app.api.v1.calculations import router as calculations_router
 from app.ws.notifications import router as ws_router
 
 setup_logging()
@@ -416,6 +417,7 @@ app.include_router(production_v2_router, prefix=API_PREFIX, tags=["Production v2
 app.include_router(notifications_router, prefix=API_PREFIX, tags=["Notifications"])
 app.include_router(alerts_router, prefix=API_PREFIX, tags=["Alerts"])
 app.include_router(custom_fields_router, prefix=API_PREFIX, tags=["Custom Fields"])
+app.include_router(calculations_router, prefix=API_PREFIX, tags=["Spinning Calculations"])
 app.include_router(ws_router)
 
 

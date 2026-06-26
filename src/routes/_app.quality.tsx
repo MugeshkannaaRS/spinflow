@@ -194,6 +194,7 @@ function QualityPage() {
               <TabsTrigger value="ringframe">Ring Frame</TabsTrigger>
               <TabsTrigger value="autoconer">Auto Coner</TabsTrigger>
               <TabsTrigger value="packing">Packing</TabsTrigger>
+              <TabsTrigger value="calculations">⚙ Calc</TabsTrigger>
             </TabsList>
 
             <TabsContent value="tests">
@@ -1134,6 +1135,9 @@ function QualityPage() {
                   layout="grid"
                 />
               </div>
+            </TabsContent>
+            <TabsContent value="calculations">
+              <SpinCalcTab />
             </TabsContent>
           </Tabs>
         </div>
@@ -3039,5 +3043,262 @@ function LotRejectAction({ lotId }: { lotId: string }) {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SPINNING CALCULATIONS TAB — all formulas from Yarn-Calculations PDF
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SpinCalcTab() {
+  const [activeCalc, setActiveCalc] = useState<string>("count");
+  const calcs = [
+    { id: "count", label: "Count Conversion" },
+    { id: "draft", label: "Draft" },
+    { id: "tpi", label: "TPI / Twist" },
+    { id: "production", label: "Production" },
+    { id: "hank", label: "Hank / CV%" },
+    { id: "blow_room", label: "Blow Room" },
+    { id: "reference", label: "Formula Reference" },
+  ];
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="pb-2 pt-3 px-4">
+          <CardTitle className="text-sm font-medium">Spinning Calculations</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">All formulas from yarn count theory — auto-computed, no save needed.</p>
+        </CardHeader>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap gap-2 mb-4">
+            {calcs.map((c) => (
+              <button key={c.id} onClick={() => setActiveCalc(c.id)}
+                className={`px-3 py-1 text-xs rounded border transition-colors ${activeCalc === c.id ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"}`}>
+                {c.label}
+              </button>
+            ))}
+          </div>
+          {activeCalc === "count" && <ScCountConversion />}
+          {activeCalc === "draft" && <ScDraft />}
+          {activeCalc === "tpi" && <ScTpi />}
+          {activeCalc === "production" && <ScProduction />}
+          {activeCalc === "hank" && <ScHankCv />}
+          {activeCalc === "blow_room" && <ScBlowRoom />}
+          {activeCalc === "reference" && <ScFormulaRef />}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ScRow({ label, value, unit = "" }: { label: string; value: string | number | null | undefined; unit?: string }) {
+  if (value === null || value === undefined || value === "") return null;
+  return (
+    <div className="flex items-center justify-between py-1 border-b border-border/40 last:border-0">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-xs font-semibold font-mono">
+        {typeof value === "number" ? value.toLocaleString(undefined, { maximumFractionDigits: 6 }) : value}
+        {unit && <span className="text-muted-foreground ml-1">{unit}</span>}
+      </span>
+    </div>
+  );
+}
+
+function ScInput({ label, value, onChange, placeholder = "0", step = "0.001", unit = "" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; step?: string; unit?: string }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{label}{unit && ` (${unit})`}</label>
+      <input type="number" step={step} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+        className="h-8 text-xs border border-border rounded px-2 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary w-full" />
+    </div>
+  );
+}
+
+function ScBox({ children }: { children: React.ReactNode }) {
+  return <div className="mt-4 rounded bg-muted/40 border border-border p-3 space-y-0.5">{children}</div>;
+}
+
+function scRnd(n: number, dp = 4): number | null { return isFinite(n) && !isNaN(n) ? parseFloat(n.toFixed(dp)) : null; }
+function scF(s: string): number | null { const v = parseFloat(s); return isNaN(v) || v <= 0 ? null : v; }
+function scFi(s: string): number | null { const v = parseInt(s); return isNaN(v) || v <= 0 ? null : v; }
+
+function ScCountConversion() {
+  const [val, setVal] = useState("30");
+  const [sys, setSys] = useState("ne");
+  const v = parseFloat(val);
+  const valid = isFinite(v) && v > 0;
+  let tex: number | null = null;
+  if (valid) { switch (sys) { case "ne": tex = 590.5 / v; break; case "nm": tex = 1000 / v; break; case "tex": tex = v; break; case "denier": tex = v / 9; break; case "grex": tex = v / 10; break; } }
+  const ne = tex && tex > 0 ? scRnd(590.5 / tex) : null;
+  const nm = tex && tex > 0 ? scRnd(1000 / tex, 3) : null;
+  const denier = tex ? scRnd(tex * 9, 3) : null;
+  const grex = tex ? scRnd(tex * 10, 3) : null;
+  const texR = tex ? scRnd(tex, 4) : null;
+  return (
+    <div className="max-w-sm space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <ScInput label="Count value" value={val} onChange={setVal} placeholder="30" step="0.1" />
+        <div className="flex flex-col gap-0.5">
+          <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">System</label>
+          <select value={sys} onChange={(e) => setSys(e.target.value)} className="h-8 text-xs border border-border rounded px-2 bg-background text-foreground">
+            <option value="ne">Ne (English)</option><option value="nm">Nm (Metric)</option><option value="tex">Tex</option><option value="denier">Denier</option><option value="grex">Grex</option>
+          </select>
+        </div>
+      </div>
+      {valid && tex && (<ScBox><ScRow label="Ne" value={ne} unit="hanks/lb" /><ScRow label="Nm" value={nm} unit="km/kg" /><ScRow label="Tex" value={texR} unit="g/1000m" /><ScRow label="Denier" value={denier} unit="g/9000m" /><ScRow label="Grex" value={grex} unit="g/10000m" /></ScBox>)}
+      <p className="text-[10px] text-muted-foreground">Ne = 590.5/Tex · Nm = 1.6935×Ne · Denier = Tex×9 · 1 Hank = 840 yards</p>
+    </div>
+  );
+}
+
+function ScDraft() {
+  const [sys, setSys] = useState<"indirect"|"direct">("indirect");
+  const [cfed, setCfed] = useState(""); const [cdel, setCdel] = useState(""); const [dbl, setDbl] = useState("6");
+  const cf = scF(cfed); const cd = scF(cdel); const db = scFi(dbl) ?? 1;
+  const draft = cf && cd ? (sys === "indirect" ? scRnd((cd * db) / cf, 3) : scRnd((cf * db) / cd, 3)) : null;
+  return (
+    <div className="max-w-sm space-y-3">
+      <div className="flex gap-2 mb-1">
+        {(["indirect","direct"] as const).map((m) => (<button key={m} onClick={() => setSys(m)} className={`px-3 py-1 text-xs rounded border ${sys===m?"bg-primary text-primary-foreground border-primary":"border-border"}`}>{m==="indirect"?"Indirect (Ne/Nm)":"Direct (Tex/Denier)"}</button>))}
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <ScInput label="Count fed" value={cfed} onChange={setCfed} /><ScInput label="Count delivered" value={cdel} onChange={setCdel} /><ScInput label="Doubling" value={dbl} onChange={setDbl} placeholder="6" step="1" />
+      </div>
+      {draft !== null && (<ScBox><ScRow label="Actual Draft" value={draft} /></ScBox>)}
+      <p className="text-[10px] text-muted-foreground">Indirect: (count_del × doubling)/count_fed · Direct: (count_fed × doubling)/count_del</p>
+    </div>
+  );
+}
+
+function ScTpi() {
+  const [method, setMethod] = useState<"tm"|"speed">("tm");
+  const [tm, setTm] = useState(""); const [ne, setNe] = useState("");
+  const [flyerRpm, setFlyerRpm] = useState(""); const [frontDia, setFrontDia] = useState(""); const [frontRpm, setFrontRpm] = useState("");
+  let tpi: number|null = null; let tpm: number|null = null; let tmCalc: number|null = null;
+  if (method === "tm") { const tmV=scF(tm); const neV=scF(ne); if(tmV&&neV){tpi=scRnd(tmV*Math.sqrt(neV),3); tpm=tpi?scRnd(tpi*39.3701,2):null;} }
+  else { const fr=scF(flyerRpm); const fd=scF(frontDia); const fn=scF(frontRpm); if(fr&&fd&&fn){const ss=Math.PI*fd*fn; tpi=scRnd(fr/ss,3); tpm=tpi?scRnd(tpi*39.3701,2):null; const neV=scF(ne); if(tpi&&neV)tmCalc=scRnd(tpi/Math.sqrt(neV),3);} }
+  return (
+    <div className="max-w-sm space-y-3">
+      <div className="flex gap-2 mb-1">
+        {(["tm","speed"] as const).map((m) => (<button key={m} onClick={() => setMethod(m)} className={`px-3 py-1 text-xs rounded border ${method===m?"bg-primary text-primary-foreground border-primary":"border-border"}`}>{m==="tm"?"TM × √Ne":"Speed method"}</button>))}
+      </div>
+      {method==="tm" ? (<div className="grid grid-cols-2 gap-2"><ScInput label="Twist Multiplier (TM)" value={tm} onChange={setTm} placeholder="3.8" /><ScInput label="Count (Ne)" value={ne} onChange={setNe} placeholder="30" /></div>) : (<div className="space-y-2"><div className="grid grid-cols-2 gap-2"><ScInput label="Flyer RPM" value={flyerRpm} onChange={setFlyerRpm} placeholder="700" step="1" /><ScInput label="Front roller dia (in)" value={frontDia} onChange={setFrontDia} placeholder="1.25" /></div><div className="grid grid-cols-2 gap-2"><ScInput label="Front roller RPM" value={frontRpm} onChange={setFrontRpm} placeholder="160" step="1" /><ScInput label="Count Ne (for TM)" value={ne} onChange={setNe} placeholder="30" /></div></div>)}
+      {tpi !== null && (<ScBox><ScRow label="TPI" value={tpi} /><ScRow label="TPM" value={tpm} />{tmCalc!==null&&<ScRow label="Twist Multiplier" value={tmCalc} />}</ScBox>)}
+      <p className="text-[10px] text-muted-foreground">TPI = TM×√Ne · TPI = flyer_rpm/(π×D_front×N_front) · TPM = TPI×39.37</p>
+    </div>
+  );
+}
+
+function ScProduction() {
+  const [machine, setMachine] = useState("ring_frame");
+  const [spRpm,setSpRpm]=useState(""); const [tpi,setTpi]=useState(""); const [ne,setNe]=useState("");
+  const [spindles,setSpindles]=useState(""); const [eff,setEff]=useState("85"); const [shiftH,setShiftH]=useState("8");
+  const [flyerDia,setFlyerDia]=useState(""); const [flyerRpm,setFlyerRpm]=useState(""); const [rovGrains,setRovGrains]=useState(""); const [sp2,setSp2]=useState("");
+
+  const effN = parseFloat(eff)||85; const shN = parseFloat(shiftH)||8;
+  const rfResult = useMemo(() => {
+    const sr=scF(spRpm); const tp=scF(tpi); const cn=scF(ne); const as=scFi(spindles);
+    if(!sr||!tp||!cn) return null;
+    const oz=(sr*60/(tp*36))*(16*shN/(840*cn))*(effN/100);
+    const kg=oz*0.028349;
+    return {oz:scRnd(oz,5), kg:scRnd(kg,5), total:as?scRnd(kg*as,3):null};
+  }, [spRpm,tpi,ne,spindles,effN,shN]);
+  const spResult = useMemo(() => {
+    const fd=scF(flyerDia); const fr=scF(flyerRpm); const rg=scF(rovGrains); const sp=scFi(sp2);
+    if(!fd||!fr||!rg||!sp) return null;
+    const lb=(Math.PI*fd*fr*60/36)*(rg/7000)*(effN/100)*sp;
+    return {lb:scRnd(lb,3), kg:scRnd(lb*0.453592,3)};
+  }, [flyerDia,flyerRpm,rovGrains,sp2,effN]);
+
+  return (
+    <div className="max-w-md space-y-3">
+      <div className="flex flex-col gap-0.5">
+        <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Machine Type</label>
+        <select value={machine} onChange={(e)=>setMachine(e.target.value)} className="h-8 text-xs border border-border rounded px-2 bg-background text-foreground w-full max-w-xs">
+          <option value="ring_frame">Ring Frame</option><option value="simplex">Simplex</option>
+        </select>
+      </div>
+      {machine==="ring_frame" && (<div className="grid grid-cols-2 gap-2"><ScInput label="Spindle RPM" value={spRpm} onChange={setSpRpm} placeholder="18000" step="100" /><ScInput label="TPI" value={tpi} onChange={setTpi} placeholder="20" /><ScInput label="Count (Ne)" value={ne} onChange={setNe} placeholder="30" /><ScInput label="Active Spindles" value={spindles} onChange={setSpindles} placeholder="480" step="1" /><ScInput label="Efficiency %" value={eff} onChange={setEff} placeholder="85" /><ScInput label="Shift Hours" value={shiftH} onChange={setShiftH} placeholder="8" step="0.5" /></div>)}
+      {machine==="simplex" && (<div className="grid grid-cols-2 gap-2"><ScInput label="Flyer Dia (in)" value={flyerDia} onChange={setFlyerDia} placeholder="3.5" /><ScInput label="Flyer RPM" value={flyerRpm} onChange={setFlyerRpm} placeholder="700" step="10" /><ScInput label="Roving (grains/yd)" value={rovGrains} onChange={setRovGrains} placeholder="60" /><ScInput label="Spindles" value={sp2} onChange={setSp2} placeholder="120" step="1" /><ScInput label="Efficiency %" value={eff} onChange={setEff} placeholder="85" /></div>)}
+      {machine==="ring_frame" && rfResult && (<ScBox><ScRow label="oz/shift/spindle" value={rfResult.oz} unit="oz" /><ScRow label="kg/shift/spindle" value={rfResult.kg} unit="kg" />{rfResult.total!==null&&<ScRow label={`Total (${spindles} spindles)`} value={rfResult.total} unit="kg/shift" />}</ScBox>)}
+      {machine==="simplex" && spResult && (<ScBox><ScRow label="Production" value={spResult.lb} unit="lb/hr" /><ScRow label="Production" value={spResult.kg} unit="kg/hr" /></ScBox>)}
+      <p className="text-[10px] text-muted-foreground">Ring Frame: P = spindle_rpm×60/(TPI×36) × 16×shift_h/(840×Ne) × η</p>
+    </div>
+  );
+}
+
+function ScHankCv() {
+  const [readings, setReadings] = useState<string[]>(Array(10).fill(""));
+  const [stdHank, setStdHank] = useState(""); const [ly, setLy] = useState("120");
+  const weights = readings.map((r) => parseFloat(r)).filter((v) => isFinite(v) && v > 0);
+  const lyN = parseFloat(ly)||120; const sh = parseFloat(stdHank)||null;
+  const result = useMemo(() => {
+    if(!weights.length) return null;
+    const avg = weights.reduce((s,v)=>s+v,0)/weights.length;
+    const hank = (lyN*453.592)/(840*avg);
+    const n = weights.length;
+    let cv: number|null = null;
+    if(n>=2){const variance=weights.reduce((s,v)=>s+(v-avg)**2,0)/(n-1); cv=(Math.sqrt(variance)/avg)*100;}
+    const u = cv!==null ? cv/Math.sqrt(2) : null;
+    let withinSpec: number|null = null;
+    if(sh){const hanks=weights.map((w)=>(lyN*453.592)/(840*w)); const lo=sh*0.995; const hi=sh*1.005; withinSpec=scRnd((hanks.filter((h)=>h>=lo&&h<=hi).length/hanks.length)*100,1);}
+    return {count:weights.length, avg:scRnd(avg,4), hank:scRnd(hank,4), cv:cv!==null?scRnd(cv,3):null, u:u!==null?scRnd(u,3):null, min:scRnd(Math.min(...weights),4), max:scRnd(Math.max(...weights),4), withinSpec};
+  }, [JSON.stringify(weights), lyN, sh]);
+  return (
+    <div className="max-w-md space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <ScInput label="Wrap length (yards)" value={ly} onChange={setLy} placeholder="120" step="1" />
+        <ScInput label="Std hank (Ne)" value={stdHank} onChange={setStdHank} placeholder="0.1050" step="0.0001" />
+      </div>
+      <div>
+        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide mb-1">Individual weights (g) — up to 10</p>
+        <div className="grid grid-cols-5 gap-1">
+          {readings.map((v,i) => (<input key={i} type="number" step="0.1" value={v} onChange={(e)=>{const next=[...readings];next[i]=e.target.value;setReadings(next);}} placeholder={`R${i+1}`} className="h-8 text-xs border border-border rounded px-2 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary" />))}
+        </div>
+      </div>
+      {result && (<ScBox><ScRow label="Readings" value={result.count} /><ScRow label="Avg weight" value={result.avg} unit="g" /><ScRow label="Actual Hank (Ne)" value={result.hank} /><ScRow label="CV%" value={result.cv} unit="%" /><ScRow label="U% (approx)" value={result.u} unit="%" /><ScRow label="Min / Max" value={`${result.min} / ${result.max}`} unit="g" />{result.withinSpec!==null&&<ScRow label="Within ±0.5% of std hank" value={`${result.withinSpec}%`} />}</ScBox>)}
+      <p className="text-[10px] text-muted-foreground">Hank (Ne) = (length_yards × 453.592) / (840 × avg_weight_g) · CV% = σ/mean × 100</p>
+    </div>
+  );
+}
+
+function ScBlowRoom() {
+  const [trashFed,setTrashFed]=useState(""); const [trashDel,setTrashDel]=useState("");
+  const [beaterRpm,setBeaterRpm]=useState(""); const [arms,setArms]=useState("2");
+  const [feedDia,setFeedDia]=useState(""); const [feedRpm,setFeedRpm]=useState("");
+  const tf=scF(trashFed); const td=parseFloat(trashDel); const br=scF(beaterRpm); const ar=parseInt(arms)||2; const fd=scF(feedDia); const fr=scF(feedRpm);
+  const cleaningEff = tf&&isFinite(td)&&td>=0 ? scRnd(((tf-td)/tf)*100,3) : null;
+  const bpi = br&&fd&&fr ? scRnd((br*ar)/(Math.PI*fd*fr),3) : null;
+  return (
+    <div className="max-w-sm space-y-3">
+      <p className="text-xs font-medium border-b border-border/40 pb-1">Cleaning Efficiency</p>
+      <div className="grid grid-cols-2 gap-2"><ScInput label="Trash fed %" value={trashFed} onChange={setTrashFed} placeholder="3.5" step="0.1" unit="%" /><ScInput label="Trash delivered %" value={trashDel} onChange={setTrashDel} placeholder="0.8" step="0.1" unit="%" /></div>
+      {cleaningEff!==null&&(<ScBox><ScRow label="Cleaning Efficiency" value={cleaningEff} unit="%" /><ScRow label="Trash removed" value={tf&&isFinite(td)?scRnd(tf-td,3):null} unit="%" /></ScBox>)}
+      <p className="text-xs font-medium border-b border-border/40 pb-1 mt-4">Beats per Inch</p>
+      <div className="grid grid-cols-2 gap-2"><ScInput label="Beater RPM" value={beaterRpm} onChange={setBeaterRpm} placeholder="800" step="10" /><ScInput label="Arms / revolution" value={arms} onChange={setArms} placeholder="2" step="1" /><ScInput label="Feed roller dia (in)" value={feedDia} onChange={setFeedDia} placeholder="2.0" /><ScInput label="Feed roller RPM" value={feedRpm} onChange={setFeedRpm} placeholder="12" step="1" /></div>
+      {bpi!==null&&(<ScBox><ScRow label="Beats per Inch" value={bpi} /></ScBox>)}
+      <p className="text-[10px] text-muted-foreground">CE% = (trash_fed − trash_del)/trash_fed × 100 · BPI = beater_rpm × arms / (π × D_feed × N_feed)</p>
+    </div>
+  );
+}
+
+function ScFormulaRef() {
+  const sections = [
+    {title:"Count Systems",rows:[["Ne (English, indirect)","Hanks (840 yd) per lb — higher = finer"],["Nm (Metric, indirect)","km per kg"],["Tex (direct)","g per 1000 m"],["Denier (direct)","g per 9000 m"],["Grex (direct)","g per 10000 m"]]},
+    {title:"Count Conversion",rows:[["Tex = 590.5 / Ne","Ne = 590.5 / Tex"],["Nm = 1.6935 × Ne","Ne = Nm / 1.6935"],["Denier = Tex × 9","Tex = Denier / 9"],["Grex = Tex × 10","1 Hank = 840 yards"]]},
+    {title:"Twist",rows:[["TPI = TM × √Ne","TM: Simplex 1.0–1.4, Ring Frame 3.0–5.0"],["TPI = flyer_rpm / (π × D_front × N_front)",""],["TPM = TPI × 39.37",""]]},
+    {title:"Draft",rows:[["Indirect (Ne/Nm)","Draft = (count_del × doubling) / count_fed"],["Direct (Tex/Denier)","Draft = (count_fed × doubling) / count_del"],["Mechanical Draft","(D_front × N_front) / (D_back × N_back)"]]},
+    {title:"Production",rows:[["Scutcher","P(oz/hr) = π×D×N/36 × 60 × lap_wt_oz_yd × η"],["Card","P(lb/hr) = π×D×N/36 × 60 × gr_yd/7000 × tension × η"],["Draw Frame","P(lb/hr) = π×D×N/36 × 60 × gr_yd/7000 × η × heads × machines"],["Comber","P = f × π×D×N/36 × 60 × gr_yd/7000 × η × nips × heads × m × (1-waste%)"],["Simplex","P(lb/hr) = π×D×N/36 × 60 × roving_gr_yd/7000 × η × spindles"],["Ring Frame","P(oz/shift/sp) = spindle_rpm×60/(TPI×36) × 16×shift_h/(840×Ne) × η"]]},
+    {title:"Quality",rows:[["Actual Hank (Ne)","(length_yards × 453.592) / (840 × weight_g)"],["CV%","(σ / mean) × 100  (σ = sample std dev)"],["U% (approx)","CV% / √2"],["Cleaning Efficiency","(trash_fed − trash_del) / trash_fed × 100"],["Beats per Inch","(beater_rpm × arms) / (π × D_feed × N_feed)"],["CSP","lea_strength_lb × count_Ne"],["Splice Efficiency","splice_strength / yarn_strength × 100"]]},
+    {title:"Constants",rows:[["1 Hank","840 yards = 768.096 m"],["1 lb","453.592 g = 7000 grains"],["1 oz","28.349 g"],["1 inch","25.4 mm"],["Standard wrap","120 yards (1.5 yd arm × 80 laps)"]]},
+  ];
+  return (
+    <div className="space-y-4 max-w-2xl">
+      {sections.map((s) => (
+        <div key={s.title}>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1 border-b border-border/40 pb-0.5">{s.title}</p>
+          <table className="w-full text-xs"><tbody>{s.rows.map(([a,b],i) => (<tr key={i} className={i%2===0?"bg-muted/20":""}><td className="py-1 px-2 font-mono font-medium">{a}</td><td className="py-1 px-2 text-muted-foreground">{b}</td></tr>))}</tbody></table>
+        </div>
+      ))}
+    </div>
   );
 }
