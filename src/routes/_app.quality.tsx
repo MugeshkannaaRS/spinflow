@@ -55,6 +55,25 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { QualityTest } from "@/lib/types";
+
+/** Turn any axios/FastAPI error into a human-readable save-failure message. */
+function saveErrorMessage(e: any, fallback = "Failed to save"): string {
+  const detail = e?.response?.data?.detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d: any) => {
+        const field = d?.loc?.slice(-1)?.[0];
+        return field ? `${field}: ${d.msg}` : d.msg;
+      })
+      .join(", ");
+  }
+  if (typeof detail === "string" && detail) return detail;
+  if (e?.response?.status === 401) return "Session expired — please log in again.";
+  if (e?.response?.status === 403) return "You don't have permission to save this.";
+  if (e?.message === "Network Error" || !e?.response)
+    return "Network error — check your connection and try again.";
+  return e?.message || fallback;
+}
 import { exportToLetterheadPdf } from "@/lib/export-utils";
 import { useTableKeyNav } from "@/lib/useTableKeyNav";
 import { LetterheadPreview } from "@/components/ui/LetterheadPreview";
@@ -497,7 +516,7 @@ function QualityPage() {
                   hasProcess={false}
                   hasTime={true}
                   hankField="std_hank"
-                  readingLabel="g"
+                  readingLabel="Kg"
                 />
               </div>
             </TabsContent>
@@ -603,7 +622,7 @@ function QualityPage() {
                   hasProcess={true}
                   hasTime={true}
                   hankField="std_hank"
-                  readingLabel="g"
+                  readingLabel="Kg"
                 />
               </div>
             </TabsContent>
@@ -624,7 +643,7 @@ function QualityPage() {
                   hasProcess={false}
                   hasTime={true}
                   hankField="nominal_hank"
-                  readingLabel="g"
+                  readingLabel="Kg"
                 />
 
                 {/* ── Simplex Breakage Study ── */}
@@ -1090,10 +1109,10 @@ function QualityPage() {
                     { key: "cone_tip_type", label: "Cone Tip" },
                     { key: "inspector", label: "Inspector" },
                     { key: "total_samples", label: "No. of Cones" },
-                    { key: "target_weight", label: "Target Wt (g)" },
-                    { key: "avg_net_weight", label: "Avg Net Wt (g)" },
-                    { key: "min_net_weight", label: "Min Wt (g)" },
-                    { key: "max_net_weight", label: "Max Wt (g)" },
+                    { key: "target_weight", label: "Target Wt (Kg)" },
+                    { key: "avg_net_weight", label: "Avg Net Wt (Kg)" },
+                    { key: "min_net_weight", label: "Min Wt (Kg)" },
+                    { key: "max_net_weight", label: "Max Wt (Kg)" },
                     { key: "std_deviation", label: "Std Dev" },
                     { key: "deviation_pct", label: "Dev %" },
                     { key: "underweight_count", label: "Under" },
@@ -1863,7 +1882,7 @@ function QmGridDialog({
       qc.invalidateQueries({ queryKey: ["qm-tab", endpoint] });
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail ?? "Failed to save");
+      toast.error(saveErrorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -1943,14 +1962,13 @@ function QmSheetDialog({
   const shiftOptions = useShifts();
   const today = new Date().toISOString().slice(0, 10);
   const listId = useMemo(() => `mc-dl-sheet-${Math.random().toString(36).slice(2)}`, []);
-  // 1 row × 5 cols for r1–r5 reading inputs
-  const snav = useTableKeyNav({ rows: 1, cols: 5 });
+  // 5 rows × 3 cols: N+1=0, N=1, N-1=2
+  const snav = useTableKeyNav({ rows: 5, cols: 3 });
 
   const makeDefault = () => ({
     date: today, shift_code: "", lot_no: "", process: "",
     [hankField]: "", cotton_type: "",
     machine_no: "", side: "", time_taken: "",
-    r1: "", r2: "", r3: "", r4: "", r5: "",
     ok_input: "", remarks: "",
   });
 
@@ -1960,6 +1978,12 @@ function QmSheetDialog({
   const [form, setForm] = useState<Record<string, any>>(makeDefault);
   const [customFields, setCustomFields] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
+  // Wrap reel length — 6.55 yd = quadrant reel, 120 yd = full hank reel
+  const [wrapYards, setWrapYards] = useState<string>("6.55");
+  // 3 columns × 5 rows: nplus, n (baseline), nminus
+  const [nplus, setNplus] = useState<string[]>(Array(5).fill(""));
+  const [n, setN] = useState<string[]>(Array(5).fill(""));
+  const [nminus, setNminus] = useState<string[]>(Array(5).fill(""));
   const setF = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
   const sheetTableName = "qm_" + endpoint.split("/").pop()!.replace(/-/g, "_");
 
@@ -1976,14 +2000,19 @@ function QmSheetDialog({
         machine_no: editRecord.machine_no ?? "",
         side: editRecord.side ?? "",
         time_taken: editRecord.time_taken ?? "",
-        r1: editRecord.r1 ?? "", r2: editRecord.r2 ?? "", r3: editRecord.r3 ?? "",
-        r4: editRecord.r4 ?? "", r5: editRecord.r5 ?? "",
         ok_input: editRecord.ok_input === true ? "true" : editRecord.ok_input === false ? "false" : "",
         remarks: editRecord.remarks ?? "",
       });
+      const rd = editRecord.readings_json ?? {};
+      setNplus((rd.nplus ?? []).concat(Array(5).fill("")).slice(0, 5).map(String));
+      setN((rd.n ?? [rd.r1, rd.r2, rd.r3, rd.r4, rd.r5].filter(Boolean)).concat(Array(5).fill("")).slice(0, 5).map(String));
+      setNminus((rd.nminus ?? []).concat(Array(5).fill("")).slice(0, 5).map(String));
     } else {
       const saved = sheetDraft.restoreDraft();
       setForm(saved ?? makeDefault());
+      setNplus(Array(5).fill(""));
+      setN(Array(5).fill(""));
+      setNminus(Array(5).fill(""));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editRecord, open]);
@@ -1997,12 +2026,47 @@ function QmSheetDialog({
   }, [form]);
 
   const stdHankNum = parseFloat(form[hankField]) || null;
-  const { avgWt, hank, cv } = useMemo(() => computeReadings(form, hankField), [form, hankField]);
-  const cvOk = cv == null ? null : cv <= 2.0;
+
+  // Column averages
+  const avgArr = (arr: string[]) => {
+    const nums = arr.map(parseFloat).filter((x) => !isNaN(x) && x > 0);
+    return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : null;
+  };
+  const avgN = avgArr(n);
+  const avgNplus = avgArr(nplus);
+  const avgNminus = avgArr(nminus);
+
+  // Convert avg Kg weight → hank (Ne)
+  // Formula: Hank = (wrapYards × 0.453592 Kg/lb) / (840 yards/hank × avg_weight_Kg)
+  const wy = parseFloat(wrapYards);
+  const kgToHank = (avgKg: number | null) =>
+    avgKg && avgKg > 0 && wy > 0 ? (wy * 0.453592) / (840 * avgKg) : null;
+
+  const hankN      = kgToHank(avgN);
+  const hankNplus  = kgToHank(avgNplus);
+  const hankNminus = kgToHank(avgNminus);
+
+  // CV% on N column
+  const cvOk = (() => {
+    const nums = n.map(parseFloat).filter((x) => !isNaN(x) && x > 0);
+    if (nums.length < 2 || !avgN) return null;
+    const variance = nums.reduce((s, v) => s + (v - avgN) ** 2, 0) / nums.length;
+    const cv = (Math.sqrt(variance) / avgN) * 100;
+    return cv;
+  })();
+
+  // A% = deviation of N+1 / N-1 from baseline N
+  const aPctNplus  = hankNplus  != null && hankN ? ((hankNplus  - hankN) / hankN) * 100 : null;
+  const aPctNminus = hankNminus != null && hankN ? ((hankNminus - hankN) / hankN) * 100 : null;
 
   const handleSave = async () => {
     setSaving(true);
     try {
+      const nplusNums = nplus.map(parseFloat).filter((x) => !isNaN(x));
+      const nNums     = n.map(parseFloat).filter((x) => !isNaN(x));
+      const nminusNums = nminus.map(parseFloat).filter((x) => !isNaN(x));
+      const rFields: Record<string, number | null> = {};
+      ["r1","r2","r3","r4","r5"].forEach((k, i) => { rFields[k] = nNums[i] ?? null; });
       const payload: Record<string, any> = {
         date: form.date || null,
         shift_code: form.shift_code || null,
@@ -2011,14 +2075,14 @@ function QmSheetDialog({
         cotton_type: form.cotton_type || null,
         machine_no: form.machine_no || null,
         time_taken: form.time_taken || null,
-        r1: form.r1 !== "" ? parseFloat(form.r1) : null,
-        r2: form.r2 !== "" ? parseFloat(form.r2) : null,
-        r3: form.r3 !== "" ? parseFloat(form.r3) : null,
-        r4: form.r4 !== "" ? parseFloat(form.r4) : null,
-        r5: form.r5 !== "" ? parseFloat(form.r5) : null,
-        avg_weight: avgWt != null ? parseFloat(avgWt.toFixed(3)) : null,
-        actual_hank: hank != null ? parseFloat(hank.toFixed(4)) : null,
-        cv_pct: cv != null ? parseFloat(cv.toFixed(3)) : null,
+        ...rFields,
+        readings_json: { nplus: nplusNums, n: nNums, nminus: nminusNums },
+        avg_weight: avgN != null ? parseFloat(avgN.toFixed(4)) : null,
+        actual_hank: hankN != null ? parseFloat(hankN.toFixed(4)) : null,
+        cv_pct: cvOk != null ? parseFloat(cvOk.toFixed(3)) : null,
+        hank_cv_pct: cvOk != null ? parseFloat(cvOk.toFixed(3)) : null,
+        a_pct_n_plus: aPctNplus != null ? parseFloat(aPctNplus.toFixed(3)) : null,
+        a_pct_n_minus: aPctNminus != null ? parseFloat(aPctNminus.toFixed(3)) : null,
         ok_input: form.ok_input === "true" ? true : form.ok_input === "false" ? false : null,
         remarks: form.remarks || null,
       };
@@ -2036,7 +2100,7 @@ function QmSheetDialog({
       qc.invalidateQueries({ queryKey: ["qm-tab", endpoint] });
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail ?? "Failed to save");
+      toast.error(saveErrorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -2056,7 +2120,7 @@ function QmSheetDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {/* Header section — shared fields (mirrors top of paper form) */}
+        {/* Header section — shared fields */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pb-3 border-b border-border">
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Date</label>
@@ -2072,7 +2136,7 @@ function QmSheetDialog({
             </select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Process / Lot</label>
+            <label className="text-xs font-medium text-muted-foreground">Lot No</label>
             <input value={form.lot_no} onChange={(e) => setF("lot_no", e.target.value)}
               placeholder="e.g. CR-80/20"
               className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
@@ -2101,9 +2165,15 @@ function QmSheetDialog({
               </p>
             )}
           </div>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Wrap Reel (yards)</label>
+            <input type="number" step="0.01" min="0.1" value={wrapYards} onChange={(e) => setWrapYards(e.target.value)} placeholder="6.55"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+            <p className="text-[10px] text-muted-foreground">6.55 yd = quadrant reel · 120 yd = full hank reel</p>
+          </div>
         </div>
 
-        {/* Per-machine fields + readings */}
+        {/* Per-machine fields */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">Machine No</label>
@@ -2145,49 +2215,113 @@ function QmSheetDialog({
           )}
         </div>
 
-        {/* Readings grid — 5 readings across */}
-        <div className="space-y-2 pt-1">
+        {/* N+1 / N / N-1 reading grid — same as A% Check */}
+        <div className="space-y-2 pt-2 border-t border-border">
           <label className="text-xs font-medium text-muted-foreground">
-            Readings ({readingLabel}) — enter 5 samples
+            Readings ({readingLabel}) — weights from wrap reel, 5 samples per column
           </label>
-          <div className="grid grid-cols-5 gap-2">
-            {["r1","r2","r3","r4","r5"].map((rk, i) => (
-              <div key={rk} className="space-y-1">
-                <label className="text-[10px] text-muted-foreground text-center block">{i+1}</label>
-                <input
-                  ref={snav.cellRef(0, i)} onKeyDown={snav.onKeyDown(0, i)}
-                  type="number" step="0.01" value={form[rk] ?? ""} onChange={(e) => setF(rk, e.target.value)}
-                  placeholder="—"
-                  className="flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring" />
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-muted/40">
+                  <th className="border border-border px-2 py-1.5 text-[10px] font-medium text-muted-foreground w-10">SI No</th>
+                  <th className="border border-border px-3 py-1.5 text-[10px] font-semibold text-center">N+1</th>
+                  <th className="border border-border px-3 py-1.5 text-[10px] font-semibold text-center">N</th>
+                  <th className="border border-border px-3 py-1.5 text-[10px] font-semibold text-center">N-1</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[0,1,2,3,4].map((i) => (
+                  <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-muted/10"}>
+                    <td className="border border-border px-2 py-1 text-center text-[10px] font-medium text-muted-foreground">{i + 1}</td>
+                    {([
+                      [nplus,  setNplus],
+                      [n,      setN],
+                      [nminus, setNminus],
+                    ] as const).map(([vals, setter], ci) => (
+                      <td key={ci} className="border border-border p-1">
+                        <input
+                          ref={snav.cellRef(i, ci)}
+                          onKeyDown={snav.onKeyDown(i, ci)}
+                          type="number" step="0.0001"
+                          value={(vals as string[])[i]}
+                          onChange={(e) => {
+                            const nw = [...(vals as string[])];
+                            nw[i] = e.target.value;
+                            (setter as any)(nw);
+                          }}
+                          placeholder="—"
+                          className="w-full h-7 rounded border-0 bg-transparent px-1 text-xs text-center font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                {/* Average row */}
+                <tr className="bg-muted/30 font-semibold">
+                  <td className="border border-border px-2 py-1.5 text-[10px] text-center text-muted-foreground">Avg</td>
+                  {[avgNplus, avgN, avgNminus].map((avg, ci) => (
+                    <td key={ci} className="border border-border px-3 py-1.5 text-center font-mono text-xs text-foreground">
+                      {avg != null ? avg.toFixed(4) : "—"}
+                    </td>
+                  ))}
+                </tr>
+                {/* Hank row */}
+                <tr className="bg-emerald-50 dark:bg-emerald-950/20">
+                  <td className="border border-border px-2 py-1.5 text-[10px] text-center font-medium text-emerald-800">Hank</td>
+                  {[hankNplus, hankN, hankNminus].map((h, ci) => (
+                    <td key={ci} className="border border-border px-3 py-1.5 text-center font-mono text-xs font-semibold text-emerald-700">
+                      {h != null ? h.toFixed(4) : "—"}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
           </div>
+        </div>
 
-          {/* Live computed results */}
-          {avgWt != null && (
-            <div className="flex gap-4 mt-2 p-2 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800">
-              <div>
-                <p className="text-[10px] text-muted-foreground">Avg Weight</p>
-                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">{avgWt.toFixed(2)} {readingLabel}</p>
-              </div>
-              {hank != null && (
-                <div>
-                  <p className="text-[10px] text-muted-foreground">Actual Hank</p>
-                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">{hank.toFixed(4)}</p>
+        {/* Auto-computed A% results */}
+        {(hankN != null || aPctNplus != null || aPctNminus != null) && (
+          <div className="p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 space-y-2">
+            <div className="flex gap-3 text-xs">
+              {[
+                { label: "Hank N+1", val: hankNplus },
+                { label: "Hank N (baseline)", val: hankN },
+                { label: "Hank N-1", val: hankNminus },
+              ].map(({ label, val }) => (
+                <div key={label} className="flex-1 text-center">
+                  <p className="text-[10px] text-muted-foreground">{label}</p>
+                  <p className="font-semibold font-mono text-emerald-800">{val != null ? val.toFixed(4) : "—"}</p>
                 </div>
-              )}
-              {cv != null && (
-                <div>
-                  <p className="text-[10px] text-muted-foreground">CV%</p>
-                  <p className={`text-sm font-semibold ${cvOk ? "text-emerald-700 dark:text-emerald-400" : "text-red-600"}`}>
-                    {cv.toFixed(2)}%
-                    {cvOk === false && <span className="ml-1 text-[10px]">⚠ High</span>}
+              ))}
+            </div>
+            <div className="flex gap-3 text-xs border-t border-emerald-200 pt-2">
+              <div className="flex-1 text-center">
+                <p className="text-[10px] text-muted-foreground">A% (N+1 vs N)</p>
+                <p className={`font-semibold ${aPctNplus != null && Math.abs(aPctNplus) > 0.5 ? "text-red-600" : "text-emerald-700"}`}>
+                  {aPctNplus != null ? `${aPctNplus >= 0 ? "+" : ""}${aPctNplus.toFixed(2)}%` : "—"}
+                </p>
+              </div>
+              <div className="flex-1 text-center">
+                <p className="text-[10px] text-muted-foreground">A% (N-1 vs N)</p>
+                <p className={`font-semibold ${aPctNminus != null && Math.abs(aPctNminus) > 0.5 ? "text-red-600" : "text-emerald-700"}`}>
+                  {aPctNminus != null ? `${aPctNminus >= 0 ? "+" : ""}${aPctNminus.toFixed(2)}%` : "—"}
+                </p>
+              </div>
+              {cvOk != null && (
+                <div className="flex-1 text-center">
+                  <p className="text-[10px] text-muted-foreground">CV% (N col)</p>
+                  <p className={`font-semibold ${cvOk > 2.0 ? "text-red-600" : "text-emerald-700"}`}>
+                    {cvOk.toFixed(2)}%{cvOk > 2.0 && <span className="ml-1 text-[10px]">⚠ High</span>}
                   </p>
                 </div>
               )}
             </div>
-          )}
-        </div>
+            <p className="text-[10px] text-muted-foreground border-t border-emerald-200 pt-1">
+              A% = (Hank_col − Hank_N) / Hank_N × 100 · Spec: ±0.5%
+            </p>
+          </div>
+        )}
 
         {/* OK & Remarks */}
         <div className="grid grid-cols-2 gap-3">
@@ -2305,7 +2439,7 @@ function BagWeightDialog({ open, onClose, editRecord, millId, endpoint }: {
       qc.invalidateQueries({ queryKey: ["qm-tab", endpoint] });
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail ?? "Failed to save");
+      toast.error(saveErrorMessage(e));
     } finally { setSaving(false); }
   };
 
@@ -2350,7 +2484,7 @@ function BagWeightDialog({ open, onClose, editRecord, millId, endpoint }: {
               className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Target Wt (g)</label>
+            <label className="text-xs font-medium text-muted-foreground">Target Wt (Kg)</label>
             <input type="number" step="0.01" value={form.target_weight} onChange={(e) => setForm((p) => ({ ...p, target_weight: e.target.value }))} placeholder="51.80"
               className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
           </div>
@@ -2364,7 +2498,7 @@ function BagWeightDialog({ open, onClose, editRecord, millId, endpoint }: {
         {/* Individual cone weights grid */}
         <div className="space-y-2 pt-2 border-t border-border">
           <label className="text-xs font-medium text-muted-foreground">
-            Individual Cone Weights (g) — enter each cone net weight
+            Individual Cone Weights (Kg) — enter each cone net weight
           </label>
           <div className="grid grid-cols-5 gap-1.5">
             {weights.map((w, i) => (
@@ -2390,7 +2524,7 @@ function BagWeightDialog({ open, onClose, editRecord, millId, endpoint }: {
         {/* Auto-computed summary */}
         {avgWt != null && (
           <div className="grid grid-cols-4 gap-2 p-3 rounded-md bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 text-center text-xs">
-            <div><p className="text-[10px] text-muted-foreground">Avg Net Wt</p><p className="font-semibold text-emerald-700">{avgWt.toFixed(2)} g</p></div>
+            <div><p className="text-[10px] text-muted-foreground">Avg Net Wt</p><p className="font-semibold text-emerald-700">{avgWt.toFixed(2)} Kg</p></div>
             <div><p className="text-[10px] text-muted-foreground">Min / Max</p><p className="font-semibold">{minWt?.toFixed(2)} / {maxWt?.toFixed(2)}</p></div>
             <div><p className="text-[10px] text-muted-foreground">Std Dev</p><p className="font-semibold">{stdDev?.toFixed(3) ?? "—"}</p></div>
             <div><p className="text-[10px] text-muted-foreground">Pass% (Under/Over)</p>
@@ -2465,7 +2599,7 @@ function PaperConeDialog({ open, onClose, editRecord, millId, endpoint }: {
       qc.invalidateQueries({ queryKey: ["qm-tab", endpoint] });
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail ?? "Failed to save");
+      toast.error(saveErrorMessage(e));
     } finally { setSaving(false); }
   };
 
@@ -2673,7 +2807,7 @@ function CspDialog({ open, onClose, editRecord, millId, endpoint, department }: 
       qc.invalidateQueries({ queryKey: ["qm-tab", endpoint] });
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail ?? "Failed to save");
+      toast.error(saveErrorMessage(e));
     } finally { setSaving(false); }
   };
 
@@ -3009,7 +3143,7 @@ function ACheckDialog({ open, onClose, editRecord, millId, endpoint, department 
       qc.invalidateQueries({ queryKey: ["qm-tab", endpoint] });
       onClose();
     } catch (e: any) {
-      toast.error(e?.response?.data?.detail ?? "Failed to save");
+      toast.error(saveErrorMessage(e));
     } finally { setSaving(false); }
   };
 
@@ -3092,7 +3226,7 @@ function ACheckDialog({ open, onClose, editRecord, millId, endpoint, department 
         {/* N+1 / N / N-1 reading grid — matches physical paper form */}
         <div className="space-y-2 pt-2 border-t border-border">
           <label className="text-xs font-medium text-muted-foreground">
-            Readings (g) — weights from wrap reel, 5 samples per column
+            Readings (Kg) — weights from wrap reel, 5 samples per column
           </label>
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">

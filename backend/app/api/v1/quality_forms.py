@@ -739,6 +739,51 @@ def _model_cols(model) -> set:
     return {c.key for c in model.__table__.columns if c.key not in reserved}
 
 
+def _coerce_payload(model, payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Filter a raw form payload to valid columns and coerce values to the
+    column's Python type so a save never fails on a type/empty-string mismatch.
+
+    Rules applied per column:
+      • unknown keys (e.g. custom_fields, cv_pct when the model uses
+        hank_cv_pct) are dropped silently
+      • "" / "  " → None  (HTML inputs send empty strings, DB wants NULL)
+      • numeric columns: "34.90" → 34.9, bad text → None (never crashes insert)
+      • boolean columns: "true"/"false"/1/0 → bool
+    """
+    from sqlalchemy import Float, Integer, Numeric, Boolean
+
+    allowed = _model_cols(model)
+    col_types = {c.key: c.type for c in model.__table__.columns}
+    out: Dict[str, Any] = {}
+    for k, v in payload.items():
+        if k not in allowed:
+            continue  # drop unknown keys (custom_fields, renamed calc fields, etc.)
+        ctype = col_types.get(k)
+        # Normalise blanks to NULL
+        if isinstance(v, str) and v.strip() == "":
+            out[k] = None
+            continue
+        if v is None:
+            out[k] = None
+            continue
+        try:
+            if isinstance(ctype, (Float, Numeric)):
+                out[k] = float(v)
+            elif isinstance(ctype, Integer):
+                out[k] = int(float(v))
+            elif isinstance(ctype, Boolean):
+                if isinstance(v, bool):
+                    out[k] = v
+                else:
+                    out[k] = str(v).strip().lower() in ("true", "1", "yes", "y", "ok")
+            else:
+                out[k] = v
+        except (TypeError, ValueError):
+            # Un-parseable numeric → store NULL rather than crash the insert
+            out[k] = None
+    return out
+
+
 async def _v2_list(slug: str, db: AsyncSession, current_user: User,
                    date: Optional[str], lot_no: Optional[str],
                    machine_no: Optional[str], page: int, page_size: int,
@@ -767,8 +812,7 @@ async def _v2_create(slug: str, payload: Dict[str, Any],
                      db: AsyncSession, current_user: User):
     model = _V2_MODEL_MAP[slug]
     scope = await get_mill_scope(current_user, db)
-    allowed = _model_cols(model)
-    kwargs = {k: v for k, v in payload.items() if k in allowed}
+    kwargs = _coerce_payload(model, payload)
 
     mill_id = scope.get("mill_id")
     # MILL_OWNER has mill_id=None — resolve to their first mill
@@ -828,17 +872,26 @@ async def _v2_update(slug: str, record_id: str, payload: Dict[str, Any],
     record = (await db.execute(q)).scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=404, detail="Record not found")
-    allowed = _model_cols(model)
-    for k, v in payload.items():
-        if k in allowed:
-            setattr(record, k, v)
+    for k, v in _coerce_payload(model, payload).items():
+        setattr(record, k, v)
     # Re-run domain-specific calculations after update
     if model is QmCardingWasteStudy:
         await _calculate_waste_study(record)
-    await db.flush()
-    await db.commit()
-    await db.refresh(record)
-    return record
+    try:
+        await db.flush()
+        await db.commit()
+        await db.refresh(record)
+        return record
+    except Exception as e:
+        await db.rollback()
+        err = str(e)
+        logger.error(f"_v2_update {slug} error: {err}", exc_info=True)
+        if "not-null constraint" in err or "null value in column" in err:
+            import re
+            col = re.search(r'column "([^"]+)"', err)
+            field = col.group(1) if col else "a required field"
+            raise HTTPException(status_code=400, detail=f"{field.replace('_', ' ').title()} is required.")
+        raise HTTPException(status_code=400, detail=f"Save failed: {err}")
 
 
 async def _v2_delete(slug: str, record_id: str,

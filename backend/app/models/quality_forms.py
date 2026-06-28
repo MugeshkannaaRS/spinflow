@@ -92,10 +92,12 @@ class QmBackProcessAllocation(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     lot_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("lots.id"), nullable=True, index=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    line_no: Mapped[str] = mapped_column(String(5), nullable=False)           # B1 / B2
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    line_no: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)           # B1 / B2
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     total_machines: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     ratio_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     hank: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -113,8 +115,10 @@ class QmCardingWasteStudy(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     delivery_hank: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     licker_in_speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -148,11 +152,13 @@ class QmCardingCvRecord(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     cotton_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)        # R/A R/B R/C
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)        # R/A R/B R/C
     process: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     delivery_speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     cv_1m: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -175,10 +181,13 @@ class QmCardingWrapping(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     line_no: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
     time_taken: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     std_hank: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -203,9 +212,11 @@ class QmCardingDfkPressure(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     line_no: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
     hank: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     cv_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -234,9 +245,11 @@ class QmCardingCfdCheck(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     side: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)     # RS/LS
     carding_line: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
     lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -256,8 +269,10 @@ class QmCardingSpeedRecord(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     card_speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     cylinder_speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     licker1_speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -274,7 +289,8 @@ class QmCardingFlatsCleaning(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     flats_tops_ok: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     doffer_ok: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
@@ -291,7 +307,7 @@ class QmDailyWastage(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    line_no: Mapped[str] = mapped_column(String(5), nullable=False)           # B1 / B2
+    line_no: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)           # B1 / B2
     process: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     production_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     wastage_d1_kg: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -309,11 +325,14 @@ class QmDrawingCheck(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     cotton_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     side: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)     # LHS/RHS
     top_roller_cond: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     bottom_roller_cond: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
@@ -331,9 +350,11 @@ class QmCotRollerChange(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     side: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)     # LHS/RHS
     time_slot: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     changed_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -347,10 +368,13 @@ class QmSliverWrapping(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     process: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # BD / FD
     side: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
     std_hank: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -377,11 +401,14 @@ class QmDrawingCvRecord(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     cotton_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     side: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
     process: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)  # BD/FD
     delivery_speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -405,8 +432,10 @@ class QmAPctCheck(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     cotton_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     feed_hank: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -441,9 +470,11 @@ class QmDrawMonitorCheck(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     side: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
     parameters_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)  # 21 params
     remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -456,9 +487,11 @@ class QmDrawingStopOccurrences(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     ends_down: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     levelling_stops: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     lapping_stops: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -482,10 +515,13 @@ class QmDrawingSpeedCheck(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     side: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     ratio: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     actual_speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     std_speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -501,7 +537,8 @@ class QmCanRandomisationCheck(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     bd_group_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)   # time checkpoints
     fd_group_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -518,11 +555,14 @@ class QmSimplexCheck(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     cotton_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     top_roller_cond: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     bottom_roller_cond: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     top_clearer_cond: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
@@ -539,10 +579,13 @@ class QmSimplexHankTest(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     cotton_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     process: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     nominal_hank: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -567,8 +610,10 @@ class QmSimplexBobbinWeight(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     ratio: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     length: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -585,8 +630,10 @@ class QmSimplexBreakageStudy(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     cotton_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     process: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
@@ -620,9 +667,11 @@ class QmSimplexStretchPct(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     top_readings_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)     # [{spl,r1-5,avg_hank}]
     bottom_readings_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)  # [{spl,r1-5,avg_hank,stretch_pct}]
     avg_stretch_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -637,10 +686,13 @@ class QmSimplexSpeedCheck(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     side: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
     ratio: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     actual_speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -656,10 +708,13 @@ class QmSimplexNozzleCheck(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     side: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
     nozzle_guide_ok: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     nozzle_pipe_ok: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
@@ -680,10 +735,13 @@ class QmRfSnapStudy(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     rf_type: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     snap_rhs: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -705,7 +763,8 @@ class QmRfTraverseCheck(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     rhs_gear_end: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     rhs_middle: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -723,9 +782,11 @@ class QmRfQcChecklist(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     start_time: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     end_time: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     check_items_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
@@ -739,9 +800,11 @@ class QmRfCleaningCheck(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     lh_drafting_zone_ok: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     lh_front_roller_ok: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
@@ -767,9 +830,11 @@ class QmRfKneeBreakCheck(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     spindle_tape_cond: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     knee_break_cond: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -782,10 +847,13 @@ class QmRfMonitorSettings(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     model: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     nominal_count: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     actual_count: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -807,8 +875,10 @@ class QmRfCspReport(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     ratio: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
@@ -874,7 +944,8 @@ class QmRfBreakageStudy(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     ratio: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     tm: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -900,9 +971,11 @@ class QmRfDoffBreakage(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     ratio: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     avg_speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -917,7 +990,8 @@ class QmRfRestartBreakage(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     before_doff_total: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     doff_time_total: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -938,8 +1012,10 @@ class QmRfCountTest(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     samples_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)  # [{weight}] × 10
@@ -958,10 +1034,13 @@ class QmRfSpindleSlippage(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     slip_100_rpm: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     slip_200_rpm: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -976,9 +1055,11 @@ class QmRfTravellerLoading(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     spindle_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     traveller_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -993,9 +1074,11 @@ class QmRfSpacerCheck(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     side: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
     spacer_size: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     spacer_colour: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
@@ -1014,11 +1097,14 @@ class QmYarnFaultsUster(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     drum_no: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     ratio: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -1056,8 +1142,10 @@ class QmClassimatResults(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     group: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
@@ -1088,8 +1176,10 @@ class QmBagFaults(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     cone_tip_colour: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     bag_gross_weight: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -1126,10 +1216,13 @@ class QmDailyRejectCone(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     drum_no: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     out_yarn: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -1166,7 +1259,8 @@ class QmShadeCone(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     side: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)    # Melange/PC-CVC/Cotton/KW-VIS
     shade_cone_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     stock_cone_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -1183,9 +1277,12 @@ class QmJMarkCones(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     process: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     cone_tip_colour: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
@@ -1201,10 +1298,13 @@ class QmWaxPickup(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     machine_type: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     drum_wax_data_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
@@ -1222,10 +1322,13 @@ class QmSpliceStrength(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     test_grid_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     # 3 grids × 5 drums × 4 tests: {splice_strength, parent_yarn_strength}
@@ -1241,10 +1344,13 @@ class QmSpliceAppearance(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     drum_checks_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     # [{drum_no, ln_lever_pos, appearance_ok, recheck}]
     remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -1257,9 +1363,11 @@ class QmTailEndCheck(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     tail_missing_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     tail_end_ok_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     total: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -1287,7 +1395,8 @@ class QmWaxRotatingCheck(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     wax_roller_ok: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     wax_washer_plate_ok: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
@@ -1326,7 +1435,8 @@ class QmLotRunout(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), index=True, nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     process: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     ratio: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
@@ -1345,10 +1455,13 @@ class QmFinishingBreaksStudy(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    machine_no: Mapped[str] = mapped_column(String(20), nullable=False)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     process: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     cotton_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
@@ -1381,7 +1494,8 @@ class QmUvLightAudit(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     area: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     lights_available_std: Mapped[int] = mapped_column(Integer, default=24)
     lights_glowing: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -1402,7 +1516,8 @@ class QmPwseCheck(TimestampMixin, Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     machine_data_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     # [{machine_no, target_weight, mean_weight, cv_pct}] × 4 PWSE machines
     status: Mapped[str] = mapped_column(String(20), default="draft")
@@ -1414,7 +1529,8 @@ class QmBlendTest(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     machine_no: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False)
     line_no: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)
@@ -1448,9 +1564,11 @@ class QmBagWeightCheck(TimestampMixin, Base):
     mill_id: Mapped[str] = mapped_column(String(36), ForeignKey("mills.id"), nullable=False, index=True)
     company_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("companies.id"), nullable=True, index=True)
     date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
-    shift_code: Mapped[str] = mapped_column(String(20), nullable=False)
+    shift_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+
     count_ne: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    lot_no: Mapped[str] = mapped_column(String(50), nullable=False)
+    lot_no: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
     cone_tip_type: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
     inspector: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     samples_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
