@@ -37,9 +37,9 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
     )
-    op.create_index("ix_pm_entry_log_entry_date", "pm_entry_log", ["entry_date"])
-    op.create_index("ix_pm_entry_log_section", "pm_entry_log", ["section"])
-    op.create_index("ix_pm_entry_log_mill_id", "pm_entry_log", ["mill_id"])
+    op.create_index("ix_pm_entry_log_entry_date", "pm_entry_log", ["entry_date"], if_not_exists=True)
+    op.create_index("ix_pm_entry_log_section", "pm_entry_log", ["section"], if_not_exists=True)
+    op.create_index("ix_pm_entry_log_mill_id", "pm_entry_log", ["mill_id"], if_not_exists=True)
 
 
 def downgrade() -> None:
