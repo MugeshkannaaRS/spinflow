@@ -1,5 +1,7 @@
 from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import JSONB
+from typing import Optional
 from datetime import datetime
 from app.db.base import Base, TimestampMixin, generate_uuid
 
@@ -58,6 +60,31 @@ class Technician(Base):
     phone: Mapped[str] = mapped_column(String(20), nullable=True)
     specialization: Mapped[str] = mapped_column(String(200), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class PMEntryLog(TimestampMixin, Base):
+    """
+    Section-specific maintenance entry records.
+    entry_type: 'activity' | 'cot_grinding' | 'ac_plant'
+    section: 'Blowroom' | 'Carding' | 'Drawing' | 'Simplex' | 'Ring Frame' | 'A/C Plant' | 'Buffing Room'
+    data: JSONB — section-specific fields stored as structured dict
+    """
+    __tablename__ = "pm_entry_log"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    entry_date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    section: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    entry_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    # Common fields
+    machine_code: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    machine_line_code: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    activity: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    done_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="done", nullable=False)
+    # Section-specific structured data (dia readings, shore hardness, task details etc.)
+    data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
 
 
 class MachineParameter(Base):

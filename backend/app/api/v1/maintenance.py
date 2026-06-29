@@ -10,7 +10,7 @@ from app.db.session import get_db
 logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
-from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter
+from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter, PMEntryLog
 from app.models.production import Machine
 from app.models.masters import Mill
 from app.schemas.maintenance import (
@@ -805,3 +805,136 @@ def _freq_label(days: int) -> str:
     if days <= 186: return "6-Monthly"
     if days <= 366: return "Yearly"
     return f"Every {days//365}Y"
+
+
+# ---------------------------------------------------------------------------
+# PM ENTRY LOG — section-specific maintenance records
+# ---------------------------------------------------------------------------
+
+@router.post("/maintenance/entries", status_code=201)
+async def create_pm_entry(
+    payload: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance", write=True)),
+):
+    """
+    Create one or more PM entry records.
+    Accepts: { entries: [...] } or a single entry object.
+    entry_type: 'activity' | 'cot_grinding' | 'ac_plant'
+    """
+    from datetime import date as dt_date
+
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id")
+
+    raw = payload.get("entries", None)
+    if raw is None:
+        raw = [payload]
+
+    created = 0
+    errors: List[str] = []
+
+    for item in raw:
+        try:
+            entry = PMEntryLog(
+                mill_id=mill_id,
+                entry_date=item.get("entry_date") or dt_date.today().isoformat(),
+                section=item.get("section", "General"),
+                entry_type=item.get("entry_type", "activity"),
+                machine_code=item.get("machine_code"),
+                machine_line_code=item.get("machine_line_code"),
+                activity=item.get("activity"),
+                done_by=item.get("done_by"),
+                remarks=item.get("remarks"),
+                status=item.get("status", "done"),
+                data=item.get("data") or {},
+            )
+            db.add(entry)
+            created += 1
+        except Exception as exc:
+            errors.append(str(exc))
+
+    await db.commit()
+    return {"created": created, "errors": errors}
+
+
+@router.get("/maintenance/entries")
+async def list_pm_entries(
+    section: Optional[str] = Query(None),
+    entry_type: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    machine_code: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=500),
+    mill_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance")),
+):
+    """List PM entry logs with filters."""
+    scope = await get_mill_scope(current_user, db)
+    effective_mill_id = scope.get("mill_id")
+    if mill_id and scope.get("role") == "SUPER_ADMIN":
+        effective_mill_id = mill_id
+
+    stmt = select(PMEntryLog)
+    if effective_mill_id:
+        stmt = stmt.where(PMEntryLog.mill_id == effective_mill_id)
+    if section:
+        stmt = stmt.where(PMEntryLog.section == section)
+    if entry_type:
+        stmt = stmt.where(PMEntryLog.entry_type == entry_type)
+    if date_from:
+        stmt = stmt.where(PMEntryLog.entry_date >= date_from)
+    if date_to:
+        stmt = stmt.where(PMEntryLog.entry_date <= date_to)
+    if machine_code:
+        stmt = stmt.where(PMEntryLog.machine_code == machine_code)
+
+    total_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(total_stmt)).scalar() or 0
+
+    stmt = stmt.order_by(PMEntryLog.entry_date.desc(), PMEntryLog.created_at.desc())
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    rows = (await db.execute(stmt)).scalars().all()
+
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "data": [
+            {
+                "id": r.id,
+                "entry_date": r.entry_date,
+                "section": r.section,
+                "entry_type": r.entry_type,
+                "machine_code": r.machine_code,
+                "machine_line_code": r.machine_line_code,
+                "activity": r.activity,
+                "done_by": r.done_by,
+                "remarks": r.remarks,
+                "status": r.status,
+                "data": r.data or {},
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.delete("/maintenance/entries/{entry_id}")
+async def delete_pm_entry(
+    entry_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(PMEntryLog).where(PMEntryLog.id == entry_id)
+    if scope.get("mill_id"):
+        stmt = stmt.where(PMEntryLog.mill_id == scope["mill_id"])
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    await db.delete(row)
+    await db.commit()
+    return {"message": "deleted", "id": entry_id}

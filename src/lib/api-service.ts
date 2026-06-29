@@ -312,6 +312,15 @@ export const maintenanceApi = {
     if (section) params.set("section", section);
     return api.get(`/maintenance/day-plan?${params}`).then((r) => r.data);
   },
+  createEntries: (entries: any[]) =>
+    api.post("/maintenance/entries", { entries }).then((r) => r.data),
+  getEntries: (params: Record<string, string | number | undefined>) => {
+    const p = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== "") p.set(k, String(v)); });
+    return api.get(`/maintenance/entries?${p}`).then((r) => r.data);
+  },
+  deleteEntry: (id: string) =>
+    api.delete(`/maintenance/entries/${id}`).then((r) => r.data),
 };
 
 // Dashboard
