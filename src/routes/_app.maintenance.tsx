@@ -351,7 +351,7 @@ function MaintenancePage() {
 
   const machinesQ = useQuery({
     queryKey: ["maintenance", "machines"],
-    queryFn: () => productionApi.getMachines(),
+    queryFn: () => productionApi.getMachines({ page_size: 500 }),
     staleTime: 60_000,
     retry: 1,
   });
