@@ -720,6 +720,8 @@ export function UniversalImportModal({
     masters_customers: ["name", "code"],
     masters_departments: ["name", "code"],
     masters_vehicles: ["vehicle_no", "name"],
+    maintenance_schedules: ["machine_code", "task_description", "description"],
+    maintenance_parameters: ["machine_code", "parameter_name"],
   };
 
   const handleImport = useCallback(async () => {
