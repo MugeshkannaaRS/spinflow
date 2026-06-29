@@ -1,7 +1,7 @@
 import asyncio
 from logging.config import fileConfig
 
-from sqlalchemy import pool
+from sqlalchemy import pool, create_engine
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -12,7 +12,6 @@ from app.db.base import Base
 from app.models import *  # noqa: F401, F403
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
@@ -20,9 +19,32 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def _get_sync_url() -> str:
+    """
+    Convert asyncpg URL to psycopg2 URL for sync migrations.
+    Supabase pooler port 5432 = transaction mode; use port 6543 (session mode)
+    so Alembic advisory locks work.
+    """
+    url = settings.DATABASE_URL
+    # asyncpg → psycopg2
+    url = url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+    # strip query params (ssl=require etc.) — psycopg2 uses sslmode kwarg
+    url = url.split("?")[0]
+    # switch to session-mode pooler port
+    url = url.replace(
+        "pooler.supabase.com:5432", "pooler.supabase.com:6543"
+    )
+    return url
+
+
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
-    context.configure(url=url, target_metadata=target_metadata, literal_binds=True, dialect_opts={"paramstyle": "named"})
+    url = _get_sync_url()
+    context.configure(
+        url=url,
+        target_metadata=target_metadata,
+        literal_binds=True,
+        dialect_opts={"paramstyle": "named"},
+    )
     with context.begin_transaction():
         context.run_migrations()
 
@@ -33,24 +55,18 @@ def do_run_migrations(connection: Connection) -> None:
         context.run_migrations()
 
 
-async def run_async_migrations() -> None:
-    from sqlalchemy.ext.asyncio import create_async_engine
-    # Supabase pooler port 5432 = transaction mode (breaks Alembic advisory locks).
-    # Port 6543 = session mode — required for migrations. Swap here only.
-    migration_url = settings.DATABASE_URL.replace(
-        "pooler.supabase.com:5432", "pooler.supabase.com:6543"
-    ).split("?")[0]
-    connectable = create_async_engine(
-        migration_url, poolclass=pool.NullPool,
-        connect_args={"timeout": 30, "ssl": "require", "statement_cache_size": 0},
-    )
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
-
-
 def run_migrations_online() -> None:
-    asyncio.run(run_async_migrations())
+    """Use synchronous psycopg2 engine for migrations — avoids pgbouncer
+    prepared-statement conflicts that asyncpg triggers."""
+    sync_url = _get_sync_url()
+    connectable = create_engine(
+        sync_url,
+        poolclass=pool.NullPool,
+        connect_args={"sslmode": "require"},
+    )
+    with connectable.connect() as connection:
+        do_run_migrations(connection)
+    connectable.dispose()
 
 
 if context.is_offline_mode():
