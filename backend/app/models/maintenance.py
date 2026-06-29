@@ -33,6 +33,13 @@ class MaintenanceSchedule(Base):
     last_done: Mapped[str] = mapped_column(String(10), nullable=True)
     next_due: Mapped[str] = mapped_column(String(10), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # AACSL enrichment fields
+    department: Mapped[str] = mapped_column(String(100), nullable=True, index=True)
+    lubricant_name: Mapped[str] = mapped_column(String(200), nullable=True)
+    lubricant_quantity: Mapped[str] = mapped_column(String(100), nullable=True)
+    manpower_count: Mapped[int] = mapped_column(Integer, nullable=True)
+    machine_count: Mapped[int] = mapped_column(Integer, nullable=True)
+    sl_no: Mapped[int] = mapped_column(Integer, nullable=True)
 
 
 class Technician(Base):

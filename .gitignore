@@ -50,3 +50,13 @@ __pycache__/
 .opencode/
 backups/
 backend/.env.staging
+
+# Test & build artifacts
+test-results/
+playwright-report/
+backend/static/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+coverage/
+*.cover

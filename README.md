@@ -113,20 +113,62 @@ spinflow-erp/
 │   │   ├── db/               # Session, Base, seed
 │   │   ├── models/           # SQLAlchemy models
 │   │   ├── schemas/          # Pydantic schemas
+│   │   ├── repositories/     # Data-access layer
+│   │   ├── services/         # Business logic
 │   │   ├── api/v1/           # REST API routers
 │   │   ├── ws/               # WebSocket notifications
 │   │   └── workers/          # Background tasks
 │   ├── alembic/              # Database migrations
+│   ├── sql/                  # Manual SQL migrations / audits
+│   ├── scripts/              # Seed & ops scripts
+│   ├── tests/                # Backend test suite (pytest)
 │   └── requirements.txt
 ├── src/                      # React frontend
-│   ├── components/           # UI components
-│   ├── lib/                  # Mock API, RBAC, API service
-│   ├── routes/               # Page routes
-│   └── stores/               # Zustand stores
-├── docker-compose.yml
-├── Dockerfile.frontend
-├── nginx.conf
-└── DEPLOYMENT.md
+│   ├── components/           # UI components (incl. shadcn/ui)
+│   ├── contexts/             # React contexts
+│   ├── hooks/                # Custom hooks
+│   ├── lib/                  # API service, RBAC, mock API
+│   ├── routes/               # Page routes (TanStack Router)
+│   ├── services/             # API clients
+│   ├── stores/               # Zustand stores
+│   └── types/                # Shared TypeScript types
+├── e2e/                      # Playwright end-to-end tests
+├── scripts/                  # Repo-level test / smoke scripts
+├── public/                   # Static frontend assets
+├── docs/                     # Project docs
+│   └── archive/              # Historical audit & planning reports
+├── docker-compose.yml        # Full-stack local stack
+├── Dockerfile.frontend       # Frontend container
+├── nginx.conf                # Reverse proxy (used by docker-compose)
+└── DEPLOYMENT.md             # Deployment guide
+```
+
+Deployment configs live at the repo root where each platform expects them:
+`render.yaml` (Render), `vercel.json` (Vercel), `railway.json` / `railpack.json`
+(Railway), and `wrangler.jsonc` (Cloudflare).
+
+---
+
+## Development
+
+```bash
+# Frontend
+npm install
+npm run dev          # dev server
+npm run build        # production build
+npm run lint         # eslint
+npm run typecheck    # tsc --noEmit
+npm run test         # vitest
+
+# Backend
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+pytest               # backend tests
+
+# End-to-end
+npx playwright test  # e2e/
 ```
 
 ---

@@ -374,6 +374,25 @@ function MaintenancePage() {
   ).length;
   const totalDownTime = tasks.reduce((s, t) => s + (t.downtimeMin ?? 0), 0);
 
+  const today = new Date();
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const dueThisMonth = schedules.filter((s) => {
+    if (!s.next_due) return false;
+    const d = new Date(s.next_due);
+    return d >= today && d <= endOfMonth;
+  }).length;
+
+  // Group schedules by department for PM Calendar
+  const schedulesByDept = useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const s of schedules) {
+      const dept = s.department || "General";
+      if (!map[dept]) map[dept] = [];
+      map[dept].push(s);
+    }
+    return map;
+  }, [schedules]);
+
   if (!user)
     return (
       <div className="p-6 space-y-4">
@@ -455,6 +474,14 @@ function MaintenancePage() {
           <Tabs defaultValue="tasks">
             <TabsList>
               <TabsTrigger value="tasks">Maintenance Tasks</TabsTrigger>
+              <TabsTrigger value="calendar">
+                PM Calendar
+                {dueThisMonth > 0 && (
+                  <Badge variant="destructive" className="ml-1.5 text-[10px] px-1.5">
+                    {dueThisMonth}
+                  </Badge>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="schedules">
                 PM Schedules
                 {schedules.length > 0 && (
@@ -584,6 +611,14 @@ function MaintenancePage() {
               </Card>
             </TabsContent>
 
+            {/* ── PM Calendar tab ── */}
+            <TabsContent value="calendar">
+              <PMCalendarView
+                schedulesByDept={schedulesByDept}
+                loading={schedulesQ.isLoading}
+              />
+            </TabsContent>
+
             {/* ── PM Schedules tab ── */}
             <TabsContent value="schedules">
               <Card>
@@ -598,18 +633,60 @@ function MaintenancePage() {
                       columns={
                         [
                           {
+                            key: "sl_no",
+                            label: "SL",
+                            className: "w-10 text-center text-xs text-muted-foreground",
+                            render: (s: any) => s.sl_no ?? "—",
+                          },
+                          {
+                            key: "department",
+                            label: "Department",
+                            render: (s: any) => s.department ? (
+                              <Badge variant="outline" className="text-xs">{s.department}</Badge>
+                            ) : "—",
+                          },
+                          {
                             key: "machine_code",
                             label: schedColConfig.getLabel("machine_code"),
                             className: "font-mono text-xs",
                           },
                           {
-                            key: "type",
-                            label: schedColConfig.getLabel("type"),
-                            render: (s: any) => <Badge variant="secondary">{s.type}</Badge>,
+                            key: "description",
+                            label: "Work Description",
+                            className: "max-w-[280px]",
+                            render: (s: any) => (
+                              <span className="text-xs leading-snug">{s.description || "—"}</span>
+                            ),
                           },
                           {
                             key: "frequency_days",
-                            label: schedColConfig.getLabel("frequency_days"),
+                            label: "Freq (Days)",
+                            render: (s: any) => (
+                              <Badge variant="secondary" className="text-xs">
+                                {s.frequency_days}d
+                              </Badge>
+                            ),
+                          },
+                          {
+                            key: "lubricant_name",
+                            label: "Lubricant",
+                            render: (s: any) => s.lubricant_name ? (
+                              <span className="text-xs">{s.lubricant_name}</span>
+                            ) : "—",
+                          },
+                          {
+                            key: "lubricant_quantity",
+                            label: "Qty",
+                            render: (s: any) => s.lubricant_quantity ? (
+                              <span className="text-xs font-mono">{s.lubricant_quantity}</span>
+                            ) : "—",
+                          },
+                          {
+                            key: "manpower_count",
+                            label: "Manpower",
+                            render: (s: any) => s.manpower_count != null ? (
+                              <span className="text-xs">{s.manpower_count} persons</span>
+                            ) : "—",
                           },
                           {
                             key: "last_done",
@@ -618,13 +695,18 @@ function MaintenancePage() {
                           },
                           {
                             key: "next_due",
-                            label: schedColConfig.getLabel("next_due"),
-                            render: (s: any) => s.next_due || "—",
-                          },
-                          {
-                            key: "description",
-                            label: schedColConfig.getLabel("description"),
-                            className: "max-w-[300px] truncate",
+                            label: "Next Due",
+                            render: (s: any) => {
+                              if (!s.next_due) return "—";
+                              const d = new Date(s.next_due);
+                              const now = new Date();
+                              const overdue = d < now;
+                              return (
+                                <span className={overdue ? "text-destructive font-semibold text-xs" : "text-xs"}>
+                                  {s.next_due}
+                                </span>
+                              );
+                            },
                           },
                           {
                             key: "is_active",
@@ -815,6 +897,226 @@ function MaintenancePage() {
     </>
   );
 }
+
+// ─── PM Calendar View ────────────────────────────────────────────────────────
+
+const DEPT_COLORS: Record<string, string> = {
+  Blowroom: "bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800",
+  Carding: "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800",
+  DSC: "bg-yellow-50 border-yellow-200 dark:bg-yellow-950/30 dark:border-yellow-800",
+  Finishing: "bg-red-50 border-red-200 dark:bg-red-950/30 dark:border-red-800",
+  General: "bg-muted border-muted-foreground/20",
+};
+
+const FREQ_LABEL: Record<number, string> = {
+  30: "Monthly",
+  60: "2-Monthly",
+  90: "3-Monthly",
+  120: "4-Monthly",
+  180: "6-Monthly",
+  365: "Yearly",
+  730: "2-Yearly",
+  912: "2.5-Yearly",
+  1095: "3-Yearly",
+  1460: "4-Yearly",
+  1825: "5-Yearly",
+};
+
+function freqLabel(days: number) {
+  return FREQ_LABEL[days] ?? `${days}d`;
+}
+
+function dueBadge(nextDue: string | null) {
+  if (!nextDue) return <Badge variant="secondary">No Due Date</Badge>;
+  const d = new Date(nextDue);
+  const now = new Date();
+  const diff = Math.ceil((d.getTime() - now.getTime()) / 86400000);
+  if (diff < 0) return <Badge variant="destructive">Overdue {Math.abs(diff)}d</Badge>;
+  if (diff <= 7) return <Badge className="bg-orange-500 text-white border-0">Due in {diff}d</Badge>;
+  if (diff <= 30) return <Badge className="bg-yellow-500 text-white border-0">Due in {diff}d</Badge>;
+  return <Badge variant="outline" className="text-muted-foreground">{nextDue}</Badge>;
+}
+
+function PMCalendarView({
+  schedulesByDept,
+  loading,
+}: {
+  schedulesByDept: Record<string, any[]>;
+  loading: boolean;
+}) {
+  const [filterFreq, setFilterFreq] = useState<string>("all");
+  const [filterDept, setFilterDept] = useState<string>("all");
+  const [expandedDepts, setExpandedDepts] = useState<Record<string, boolean>>({});
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 w-full rounded-lg" />)}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const depts = Object.keys(schedulesByDept);
+
+  if (depts.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-16 text-center text-muted-foreground">
+          <Wrench className="size-8 mx-auto mb-3 opacity-40" />
+          <p className="text-sm">No PM schedules loaded yet.</p>
+          <p className="text-xs mt-1">Switch to the PM Schedules tab and use "Import Schedule" to upload AACSL_PM_Schedule_Seed.xlsx</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const freqOptions = Array.from(
+    new Set(
+      Object.values(schedulesByDept)
+        .flat()
+        .map((s) => s.frequency_days)
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a - b);
+
+  return (
+    <div className="space-y-4">
+      {/* Filter bar */}
+      <Card>
+        <CardContent className="p-3 flex flex-wrap gap-3 items-center">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Activity className="size-4" />
+            Filters:
+          </div>
+          <Select value={filterDept} onValueChange={setFilterDept}>
+            <SelectTrigger className="h-8 w-40 text-xs">
+              <SelectValue placeholder="Department" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Departments</SelectItem>
+              {depts.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Select value={filterFreq} onValueChange={setFilterFreq}>
+            <SelectTrigger className="h-8 w-40 text-xs">
+              <SelectValue placeholder="Frequency" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Frequencies</SelectItem>
+              {freqOptions.map((f) => (
+                <SelectItem key={f} value={String(f)}>{freqLabel(f)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button size="sm" variant="ghost" className="text-xs h-8" onClick={() => { setFilterDept("all"); setFilterFreq("all"); }}>
+            <X className="size-3 mr-1" /> Clear
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Department cards */}
+      {depts
+        .filter((d) => filterDept === "all" || d === filterDept)
+        .map((dept) => {
+          const deptSchedules = schedulesByDept[dept].filter(
+            (s) => filterFreq === "all" || String(s.frequency_days) === filterFreq
+          );
+          if (deptSchedules.length === 0) return null;
+
+          const sample = deptSchedules[0];
+          const manpower = sample?.manpower_count;
+          const machineCount = sample?.machine_count;
+          const isExpanded = expandedDepts[dept] !== false; // default open
+          const colorClass = DEPT_COLORS[dept] ?? DEPT_COLORS.General;
+
+          // Group by frequency within dept
+          const byFreq: Record<number, any[]> = {};
+          for (const s of deptSchedules) {
+            const f = s.frequency_days ?? 30;
+            if (!byFreq[f]) byFreq[f] = [];
+            byFreq[f].push(s);
+          }
+          const sortedFreqs = Object.keys(byFreq).map(Number).sort((a, b) => a - b);
+
+          return (
+            <Card key={dept} className={`border ${colorClass}`}>
+              <CardHeader
+                className="p-4 cursor-pointer select-none"
+                onClick={() => setExpandedDepts((p) => ({ ...p, [dept]: !isExpanded }))}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Wrench className="size-4 text-muted-foreground" />
+                    <div>
+                      <CardTitle className="text-sm font-semibold">{dept}</CardTitle>
+                      <div className="text-xs text-muted-foreground mt-0.5 flex gap-3">
+                        {manpower != null && <span>👷 {manpower} persons</span>}
+                        {machineCount != null && <span>⚙️ {machineCount} machines</span>}
+                        <span>{deptSchedules.length} PM tasks</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 items-center">
+                    {sortedFreqs.slice(0, 4).map((f) => (
+                      <Badge key={f} variant="secondary" className="text-[10px]">
+                        {freqLabel(f)} × {byFreq[f].length}
+                      </Badge>
+                    ))}
+                    <Button variant="ghost" size="icon" className="size-6">
+                      {isExpanded ? <ArrowDown className="size-3" /> : <Plus className="size-3" />}
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+
+              {isExpanded && (
+                <CardContent className="p-0 pb-2">
+                  {sortedFreqs.map((freq) => (
+                    <div key={freq} className="px-4 pb-3">
+                      <div className="flex items-center gap-2 mb-2 mt-1">
+                        <Badge variant="outline" className="text-xs font-semibold">{freqLabel(freq)}</Badge>
+                        <span className="text-xs text-muted-foreground">{byFreq[freq].length} task{byFreq[freq].length > 1 ? "s" : ""}</span>
+                      </div>
+                      <div className="rounded-md border overflow-hidden">
+                        <table className="w-full text-xs">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="text-left px-3 py-1.5 font-medium w-8">#</th>
+                              <th className="text-left px-3 py-1.5 font-medium">Machine</th>
+                              <th className="text-left px-3 py-1.5 font-medium">Work Description</th>
+                              <th className="text-left px-3 py-1.5 font-medium">Lubricant</th>
+                              <th className="text-left px-3 py-1.5 font-medium">Qty</th>
+                              <th className="text-left px-3 py-1.5 font-medium">Next Due</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {byFreq[freq].map((s, i) => (
+                              <tr key={s.id} className={i % 2 === 0 ? "bg-background" : "bg-muted/20"}>
+                                <td className="px-3 py-1.5 text-muted-foreground">{s.sl_no ?? i + 1}</td>
+                                <td className="px-3 py-1.5 font-mono">{s.machine_code}</td>
+                                <td className="px-3 py-1.5 max-w-[300px]">{s.description}</td>
+                                <td className="px-3 py-1.5 text-muted-foreground">{s.lubricant_name || "—"}</td>
+                                <td className="px-3 py-1.5 font-mono text-muted-foreground">{s.lubricant_quantity || "—"}</td>
+                                <td className="px-3 py-1.5">{dueBadge(s.next_due)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              )}
+            </Card>
+          );
+        })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function ImportScheduleDialog() {
   const [open, setOpen] = useState(false);

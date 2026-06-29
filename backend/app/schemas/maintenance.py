@@ -81,13 +81,19 @@ class ScheduleCreate(BaseModel):
 
 class ScheduleOut(BaseModel):
     id: str
-    machine_id: Optional[str] = None
-    schedule_type: Optional[str] = None
+    machine_code: Optional[str] = None
+    type: Optional[str] = None
     frequency_days: Optional[int] = None
-    next_due_date: Optional[date] = None
     description: Optional[str] = None
+    last_done: Optional[str] = None
+    next_due: Optional[str] = None
     is_active: bool = True
-    created_at: Optional[datetime] = None
+    department: Optional[str] = None
+    lubricant_name: Optional[str] = None
+    lubricant_quantity: Optional[str] = None
+    manpower_count: Optional[int] = None
+    machine_count: Optional[int] = None
+    sl_no: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -100,6 +106,13 @@ class ScheduleBulkItem(BaseModel):
     last_done_date: Optional[str] = None
     next_due_date: Optional[str] = None
     technician_name: Optional[str] = None
+    # AACSL enrichment
+    department: Optional[str] = None
+    lubricant_name: Optional[str] = None
+    lubricant_quantity: Optional[str] = None
+    manpower_count: Optional[int] = None
+    machine_count: Optional[int] = None
+    sl_no: Optional[int] = None
 
 
 class ScheduleBulkCreate(BaseModel):

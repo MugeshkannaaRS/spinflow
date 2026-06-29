@@ -243,6 +243,12 @@ async def bulk_create_schedules(
                 last_done=item.last_done_date,
                 next_due=item.next_due_date,
                 is_active=True,
+                department=item.department,
+                lubricant_name=item.lubricant_name,
+                lubricant_quantity=item.lubricant_quantity,
+                manpower_count=item.manpower_count,
+                machine_count=item.machine_count,
+                sl_no=item.sl_no,
             )
             db.add(schedule)
             created += 1
