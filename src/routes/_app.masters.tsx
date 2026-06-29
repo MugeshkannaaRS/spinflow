@@ -92,6 +92,19 @@ const DEPARTMENT_TYPES = [
 
 const VEHICLE_TYPES = ["truck", "mini_truck", "lorry", "tempo", "other"] as const;
 
+// Machine sections — physical mill sections (NOT HR departments)
+const MACHINE_SECTIONS = [
+  "Blowroom",
+  "Carding",
+  "Drawing",
+  "Simplex",
+  "Ring Frame",
+  "Autoconer / Winding",
+  "A/C Plant",
+  "Buffing Room",
+  "Civil / General",
+] as const;
+
 export const Route = createFileRoute("/_app/masters")({
   head: () => ({ meta: [{ title: "Masters — SpinFlow ERP" }] }),
   component: MastersPage,
@@ -2207,7 +2220,7 @@ function MachinesTab({
     },
     {
       key: "department",
-      label: "Department",
+      label: "Section",
       render: (m) => <span className="text-xs">{m.department ?? "—"}</span>,
     },
     {
@@ -2436,12 +2449,7 @@ function MachineForm({
   const [saving, setSaving] = useState(false);
   const isEdit = !!item;
 
-  const { data: deptsRaw } = useQuery({
-    queryKey: ["masters", "departments"],
-    queryFn: () => mastersApi.getDepartments(),
-    staleTime: 60_000,
-  });
-  const depts = (Array.isArray(deptsRaw) ? deptsRaw : []) as any[];
+  // Machine sections are a fixed list — not HR departments
 
   // Fetch custom field definitions for this mill's machines
   const { data: customFieldDefs } = useQuery({
@@ -2537,18 +2545,18 @@ function MachineForm({
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Department</Label>
+            <Label>Section</Label>
             <Select
               value={form.department}
               onValueChange={(v) => setForm({ ...form, department: v })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select department…" />
+                <SelectValue placeholder="Select section…" />
               </SelectTrigger>
               <SelectContent>
-                {depts.map((d: any) => (
-                  <SelectItem key={d.id} value={d.name}>
-                    {d.name}
+                {MACHINE_SECTIONS.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
                   </SelectItem>
                 ))}
               </SelectContent>
