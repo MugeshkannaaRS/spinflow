@@ -102,7 +102,8 @@ class ScheduleOut(BaseModel):
 class ScheduleBulkItem(BaseModel):
     machine_code: str
     task_description: str
-    frequency: str
+    frequency: Optional[str] = None        # human label e.g. "01 Month"
+    frequency_days: Optional[int] = None   # pre-computed days (takes priority)
     last_done_date: Optional[str] = None
     next_due_date: Optional[str] = None
     technician_name: Optional[str] = None

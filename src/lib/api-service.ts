@@ -295,13 +295,18 @@ export const maintenanceApi = {
   updateStatus: (id: string, data: any) =>
     api.put(`/maintenance/tasks/${id}/status`, data).then((r) => r.data),
   deleteTask: (id: string) => api.delete(`/maintenance/tasks/${id}`).then((r) => r.data),
-  getSchedules: () => api.get("/maintenance/schedules").then((r: any) => extractList(r.data)),
+  getSchedules: () =>
+    api.get("/maintenance/schedules?page_size=500").then((r: any) => extractList(r.data)),
   deleteSchedule: (id: string) => api.delete(`/maintenance/schedules/${id}`).then((r) => r.data),
+  markScheduleDone: (id: string) =>
+    api.patch(`/maintenance/schedules/${id}/done`).then((r) => r.data),
   bulkCreateSchedules: (data: any) =>
     api.post("/maintenance/schedules/bulk", data).then((r) => r.data),
   getParameters: () => api.get("/maintenance/parameters").then((r: any) => extractList(r.data)),
   bulkCreateParameters: (data: any) =>
     api.post("/maintenance/parameters/bulk", data).then((r) => r.data),
+  getManpowerSummary: () =>
+    api.get("/maintenance/manpower-summary").then((r) => r.data),
 };
 
 // Dashboard

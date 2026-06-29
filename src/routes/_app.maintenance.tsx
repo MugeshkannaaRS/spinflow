@@ -54,6 +54,12 @@ import {
   Pencil,
   ArrowDown,
   Trash2,
+  Users,
+  Clock,
+  TrendingUp,
+  CalendarCheck,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import type { MaintenanceTask, MasterMachine } from "@/lib/types";
 import * as XLSX from "xlsx";
@@ -342,6 +348,13 @@ function MaintenancePage() {
     staleTime: 60_000,
     retry: 1,
   });
+  const manpowerQ = useQuery({
+    queryKey: ["maintenance", "manpower-summary"],
+    queryFn: maintenanceApi.getManpowerSummary,
+    staleTime: 120_000,
+    retry: 1,
+    enabled: !!millId,
+  });
 
   const machineColConfig = useColumnConfig("maintenance_machines");
 
@@ -482,6 +495,10 @@ function MaintenancePage() {
                   </Badge>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="manpower">
+                <Users className="size-3.5 mr-1.5" />
+                Manpower Plan
+              </TabsTrigger>
               <TabsTrigger value="schedules">
                 PM Schedules
                 {schedules.length > 0 && (
@@ -616,6 +633,16 @@ function MaintenancePage() {
               <PMCalendarView
                 schedulesByDept={schedulesByDept}
                 loading={schedulesQ.isLoading}
+                canEdit={canEdit}
+              />
+            </TabsContent>
+
+            {/* ── Manpower Plan tab ── */}
+            <TabsContent value="manpower">
+              <ManpowerPlanView
+                summary={manpowerQ.data}
+                schedulesByDept={schedulesByDept}
+                loading={manpowerQ.isLoading}
               />
             </TabsContent>
 
@@ -940,10 +967,13 @@ function dueBadge(nextDue: string | null) {
 function PMCalendarView({
   schedulesByDept,
   loading,
+  canEdit,
 }: {
   schedulesByDept: Record<string, any[]>;
   loading: boolean;
+  canEdit?: boolean;
 }) {
+  const qc = useQueryClient();
   const [filterFreq, setFilterFreq] = useState<string>("all");
   const [filterDept, setFilterDept] = useState<string>("all");
   const [expandedDepts, setExpandedDepts] = useState<Record<string, boolean>>({});
@@ -1088,7 +1118,9 @@ function PMCalendarView({
                               <th className="text-left px-3 py-1.5 font-medium">Work Description</th>
                               <th className="text-left px-3 py-1.5 font-medium">Lubricant</th>
                               <th className="text-left px-3 py-1.5 font-medium">Qty</th>
+                              <th className="text-left px-3 py-1.5 font-medium">Last Done</th>
                               <th className="text-left px-3 py-1.5 font-medium">Next Due</th>
+                              {canEdit && <th className="px-3 py-1.5 font-medium w-24"></th>}
                             </tr>
                           </thead>
                           <tbody>
@@ -1096,10 +1128,16 @@ function PMCalendarView({
                               <tr key={s.id} className={i % 2 === 0 ? "bg-background" : "bg-muted/20"}>
                                 <td className="px-3 py-1.5 text-muted-foreground">{s.sl_no ?? i + 1}</td>
                                 <td className="px-3 py-1.5 font-mono">{s.machine_code}</td>
-                                <td className="px-3 py-1.5 max-w-[300px]">{s.description}</td>
+                                <td className="px-3 py-1.5 max-w-[280px]">{s.description}</td>
                                 <td className="px-3 py-1.5 text-muted-foreground">{s.lubricant_name || "—"}</td>
                                 <td className="px-3 py-1.5 font-mono text-muted-foreground">{s.lubricant_quantity || "—"}</td>
+                                <td className="px-3 py-1.5 text-muted-foreground">{s.last_done || "—"}</td>
                                 <td className="px-3 py-1.5">{dueBadge(s.next_due)}</td>
+                                {canEdit && (
+                                  <td className="px-3 py-1.5">
+                                    <MarkDoneButton scheduleId={s.id} onDone={() => qc.invalidateQueries({ queryKey: ["maintenance-schedules"] })} />
+                                  </td>
+                                )}
                               </tr>
                             ))}
                           </tbody>
@@ -1112,6 +1150,281 @@ function PMCalendarView({
             </Card>
           );
         })}
+    </div>
+  );
+}
+
+// ─── Mark Done Button ─────────────────────────────────────────────────────────
+
+function MarkDoneButton({ scheduleId, onDone }: { scheduleId: string; onDone: () => void }) {
+  const mut = useMutation({
+    mutationFn: () => maintenanceApi.markScheduleDone(scheduleId),
+    onSuccess: () => { toast.success("Marked done — next due date advanced"); onDone(); },
+    onError: () => toast.error("Failed to mark done"),
+  });
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="h-6 text-[10px] px-2 text-green-700 border-green-300 hover:bg-green-50"
+      onClick={() => mut.mutate()}
+      disabled={mut.isPending}
+    >
+      <CalendarCheck className="size-3 mr-1" />
+      {mut.isPending ? "..." : "Done"}
+    </Button>
+  );
+}
+
+// ─── Manpower Plan View ───────────────────────────────────────────────────────
+
+const DEPT_COLORS_UTIL: Record<string, { bg: string; border: string; bar: string }> = {
+  Blowroom: { bg: "bg-blue-50 dark:bg-blue-950/30", border: "border-blue-200 dark:border-blue-800", bar: "bg-blue-500" },
+  Carding:  { bg: "bg-green-50 dark:bg-green-950/30", border: "border-green-200 dark:border-green-800", bar: "bg-green-500" },
+  DSC:      { bg: "bg-yellow-50 dark:bg-yellow-950/30", border: "border-yellow-200 dark:border-yellow-800", bar: "bg-yellow-500" },
+  Finishing: { bg: "bg-red-50 dark:bg-red-950/30", border: "border-red-200 dark:border-red-800", bar: "bg-rose-500" },
+  General:  { bg: "bg-muted", border: "border-muted-foreground/20", bar: "bg-gray-400" },
+};
+
+function utilisationColor(pct: number): string {
+  if (pct >= 80) return "text-red-600 font-bold";
+  if (pct >= 50) return "text-orange-500 font-semibold";
+  if (pct >= 20) return "text-yellow-600";
+  return "text-green-600";
+}
+
+function DayWisePlanTable({ dept, schedules }: { dept: string; schedules: any[] }) {
+  // Build day-wise plan: tasks grouped by frequency → spread across calendar days
+  const SHIFT_MIN = 450;
+  const TASK_EST: Record<number, number> = { 30:20,60:25,90:30,120:35,180:45,365:90,730:180,912:240,1095:300,1460:360,1825:480 };
+  const manpower = schedules[0]?.manpower_count ?? 1;
+  const machineCount = schedules[0]?.machine_count ?? 1;
+  const machPerPerson = Math.ceil(machineCount / manpower);
+
+  // Monthly tasks only (freq=30) are the ones that happen every month
+  const monthlyTasks = schedules.filter(s => (s.frequency_days ?? 30) === 30);
+  const sixMonthlyTasks = schedules.filter(s => (s.frequency_days ?? 30) === 180);
+  const yearlyTasks = schedules.filter(s => (s.frequency_days ?? 30) === 365);
+
+  const dayPlan: Array<{ day: number; person: string; machines: string; tasks: string; estMin: number; taskType: string }> = [];
+
+  if (monthlyTasks.length > 0) {
+    const minPerPerson = monthlyTasks.reduce((s, t) => s + (TASK_EST[30] ?? 20), 0);
+    const daysNeeded = Math.ceil((minPerPerson * machineCount / manpower) / (SHIFT_MIN * 0.85));
+    for (let d = 1; d <= daysNeeded; d++) {
+      const startMc = (d - 1) * machPerPerson * manpower + 1;
+      const endMc = Math.min(d * machPerPerson * manpower, machineCount);
+      dayPlan.push({
+        day: d,
+        person: `All ${manpower} persons`,
+        machines: `Mc ${startMc}–${endMc}`,
+        tasks: `Monthly PM (${monthlyTasks.length} tasks/mc)`,
+        estMin: Math.min(minPerPerson * machPerPerson, SHIFT_MIN * 0.85),
+        taskType: "monthly",
+      });
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-md border overflow-hidden text-xs">
+      <table className="w-full">
+        <thead className="bg-muted/60">
+          <tr>
+            <th className="text-left px-3 py-2 font-medium">Day</th>
+            <th className="text-left px-3 py-2 font-medium">Who</th>
+            <th className="text-left px-3 py-2 font-medium">Machines</th>
+            <th className="text-left px-3 py-2 font-medium">Tasks</th>
+            <th className="text-left px-3 py-2 font-medium">Est. Time</th>
+            <th className="text-left px-3 py-2 font-medium">Shift Util</th>
+          </tr>
+        </thead>
+        <tbody>
+          {dayPlan.length === 0 ? (
+            <tr><td colSpan={6} className="px-3 py-4 text-center text-muted-foreground">No monthly tasks scheduled</td></tr>
+          ) : (
+            dayPlan.map((row, i) => {
+              const util = Math.round((row.estMin / SHIFT_MIN) * 100);
+              return (
+                <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-muted/20"}>
+                  <td className="px-3 py-2 font-semibold">Day {row.day}</td>
+                  <td className="px-3 py-2">{row.person}</td>
+                  <td className="px-3 py-2 font-mono">{row.machines}</td>
+                  <td className="px-3 py-2">{row.tasks}</td>
+                  <td className="px-3 py-2">{Math.round(row.estMin)} min ({(row.estMin/60).toFixed(1)}h)</td>
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                        <div className="h-2 bg-blue-500 rounded-full" style={{ width: `${Math.min(util, 100)}%` }} />
+                      </div>
+                      <span className={utilisationColor(util)}>{util}%</span>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+      </table>
+      {sixMonthlyTasks.length > 0 && (
+        <div className="px-3 py-2 border-t bg-muted/30 text-xs text-muted-foreground">
+          <span className="font-medium">6-Monthly block:</span> {sixMonthlyTasks.length} tasks — schedule on Day 1 of months 1, 7
+        </div>
+      )}
+      {yearlyTasks.length > 0 && (
+        <div className="px-3 py-2 border-t bg-muted/30 text-xs text-muted-foreground">
+          <span className="font-medium">Yearly block:</span> {yearlyTasks.length} tasks — schedule in January or as per OEM
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ManpowerPlanView({
+  summary,
+  schedulesByDept,
+  loading,
+}: {
+  summary: any;
+  schedulesByDept: Record<string, any[]>;
+  loading: boolean;
+}) {
+  const [expandedDepts, setExpandedDepts] = useState<Record<string, boolean>>({});
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-32 w-full rounded-lg" />)}
+      </div>
+    );
+  }
+
+  const depts: any[] = summary?.departments ?? [];
+
+  if (depts.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-16 text-center text-muted-foreground">
+          <Users className="size-8 mx-auto mb-3 opacity-40" />
+          <p className="text-sm">No manpower data yet — import PM schedules first.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const totalPersons = depts.reduce((s, d) => s + (d.manpower ?? 0), 0);
+  const totalTasks = summary?.total_schedules ?? 0;
+  const overdueTotal = depts.reduce((s, d) => s + (d.overdue_count ?? 0), 0);
+  const dueWeekTotal = depts.reduce((s, d) => s + (d.due_this_week ?? 0), 0);
+
+  return (
+    <div className="space-y-4">
+      {/* Summary KPI bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "Total Manpower", value: totalPersons, icon: <Users className="size-4 text-blue-500" />, sub: "across all depts" },
+          { label: "PM Tasks", value: totalTasks, icon: <Wrench className="size-4 text-green-500" />, sub: "active schedules" },
+          { label: "Overdue", value: overdueTotal, icon: <AlertTriangle className="size-4 text-red-500" />, sub: "need attention", highlight: overdueTotal > 0 },
+          { label: "Due This Week", value: dueWeekTotal, icon: <Clock className="size-4 text-orange-500" />, sub: "coming up" },
+        ].map(kpi => (
+          <Card key={kpi.label} className={kpi.highlight ? "border-red-300 bg-red-50 dark:bg-red-950/20" : ""}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">{kpi.icon} {kpi.label}</div>
+              <div className="text-2xl font-bold">{kpi.value}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{kpi.sub}</div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Per-department cards */}
+      {depts.map((dept: any) => {
+        const colors = DEPT_COLORS_UTIL[dept.department] ?? DEPT_COLORS_UTIL.General;
+        const isExpanded = expandedDepts[dept.department] !== false;
+        const util = dept.utilisation_pct ?? 0;
+        const deptSchedules = schedulesByDept[dept.department] ?? [];
+
+        return (
+          <Card key={dept.department} className={`border ${colors.border} ${colors.bg}`}>
+            <CardHeader
+              className="p-4 cursor-pointer select-none"
+              onClick={() => setExpandedDepts(p => ({ ...p, [dept.department]: !isExpanded }))}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {isExpanded
+                    ? <ChevronDown className="size-4 text-muted-foreground" />
+                    : <ChevronRight className="size-4 text-muted-foreground" />}
+                  <div>
+                    <CardTitle className="text-sm font-semibold">{dept.department}</CardTitle>
+                    <div className="text-xs text-muted-foreground mt-0.5 flex gap-4">
+                      <span><Users className="size-3 inline mr-0.5" />{dept.manpower} persons</span>
+                      <span>⚙️ {dept.machine_count} machines</span>
+                      <span><TrendingUp className="size-3 inline mr-0.5" />{dept.machines_per_person} mc/person</span>
+                      <span>{dept.task_count} PM tasks</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  {dept.overdue_count > 0 && (
+                    <Badge variant="destructive" className="text-xs">{dept.overdue_count} overdue</Badge>
+                  )}
+                  {dept.due_this_week > 0 && (
+                    <Badge className="bg-orange-500 text-white text-xs border-0">{dept.due_this_week} this week</Badge>
+                  )}
+                  <div className="text-right min-w-[80px]">
+                    <div className={`text-lg font-bold ${utilisationColor(util)}`}>{util}%</div>
+                    <div className="text-[10px] text-muted-foreground">utilisation</div>
+                  </div>
+                  {/* Utilisation bar */}
+                  <div className="w-24 h-3 bg-muted rounded-full overflow-hidden hidden sm:block">
+                    <div
+                      className={`h-3 rounded-full transition-all ${colors.bar}`}
+                      style={{ width: `${Math.min(util * 5, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+
+            {isExpanded && (
+              <CardContent className="px-4 pb-4 pt-0">
+                {/* Stats row */}
+                <div className="grid grid-cols-3 gap-3 mb-3">
+                  <div className="rounded-lg bg-background/70 p-3 text-center border">
+                    <div className="text-xs text-muted-foreground">Shift Capacity</div>
+                    <div className="font-semibold">{dept.capacity_min} min</div>
+                    <div className="text-[10px] text-muted-foreground">{dept.shift_hrs}h × {dept.manpower} persons</div>
+                  </div>
+                  <div className="rounded-lg bg-background/70 p-3 text-center border">
+                    <div className="text-xs text-muted-foreground">Daily PM Load (avg)</div>
+                    <div className="font-semibold">{Math.round(dept.daily_workload_min)} min</div>
+                    <div className="text-[10px] text-muted-foreground">spread across all tasks</div>
+                  </div>
+                  <div className="rounded-lg bg-background/70 p-3 text-center border">
+                    <div className="text-xs text-muted-foreground">Remaining capacity</div>
+                    <div className={`font-semibold ${util > 80 ? "text-red-600" : "text-green-600"}`}>
+                      {Math.round(dept.capacity_min - dept.daily_workload_min)} min/day
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">available for breakdown</div>
+                  </div>
+                </div>
+
+                {/* Day-wise plan table */}
+                {deptSchedules.length > 0 && (
+                  <DayWisePlanTable dept={dept.department} schedules={deptSchedules} />
+                )}
+
+                {/* Note about low utilisation */}
+                {util < 15 && (
+                  <div className="mt-3 rounded-md bg-blue-50 dark:bg-blue-950/30 border border-blue-200 px-3 py-2 text-xs text-blue-800 dark:text-blue-200">
+                    ℹ️ Low daily utilisation is expected — manpower is sized for 6-monthly/yearly overhaul bursts and breakdown response.
+                  </div>
+                )}
+              </CardContent>
+            )}
+          </Card>
+        );
+      })}
     </div>
   );
 }

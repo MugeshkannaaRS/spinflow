@@ -39,12 +39,10 @@ async def run_async_migrations() -> None:
     # Port 6543 = session mode — required for migrations. Swap here only.
     migration_url = settings.DATABASE_URL.replace(
         "pooler.supabase.com:5432", "pooler.supabase.com:6543"
-    )
-    # pgbouncer rejects prepared statements; disable cache
-    migration_url += "?statement_cache_size=0"
+    ).split("?")[0]
     connectable = create_async_engine(
         migration_url, poolclass=pool.NullPool,
-        connect_args={"timeout": 30},
+        connect_args={"timeout": 30, "ssl": "require", "statement_cache_size": 0},
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

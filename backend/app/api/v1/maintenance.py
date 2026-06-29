@@ -204,7 +204,31 @@ async def create_schedule(
     return schedule
 
 
-_FREQ_MAP = {"daily": 1, "weekly": 7, "monthly": 30, "quarterly": 90, "yearly": 365}
+_FREQ_MAP: dict = {
+    # Generic
+    "daily": 1, "weekly": 7, "monthly": 30, "quarterly": 90, "yearly": 365,
+    # AACSL exact strings (normalised to lower)
+    "01 month": 30,  "1 month": 30,  "1 month ": 30,  "1 months": 30,
+    "02 month": 60,  "2 month": 60,  "2 month ": 60,  "2 months": 60,
+    "03 month": 90,  "3 month": 90,  "3 months": 90,
+    "04 month": 120, "4 month": 120,
+    "06 month": 180, "6 month": 180, "06 months": 180, "6 months": 180,
+    "01 year": 365,  "1 year": 365,  "1 year ": 365,
+    "02 years": 730, "2 years": 730,
+    "2 .5 year": 912, "2.5 year": 912, "2.5 years": 912,
+    "03 year": 1095, "3 year": 1095,  "03 years": 1095, "3 years": 1095,
+    "04 years": 1460, "4 years": 1460,
+    "05 years": 1825, "5 years": 1825,
+    "dia base": 180,  # treat cot renewal as 6-month cycle
+}
+
+def _parse_freq(frequency_str: str) -> int:
+    """Convert any AACSL or generic frequency string to days. Falls back to 30."""
+    if not frequency_str:
+        return 30
+    # If the bulk import already resolved to an integer frequency_days, trust it
+    s = str(frequency_str).strip().lower()
+    return _FREQ_MAP.get(s, 30)
 
 
 @router.post("/maintenance/schedules/bulk", response_model=BulkResponse)
@@ -231,7 +255,12 @@ async def bulk_create_schedules(
                 errors.append(f"{item.machine_code}: machine not in scope")
                 skipped += 1
                 continue
-            freq_days = _FREQ_MAP.get(item.frequency.strip().lower(), 30)
+            # Use pre-computed frequency_days from Excel if present, else parse string
+            freq_days = (
+                int(item.frequency_days)
+                if getattr(item, "frequency_days", None) and str(item.frequency_days).isdigit()
+                else _parse_freq(item.frequency or "")
+            )
             description = item.task_description
             if item.technician_name:
                 description = f"{description} | Technician: {item.technician_name}"
@@ -257,6 +286,34 @@ async def bulk_create_schedules(
             skipped += 1
     await db.commit()
     return BulkResponse(created=created, skipped=skipped, errors=errors)
+
+
+@router.patch("/maintenance/schedules/{schedule_id}/done", response_model=ScheduleOut)
+async def mark_schedule_done(
+    schedule_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance", write=True)),
+):
+    """Mark a PM task as done today. Auto-advances last_done and next_due."""
+    from datetime import date, timedelta
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(MaintenanceSchedule).where(MaintenanceSchedule.id == schedule_id)
+    if scope.get("mill_id") or scope.get("company_id"):
+        stmt = stmt.join(Machine, MaintenanceSchedule.machine_code == Machine.code)
+        if scope.get("mill_id"):
+            stmt = stmt.where(Machine.mill_id == scope["mill_id"])
+        elif scope.get("company_id"):
+            stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    schedule = result.scalar_one_or_none()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    today = date.today()
+    schedule.last_done = today.isoformat()
+    schedule.next_due = (today + timedelta(days=schedule.frequency_days)).isoformat()
+    await db.flush()
+    await db.commit()
+    return schedule
 
 
 @router.put("/maintenance/schedules/{schedule_id}", response_model=ScheduleOut)
@@ -378,6 +435,99 @@ async def bulk_create_parameters(
             skipped += 1
     await db.commit()
     return BulkResponse(created=created, skipped=skipped, errors=errors)
+
+
+@router.get("/maintenance/manpower-summary")
+async def get_manpower_summary(
+    mill_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance")),
+):
+    """
+    Returns per-department PM manpower utilisation.
+    Calculation: sum(task_min_per_day_all_machines) / (manpower * shift_min) * 100
+    task_min_per_day = estimated_task_min / frequency_days * machine_count
+    Uses TASK_MIN_ESTIMATE based on frequency bucket.
+    """
+    from datetime import date as dt_date
+    SHIFT_MIN = 450  # 7.5 hours
+    # Estimated minutes per task visit by frequency bucket
+    TASK_EST: dict = {
+        30: 20, 60: 25, 90: 30, 120: 35, 180: 45,
+        365: 90, 730: 180, 912: 240, 1095: 300, 1460: 360, 1825: 480,
+    }
+
+    scope = await get_mill_scope(current_user, db)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+    if mill_id and role_code == "SUPER_ADMIN":
+        effective_mill_id = mill_id
+
+    stmt = select(MaintenanceSchedule).where(MaintenanceSchedule.is_active == True)
+    if effective_mill_id or scope.get("company_id"):
+        stmt = stmt.join(Machine, MaintenanceSchedule.machine_code == Machine.code)
+        if effective_mill_id:
+            stmt = stmt.where(Machine.mill_id == effective_mill_id)
+        elif scope.get("company_id"):
+            stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+
+    result = await db.execute(stmt)
+    schedules = result.scalars().all()
+
+    today_str = dt_date.today().isoformat()
+    dept_data: dict = {}
+    for s in schedules:
+        dept = s.department or "General"
+        if dept not in dept_data:
+            dept_data[dept] = {
+                "department": dept,
+                "manpower": s.manpower_count or 1,
+                "machine_count": s.machine_count or 1,
+                "task_count": 0,
+                "daily_workload_min": 0.0,
+                "overdue_count": 0,
+                "due_this_week": 0,
+                "due_this_month": 0,
+            }
+        d = dept_data[dept]
+        # Use the most recent manpower/machine_count seen
+        if s.manpower_count:
+            d["manpower"] = s.manpower_count
+        if s.machine_count:
+            d["machine_count"] = s.machine_count
+
+        freq = s.frequency_days or 30
+        machine_count = s.machine_count or 1
+        est_min = TASK_EST.get(freq, max(t for t in TASK_EST if t <= freq) if freq > 30 else 20)
+        d["daily_workload_min"] += (est_min / freq) * machine_count
+        d["task_count"] += 1
+
+        if s.next_due:
+            from datetime import timedelta
+            nd = s.next_due
+            if nd < today_str:
+                d["overdue_count"] += 1
+            week_end = (dt_date.today() + timedelta(days=7)).isoformat()
+            month_end = (dt_date.today() + timedelta(days=30)).isoformat()
+            if today_str <= nd <= week_end:
+                d["due_this_week"] += 1
+            if today_str <= nd <= month_end:
+                d["due_this_month"] += 1
+
+    summary = []
+    for dept, d in dept_data.items():
+        capacity = d["manpower"] * SHIFT_MIN
+        utilisation = round((d["daily_workload_min"] / capacity) * 100, 1) if capacity > 0 else 0
+        machines_per_person = round(d["machine_count"] / d["manpower"], 1) if d["manpower"] > 0 else 0
+        summary.append({
+            **d,
+            "shift_hrs": 7.5,
+            "capacity_min": capacity,
+            "utilisation_pct": utilisation,
+            "machines_per_person": machines_per_person,
+        })
+    summary.sort(key=lambda x: x["department"])
+    return {"departments": summary, "total_schedules": len(schedules)}
 
 
 @router.get("/maintenance/page-init")

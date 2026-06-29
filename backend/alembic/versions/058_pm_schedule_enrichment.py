@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "058_pm_schedule_enrichment"
-down_revision = "057_relax_qc_form_columns_nullable"
+down_revision = "057"
 branch_labels = None
 depends_on = None
 
