@@ -160,7 +160,7 @@ function QualityPage() {
     <>
       <PageHeader
         title="Quality Control"
-        subtitle="CSP testing, lot approvals, rejection analysis & lab register"
+        subtitle="Section-wise quality monitoring — Carding, Drawing, Simplex, Ring Frame, Autoconer, Packing"
         onRefresh={() => qc.invalidateQueries({ queryKey: ["quality-tests"] })}
         isRefreshing={testsQ.isFetching}
       />
@@ -205,11 +205,8 @@ function QualityPage() {
             </Card>
           </div>
 
-          <Tabs defaultValue="tests">
+          <Tabs defaultValue="carding">
             <TabsList className="flex-wrap h-auto gap-y-1">
-              <TabsTrigger value="tests">Lab Tests</TabsTrigger>
-              <TabsTrigger value="lots">Lot Approvals</TabsTrigger>
-              <TabsTrigger value="rejections">Rejections</TabsTrigger>
               <TabsTrigger value="carding">Carding / Blowroom</TabsTrigger>
               <TabsTrigger value="drawing">Drawing</TabsTrigger>
               <TabsTrigger value="simplex">Simplex</TabsTrigger>
@@ -219,200 +216,6 @@ function QualityPage() {
               <TabsTrigger value="calculations">⚙ Calc</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="tests">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-base">Quality Test Results</CardTitle>
-                  {canEdit && <NewTestSlideOver />}
-                </CardHeader>
-                <CardContent>
-                  <ErrorBoundary inline label="Quality Tests">
-                    <DataTable
-                      tableId="quality_tests"
-                      columns={
-                        [
-                          { key: "date", label: testColConfig.getLabel("date"), type: "date" },
-                          {
-                            key: "type",
-                            label: testColConfig.getLabel("type"),
-                            type: "status",
-                            render: (t: any) => <Badge variant="outline">{t.type}</Badge>,
-                          },
-                          {
-                            key: "lot_id",
-                            label: testColConfig.getLabel("lot_id"),
-                            className: "font-mono text-xs",
-                          },
-                          {
-                            key: "machine_code",
-                            label: testColConfig.getLabel("machine_code"),
-                            className: "font-mono text-xs",
-                          },
-                          { key: "sample_ref", label: testColConfig.getLabel("sample_ref") },
-                          {
-                            key: "result",
-                            label: testColConfig.getLabel("result"),
-                            render: (t: any) => `${t.result} ${t.unit}`,
-                          },
-                          {
-                            key: "standard",
-                            label: testColConfig.getLabel("standard"),
-                            render: (t: any) => `${t.standard} ${t.unit}`,
-                          },
-                          {
-                            key: "status",
-                            label: testColConfig.getLabel("status"),
-                            type: "status",
-                            render: (t: any) => <StatusBadge status={t.status} size="sm" />,
-                          },
-                          { key: "tested_by", label: testColConfig.getLabel("tested_by") },
-                        ] satisfies ColDef[]
-                      }
-                      data={tests}
-                      loading={testsQ.isLoading}
-                      rowKey={(t) => t.id}
-                      exportFilename="quality_tests"
-                      disableExport={true}
-                      toolbar={
-                        <div className="flex gap-1">
-                          <ExportDateRangeButton
-                            onExportXlsx={(f, t) => exportApi.qualityXlsx(f, t)}
-                            onFetchData={(f, t) => exportApi.qualityJson(f, t)}
-                            exportTitle="Quality Lab Tests"
-                            shifts={shiftOptions}
-                          />
-                          {canEdit && <ImportTestsDialog />}
-                        </div>
-                      }
-                      actions={
-                        canEdit
-                          ? (t: any) =>
-                              t.status === "pending" ? (
-                                <ConfirmDeleteButton
-                                  onConfirm={async () => {
-                                    await qualityApi.deleteTest(t.id);
-                                    qc.invalidateQueries({ queryKey: ["quality-tests"] });
-                                  }}
-                                  label={`Cancel quality test for lot ${t.lot_id || "—"}?`}
-                                  successMessage="Quality test cancelled"
-                                />
-                              ) : null
-                          : undefined
-                      }
-                    />
-                  </ErrorBoundary>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="lots">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Lot Approval Workflow</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ErrorBoundary inline label="Lot Approvals">
-                    <DataTable
-                      tableId="quality_lots"
-                      columns={
-                        [
-                          {
-                            key: "lot_no",
-                            label: lotColConfig.getLabel("lot_no"),
-                            className: "font-mono text-xs",
-                          },
-                          {
-                            key: "department",
-                            label: lotColConfig.getLabel("department"),
-                            type: "status",
-                          },
-                          { key: "produced_kg", label: lotColConfig.getLabel("produced_kg") },
-                          { key: "csp_result", label: lotColConfig.getLabel("csp_result") },
-                          { key: "count_result", label: lotColConfig.getLabel("count_result") },
-                          {
-                            key: "moisture_result",
-                            label: lotColConfig.getLabel("moisture_result"),
-                            render: (l: any) =>
-                              l.moisture_result != null ? `${l.moisture_result}%` : "—",
-                          },
-                          {
-                            key: "strength_result",
-                            label: lotColConfig.getLabel("strength_result"),
-                          },
-                          {
-                            key: "status",
-                            label: lotColConfig.getLabel("status"),
-                            type: "status",
-                            render: (l: any) => <StatusBadge status={l.status} size="sm" />,
-                          },
-                        ] satisfies ColDef[]
-                      }
-                      data={lots}
-                      loading={lotsQ.isLoading}
-                      rowKey={(l) => l.id}
-                      exportFilename="lot_approvals"
-                      actions={(l) =>
-                        l.status === "pending" && canEdit ? (
-                          <div className="flex gap-1">
-                            <LotApproveAction lotId={l.id} />
-                            <LotRejectAction lotId={l.id} />
-                          </div>
-                        ) : null
-                      }
-                    />
-                  </ErrorBoundary>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="rejections">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Rejection Analysis</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ErrorBoundary inline label="Rejection Analysis">
-                    <DataTable
-                      tableId="quality_rejections"
-                      columns={
-                        [
-                          { key: "date", label: rejColConfig.getLabel("date"), type: "date" },
-                          {
-                            key: "lot_id",
-                            label: rejColConfig.getLabel("lot_id"),
-                            className: "font-mono text-xs",
-                          },
-                          {
-                            key: "category",
-                            label: rejColConfig.getLabel("category"),
-                            type: "status",
-                            render: (r: any) => <Badge variant="destructive">{r.category}</Badge>,
-                          },
-                          { key: "quantity_kg", label: rejColConfig.getLabel("quantity_kg") },
-                          {
-                            key: "reason",
-                            label: rejColConfig.getLabel("reason"),
-                            className: "max-w-xs truncate",
-                          },
-                          {
-                            key: "disposition",
-                            label: rejColConfig.getLabel("disposition"),
-                            type: "status",
-                            render: (r: any) => <Badge variant="outline">{r.disposition}</Badge>,
-                          },
-                          { key: "noted_by", label: rejColConfig.getLabel("noted_by") },
-                        ] satisfies ColDef[]
-                      }
-                      data={rejections}
-                      loading={rejQ.isLoading}
-                      rowKey={(r) => r.id}
-                      exportFilename="rejections"
-                    />
-                  </ErrorBoundary>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            {/* ── Department tabs ── */}
             <TabsContent value="carding">
               <div className="space-y-4">
                 {/* ── Carding CV% Record (Uster multi-length) ── */}

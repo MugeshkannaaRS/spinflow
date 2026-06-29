@@ -40,6 +40,13 @@ class MaintenanceSchedule(Base):
     manpower_count: Mapped[int] = mapped_column(Integer, nullable=True)
     machine_count: Mapped[int] = mapped_column(Integer, nullable=True)
     sl_no: Mapped[int] = mapped_column(Integer, nullable=True)
+    # machine line / unit tracking (e.g. "BDA-1", "Line-1 MC-05", "A/C Unit-1A")
+    machine_line_code: Mapped[str] = mapped_column(String(100), nullable=True)
+    # cot grinding specific
+    opening_dia_mm: Mapped[float] = mapped_column(Float, nullable=True)
+    current_dia_mm: Mapped[float] = mapped_column(Float, nullable=True)
+    grinding_freq_days: Mapped[int] = mapped_column(Integer, nullable=True)
+    last_grinding_date: Mapped[str] = mapped_column(String(10), nullable=True)
 
 
 class Technician(Base):

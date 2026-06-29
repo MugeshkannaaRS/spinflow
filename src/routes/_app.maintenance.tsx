@@ -75,6 +75,19 @@ export const Route = createFileRoute("/_app/maintenance")({
   component: MaintenancePage,
 });
 
+// ─── Machine sections (physical mill sections, not HR departments) ────────────
+const MACHINE_SECTIONS = [
+  "Blowroom",
+  "Carding",
+  "Drawing",
+  "Simplex",
+  "Ring Frame",
+  "Autoconer / Winding",
+  "A/C Plant",
+  "Buffing Room",
+  "Civil / General",
+];
+
 // ─── Template generators ─────────────────────────────────────────────────────
 
 function downloadParameterTemplate() {
@@ -495,6 +508,10 @@ function MaintenancePage() {
                   </Badge>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="dayplan">
+                <CalendarCheck className="size-3.5 mr-1.5" />
+                Day Plan
+              </TabsTrigger>
               <TabsTrigger value="manpower">
                 <Users className="size-3.5 mr-1.5" />
                 Manpower Plan
@@ -635,6 +652,11 @@ function MaintenancePage() {
                 loading={schedulesQ.isLoading}
                 canEdit={canEdit}
               />
+            </TabsContent>
+
+            {/* ── Day Plan tab ── */}
+            <TabsContent value="dayplan">
+              <DayPlanView />
             </TabsContent>
 
             {/* ── Manpower Plan tab ── */}
@@ -845,7 +867,7 @@ function MaintenancePage() {
                   <CardTitle className="text-base">Machines ({machinesData.length})</CardTitle>
                   <div className="flex gap-2">
                     {canEdit && <ImportMachinesDialog />}
-                    {canEdit && <MachineDialog departments={deptsData} />}
+                    {canEdit && <MachineDialog />}
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -861,7 +883,7 @@ function MaintenancePage() {
                           },
                           { key: "name", label: machineColConfig.getLabel("name") },
                           { key: "machine_type", label: machineColConfig.getLabel("machine_type") },
-                          { key: "department", label: machineColConfig.getLabel("department") },
+                          { key: "department", label: "Section" },
                           { key: "target_kg", label: machineColConfig.getLabel("target_kg") },
                           {
                             key: "current_status",
@@ -889,7 +911,7 @@ function MaintenancePage() {
                       actions={
                         canEdit
                           ? (m: any) => (
-                              <MachineDialog item={m as MasterMachine} departments={deptsData} />
+                              <MachineDialog item={m as MasterMachine} />
                             )
                           : undefined
                       }
@@ -1279,6 +1301,346 @@ function DayWisePlanTable({ dept, schedules }: { dept: string; schedules: any[] 
   );
 }
 
+// ─── Day Plan View ────────────────────────────────────────────────────────────
+
+const SECTION_COLORS: Record<string, { bg: string; border: string; badge: string }> = {
+  "Blowroom":             { bg: "bg-blue-50",   border: "border-blue-200",   badge: "bg-blue-100 text-blue-800" },
+  "Carding":              { bg: "bg-green-50",  border: "border-green-200",  badge: "bg-green-100 text-green-800" },
+  "Drawing":              { bg: "bg-amber-50",  border: "border-amber-200",  badge: "bg-amber-100 text-amber-800" },
+  "Simplex":              { bg: "bg-purple-50", border: "border-purple-200", badge: "bg-purple-100 text-purple-800" },
+  "Ring Frame":           { bg: "bg-rose-50",   border: "border-rose-200",   badge: "bg-rose-100 text-rose-800" },
+  "Autoconer / Winding":  { bg: "bg-cyan-50",   border: "border-cyan-200",   badge: "bg-cyan-100 text-cyan-800" },
+  "A/C Plant":            { bg: "bg-lime-50",   border: "border-lime-200",   badge: "bg-lime-100 text-lime-800" },
+  "Buffing Room":         { bg: "bg-orange-50", border: "border-orange-200", badge: "bg-orange-100 text-orange-800" },
+  "General":              { bg: "bg-slate-50",  border: "border-slate-200",  badge: "bg-slate-100 text-slate-700" },
+};
+
+function secColor(sec: string) {
+  return SECTION_COLORS[sec] ?? SECTION_COLORS.General;
+}
+
+function loadColor(pct: number) {
+  if (pct >= 90) return "bg-red-500";
+  if (pct >= 70) return "bg-amber-500";
+  if (pct >= 40) return "bg-blue-500";
+  return "bg-green-400";
+}
+
+function DayPlanView() {
+  const today = new Date();
+  const [month, setMonth] = useState(today.getMonth() + 1);
+  const [year, setYear]   = useState(today.getFullYear());
+  const [section, setSection] = useState("all");
+  const [expandedDays, setExpandedDays] = useState<Record<number, boolean>>({});
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+
+  const planQ = useQuery({
+    queryKey: ["maintenance", "day-plan", year, month, section],
+    queryFn: () => maintenanceApi.getDayPlan(month, year, section === "all" ? undefined : section),
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  const plan = planQ.data;
+  const days: any[] = plan?.days ?? [];
+  const sectionSummary: any[] = plan?.section_summary ?? [];
+  const allSections = Array.from(new Set(days.flatMap((d: any) => d.tasks.map((t: any) => t.section)))).sort();
+
+  const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  function prevMonth() {
+    if (month === 1) { setMonth(12); setYear(y => y - 1); }
+    else setMonth(m => m - 1);
+  }
+  function nextMonth() {
+    if (month === 12) { setMonth(1); setYear(y => y + 1); }
+    else setMonth(m => m + 1);
+  }
+
+  const toggleDay = (day: number) =>
+    setExpandedDays(p => ({ ...p, [day]: !p[day] }));
+
+  const todayDay = today.getMonth() + 1 === month && today.getFullYear() === year
+    ? today.getDate() : -1;
+
+  return (
+    <div className="space-y-4">
+      {/* Controls */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Month navigator */}
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={prevMonth}>‹</Button>
+              <span className="font-semibold text-sm w-28 text-center">
+                {monthNames[month - 1]} {year}
+              </span>
+              <Button variant="outline" size="sm" onClick={nextMonth}>›</Button>
+            </div>
+
+            {/* Section filter */}
+            <Select value={section} onValueChange={setSection}>
+              <SelectTrigger className="w-52 h-8 text-sm">
+                <SelectValue placeholder="All Sections" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Sections</SelectItem>
+                {allSections.map(s => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* View toggle */}
+            <div className="flex gap-1 ml-auto">
+              <Button
+                size="sm" variant={viewMode === "list" ? "default" : "outline"}
+                onClick={() => setViewMode("list")} className="h-8 px-3 text-xs"
+              >List</Button>
+              <Button
+                size="sm" variant={viewMode === "grid" ? "default" : "outline"}
+                onClick={() => setViewMode("grid")} className="h-8 px-3 text-xs"
+              >Grid</Button>
+            </div>
+
+            {planQ.isFetching && (
+              <span className="text-xs text-muted-foreground animate-pulse">Loading…</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Section summary pills */}
+      {sectionSummary.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {sectionSummary.map((s: any) => {
+            const col = secColor(s.section);
+            return (
+              <div
+                key={s.section}
+                className={`rounded-lg px-3 py-1.5 border text-xs font-medium ${col.bg} ${col.border} cursor-pointer`}
+                onClick={() => setSection(section === s.section ? "all" : s.section)}
+              >
+                <span className="font-semibold">{s.section}</span>
+                <span className="ml-2 text-muted-foreground">{s.total_tasks} tasks · {s.total_manpower_days} MP-days</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Loading skeleton */}
+      {planQ.isLoading && (
+        <div className="space-y-2">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+          ))}
+        </div>
+      )}
+
+      {/* Grid view — calendar-style */}
+      {!planQ.isLoading && viewMode === "grid" && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-muted-foreground mb-2">
+              {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => <div key={d}>{d}</div>)}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {/* Empty cells before first day */}
+              {days.length > 0 && [...Array(new Date(year, month - 1, 1).getDay())].map((_, i) => (
+                <div key={`e${i}`} />
+              ))}
+              {days.map((d: any) => {
+                const isToday = d.day === todayDay;
+                const hasTasks = d.total_tasks > 0;
+                const overdue = d.tasks.some((t: any) => t.is_overdue);
+                return (
+                  <div
+                    key={d.day}
+                    onClick={() => { if (hasTasks) { setViewMode("list"); setExpandedDays(p => ({...p, [d.day]: true})); } }}
+                    className={cn(
+                      "rounded-md p-1.5 text-center cursor-pointer border min-h-[60px] transition-all",
+                      isToday ? "border-blue-500 bg-blue-50 ring-1 ring-blue-400" : "border-transparent hover:border-slate-200",
+                      hasTasks ? "hover:bg-slate-50" : "opacity-60",
+                    )}
+                  >
+                    <div className={cn("text-xs font-semibold", isToday ? "text-blue-700" : "text-slate-700")}>{d.day}</div>
+                    <div className="text-[10px] text-muted-foreground">{d.weekday}</div>
+                    {hasTasks && (
+                      <div className={cn(
+                        "mt-1 rounded px-1 text-[10px] font-medium",
+                        overdue ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
+                      )}>
+                        {d.total_tasks}
+                      </div>
+                    )}
+                    {hasTasks && (
+                      <div className="mt-1 h-1 rounded-full overflow-hidden bg-slate-200">
+                        <div className={cn("h-full rounded-full", loadColor(d.load_pct))}
+                          style={{ width: `${Math.min(d.load_pct, 100)}%` }} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-4 mt-3 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400 inline-block"/>Low load</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block"/>Medium</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block"/>High</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block"/>Critical</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* List view — day-by-day expandable */}
+      {!planQ.isLoading && viewMode === "list" && (
+        <div className="space-y-2">
+          {days.filter((d: any) => d.total_tasks > 0).map((d: any) => {
+            const isToday = d.day === todayDay;
+            const isExpanded = expandedDays[d.day] ?? (d.day === todayDay);
+            const overdue = d.tasks.some((t: any) => t.is_overdue);
+
+            // Group tasks by section
+            const bySection: Record<string, any[]> = {};
+            for (const t of d.tasks) {
+              (bySection[t.section] = bySection[t.section] || []).push(t);
+            }
+
+            return (
+              <Card
+                key={d.day}
+                className={cn(
+                  "border transition-all",
+                  isToday ? "border-blue-400 shadow-sm" : "border-border",
+                  overdue && !isToday ? "border-red-200" : "",
+                )}
+              >
+                {/* Day header — always visible */}
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
+                  onClick={() => toggleDay(d.day)}
+                >
+                  {/* Date */}
+                  <div className={cn(
+                    "flex-shrink-0 w-12 h-12 rounded-lg flex flex-col items-center justify-center border text-center",
+                    isToday ? "bg-blue-600 border-blue-600 text-white" : "bg-muted border-border text-foreground"
+                  )}>
+                    <span className="text-lg font-bold leading-none">{d.day}</span>
+                    <span className="text-[10px] font-medium">{d.weekday}</span>
+                  </div>
+
+                  {/* Summary */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-sm">{d.total_tasks} tasks</span>
+                      <span className="text-xs text-muted-foreground">·</span>
+                      <span className="text-xs text-muted-foreground">{d.total_manpower_needed} persons needed</span>
+                      <span className="text-xs text-muted-foreground">·</span>
+                      <span className="text-xs text-muted-foreground">{Math.round(d.total_est_min / 60 * 10) / 10}h est.</span>
+                      {overdue && (
+                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Overdue</Badge>
+                      )}
+                    </div>
+                    {/* Section chips */}
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {Object.entries(bySection).map(([sec, tasks]) => {
+                        const col = secColor(sec);
+                        return (
+                          <span key={sec} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${col.badge}`}>
+                            {sec} ({tasks.length})
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Load bar */}
+                  <div className="flex-shrink-0 w-20 hidden sm:block">
+                    <div className="text-[10px] text-muted-foreground text-right mb-1">{d.load_pct}% load</div>
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full transition-all", loadColor(d.load_pct))}
+                        style={{ width: `${Math.min(d.load_pct, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <ChevronRight className={cn("size-4 text-muted-foreground flex-shrink-0 transition-transform", isExpanded && "rotate-90")} />
+                </button>
+
+                {/* Expanded: tasks grouped by section */}
+                {isExpanded && (
+                  <div className="border-t">
+                    {Object.entries(bySection).map(([sec, tasks]) => {
+                      const col = secColor(sec);
+                      return (
+                        <div key={sec} className={`${col.bg} border-b last:border-b-0`}>
+                          <div className={`px-4 py-1.5 border-b ${col.border} flex items-center gap-2`}>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${col.badge}`}>{sec}</span>
+                            <span className="text-xs text-muted-foreground">{tasks.length} tasks · {tasks.reduce((a: number, t: any) => a + t.manpower_needed, 0)} persons</span>
+                          </div>
+                          <div className="divide-y divide-border/50">
+                            {tasks.map((t: any) => (
+                              <div key={t.id} className="px-4 py-2.5 flex items-start gap-3">
+                                {/* Machine/Line */}
+                                <div className="flex-shrink-0 min-w-[90px]">
+                                  <div className="text-xs font-mono font-semibold text-foreground">{t.machine_code}</div>
+                                  {t.machine_line_code && (
+                                    <div className="text-[10px] text-muted-foreground font-mono">{t.machine_line_code}</div>
+                                  )}
+                                </div>
+                                {/* Task description */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs text-foreground leading-snug">{t.description}</div>
+                                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                    <span className="text-[10px] text-muted-foreground">{t.frequency_label}</span>
+                                    {t.lubricant_name && (
+                                      <span className="text-[10px] text-amber-700 bg-amber-50 px-1.5 rounded">
+                                        🛢 {t.lubricant_name} {t.lubricant_quantity}
+                                      </span>
+                                    )}
+                                    {t.is_overdue && (
+                                      <span className="text-[10px] text-red-600 font-semibold">⚠ Overdue</span>
+                                    )}
+                                  </div>
+                                </div>
+                                {/* Right: manpower + est time */}
+                                <div className="flex-shrink-0 text-right">
+                                  <div className="text-xs font-semibold text-foreground">{t.manpower_needed} person{t.manpower_needed !== 1 ? "s" : ""}</div>
+                                  <div className="text-[10px] text-muted-foreground">{t.est_min} min est.</div>
+                                  {t.machine_count > 1 && (
+                                    <div className="text-[10px] text-muted-foreground">{t.machine_count} machines</div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+
+          {days.filter((d: any) => d.total_tasks > 0).length === 0 && !planQ.isLoading && (
+            <Card>
+              <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                No PM tasks scheduled for {monthNames[month - 1]} {year}.
+                {section !== "all" && " Try removing the section filter."}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ManpowerPlanView({
   summary,
   schedulesByDept,
@@ -1473,7 +1835,7 @@ function ImportMachinesDialog() {
   );
 }
 
-function MachineDialog({ item, departments }: { item?: MasterMachine; departments: any[] }) {
+function MachineDialog({ item }: { item?: MasterMachine }) {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
   const { data: machineTypes } = useMillMasterCategory("machine_type");
@@ -1585,22 +1947,20 @@ function MachineDialog({ item, departments }: { item?: MasterMachine; department
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label>Department</Label>
+            <Label>Section</Label>
             <Select
               value={form.department}
               onValueChange={(v) => setForm({ ...form, department: v })}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select department" />
+                <SelectValue placeholder="Select section" />
               </SelectTrigger>
               <SelectContent>
-                {departments
-                  .filter((d: any) => d?.code)
-                  .map((d: any) => (
-                    <SelectItem key={d.id} value={d.code}>
-                      {d.name}
-                    </SelectItem>
-                  ))}
+                {MACHINE_SECTIONS.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

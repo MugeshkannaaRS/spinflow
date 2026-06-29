@@ -278,6 +278,11 @@ async def bulk_create_schedules(
                 manpower_count=item.manpower_count,
                 machine_count=item.machine_count,
                 sl_no=item.sl_no,
+                machine_line_code=item.machine_line_code,
+                opening_dia_mm=item.opening_dia_mm,
+                current_dia_mm=item.current_dia_mm,
+                grinding_freq_days=item.grinding_freq_days,
+                last_grinding_date=item.last_grinding_date,
             )
             db.add(schedule)
             created += 1
@@ -633,3 +638,170 @@ async def delete_maintenance_schedule(
     await db.flush()
     await db.commit()
     return {"message": "Maintenance schedule deleted", "id": schedule_id}
+
+
+# ---------------------------------------------------------------------------
+# DAY-WISE FLOOR PLAN
+# ---------------------------------------------------------------------------
+
+@router.get("/maintenance/day-plan")
+async def get_day_plan(
+    month: Optional[int] = Query(None),   # 1-12
+    year: Optional[int] = Query(None),
+    section: Optional[str] = Query(None), # filter by department/section
+    mill_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance")),
+):
+    """
+    Returns a day-wise schedule plan for floor workers.
+    For each day of the requested month, lists which PM tasks fall due
+    (based on frequency_days + last_done or next_due).
+    Groups by section, then by day.
+    """
+    from datetime import date as dt_date, timedelta
+    import calendar as cal_mod
+
+    today = dt_date.today()
+    y = year or today.year
+    m = month or today.month
+    days_in_month = cal_mod.monthrange(y, m)[1]
+    month_start = dt_date(y, m, 1)
+    month_end = dt_date(y, m, days_in_month)
+
+    scope = await get_mill_scope(current_user, db)
+    role_code = scope.get("role", "")
+    effective_mill_id = scope.get("mill_id")
+    if mill_id and role_code == "SUPER_ADMIN":
+        effective_mill_id = mill_id
+
+    # Fetch active schedules
+    stmt = select(MaintenanceSchedule).where(MaintenanceSchedule.is_active == True)
+    if section:
+        stmt = stmt.where(MaintenanceSchedule.department == section)
+    if effective_mill_id or scope.get("company_id"):
+        stmt = stmt.join(Machine, MaintenanceSchedule.machine_code == Machine.code)
+        if effective_mill_id:
+            stmt = stmt.where(Machine.mill_id == effective_mill_id)
+        elif scope.get("company_id"):
+            stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    result = await db.execute(stmt)
+    schedules = result.scalars().all()
+
+    # For each schedule, compute all due dates in the month
+    # A task is "due on day D" if next_due falls in that month,
+    # or if frequency_days is short enough to recur (weekly/daily)
+    day_map: dict[int, list] = {d: [] for d in range(1, days_in_month + 1)}
+
+    for s in schedules:
+        freq = s.frequency_days or 30
+        # Determine anchor date
+        anchor = None
+        if s.next_due:
+            try:
+                anchor = dt_date.fromisoformat(s.next_due)
+            except ValueError:
+                pass
+        if anchor is None:
+            if s.last_done:
+                try:
+                    ld = dt_date.fromisoformat(s.last_done)
+                    anchor = ld + timedelta(days=freq)
+                except ValueError:
+                    pass
+        if anchor is None:
+            # Default: spread tasks across month based on sl_no
+            offset = (s.sl_no or 1) % days_in_month
+            anchor = month_start + timedelta(days=offset)
+
+        # Walk forward/back to find all occurrences in month
+        # Start from the first occurrence at or before month_start
+        if anchor > month_end:
+            # next_due is after this month — check if freq allows earlier hit
+            diff = (anchor - month_start).days
+            steps_back = diff // freq
+            anchor = anchor - timedelta(days=steps_back * freq)
+        elif anchor < month_start:
+            # Move forward to first in-month occurrence
+            diff = (month_start - anchor).days
+            steps_fwd = (diff + freq - 1) // freq
+            anchor = anchor + timedelta(days=steps_fwd * freq)
+
+        # Collect all hits in month
+        current = anchor
+        while current <= month_end:
+            if current >= month_start:
+                day = current.day
+                # Estimated task duration
+                est_min = min(60, max(15, freq // 2)) if freq <= 30 else min(120, max(30, freq // 6))
+                day_map[day].append({
+                    "id": s.id,
+                    "machine_code": s.machine_code,
+                    "machine_line_code": s.machine_line_code,
+                    "description": s.description,
+                    "section": s.department or "General",
+                    "frequency_days": freq,
+                    "frequency_label": _freq_label(freq),
+                    "manpower_needed": s.manpower_count or 1,
+                    "machine_count": s.machine_count or 1,
+                    "lubricant_name": s.lubricant_name,
+                    "lubricant_quantity": s.lubricant_quantity,
+                    "last_done": s.last_done,
+                    "due_date": current.isoformat(),
+                    "est_min": est_min,
+                    "is_overdue": current < today,
+                    "sl_no": s.sl_no,
+                })
+            if freq >= 30:
+                break  # Only one occurrence per month for monthly+ tasks
+            current += timedelta(days=freq)
+
+    # Build day list
+    days_out = []
+    for day in range(1, days_in_month + 1):
+        date_obj = dt_date(y, m, day)
+        tasks = day_map[day]
+        total_mp = sum(t["manpower_needed"] for t in tasks)
+        total_min = sum(t["est_min"] for t in tasks)
+        days_out.append({
+            "day": day,
+            "date": date_obj.isoformat(),
+            "weekday": date_obj.strftime("%a"),
+            "tasks": sorted(tasks, key=lambda t: (t["section"], t["machine_code"])),
+            "total_tasks": len(tasks),
+            "total_manpower_needed": total_mp,
+            "total_est_min": total_min,
+            "load_pct": round((total_min / (total_mp * 450)) * 100, 1) if total_mp > 0 else 0,
+        })
+
+    # Section summary for the month
+    section_totals: dict = {}
+    for day_data in days_out:
+        for t in day_data["tasks"]:
+            sec = t["section"]
+            if sec not in section_totals:
+                section_totals[sec] = {"section": sec, "task_days": 0, "total_tasks": 0, "total_manpower_days": 0}
+            section_totals[sec]["task_days"] += 1
+            section_totals[sec]["total_tasks"] += 1
+            section_totals[sec]["total_manpower_days"] += t["manpower_needed"]
+
+    return {
+        "year": y,
+        "month": m,
+        "month_name": dt_date(y, m, 1).strftime("%B %Y"),
+        "days_in_month": days_in_month,
+        "days": days_out,
+        "section_summary": sorted(section_totals.values(), key=lambda x: x["section"]),
+        "total_schedule_count": len(schedules),
+    }
+
+
+def _freq_label(days: int) -> str:
+    if days <= 1:   return "Daily"
+    if days <= 7:   return f"Every {days}d"
+    if days <= 14:  return "Fortnightly"
+    if days <= 31:  return "Monthly"
+    if days <= 92:  return "Quarterly"
+    if days <= 186: return "6-Monthly"
+    if days <= 366: return "Yearly"
+    return f"Every {days//365}Y"

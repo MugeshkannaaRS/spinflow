@@ -94,6 +94,11 @@ class ScheduleOut(BaseModel):
     manpower_count: Optional[int] = None
     machine_count: Optional[int] = None
     sl_no: Optional[int] = None
+    machine_line_code: Optional[str] = None
+    opening_dia_mm: Optional[float] = None
+    current_dia_mm: Optional[float] = None
+    grinding_freq_days: Optional[int] = None
+    last_grinding_date: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -114,6 +119,11 @@ class ScheduleBulkItem(BaseModel):
     manpower_count: Optional[int] = None
     machine_count: Optional[int] = None
     sl_no: Optional[int] = None
+    machine_line_code: Optional[str] = None
+    opening_dia_mm: Optional[float] = None
+    current_dia_mm: Optional[float] = None
+    grinding_freq_days: Optional[int] = None
+    last_grinding_date: Optional[str] = None
 
 
 class ScheduleBulkCreate(BaseModel):

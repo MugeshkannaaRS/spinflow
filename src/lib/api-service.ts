@@ -307,6 +307,11 @@ export const maintenanceApi = {
     api.post("/maintenance/parameters/bulk", data).then((r) => r.data),
   getManpowerSummary: () =>
     api.get("/maintenance/manpower-summary").then((r) => r.data),
+  getDayPlan: (month: number, year: number, section?: string) => {
+    const params = new URLSearchParams({ month: String(month), year: String(year) });
+    if (section) params.set("section", section);
+    return api.get(`/maintenance/day-plan?${params}`).then((r) => r.data);
+  },
 };
 
 // Dashboard
