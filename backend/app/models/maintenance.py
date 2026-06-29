@@ -87,6 +87,23 @@ class PMEntryLog(TimestampMixin, Base):
     data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
 
 
+class PMActivityConfig(Base):
+    """
+    Editable per-section activity lists for PM entry forms.
+    One row per section — activities stored as JSONB array of strings.
+    entry_type: 'activity' | 'cot_grinding' | 'ac_plant'
+    """
+    __tablename__ = "pm_activity_config"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    section: Mapped[str] = mapped_column(String(100), nullable=False, unique=True, index=True)
+    entry_type: Mapped[str] = mapped_column(String(50), nullable=False, default="activity")
+    activities: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=list)
+    ac_units: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=list)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class MachineParameter(Base):
     __tablename__ = "machine_parameters"
 

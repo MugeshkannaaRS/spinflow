@@ -1310,93 +1310,65 @@ function DayWisePlanTable({ dept, schedules }: { dept: string; schedules: any[] 
   );
 }
 
-// ─── PM Entry View ───────────────────────────────────────────────────────────
+// ─── PM Entry View ────────────────────────────────────────────────────────────
+// Fully dynamic — machines from API grouped by section, activities from DB config
 
-// Section config — each section has its own entry form
-const ENTRY_SECTIONS = [
-  { key: "Blowroom",            type: "activity",     label: "Blowroom",            machines: ["BDT-019 (Blendomat)","LVSA","Axi-Flow","MPM-4","MPM-8","MPM-10","MS (Mono Cylinder)"] },
-  { key: "Carding",             type: "activity",     label: "Carding",             machines: ["DK-740 (Carding MC 1–12)","DK-740 (Carding MC 13–24)"] },
-  { key: "Drawing",             type: "cot_grinding", label: "Draw Frame (DSC)",    machines: [] },
-  { key: "Simplex",             type: "cot_grinding", label: "Simplex",             machines: [] },
-  { key: "Ring Frame",          type: "cot_grinding", label: "Ring Frame",          machines: [] },
-  { key: "Autoconer / Winding", type: "activity",     label: "Autoconer / Winding", machines: ["MURATA-7V-II (Units 1–10)"] },
-  { key: "A/C Plant",           type: "ac_plant",     label: "A/C Plant",           machines: [] },
-  { key: "Buffing Room",        type: "activity",     label: "Buffing Room",        machines: ["BUFF-01 (Buffing Machine 1)","BUFF-02 (Buffing Machine 2)"] },
-];
-
-// Blowroom/Carding/Finishing/Autoconer activity lists from yearly schedule
-const SECTION_ACTIVITIES: Record<string, string[]> = {
-  "Blowroom": [
-    "General Cleaning", "Opening and cleaning of all parts", "Pipeline cleaning",
-    "Conveyor / Inclined lattice condition check", "Drive belts / Stripping roll & end disk",
-    "Detacher, Truck and Turret, Wind Up Device check", "Metal Ropes checking",
-    "Gear Box Oil Condition Check", "Supporting Rolls inspect",
-    "BDT Truck Wheels Opening / Cleaning", "All Gear Box Oil Changing",
-    "Wind Up Device / Cover Belt Guide service", "Beater Roller Bearing / Chain Greasing",
-    "Grid Bar Checking / Polishing", "Waste Roller Stripper check",
-    "Pneumatic Cylinder check", "Chain & Gear Oiling", "Top Cover Opening & Cleaning",
-    "Full Over Hauling",
-  ],
-  "Carding": [
-    "Half Setting", "Full Setting (Group A)", "Full Setting (Group B)",
-    "All Chain / Gear / Wheel Oiling", "Flat Drive / Coiler Drive / Gearbox check",
-    "Licker-In Zone & Card Feed Roller Cleaning", "Can Changing Mechanism Servicing",
-    "Stripper Roll Brush / Spring check", "Top Flat Bar Cleaning & Washing",
-    "Gearbox Oil Change", "DFK Feed Roll service", "Cylinder / Doffer / Licker-In Bearing check",
-  ],
-  "Autoconer / Winding": [
-    "Splicing Unit Cleaning & Check", "Drum Tape & Tension Check",
-    "Waxing Unit & Wax Change", "Suction System & Air Filter Clean",
-    "Cradle & Drum Full Cleaning", "Yarn Clearer Setting Check & Calibrate",
-    "Electronic Board Dust Clean", "Drive Belt & Motor Inspect",
-    "Bearing Greasing", "Full Machine Overhaul", "Gearbox Oil Change",
-  ],
-  "Buffing Room": [
-    "Grinding Stone Condition & Dressing", "Cot Mandrel & Collet check",
-    "Coolant Level & Change", "Motor Bearing Greasing", "Full Machine Clean & Stone Align",
-    "Belt Drive Inspection", "Full Service & Calibration",
-  ],
-};
-
-const AC_UNITS = ["1","1A","2","2A","3","3A","4","4A","FDP","Bale Press"];
-const AC_TASKS = [
-  "Eliminator & Spray Chamber Clean", "Supply Fan & Motor check",
-  "Air Filter Cleaning", "Return Air Under Duct Line Cleaning",
-  "Luber Damper Cleaning", "Rotary Air Filter Gear Motor & Bearing check",
-  "False Ceiling Cleaning", "Water / Oil Leakage check at Cylinders",
-  "FDP Plant All Moving Point check", "Daily General Cleaning",
-];
-
-// Draw Frame machine lines
-const DF_MACHINES = [
-  ...Array.from({length:8},(_,i)=>`BDA-${i+1}`),
-  ...Array.from({length:15},(_,i)=>`BDB-${i+1}`),
-  ...Array.from({length:8},(_,i)=>`FDA-${i+1}`),
-  ...Array.from({length:14},(_,i)=>`FDB-${i+1}`),
-];
-const SIMPLEX_MACHINES = [
-  ...Array.from({length:18},(_,i)=>`A-${i+1}`),
-  ...Array.from({length:20},(_,i)=>`B-${i+1}`),
-];
-const RING_LINES = [
-  { label: "Line 1 (MC 1–32)",   machines: Array.from({length:32},(_,i)=>`L1-MC${String(i+1).padStart(2,"0")}`) },
-  { label: "Line 2 (MC 33–68)",  machines: Array.from({length:36},(_,i)=>`L2-MC${String(i+33).padStart(2,"0")}`) },
-  { label: "Line 3 (MC 71–106)", machines: Array.from({length:36},(_,i)=>`L3-MC${String(i+71).padStart(3,"0")}`) },
-  { label: "Line 4 (MC 118–153)",machines: Array.from({length:36},(_,i)=>`L4-MC${String(i+118).padStart(3,"0")}`) },
-];
+// Entry type derived from section name — no hardcoding
+function getSectionEntryType(section: string): "activity" | "cot_grinding" | "ac_plant" {
+  const s = section.toLowerCase();
+  if (s.includes("a/c") || s.includes("ac plant") || s.includes("air")) return "ac_plant";
+  if (s.includes("draw") || s.includes("simplex") || s.includes("ring")) return "cot_grinding";
+  return "activity";
+}
 
 function PMEntryView({ canEdit }: { canEdit: boolean }) {
   const today = new Date().toISOString().split("T")[0];
-  const [activeSection, setActiveSection] = useState(ENTRY_SECTIONS[0].key);
-  const [dateFrom, setDateFrom] = useState(today.slice(0,7) + "-01");
-  const [dateTo, setDateTo]     = useState(today);
   const qc = useQueryClient();
 
-  const sectionCfg = ENTRY_SECTIONS.find(s => s.key === activeSection)!;
+  // Load all machines grouped by section
+  const machinesQ = useQuery({
+    queryKey: ["pm-entry-machines"],
+    queryFn: () => productionApi.getMachines({ page_size: 500 }),
+    staleTime: 5 * 60_000,
+  });
+
+  // Load activity config from DB
+  const configQ = useQuery({
+    queryKey: ["pm-activity-config"],
+    queryFn: () => maintenanceApi.getActivityConfig(),
+    staleTime: 60_000,
+  });
+
+  const allMachines: any[] = machinesQ.data ?? [];
+
+  // Build section list from distinct machine sections + fallback to config sections
+  const machineSections: string[] = Array.from(
+    new Set([
+      ...allMachines.map((m: any) => m.section).filter(Boolean),
+      ...(configQ.data ?? []).map((c: any) => c.section),
+    ])
+  ).sort();
+
+  const [activeSection, setActiveSection] = useState<string>("");
+
+  // Auto-select first section when data loads
+  const effectiveSection = activeSection || machineSections[0] || "";
+
+  const sectionMachines = allMachines.filter((m: any) => m.section === effectiveSection);
+  const entryType = getSectionEntryType(effectiveSection);
+
+  // Config for this section
+  const sectionConfig = (configQ.data ?? []).find((c: any) => c.section === effectiveSection);
+  const activities: string[] = sectionConfig?.activities ?? [];
+  const acUnits: string[] = sectionConfig?.ac_units ?? [];
+
+  const [dateFrom, setDateFrom] = useState(today.slice(0, 7) + "-01");
+  const [dateTo, setDateTo] = useState(today);
 
   const entriesQ = useQuery({
-    queryKey: ["pm-entries", activeSection, dateFrom, dateTo],
-    queryFn: () => maintenanceApi.getEntries({ section: activeSection, date_from: dateFrom, date_to: dateTo, page_size: 200 }),
+    queryKey: ["pm-entries", effectiveSection, dateFrom, dateTo],
+    queryFn: () => maintenanceApi.getEntries({ section: effectiveSection, date_from: dateFrom, date_to: dateTo, page_size: 200 }),
+    enabled: !!effectiveSection,
     staleTime: 30_000,
   });
 
@@ -1406,42 +1378,58 @@ function PMEntryView({ canEdit }: { canEdit: boolean }) {
   });
 
   const entries: any[] = entriesQ.data?.data ?? [];
+  const isLoading = machinesQ.isLoading || configQ.isLoading;
+
+  if (isLoading) return <div className="p-8 text-center text-sm text-muted-foreground">Loading sections…</div>;
+
+  if (machineSections.length === 0) return (
+    <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">
+      No machines registered yet. Add machines in the Machines tab first.
+    </CardContent></Card>
+  );
 
   return (
     <div className="space-y-4">
-      {/* Section selector */}
+      {/* Section tabs from actual machine data */}
       <div className="flex flex-wrap gap-2">
-        {ENTRY_SECTIONS.map(s => (
-          <button
-            key={s.key}
-            onClick={() => setActiveSection(s.key)}
-            className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all",
-              activeSection === s.key
+        {machineSections.map(s => (
+          <button key={s} onClick={() => setActiveSection(s)}
+            className={cn("px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all",
+              effectiveSection === s
                 ? "bg-foreground text-background border-foreground"
                 : "bg-background text-foreground border-border hover:bg-muted"
-            )}
-          >
-            {s.label}
+            )}>
+            {s}
+            {sectionMachines.length > 0 && effectiveSection === s &&
+              <span className="ml-1.5 opacity-60">({sectionMachines.length})</span>}
           </button>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Entry form */}
-        {canEdit && (
-          <div>
-            {sectionCfg.type === "activity"    && <ActivityEntryForm section={activeSection} sectionCfg={sectionCfg} onSaved={() => qc.invalidateQueries({ queryKey: ["pm-entries"] })} />}
-            {sectionCfg.type === "cot_grinding"&& <CotGrindingEntryForm section={activeSection} onSaved={() => qc.invalidateQueries({ queryKey: ["pm-entries"] })} />}
-            {sectionCfg.type === "ac_plant"    && <ACPlantEntryForm onSaved={() => qc.invalidateQueries({ queryKey: ["pm-entries"] })} />}
-          </div>
+        {canEdit && effectiveSection && (
+          <PMSectionEntryForm
+            key={effectiveSection}
+            section={effectiveSection}
+            entryType={entryType}
+            machines={sectionMachines}
+            activities={activities}
+            acUnits={acUnits}
+            sectionConfig={sectionConfig}
+            canEditConfig={canEdit}
+            onSaved={() => qc.invalidateQueries({ queryKey: ["pm-entries"] })}
+            onConfigSaved={() => qc.invalidateQueries({ queryKey: ["pm-activity-config"] })}
+          />
         )}
 
         {/* Recent entries log */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <CardTitle className="text-sm font-semibold">Recent Entries — {activeSection}</CardTitle>
+              <CardTitle className="text-sm font-semibold">
+                Recent Entries — {effectiveSection}
+              </CardTitle>
               <div className="flex gap-2 items-center">
                 <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="h-7 text-xs w-36" />
                 <span className="text-xs text-muted-foreground">to</span>
@@ -1451,46 +1439,50 @@ function PMEntryView({ canEdit }: { canEdit: boolean }) {
           </CardHeader>
           <CardContent className="p-0">
             {entriesQ.isLoading ? (
-              <div className="p-4 space-y-2">{[...Array(3)].map((_,i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+              <div className="p-4 space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
             ) : entries.length === 0 ? (
               <div className="py-10 text-center text-sm text-muted-foreground">No entries for this period.</div>
             ) : (
-              <div className="divide-y max-h-[500px] overflow-y-auto">
+              <div className="divide-y max-h-[520px] overflow-y-auto">
                 {entries.map((e: any) => (
                   <div key={e.id} className="px-4 py-2.5 flex items-start gap-3 hover:bg-muted/30">
-                    <div className="flex-shrink-0 text-center min-w-[44px]">
+                    <div className="flex-shrink-0 text-center min-w-[50px]">
                       <div className="text-xs font-mono font-semibold">{e.entry_date}</div>
-                      <div className={cn("text-[10px] px-1 rounded mt-0.5",
+                      <div className={cn("text-[10px] px-1 rounded mt-0.5 text-center",
                         e.entry_type === "cot_grinding" ? "bg-amber-100 text-amber-700" :
-                        e.entry_type === "ac_plant"     ? "bg-cyan-100 text-cyan-700" :
+                        e.entry_type === "ac_plant" ? "bg-cyan-100 text-cyan-700" :
                         "bg-green-100 text-green-700"
-                      )}>{e.entry_type === "cot_grinding" ? "Grinding" : e.entry_type === "ac_plant" ? "A/C" : "Activity"}</div>
+                      )}>
+                        {e.entry_type === "cot_grinding" ? "Grinding" : e.entry_type === "ac_plant" ? "A/C" : "Activity"}
+                      </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold truncate">{e.machine_code || e.machine_line_code || e.section}</div>
-                      <div className="text-[11px] text-muted-foreground truncate">{e.activity || JSON.stringify(e.data).slice(0,80)}</div>
+                      <div className="text-xs font-semibold truncate">
+                        {e.machine_code || e.machine_line_code || e.section}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {e.activity || (e.data && e.data.task) || "—"}
+                      </div>
                       {e.done_by && <div className="text-[10px] text-muted-foreground">By: {e.done_by}</div>}
                       {e.remarks && <div className="text-[10px] text-orange-700 italic">{e.remarks}</div>}
-                      {/* Grinding data */}
                       {e.entry_type === "cot_grinding" && e.data && (
-                        <div className="flex gap-3 mt-0.5 text-[10px] text-muted-foreground">
-                          {e.data.dia_lhs && <span>LHS: <b>{e.data.dia_lhs}</b>mm</span>}
-                          {e.data.dia_rhs && <span>RHS: <b>{e.data.dia_rhs}</b>mm</span>}
+                        <div className="flex gap-3 mt-0.5 text-[10px] text-muted-foreground flex-wrap">
+                          {e.data.dia_lhs != null && <span>LHS: <b>{e.data.dia_lhs}</b>mm</span>}
+                          {e.data.dia_rhs != null && <span>RHS: <b>{e.data.dia_rhs}</b>mm</span>}
                           {e.data.shore_hardness && <span>Shore: <b>{e.data.shore_hardness}</b></span>}
-                          {e.data.no_of_grindings && <span>Grindings: <b>{e.data.no_of_grindings}</b></span>}
+                          {e.data.no_of_grindings && <span>Count: <b>{e.data.no_of_grindings}</b></span>}
                           {e.data.next_due && <span className="text-blue-600">Next: {e.data.next_due}</span>}
                         </div>
                       )}
-                      {/* A/C data */}
                       {e.entry_type === "ac_plant" && e.data && (
                         <div className="text-[10px] text-muted-foreground mt-0.5">
-                          {e.data.unit && <span>Unit {e.data.unit} · </span>}
-                          {e.data.task}
+                          {e.data.unit && <span>Unit {e.data.unit} · </span>}{e.data.task}
                         </div>
                       )}
                     </div>
                     {canEdit && (
-                      <button onClick={() => deleteMut.mutate(e.id)} className="text-muted-foreground hover:text-destructive p-1 flex-shrink-0">
+                      <button onClick={() => deleteMut.mutate(e.id)}
+                        className="text-muted-foreground hover:text-destructive p-1 flex-shrink-0">
                         <Trash2 className="size-3.5" />
                       </button>
                     )}
@@ -1505,25 +1497,153 @@ function PMEntryView({ canEdit }: { canEdit: boolean }) {
   );
 }
 
-// ── Activity Entry Form (Blowroom / Carding / Autoconer / Buffing) ────────────
-function ActivityEntryForm({ section, sectionCfg, onSaved }: { section: string; sectionCfg: any; onSaved: () => void }) {
+// ── Unified section entry form — switches based on entry_type ─────────────────
+function PMSectionEntryForm({
+  section, entryType, machines, activities, acUnits, sectionConfig,
+  canEditConfig, onSaved, onConfigSaved,
+}: {
+  section: string;
+  entryType: "activity" | "cot_grinding" | "ac_plant";
+  machines: any[];
+  activities: string[];
+  acUnits: string[];
+  sectionConfig: any;
+  canEditConfig: boolean;
+  onSaved: () => void;
+  onConfigSaved: () => void;
+}) {
+  const [editingConfig, setEditingConfig] = useState(false);
+
+  return (
+    <div className="space-y-3">
+      {entryType === "activity" && (
+        <ActivityEntryForm
+          section={section}
+          machines={machines}
+          activities={activities}
+          onSaved={onSaved}
+        />
+      )}
+      {entryType === "cot_grinding" && (
+        <CotGrindingEntryForm
+          section={section}
+          machines={machines}
+          onSaved={onSaved}
+        />
+      )}
+      {entryType === "ac_plant" && (
+        <ACPlantEntryForm
+          section={section}
+          acUnits={acUnits}
+          activities={activities}
+          onSaved={onSaved}
+        />
+      )}
+
+      {/* Edit activity list config */}
+      {canEditConfig && entryType !== "cot_grinding" && (
+        <ActivityConfigEditor
+          section={section}
+          entryType={entryType}
+          currentActivities={activities}
+          currentAcUnits={acUnits}
+          open={editingConfig}
+          onOpenChange={setEditingConfig}
+          onSaved={onConfigSaved}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Activity config editor — edit the activity list for a section ─────────────
+function ActivityConfigEditor({
+  section, entryType, currentActivities, currentAcUnits, open, onOpenChange, onSaved,
+}: {
+  section: string; entryType: string;
+  currentActivities: string[]; currentAcUnits: string[];
+  open: boolean; onOpenChange: (v: boolean) => void; onSaved: () => void;
+}) {
+  const [acts, setActs] = useState(currentActivities.join("\n"));
+  const [units, setUnits] = useState(currentAcUnits.join("\n"));
+
+  const mut = useMutation({
+    mutationFn: () => maintenanceApi.upsertActivityConfig(section, {
+      entry_type: entryType,
+      activities: acts.split("\n").map(s => s.trim()).filter(Boolean),
+      ac_units: units.split("\n").map(s => s.trim()).filter(Boolean),
+    }),
+    onSuccess: () => { toast.success("Config saved"); onOpenChange(false); onSaved(); },
+    onError: () => toast.error("Failed to save config"),
+  });
+
+  return (
+    <>
+      <button onClick={() => onOpenChange(true)}
+        className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mt-1">
+        <Wrench className="size-3" /> Edit activity list for {section}
+      </button>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Edit Activities — {section}</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Activities (one per line)</Label>
+              <textarea
+                value={acts}
+                onChange={e => setActs(e.target.value)}
+                rows={10}
+                className="w-full text-xs border rounded-md p-2 font-mono resize-y bg-background"
+                placeholder="General Cleaning&#10;Belt inspection&#10;..."
+              />
+            </div>
+            {entryType === "ac_plant" && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">A/C Units (one per line)</Label>
+                <textarea
+                  value={units}
+                  onChange={e => setUnits(e.target.value)}
+                  rows={5}
+                  className="w-full text-xs border rounded-md p-2 font-mono resize-y bg-background"
+                  placeholder="Unit 1&#10;Unit 1A&#10;..."
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button size="sm" onClick={() => mut.mutate()} disabled={mut.isPending}>
+              {mut.isPending ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+// ── Activity Entry Form ───────────────────────────────────────────────────────
+function ActivityEntryForm({ section, machines, activities, onSaved }: {
+  section: string; machines: any[]; activities: string[]; onSaved: () => void;
+}) {
   const today = new Date().toISOString().split("T")[0];
-  const activities = SECTION_ACTIVITIES[section] ?? [];
   const [form, setForm] = useState({
     entry_date: today,
-    machine_code: sectionCfg.machines[0] ?? "",
+    machine_code: machines[0]?.code ?? "",
     activity: activities[0] ?? "",
+    custom_activity: "",
     done_by: "",
     remarks: "",
     status: "done",
   });
+
   const mut = useMutation({
     mutationFn: () => maintenanceApi.createEntries([{
       entry_date: form.entry_date,
       section,
       entry_type: "activity",
       machine_code: form.machine_code,
-      activity: form.activity,
+      activity: form.activity === "__custom__" ? form.custom_activity : form.activity,
       done_by: form.done_by,
       remarks: form.remarks,
       status: form.status,
@@ -1541,11 +1661,12 @@ function ActivityEntryForm({ section, sectionCfg, onSaved }: { section: string; 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Date</Label>
-            <Input type="date" value={form.entry_date} onChange={e => setForm({...form, entry_date: e.target.value})} className="h-8 text-xs" />
+            <Input type="date" value={form.entry_date}
+              onChange={e => setForm({ ...form, entry_date: e.target.value })} className="h-8 text-xs" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Status</Label>
-            <Select value={form.status} onValueChange={v => setForm({...form, status: v})}>
+            <Select value={form.status} onValueChange={v => setForm({ ...form, status: v })}>
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="done">Done ✓</SelectItem>
@@ -1556,13 +1677,17 @@ function ActivityEntryForm({ section, sectionCfg, onSaved }: { section: string; 
           </div>
         </div>
 
-        {sectionCfg.machines.length > 0 && (
+        {machines.length > 0 && (
           <div className="space-y-1.5">
-            <Label className="text-xs">Machine / Group</Label>
-            <Select value={form.machine_code} onValueChange={v => setForm({...form, machine_code: v})}>
+            <Label className="text-xs">Machine</Label>
+            <Select value={form.machine_code} onValueChange={v => setForm({ ...form, machine_code: v })}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select machine" /></SelectTrigger>
-              <SelectContent>
-                {sectionCfg.machines.map((m: string) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              <SelectContent className="max-h-52">
+                {machines.map((m: any) => (
+                  <SelectItem key={m.code} value={m.code}>
+                    {m.code}{m.name ? ` — ${m.name}` : ""}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -1570,26 +1695,39 @@ function ActivityEntryForm({ section, sectionCfg, onSaved }: { section: string; 
 
         <div className="space-y-1.5">
           <Label className="text-xs">Activity</Label>
-          <Select value={form.activity} onValueChange={v => setForm({...form, activity: v})}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select activity" /></SelectTrigger>
-            <SelectContent>
-              {activities.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-              <SelectItem value="__custom__">Other (type below)</SelectItem>
-            </SelectContent>
-          </Select>
+          {activities.length > 0 ? (
+            <Select value={form.activity} onValueChange={v => setForm({ ...form, activity: v })}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select activity" /></SelectTrigger>
+              <SelectContent className="max-h-52">
+                {activities.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                <SelectItem value="__custom__">Other…</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input value={form.activity} onChange={e => setForm({ ...form, activity: e.target.value })}
+              placeholder="Describe activity performed…" className="h-8 text-xs" />
+          )}
           {form.activity === "__custom__" && (
-            <Input placeholder="Describe activity…" className="h-8 text-xs mt-1"
-              onChange={e => setForm({...form, activity: e.target.value})} />
+            <Input value={form.custom_activity}
+              onChange={e => setForm({ ...form, custom_activity: e.target.value })}
+              placeholder="Describe activity…" className="h-8 text-xs mt-1" />
+          )}
+          {activities.length === 0 && (
+            <p className="text-[10px] text-muted-foreground">
+              No activities configured — type above or use "Edit activity list" to add defaults.
+            </p>
           )}
         </div>
 
         <div className="space-y-1.5">
           <Label className="text-xs">Done By</Label>
-          <Input value={form.done_by} onChange={e => setForm({...form, done_by: e.target.value})} placeholder="Technician name" className="h-8 text-xs" />
+          <Input value={form.done_by} onChange={e => setForm({ ...form, done_by: e.target.value })}
+            placeholder="Technician name" className="h-8 text-xs" />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Remarks</Label>
-          <Input value={form.remarks} onChange={e => setForm({...form, remarks: e.target.value})} placeholder="Optional notes" className="h-8 text-xs" />
+          <Input value={form.remarks} onChange={e => setForm({ ...form, remarks: e.target.value })}
+            placeholder="Optional notes" className="h-8 text-xs" />
         </div>
         <Button size="sm" className="w-full" onClick={() => mut.mutate()} disabled={mut.isPending}>
           {mut.isPending ? "Saving…" : "Save Entry"}
@@ -1599,24 +1737,20 @@ function ActivityEntryForm({ section, sectionCfg, onSaved }: { section: string; 
   );
 }
 
-// ── Cot Grinding Entry Form (Draw Frame / Simplex / Ring Frame) ───────────────
-function CotGrindingEntryForm({ section, onSaved }: { section: string; onSaved: () => void }) {
+// ── Cot Grinding Entry Form ───────────────────────────────────────────────────
+function CotGrindingEntryForm({ section, machines, onSaved }: {
+  section: string; machines: any[]; onSaved: () => void;
+}) {
   const today = new Date().toISOString().split("T")[0];
 
-  const machineList = section === "Drawing" ? DF_MACHINES
-    : section === "Simplex" ? SIMPLEX_MACHINES
-    : RING_LINES[0].machines; // default Ring Line 1
-
-  const [ringLine, setRingLine] = useState(0);
-  const activeMachines = section === "Ring Frame" ? RING_LINES[ringLine].machines : machineList;
-
-  const freqDays = section === "Drawing"
-    ? (machineList[0]?.startsWith("BDA") || machineList[0]?.startsWith("BDB") ? 20 : 15)
-    : section === "Simplex" ? 90 : 45;
+  // Derive grinding frequency from section name
+  const freqDays = section.toLowerCase().includes("simplex") ? 90
+    : section.toLowerCase().includes("draw") ? 20
+    : 45; // Ring Frame default
 
   const [form, setForm] = useState({
     entry_date: today,
-    machine_line_code: activeMachines[0] ?? "",
+    machine_code: machines[0]?.code ?? "",
     dia_lhs: "",
     dia_rhs: "",
     shore_hardness: "",
@@ -1625,7 +1759,6 @@ function CotGrindingEntryForm({ section, onSaved }: { section: string; onSaved: 
     remarks: "",
   });
 
-  // Auto-compute next due
   const nextDue = form.entry_date
     ? new Date(new Date(form.entry_date).getTime() + freqDays * 86400000).toISOString().split("T")[0]
     : "";
@@ -1635,7 +1768,7 @@ function CotGrindingEntryForm({ section, onSaved }: { section: string; onSaved: 
       entry_date: form.entry_date,
       section,
       entry_type: "cot_grinding",
-      machine_line_code: form.machine_line_code,
+      machine_code: form.machine_code,
       done_by: form.done_by,
       remarks: form.remarks,
       status: "done",
@@ -1648,7 +1781,11 @@ function CotGrindingEntryForm({ section, onSaved }: { section: string; onSaved: 
         freq_days: freqDays,
       },
     }]),
-    onSuccess: () => { toast.success("Grinding entry saved"); onSaved(); setForm(f => ({...f, dia_lhs:"", dia_rhs:"", shore_hardness:"", no_of_grindings:"", remarks:""})); },
+    onSuccess: () => {
+      toast.success("Grinding entry saved");
+      onSaved();
+      setForm(f => ({ ...f, dia_lhs: "", dia_rhs: "", shore_hardness: "", no_of_grindings: "", remarks: "" }));
+    },
     onError: () => toast.error("Failed to save"),
   });
 
@@ -1656,32 +1793,25 @@ function CotGrindingEntryForm({ section, onSaved }: { section: string; onSaved: 
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-semibold">Cot Grinding Record — {section}</CardTitle>
-        <p className="text-[11px] text-muted-foreground">Freq: every {freqDays} days · Opening Dia: {section === "Simplex" ? "29mm" : section === "Ring Frame" ? "30–32mm" : "38mm"}</p>
+        <p className="text-[11px] text-muted-foreground">Frequency: every {freqDays} days</p>
       </CardHeader>
       <CardContent className="space-y-3">
-        {section === "Ring Frame" && (
-          <div className="space-y-1.5">
-            <Label className="text-xs">Line</Label>
-            <Select value={String(ringLine)} onValueChange={v => { setRingLine(Number(v)); setForm(f => ({...f, machine_line_code: RING_LINES[Number(v)].machines[0]})); }}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {RING_LINES.map((l,i) => <SelectItem key={i} value={String(i)}>{l.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Grinding Date</Label>
-            <Input type="date" value={form.entry_date} onChange={e => setForm({...form, entry_date: e.target.value})} className="h-8 text-xs" />
+            <Input type="date" value={form.entry_date}
+              onChange={e => setForm({ ...form, entry_date: e.target.value })} className="h-8 text-xs" />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Machine / Line No</Label>
-            <Select value={form.machine_line_code} onValueChange={v => setForm({...form, machine_line_code: v})}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent className="max-h-48">
-                {activeMachines.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+            <Label className="text-xs">Machine</Label>
+            <Select value={form.machine_code} onValueChange={v => setForm({ ...form, machine_code: v })}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select machine" /></SelectTrigger>
+              <SelectContent className="max-h-52">
+                {machines.map((m: any) => (
+                  <SelectItem key={m.code} value={m.code}>
+                    {m.code}{m.name ? ` — ${m.name}` : ""}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -1689,23 +1819,31 @@ function CotGrindingEntryForm({ section, onSaved }: { section: string; onSaved: 
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label className="text-xs">Dia After Grinding — LHS (mm)</Label>
-            <Input type="number" step="0.1" value={form.dia_lhs} onChange={e => setForm({...form, dia_lhs: e.target.value})} placeholder="e.g. 36.9" className="h-8 text-xs" />
+            <Label className="text-xs">Dia After Grinding LHS (mm)</Label>
+            <Input type="number" step="0.1" value={form.dia_lhs}
+              onChange={e => setForm({ ...form, dia_lhs: e.target.value })}
+              placeholder="e.g. 36.9" className="h-8 text-xs" />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Dia After Grinding — RHS (mm)</Label>
-            <Input type="number" step="0.1" value={form.dia_rhs} onChange={e => setForm({...form, dia_rhs: e.target.value})} placeholder="e.g. 36.9" className="h-8 text-xs" />
+            <Label className="text-xs">Dia After Grinding RHS (mm)</Label>
+            <Input type="number" step="0.1" value={form.dia_rhs}
+              onChange={e => setForm({ ...form, dia_rhs: e.target.value })}
+              placeholder="e.g. 36.9" className="h-8 text-xs" />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Shore Hardness</Label>
-            <Input value={form.shore_hardness} onChange={e => setForm({...form, shore_hardness: e.target.value})} placeholder="e.g. 83" className="h-8 text-xs" />
+            <Input value={form.shore_hardness}
+              onChange={e => setForm({ ...form, shore_hardness: e.target.value })}
+              placeholder="e.g. 83" className="h-8 text-xs" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">No. of Grindings</Label>
-            <Input type="number" value={form.no_of_grindings} onChange={e => setForm({...form, no_of_grindings: e.target.value})} placeholder="e.g. 3" className="h-8 text-xs" />
+            <Input type="number" value={form.no_of_grindings}
+              onChange={e => setForm({ ...form, no_of_grindings: e.target.value })}
+              placeholder="e.g. 3" className="h-8 text-xs" />
           </div>
         </div>
 
@@ -1717,14 +1855,16 @@ function CotGrindingEntryForm({ section, onSaved }: { section: string; onSaved: 
 
         <div className="space-y-1.5">
           <Label className="text-xs">Done By</Label>
-          <Input value={form.done_by} onChange={e => setForm({...form, done_by: e.target.value})} placeholder="Technician name" className="h-8 text-xs" />
+          <Input value={form.done_by} onChange={e => setForm({ ...form, done_by: e.target.value })}
+            placeholder="Technician name" className="h-8 text-xs" />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs">Remarks</Label>
-          <Input value={form.remarks} onChange={e => setForm({...form, remarks: e.target.value})} placeholder="Condition notes…" className="h-8 text-xs" />
+          <Input value={form.remarks} onChange={e => setForm({ ...form, remarks: e.target.value })}
+            placeholder="Condition notes…" className="h-8 text-xs" />
         </div>
-
-        <Button size="sm" className="w-full" onClick={() => mut.mutate()} disabled={mut.isPending || !form.machine_line_code}>
+        <Button size="sm" className="w-full" onClick={() => mut.mutate()}
+          disabled={mut.isPending || !form.machine_code}>
           {mut.isPending ? "Saving…" : "Save Grinding Record"}
         </Button>
       </CardContent>
@@ -1733,39 +1873,40 @@ function CotGrindingEntryForm({ section, onSaved }: { section: string; onSaved: 
 }
 
 // ── A/C Plant Entry Form ──────────────────────────────────────────────────────
-function ACPlantEntryForm({ onSaved }: { onSaved: () => void }) {
+function ACPlantEntryForm({ section, acUnits, activities, onSaved }: {
+  section: string; acUnits: string[]; activities: string[]; onSaved: () => void;
+}) {
   const today = new Date().toISOString().split("T")[0];
-  const [rows, setRows] = useState<Array<{unit: string; task: string; done: boolean}>>([
-    { unit: "", task: "", done: true },
+  const [rows, setRows] = useState<Array<{ unit: string; task: string; done: boolean }>>([
+    { unit: acUnits[0] ?? "", task: activities[0] ?? "", done: true },
   ]);
   const [form, setForm] = useState({ entry_date: today, done_by: "", remarks: "" });
 
-  const addRow = () => setRows(r => [...r, { unit: "", task: "", done: true }]);
-  const removeRow = (i: number) => setRows(r => r.filter((_,idx) => idx !== i));
+  const addRow = () => setRows(r => [...r, { unit: acUnits[0] ?? "", task: activities[0] ?? "", done: true }]);
+  const removeRow = (i: number) => setRows(r => r.filter((_, idx) => idx !== i));
   const updateRow = (i: number, field: string, val: string | boolean) =>
-    setRows(r => r.map((row, idx) => idx === i ? {...row, [field]: val} : row));
+    setRows(r => r.map((row, idx) => idx === i ? { ...row, [field]: val } : row));
+
+  const validRows = rows.filter(r => r.unit && r.task);
 
   const mut = useMutation({
-    mutationFn: () => {
-      const entries = rows
-        .filter(r => r.unit && r.task)
-        .map(r => ({
-          entry_date: form.entry_date,
-          section: "A/C Plant",
-          entry_type: "ac_plant",
-          machine_code: `AC-${r.unit}`,
-          activity: r.task,
-          done_by: form.done_by,
-          remarks: form.remarks,
-          status: r.done ? "done" : "pending",
-          data: { unit: r.unit, task: r.task },
-        }));
-      return maintenanceApi.createEntries(entries);
-    },
+    mutationFn: () => maintenanceApi.createEntries(
+      validRows.map(r => ({
+        entry_date: form.entry_date,
+        section,
+        entry_type: "ac_plant",
+        machine_code: `AC-${r.unit}`,
+        activity: r.task,
+        done_by: form.done_by,
+        remarks: form.remarks,
+        status: r.done ? "done" : "pending",
+        data: { unit: r.unit, task: r.task },
+      }))
+    ),
     onSuccess: (res: any) => {
-      toast.success(`${res.created} A/C entries saved`);
+      toast.success(`${res.created} entries saved`);
       onSaved();
-      setRows([{ unit: "", task: "", done: true }]);
+      setRows([{ unit: acUnits[0] ?? "", task: activities[0] ?? "", done: true }]);
     },
     onError: () => toast.error("Failed to save"),
   });
@@ -1773,42 +1914,52 @@ function ACPlantEntryForm({ onSaved }: { onSaved: () => void }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-semibold">A/C Plant Daily Service Log</CardTitle>
-        <p className="text-[11px] text-muted-foreground">Record per-unit tasks done today</p>
+        <CardTitle className="text-sm font-semibold">Daily Service Log — {section}</CardTitle>
+        <p className="text-[11px] text-muted-foreground">Record tasks per unit</p>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Date</Label>
-            <Input type="date" value={form.entry_date} onChange={e => setForm({...form, entry_date: e.target.value})} className="h-8 text-xs" />
+            <Input type="date" value={form.entry_date}
+              onChange={e => setForm({ ...form, entry_date: e.target.value })} className="h-8 text-xs" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Done By</Label>
-            <Input value={form.done_by} onChange={e => setForm({...form, done_by: e.target.value})} placeholder="Technician name" className="h-8 text-xs" />
+            <Input value={form.done_by} onChange={e => setForm({ ...form, done_by: e.target.value })}
+              placeholder="Technician name" className="h-8 text-xs" />
           </div>
         </div>
 
-        {/* Unit-task rows */}
         <div className="space-y-2">
-          <div className="grid grid-cols-[80px_1fr_36px_24px] gap-2 text-[10px] font-semibold text-muted-foreground px-1">
+          <div className="grid grid-cols-[1fr_1fr_36px_24px] gap-2 text-[10px] font-semibold text-muted-foreground px-1">
             <span>Unit</span><span>Task</span><span>Done</span><span></span>
           </div>
           {rows.map((row, i) => (
-            <div key={i} className="grid grid-cols-[80px_1fr_36px_24px] gap-2 items-center">
+            <div key={i} className="grid grid-cols-[1fr_1fr_36px_24px] gap-2 items-center">
               <Select value={row.unit} onValueChange={v => updateRow(i, "unit", v)}>
                 <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Unit" /></SelectTrigger>
-                <SelectContent>
-                  {AC_UNITS.map(u => <SelectItem key={u} value={u}>Unit {u}</SelectItem>)}
+                <SelectContent className="max-h-48">
+                  {acUnits.length > 0
+                    ? acUnits.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)
+                    : <SelectItem value={row.unit || "Unit 1"}>Unit 1</SelectItem>
+                  }
                 </SelectContent>
               </Select>
               <Select value={row.task} onValueChange={v => updateRow(i, "task", v)}>
                 <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Task" /></SelectTrigger>
-                <SelectContent>
-                  {AC_TASKS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                <SelectContent className="max-h-48">
+                  {activities.length > 0
+                    ? activities.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)
+                    : <SelectItem value={row.task || "General service"}>General service</SelectItem>
+                  }
                 </SelectContent>
               </Select>
-              <input type="checkbox" checked={row.done} onChange={e => updateRow(i, "done", e.target.checked)} className="size-4 mx-auto" />
-              <button onClick={() => removeRow(i)} className="text-muted-foreground hover:text-destructive"><X className="size-3.5" /></button>
+              <input type="checkbox" checked={row.done}
+                onChange={e => updateRow(i, "done", e.target.checked)} className="size-4 mx-auto" />
+              <button onClick={() => removeRow(i)} className="text-muted-foreground hover:text-destructive">
+                <X className="size-3.5" />
+              </button>
             </div>
           ))}
           <Button variant="outline" size="sm" onClick={addRow} className="w-full h-7 text-xs">
@@ -1818,11 +1969,12 @@ function ACPlantEntryForm({ onSaved }: { onSaved: () => void }) {
 
         <div className="space-y-1.5">
           <Label className="text-xs">Remarks</Label>
-          <Input value={form.remarks} onChange={e => setForm({...form, remarks: e.target.value})} placeholder="General notes" className="h-8 text-xs" />
+          <Input value={form.remarks} onChange={e => setForm({ ...form, remarks: e.target.value })}
+            placeholder="General notes" className="h-8 text-xs" />
         </div>
-
-        <Button size="sm" className="w-full" onClick={() => mut.mutate()} disabled={mut.isPending || rows.every(r => !r.unit || !r.task)}>
-          {mut.isPending ? "Saving…" : `Save ${rows.filter(r=>r.unit&&r.task).length} Entry${rows.filter(r=>r.unit&&r.task).length!==1?"s":""}`}
+        <Button size="sm" className="w-full" onClick={() => mut.mutate()}
+          disabled={mut.isPending || validRows.length === 0}>
+          {mut.isPending ? "Saving…" : `Save ${validRows.length} Entry${validRows.length !== 1 ? "s" : ""}`}
         </Button>
       </CardContent>
     </Card>

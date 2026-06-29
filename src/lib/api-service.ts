@@ -321,6 +321,10 @@ export const maintenanceApi = {
   },
   deleteEntry: (id: string) =>
     api.delete(`/maintenance/entries/${id}`).then((r) => r.data),
+  getActivityConfig: () =>
+    api.get("/maintenance/activity-config").then((r) => r.data.data as any[]),
+  upsertActivityConfig: (section: string, payload: any) =>
+    api.put(`/maintenance/activity-config/${encodeURIComponent(section)}`, payload).then((r) => r.data),
 };
 
 // Dashboard

@@ -10,7 +10,7 @@ from app.db.session import get_db
 logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
-from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter, PMEntryLog
+from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter, PMEntryLog, PMActivityConfig
 from app.models.production import Machine
 from app.models.masters import Mill
 from app.schemas.maintenance import (
@@ -891,12 +891,18 @@ async def list_pm_entries(
     if machine_code:
         stmt = stmt.where(PMEntryLog.machine_code == machine_code)
 
-    total_stmt = select(func.count()).select_from(stmt.subquery())
-    total = (await db.execute(total_stmt)).scalar() or 0
+    try:
+        total_stmt = select(func.count()).select_from(stmt.subquery())
+        total = (await db.execute(total_stmt)).scalar() or 0
+    except Exception:
+        total = 0
 
-    stmt = stmt.order_by(PMEntryLog.entry_date.desc(), PMEntryLog.created_at.desc())
+    stmt = stmt.order_by(PMEntryLog.entry_date.desc())
     stmt = stmt.offset((page - 1) * page_size).limit(page_size)
-    rows = (await db.execute(stmt)).scalars().all()
+    try:
+        rows = (await db.execute(stmt)).scalars().all()
+    except Exception:
+        rows = []
 
     return {
         "total": total,
@@ -938,3 +944,66 @@ async def delete_pm_entry(
     await db.delete(row)
     await db.commit()
     return {"message": "deleted", "id": entry_id}
+
+
+# ---------------------------------------------------------------------------
+# PM ACTIVITY CONFIG — editable per-section activity lists
+# ---------------------------------------------------------------------------
+
+@router.get("/maintenance/activity-config")
+async def get_activity_config(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance")),
+):
+    """Return all section activity configs."""
+    rows = (await db.execute(select(PMActivityConfig).order_by(PMActivityConfig.section))).scalars().all()
+    return {
+        "data": [
+            {
+                "id": r.id,
+                "section": r.section,
+                "entry_type": r.entry_type,
+                "activities": r.activities or [],
+                "ac_units": r.ac_units or [],
+                "notes": r.notes,
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.put("/maintenance/activity-config/{section}")
+async def upsert_activity_config(
+    section: str,
+    payload: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance", write=True)),
+):
+    """Create or update activity config for a section."""
+    from datetime import datetime as dt
+    stmt = select(PMActivityConfig).where(PMActivityConfig.section == section)
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    if row:
+        row.entry_type = payload.get("entry_type", row.entry_type)
+        row.activities = payload.get("activities", row.activities)
+        row.ac_units = payload.get("ac_units", row.ac_units)
+        row.notes = payload.get("notes", row.notes)
+        row.updated_at = dt.now(timezone.utc)
+    else:
+        row = PMActivityConfig(
+            section=section,
+            entry_type=payload.get("entry_type", "activity"),
+            activities=payload.get("activities", []),
+            ac_units=payload.get("ac_units", []),
+            notes=payload.get("notes"),
+            updated_at=dt.now(timezone.utc),
+        )
+        db.add(row)
+    await db.commit()
+    return {
+        "section": row.section,
+        "entry_type": row.entry_type,
+        "activities": row.activities or [],
+        "ac_units": row.ac_units or [],
+    }
