@@ -28,6 +28,7 @@ class MaintenanceSchedule(Base):
     __tablename__ = "maintenance_schedule"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
     machine_code: Mapped[str] = mapped_column(String(50), nullable=False)
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     frequency_days: Mapped[int] = mapped_column(Integer, nullable=False)

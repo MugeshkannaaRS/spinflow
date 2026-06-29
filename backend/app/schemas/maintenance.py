@@ -81,6 +81,7 @@ class ScheduleCreate(BaseModel):
 
 class ScheduleOut(BaseModel):
     id: str
+    mill_id: Optional[str] = None
     machine_code: Optional[str] = None
     type: Optional[str] = None
     frequency_days: Optional[int] = None

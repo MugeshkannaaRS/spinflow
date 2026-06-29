@@ -160,11 +160,10 @@ async def get_schedules(
             if mill_check.scalar_one_or_none():
                 effective_mill_id = mill_id
 
-    stmt = select(MaintenanceSchedule).join(Machine, MaintenanceSchedule.machine_code == Machine.code)
+    # Use mill_id directly on the schedule for scoping — avoids dependency on machines table
+    stmt = select(MaintenanceSchedule)
     if effective_mill_id:
-        stmt = stmt.where(Machine.mill_id == effective_mill_id)
-    elif scope["company_id"]:
-        stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+        stmt = stmt.where(MaintenanceSchedule.mill_id == effective_mill_id)
     try:
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = (await db.execute(count_stmt)).scalar() or 0
@@ -240,6 +239,7 @@ async def bulk_create_schedules(
     if len(req.items) > MAX_BATCH:
         raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id")
     created = 0
     skipped = 0
     errors: List[str] = []
@@ -249,22 +249,24 @@ async def bulk_create_schedules(
                 errors.append(f"Row missing machine_code or task_description")
                 skipped += 1
                 continue
+            # Soft validation — allow import even if machine code not yet registered
             try:
                 await _validate_machine_in_scope(db, item.machine_code, scope)
             except HTTPException:
-                errors.append(f"{item.machine_code}: machine not in scope")
-                skipped += 1
-                continue
+                pass
             # Use pre-computed frequency_days from Excel if present, else parse string
-            freq_days = (
-                int(item.frequency_days)
-                if getattr(item, "frequency_days", None) and str(item.frequency_days).isdigit()
-                else _parse_freq(item.frequency or "")
-            )
+            raw_fd = getattr(item, "frequency_days", None)
+            try:
+                freq_days = int(float(raw_fd)) if raw_fd is not None else None
+            except (TypeError, ValueError):
+                freq_days = None
+            if not freq_days:
+                freq_days = _parse_freq(item.frequency or "")
             description = item.task_description
             if item.technician_name:
                 description = f"{description} | Technician: {item.technician_name}"
             schedule = MaintenanceSchedule(
+                mill_id=mill_id,
                 machine_code=item.machine_code.strip(),
                 type="preventive",
                 frequency_days=freq_days,
@@ -303,12 +305,8 @@ async def mark_schedule_done(
     from datetime import date, timedelta
     scope = await get_mill_scope(current_user, db)
     stmt = select(MaintenanceSchedule).where(MaintenanceSchedule.id == schedule_id)
-    if scope.get("mill_id") or scope.get("company_id"):
-        stmt = stmt.join(Machine, MaintenanceSchedule.machine_code == Machine.code)
-        if scope.get("mill_id"):
-            stmt = stmt.where(Machine.mill_id == scope["mill_id"])
-        elif scope.get("company_id"):
-            stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if scope.get("mill_id"):
+        stmt = stmt.where(MaintenanceSchedule.mill_id == scope["mill_id"])
     result = await db.execute(stmt)
     schedule = result.scalar_one_or_none()
     if not schedule:
@@ -329,11 +327,9 @@ async def update_schedule(
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
     scope = await get_mill_scope(current_user, db)
-    stmt = select(MaintenanceSchedule).join(Machine, MaintenanceSchedule.machine_code == Machine.code).where(MaintenanceSchedule.id == schedule_id)
-    if scope["mill_id"]:
-        stmt = stmt.where(Machine.mill_id == scope["mill_id"])
-    elif scope["company_id"]:
-        stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    stmt = select(MaintenanceSchedule).where(MaintenanceSchedule.id == schedule_id)
+    if scope.get("mill_id"):
+        stmt = stmt.where(MaintenanceSchedule.mill_id == scope["mill_id"])
     result = await db.execute(stmt)
     schedule = result.scalar_one_or_none()
     if not schedule:
@@ -469,12 +465,8 @@ async def get_manpower_summary(
         effective_mill_id = mill_id
 
     stmt = select(MaintenanceSchedule).where(MaintenanceSchedule.is_active == True)
-    if effective_mill_id or scope.get("company_id"):
-        stmt = stmt.join(Machine, MaintenanceSchedule.machine_code == Machine.code)
-        if effective_mill_id:
-            stmt = stmt.where(Machine.mill_id == effective_mill_id)
-        elif scope.get("company_id"):
-            stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if effective_mill_id:
+        stmt = stmt.where(MaintenanceSchedule.mill_id == effective_mill_id)
 
     result = await db.execute(stmt)
     schedules = result.scalars().all()
@@ -623,13 +615,8 @@ async def delete_maintenance_schedule(
     # Schedules use machine_code; SUPER_ADMIN can delete any, others rely on machine scope
     scope = await get_mill_scope(current_user, db)
     stmt = select(MaintenanceSchedule).where(MaintenanceSchedule.id == schedule_id)
-    if scope.get("mill_id") or scope.get("company_id"):
-        # Validate the schedule's machine is in scope
-        stmt = stmt.join(Machine, MaintenanceSchedule.machine_code == Machine.code)
-        if scope.get("mill_id"):
-            stmt = stmt.where(Machine.mill_id == scope["mill_id"])
-        elif scope.get("company_id"):
-            stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if scope.get("mill_id"):
+        stmt = stmt.where(MaintenanceSchedule.mill_id == scope["mill_id"])
     result = await db.execute(stmt)
     schedule = result.scalar_one_or_none()
     if not schedule:
@@ -675,16 +662,12 @@ async def get_day_plan(
     if mill_id and role_code == "SUPER_ADMIN":
         effective_mill_id = mill_id
 
-    # Fetch active schedules
+    # Fetch active schedules — scope by mill_id directly (no machines JOIN needed)
     stmt = select(MaintenanceSchedule).where(MaintenanceSchedule.is_active == True)
     if section:
         stmt = stmt.where(MaintenanceSchedule.department == section)
-    if effective_mill_id or scope.get("company_id"):
-        stmt = stmt.join(Machine, MaintenanceSchedule.machine_code == Machine.code)
-        if effective_mill_id:
-            stmt = stmt.where(Machine.mill_id == effective_mill_id)
-        elif scope.get("company_id"):
-            stmt = stmt.join(Mill, Machine.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    if effective_mill_id:
+        stmt = stmt.where(MaintenanceSchedule.mill_id == effective_mill_id)
     result = await db.execute(stmt)
     schedules = result.scalars().all()
 
