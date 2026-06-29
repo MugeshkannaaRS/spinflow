@@ -106,6 +106,8 @@ class ScheduleOut(BaseModel):
 
 
 class ScheduleBulkItem(BaseModel):
+    model_config = {"extra": "ignore"}
+
     machine_code: str
     task_description: str
     frequency: Optional[str] = None        # human label e.g. "01 Month"
@@ -128,6 +130,7 @@ class ScheduleBulkItem(BaseModel):
 
 
 class ScheduleBulkCreate(BaseModel):
+    model_config = {"extra": "ignore"}
     items: List[ScheduleBulkItem]
 
 
