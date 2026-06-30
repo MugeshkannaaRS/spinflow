@@ -243,10 +243,35 @@ async def bulk_create_schedules(
     created = 0
     skipped = 0
     errors: List[str] = []
+
+    def _trim(val, length):
+        """Coerce to str and clip to the column length to avoid DB overflow."""
+        if val is None:
+            return None
+        s = str(val).strip()
+        return s[:length] if s else None
+
+    def _as_int(val):
+        """Best-effort int coercion; returns None on anything non-numeric."""
+        if val is None or val == "":
+            return None
+        try:
+            return int(float(str(val).replace(",", "").strip()))
+        except (TypeError, ValueError):
+            return None
+
+    def _as_float(val):
+        if val is None or val == "":
+            return None
+        try:
+            return float(str(val).replace(",", "").strip())
+        except (TypeError, ValueError):
+            return None
+
     for item in req.items:
         try:
             if not item.machine_code or not item.task_description:
-                errors.append(f"Row missing machine_code or task_description")
+                errors.append("Row missing machine_code or task_description")
                 skipped += 1
                 continue
             # Soft validation — allow import even if machine code not yet registered
@@ -255,11 +280,7 @@ async def bulk_create_schedules(
             except HTTPException:
                 pass
             # Use pre-computed frequency_days from Excel if present, else parse string
-            raw_fd = getattr(item, "frequency_days", None)
-            try:
-                freq_days = int(float(raw_fd)) if raw_fd is not None else None
-            except (TypeError, ValueError):
-                freq_days = None
+            freq_days = _as_int(getattr(item, "frequency_days", None))
             if not freq_days:
                 freq_days = _parse_freq(item.frequency or "")
             description = item.task_description
@@ -267,31 +288,42 @@ async def bulk_create_schedules(
                 description = f"{description} | Technician: {item.technician_name}"
             schedule = MaintenanceSchedule(
                 mill_id=mill_id,
-                machine_code=item.machine_code.strip(),
+                machine_code=_trim(item.machine_code, 50),
                 type="preventive",
                 frequency_days=freq_days,
                 description=description,
-                last_done=item.last_done_date,
-                next_due=item.next_due_date,
+                last_done=_trim(item.last_done_date, 10),
+                next_due=_trim(item.next_due_date, 10),
                 is_active=True,
-                department=item.department,
-                lubricant_name=item.lubricant_name,
-                lubricant_quantity=item.lubricant_quantity,
-                manpower_count=item.manpower_count,
-                machine_count=item.machine_count,
-                sl_no=item.sl_no,
-                machine_line_code=item.machine_line_code,
-                opening_dia_mm=item.opening_dia_mm,
-                current_dia_mm=item.current_dia_mm,
-                grinding_freq_days=item.grinding_freq_days,
-                last_grinding_date=item.last_grinding_date,
+                department=_trim(item.department, 100),
+                lubricant_name=_trim(item.lubricant_name, 200),
+                lubricant_quantity=_trim(item.lubricant_quantity, 100),
+                manpower_count=_as_int(item.manpower_count),
+                machine_count=_as_int(item.machine_count),
+                sl_no=_as_int(item.sl_no),
+                machine_line_code=_trim(item.machine_line_code, 100),
+                opening_dia_mm=_as_float(item.opening_dia_mm),
+                current_dia_mm=_as_float(item.current_dia_mm),
+                grinding_freq_days=_as_int(item.grinding_freq_days),
+                last_grinding_date=_trim(item.last_grinding_date, 10),
             )
-            db.add(schedule)
+            # SAVEPOINT per row: a bad row rolls back ONLY itself, leaving the
+            # rows already added intact, instead of poisoning the whole
+            # transaction at the final commit (which previously caused the 500).
+            async with db.begin_nested():
+                db.add(schedule)
+                await db.flush()
             created += 1
         except Exception as exc:
-            errors.append(f"{item.machine_code}: {str(exc)}")
+            errors.append(f"{item.machine_code}: {str(exc)[:200]}")
             skipped += 1
-    await db.commit()
+
+    try:
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        logger.error(f"maintenance.schedules.bulk commit failed: {exc}")
+        raise HTTPException(500, detail=f"Bulk insert commit failed: {str(exc)[:200]}")
     return BulkResponse(created=created, skipped=skipped, errors=errors)
 
 

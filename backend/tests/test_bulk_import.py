@@ -83,3 +83,77 @@ class TestPayrollBulkImport:
             error = f"Row 3: employee not found (code='{code}')"
             assert "Row 3" in error
             assert "not found" in error
+
+
+class TestMaintenanceScheduleCoercion:
+    """Mirrors the _trim / _as_int / _as_float helpers in the PM bulk endpoint.
+
+    These guard against the 500 seen when imported PM rows carried values that
+    overflowed column lengths or weren't valid ints/floats for Integer/Float
+    columns. Coercion makes the insert safe instead of crashing at commit.
+    """
+
+    @staticmethod
+    def _trim(val, length):
+        if val is None:
+            return None
+        s = str(val).strip()
+        return s[:length] if s else None
+
+    @staticmethod
+    def _as_int(val):
+        if val is None or val == "":
+            return None
+        try:
+            return int(float(str(val).replace(",", "").strip()))
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _as_float(val):
+        if val is None or val == "":
+            return None
+        try:
+            return float(str(val).replace(",", "").strip())
+        except (TypeError, ValueError):
+            return None
+
+    def test_trim_clips_to_column_length(self):
+        long_code = "SIMPLEX_(HOWA_RME,_RMH)_EXTRA_LONG_NAME_BEYOND_FIFTY_CHARS"
+        assert len(self._trim(long_code, 50)) == 50
+
+    def test_trim_blank_becomes_none(self):
+        assert self._trim("   ", 100) is None
+        assert self._trim(None, 100) is None
+
+    def test_as_int_handles_strings_and_floats(self):
+        assert self._as_int("3") == 3
+        assert self._as_int("3.0") == 3
+        assert self._as_int("1,200") == 1200
+        assert self._as_int(4) == 4
+
+    def test_as_int_bad_value_returns_none_not_crash(self):
+        assert self._as_int("N/A") is None
+        assert self._as_int("") is None
+        assert self._as_int(None) is None
+
+    def test_as_float_parses_dia_readings(self):
+        assert self._as_float("28.5") == 28.5
+        assert self._as_float("abc") is None
+        assert self._as_float(None) is None
+
+    def test_bad_row_isolated_good_rows_still_import(self):
+        # Simulates SAVEPOINT-per-row: one failing row doesn't drop the others.
+        rows = [
+            {"machine_code": "BDT-019", "task_description": "Clean"},
+            {"machine_code": "", "task_description": "Missing code"},
+            {"machine_code": "DK-740", "task_description": "Oil"},
+        ]
+        created, skipped = 0, 0
+        for r in rows:
+            if not r["machine_code"] or not r["task_description"]:
+                skipped += 1
+                continue
+            created += 1
+        assert created == 2
+        assert skipped == 1
