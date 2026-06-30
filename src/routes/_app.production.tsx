@@ -38,7 +38,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/com
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
 import { Checkbox } from "@/components/ui/checkbox";
-import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
+import { DirectImportModal } from "@/components/ui/DirectImportModal";
 import { useState, useMemo, useEffect } from "react";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { createPortal } from "react-dom";
@@ -4231,7 +4231,7 @@ function ImportShiftEntriesDialog() {
         <ArrowDown className="size-4 mr-1" />
         Import Excel
       </Button>
-      <UniversalImportModal
+      <DirectImportModal
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="production_entries"
@@ -5224,7 +5224,7 @@ function PackingGrid() {
         </Button>
       </div>
 
-      <UniversalImportModal
+      <DirectImportModal
         isOpen={importOpen}
         onClose={() => setImportOpen(false)}
         tableName="packing_shift_entries"

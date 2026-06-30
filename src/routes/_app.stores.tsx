@@ -24,7 +24,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { FileUpload, type UploadedFile } from "@/components/ui/file-upload";
-import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
+import { DirectImportModal } from "@/components/ui/DirectImportModal";
 import { Textarea } from "@/components/ui/textarea";
 import { useState, useEffect } from "react";
 import { DataTable } from "@/components/ui/DataTable";
@@ -757,7 +757,7 @@ function ImportSparesDialog() {
         <ArrowDown className="size-4 mr-1" />
         Import Excel
       </Button>
-      <UniversalImportModal
+      <DirectImportModal
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="stores_spares"

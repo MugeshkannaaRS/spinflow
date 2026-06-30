@@ -17,10 +17,14 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "maintenance_schedule",
-        sa.Column("mill_id", sa.String(36), nullable=True, index=True),
-    )
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    columns = {c["name"] for c in inspector.get_columns("maintenance_schedule")}
+    if "mill_id" not in columns:
+        op.add_column(
+            "maintenance_schedule",
+            sa.Column("mill_id", sa.String(36), nullable=True, index=True),
+        )
     try:
         op.create_index(
             "ix_maintenance_schedule_mill_id",

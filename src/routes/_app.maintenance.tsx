@@ -65,7 +65,7 @@ import type { MaintenanceTask, MasterMachine } from "@/lib/types";
 import * as XLSX from "xlsx";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useMillMasterCategory } from "@/hooks/useMillConfig";
-import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
+import { DirectImportModal } from "@/components/ui/DirectImportModal";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -2482,7 +2482,7 @@ function ImportScheduleDialog() {
         <Upload className="size-3.5 mr-1.5" />
         Import Schedule
       </Button>
-      <UniversalImportModal
+      <DirectImportModal
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="maintenance_schedules"
@@ -2503,7 +2503,7 @@ function ImportMachinesDialog() {
         <ArrowDown className="size-4 mr-1" />
         Import Excel
       </Button>
-      <UniversalImportModal
+      <DirectImportModal
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="maintenance_machines"

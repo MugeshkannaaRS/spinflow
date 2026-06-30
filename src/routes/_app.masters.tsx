@@ -58,7 +58,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { useMillMasterCategory, useMillMasters } from "@/hooks/useMillConfig";
-import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
+import { DirectImportModal } from "@/components/ui/DirectImportModal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CustomFieldsManager } from "@/components/ui/CustomFieldsManager";
 import type {
@@ -1956,7 +1956,7 @@ function ImportCustomersDialog() {
         <ArrowDown className="size-4 mr-1" />
         Import Excel
       </Button>
-      <UniversalImportModal
+      <DirectImportModal
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="masters_customers"
@@ -2387,7 +2387,7 @@ function MachinesTab({
       />
 
       {/* Import Modal */}
-      <UniversalImportModal
+      <DirectImportModal
         isOpen={importOpen}
         onClose={() => setImportOpen(false)}
         tableName="masters_machines"

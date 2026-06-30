@@ -52,7 +52,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { FileUpload, type UploadedFile } from "@/components/ui/file-upload";
-import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
+import { DirectImportModal } from "@/components/ui/DirectImportModal";
 import { cn } from "@/lib/utils";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -2188,7 +2188,7 @@ function ImportEmployeeDialog() {
         <ArrowDown className="size-4 mr-1" />
         Import Excel
       </Button>
-      <UniversalImportModal
+      <DirectImportModal
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="hr_employees"
@@ -2817,7 +2817,7 @@ function ImportAttendanceDialog({
         <ArrowDown className="size-4 mr-1" />
         Import Excel
       </Button>
-      <UniversalImportModal
+      <DirectImportModal
         isOpen={open}
         onClose={() => setOpen(false)}
         tableName="hr_attendance"

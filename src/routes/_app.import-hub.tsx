@@ -12,7 +12,7 @@ import {
   Upload,
 } from "lucide-react";
 import { useState } from "react";
-import { UniversalImportModal } from "@/components/ui/UniversalImportModal";
+import { DirectImportModal } from "@/components/ui/DirectImportModal";
 
 export const Route = createFileRoute("/_app/import-hub")({
   head: () => ({ meta: [{ title: "Data Import Hub — SpinFlow ERP" }] }),
@@ -174,7 +174,7 @@ function ImportHubPage() {
       </div>
 
       {activeModule && (
-        <UniversalImportModal
+        <DirectImportModal
           isOpen={true}
           tableName={activeModule.tableName}
           endpoint={activeModule.endpoint}
