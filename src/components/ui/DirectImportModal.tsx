@@ -88,6 +88,68 @@ const TABLE_KEY_FIELDS: Record<string, string[]> = {
 };
 
 /**
+ * Header aliases — maps common Excel column-header variants to a field key,
+ * per table. This is a small, fixed lookup (NOT the old fuzzy/saved-mapping
+ * system): it only kicks in when a header doesn't match a column's key/label
+ * exactly. Keys are normalized (lowercased, alphanumerics only) on use.
+ */
+const HEADER_ALIASES: Record<string, Record<string, string>> = {
+  maintenance_schedules: {
+    // description variants (col key is "description")
+    workdescription: "description",
+    taskdescription: "description",
+    task: "description",
+    activity: "description",
+    pmactivity: "description",
+    maintenanceactivity: "description",
+    workdone: "description",
+    jobdescription: "description",
+    descriptionofwork: "description",
+    // machine variants
+    machinecode: "machine_code",
+    machineno: "machine_code",
+    machine: "machine_code",
+    machinetype: "type",
+    // note: "machine_name" is intentionally NOT aliased — it is descriptive only
+    // and not a ScheduleBulkItem field, so it is safely ignored on import.
+    // frequency: human label vs explicit days
+    frequency: "frequency", // e.g. "01 Month" — kept as text, backend resolves to days
+    freq: "frequency",
+    frequencyofwork: "frequency",
+    frequencydays: "frequency_days",
+    freqdays: "frequency_days",
+    // enrichment variants
+    dept: "department",
+    section: "department",
+    slno: "sl_no",
+    sino: "sl_no",
+    srno: "sl_no",
+    manpower: "manpower_count",
+    manpowercount: "manpower_count",
+    machinecount: "machine_count",
+    noofmachines: "machine_count",
+    lubricantname: "lubricant_name",
+    lubricatingnamebrand: "lubricant_name",
+    lubricant: "lubricant_name",
+    lubricantquantity: "lubricant_quantity",
+    quantity: "lubricant_quantity",
+    machinelinecode: "machine_line_code",
+    linecode: "machine_line_code",
+    openingdiamm: "opening_dia_mm",
+    openingdia: "opening_dia_mm",
+    currentdiamm: "current_dia_mm",
+    currentdia: "current_dia_mm",
+    grindingfreqdays: "grinding_freq_days",
+    lastgrindingdate: "last_grinding_date",
+    // date variants
+    lastdone: "last_done",
+    lastdonedate: "last_done",
+    nextdue: "next_due",
+    nextduedate: "next_due",
+  },
+};
+
+/**
  * Field-name normalization applied just before POST, so the payload keys
  * match what the bulk endpoint's Pydantic schema expects. This is a small,
  * explicit per-table map — NOT a saved/fuzzy mapping system.
@@ -149,6 +211,8 @@ export function DirectImportModal({
         byNorm[norm(c.key)] = c.key;
         byNorm[norm(c.label)] = c.key;
       }
+      const aliases = HEADER_ALIASES[tableName] ?? {};
+      const knownKeys = new Set(colConfigs.map((c) => c.key));
       return headers.map((h, i) => {
         // 1. Template marker row like "[machine_code]"
         const marker = markerRow?.[i];
@@ -156,11 +220,17 @@ export function DirectImportModal({
           const m = String(marker).match(/^\[(.+)\]$/);
           if (m && colConfigs.some((c) => c.key === m[1])) return m[1];
         }
+        const nh = norm(h);
         // 2. Direct normalized match on key or label
-        return byNorm[norm(h)] ?? null;
+        if (byNorm[nh]) return byNorm[nh];
+        // 3. Header-alias fallback (common variants → field key)
+        const aliased = aliases[nh];
+        if (aliased) return aliased;
+        return null;
       });
+      void knownKeys;
     },
-    [colConfigs],
+    [colConfigs, tableName],
   );
 
   const coerce = useCallback(
