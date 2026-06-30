@@ -1,9 +1,11 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, insert
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timezone
+import time
+import uuid as _uuid
 
 from app.db.session import get_db
 
@@ -274,77 +276,72 @@ async def bulk_create_schedules(
     # which timed out the request. Machine codes are imported as-is; unknown
     # codes simply won't join to a machine until that machine is created.
 
-    def _build(item) -> Optional[MaintenanceSchedule]:
+    def _row(item) -> Optional[dict]:
+        if not item.machine_code or not item.task_description:
+            return None
         freq_days = _as_int(getattr(item, "frequency_days", None))
         if not freq_days:
             freq_days = _parse_freq(item.frequency or "")
         description = item.task_description
         if item.technician_name:
             description = f"{description} | Technician: {item.technician_name}"
-        return MaintenanceSchedule(
-            mill_id=mill_id,
-            machine_code=_trim(item.machine_code, 50),
-            type="preventive",
-            frequency_days=freq_days,
-            description=description,
-            last_done=_trim(item.last_done_date, 10),
-            next_due=_trim(item.next_due_date, 10),
-            is_active=True,
-            department=_trim(item.department, 100),
-            lubricant_name=_trim(item.lubricant_name, 200),
-            lubricant_quantity=_trim(item.lubricant_quantity, 100),
-            manpower_count=_as_int(item.manpower_count),
-            machine_count=_as_int(item.machine_count),
-            sl_no=_as_int(item.sl_no),
-            machine_line_code=_trim(item.machine_line_code, 100),
-            opening_dia_mm=_as_float(item.opening_dia_mm),
-            current_dia_mm=_as_float(item.current_dia_mm),
-            grinding_freq_days=_as_int(item.grinding_freq_days),
-            last_grinding_date=_trim(item.last_grinding_date, 10),
-        )
+        return {
+            "id": str(_uuid.uuid4()),
+            "mill_id": mill_id,
+            "machine_code": _trim(item.machine_code, 50),
+            "type": "preventive",
+            "frequency_days": freq_days,
+            "description": description,
+            "last_done": _trim(item.last_done_date, 10),
+            "next_due": _trim(item.next_due_date, 10),
+            "is_active": True,
+            "department": _trim(item.department, 100),
+            "lubricant_name": _trim(item.lubricant_name, 200),
+            "lubricant_quantity": _trim(item.lubricant_quantity, 100),
+            "manpower_count": _as_int(item.manpower_count),
+            "machine_count": _as_int(item.machine_count),
+            "sl_no": _as_int(item.sl_no),
+            "machine_line_code": _trim(item.machine_line_code, 100),
+            "opening_dia_mm": _as_float(item.opening_dia_mm),
+            "current_dia_mm": _as_float(item.current_dia_mm),
+            "grinding_freq_days": _as_int(item.grinding_freq_days),
+            "last_grinding_date": _trim(item.last_grinding_date, 10),
+        }
 
-    # Build all valid rows in memory first (no DB calls).
-    to_add: List[MaintenanceSchedule] = []
+    # Build all rows in memory (no DB calls).
+    t0 = time.monotonic()
+    rows: List[dict] = []
     for item in req.items:
-        if not item.machine_code or not item.task_description:
-            errors.append("Row missing machine_code or task_description")
-            skipped += 1
-            continue
         try:
-            to_add.append(_build(item))
+            r = _row(item)
         except Exception as exc:
             errors.append(f"{getattr(item, 'machine_code', '?')}: {str(exc)[:200]}")
             skipped += 1
+            continue
+        if r is None:
+            errors.append("Row missing machine_code or task_description")
+            skipped += 1
+        else:
+            rows.append(r)
 
-    # Fast path: add all and commit in one shot. Values are already coerced to
-    # safe types/lengths, so this rarely fails.
-    if to_add:
-        try:
-            db.add_all(to_add)
-            await db.commit()
-            created = len(to_add)
-            return BulkResponse(created=created, skipped=skipped, errors=errors)
-        except Exception as exc:
-            # Slow path: a row slipped through. Roll back and retry per-row with
-            # SAVEPOINT isolation so good rows still import and bad ones report.
-            await db.rollback()
-            logger.warning(f"maintenance.schedules.bulk fast path failed, falling back per-row: {exc}")
-            created = 0
-            for sched in to_add:
-                try:
-                    async with db.begin_nested():
-                        db.add(sched)
-                        await db.flush()
-                    created += 1
-                except Exception as row_exc:
-                    errors.append(f"{sched.machine_code}: {str(row_exc)[:200]}")
-                    skipped += 1
-            try:
-                await db.commit()
-            except Exception as commit_exc:
-                await db.rollback()
-                logger.error(f"maintenance.schedules.bulk commit failed: {commit_exc}")
-                raise HTTPException(500, detail=f"Bulk insert commit failed: {str(commit_exc)[:200]}")
+    if not rows:
+        return BulkResponse(created=created, skipped=skipped, errors=errors)
+
+    # Single bulk INSERT — one round-trip for the whole batch (SQLAlchemy core).
+    # This is dramatically faster than per-object ORM flushes on a pooled
+    # connection and avoids the request-level timeout seen with row-by-row work.
+    try:
+        await db.execute(insert(MaintenanceSchedule), rows)
+        await db.commit()
+        created = len(rows)
+        logger.info(
+            f"maintenance.schedules.bulk inserted {created} rows in "
+            f"{time.monotonic() - t0:.2f}s (mill={mill_id})"
+        )
+    except Exception as exc:
+        await db.rollback()
+        logger.error(f"maintenance.schedules.bulk insert failed: {exc}")
+        raise HTTPException(500, detail=f"Bulk insert failed: {str(exc)[:200]}")
 
     return BulkResponse(created=created, skipped=skipped, errors=errors)
 
