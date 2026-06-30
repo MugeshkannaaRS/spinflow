@@ -8,7 +8,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { exportToExcel, exportToPdf } from "@/lib/export-utils";
+import { exportToExcel, exportToPdf, loadJsPDF, loadAutoTable } from "@/lib/export-utils";
 import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
@@ -2156,11 +2156,11 @@ function DayPlanView() {
       });
       return;
     }
-    // PDF: a page per day using jsPDF
+    // PDF: a page per day using the same CDN-loaded jsPDF as the rest of the app.
     try {
-      const mod: any = await import("jspdf");
-      await import("jspdf-autotable");
-      const { jsPDF } = mod;
+      const jspdf = await loadJsPDF();
+      await loadAutoTable();
+      const { jsPDF } = jspdf;
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       activeDays.forEach((d: any, idx: number) => {
         if (idx > 0) doc.addPage();
@@ -2178,7 +2178,38 @@ function DayPlanView() {
         });
       });
       doc.save(`PM_DayCards_${monthLabel}.pdf`);
-    } catch (e) { toast.error("PDF export failed"); }
+    } catch (e) {
+      console.error("Per-day PDF export error:", e);
+      toast.error("PDF export failed");
+    }
+  }
+
+  // Export a single day's job card (defaults to today) as a one-page PDF.
+  async function exportSingleDay(day: number) {
+    const d = days.find((x: any) => x.day === day);
+    if (!d || d.total_tasks === 0) { toast.error("No tasks for that day"); return; }
+    try {
+      const jspdf = await loadJsPDF();
+      await loadAutoTable();
+      const { jsPDF } = jspdf;
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      doc.setFontSize(15);
+      doc.text(`PM Job Card — ${d.date} (${d.weekday})`, 14, 18);
+      doc.setFontSize(10);
+      const status = d.day_type === "holiday" ? "HOLIDAY" : d.day_type === "half_day" ? "HALF-DAY" : "Working day";
+      doc.text(`${status}  |  ${d.total_tasks} tasks  |  ${d.total_manpower_needed} persons needed  |  ${Math.round(d.total_est_min / 60 * 10) / 10}h est.${(d.persons_on_leave ?? 0) > 0 ? `  |  ${d.persons_on_leave} on leave` : ""}`, 14, 25);
+      (doc as any).autoTable({
+        startY: 30,
+        head: [["Section", "Machine", "Line", "Work Description", "Persons", "Min"]],
+        body: d.tasks.map((t: any) => [t.section, t.machine_code, t.machine_line_code ?? "", t.description, String(t.manpower_needed), String(t.est_min)]),
+        styles: { fontSize: 8, cellPadding: 1.5 },
+        headStyles: { fillColor: [37, 99, 235] },
+      });
+      doc.save(`PM_Card_${d.date}.pdf`);
+    } catch (e) {
+      console.error("Single-day PDF error:", e);
+      toast.error("PDF export failed");
+    }
   }
 
   return (
@@ -2225,6 +2256,9 @@ function DayPlanView() {
                   <DropdownMenuItem onClick={() => exportPlan("pdf")}>Full plan — PDF</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => exportDayCards("pdf")}>Per-day cards — PDF</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => exportDayCards("excel")}>Per-day cards — Excel</DropdownMenuItem>
+                  {todayDay > 0 && (
+                    <DropdownMenuItem onClick={() => exportSingleDay(todayDay)}>Today's card — PDF</DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -2544,6 +2578,11 @@ function DayPlanView() {
                         </div>
                       );
                     })}
+                    <div className="flex justify-end px-4 py-2 border-t bg-muted/10">
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportSingleDay(d.day)}>
+                        <Download className="size-3.5 mr-1" /> Export this day (PDF)
+                      </Button>
+                    </div>
                   </div>
                 )}
               </Card>

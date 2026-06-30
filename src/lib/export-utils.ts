@@ -94,7 +94,7 @@ export async function exportToExcel(opts: ExportOptions): Promise<void> {
 
 // ── PDF export (using jsPDF + autoTable) ─────────────────────────────────────
 
-async function loadJsPDF(): Promise<any> {
+export async function loadJsPDF(): Promise<any> {
   if ((window as any).jspdf) return (window as any).jspdf;
   return new Promise((resolve, reject) => {
     const s = document.createElement("script");
@@ -105,7 +105,7 @@ async function loadJsPDF(): Promise<any> {
   });
 }
 
-async function loadAutoTable(): Promise<void> {
+export async function loadAutoTable(): Promise<void> {
   if ((window as any).jspdf?.jsPDF?.API?.autoTable) return;
   return new Promise((resolve, reject) => {
     const s = document.createElement("script");
