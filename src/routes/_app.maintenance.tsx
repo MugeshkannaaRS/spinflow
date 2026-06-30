@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, maintenanceApi, productionApi, exportApi } from "@/lib/api-service";
+import { api } from "@/lib/api";
 import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
@@ -682,7 +683,12 @@ function MaintenancePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base">Preventive Maintenance Schedules</CardTitle>
-                  {canEdit && <ImportScheduleDialog />}
+                  {canEdit && (
+                    <div className="flex items-center gap-2">
+                      <AddScheduleDialog />
+                      <ImportScheduleDialog />
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <ErrorBoundary inline label="PM Schedules">
@@ -2490,6 +2496,136 @@ function ImportScheduleDialog() {
         onSuccess={() => qc.invalidateQueries({ queryKey: ["maintenance-schedules"] })}
         title="Import PM Schedules"
       />
+    </>
+  );
+}
+
+// Manual single-schedule entry — posts one item to the bulk endpoint so it
+// shares the same fields / mill scoping as the Excel import.
+function AddScheduleDialog() {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const millId = user?.millId ?? "";
+  const [form, setForm] = useState({
+    machine_code: "",
+    department: "",
+    task_description: "",
+    frequency: "",
+    frequency_days: "",
+    manpower_count: "",
+    machine_count: "",
+    last_done_date: "",
+    next_due_date: "",
+  });
+
+  const mut = useMutation({
+    mutationFn: (item: any) =>
+      api
+        .post(`/maintenance/schedules/bulk?mill_id=${millId}`, { items: [item], mill_id: millId })
+        .then((r) => r.data),
+    onSuccess: (data: any) => {
+      const created = data?.created ?? 0;
+      if (created > 0) {
+        toast.success("Schedule added");
+        qc.invalidateQueries({ queryKey: ["maintenance-schedules"] });
+        qc.invalidateQueries({ queryKey: ["maintenance", "manpower-summary"] });
+        setOpen(false);
+        setForm({
+          machine_code: "",
+          department: "",
+          task_description: "",
+          frequency: "",
+          frequency_days: "",
+          manpower_count: "",
+          machine_count: "",
+          last_done_date: "",
+          next_due_date: "",
+        });
+      } else {
+        toast.error(data?.errors?.[0] ?? "Could not add schedule");
+      }
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Failed to add schedule"),
+  });
+
+  const submit = () => {
+    if (!form.machine_code.trim() || !form.task_description.trim()) {
+      toast.error("Machine and Work Description are required");
+      return;
+    }
+    mut.mutate({
+      machine_code: form.machine_code.trim(),
+      department: form.department.trim() || null,
+      task_description: form.task_description.trim(),
+      frequency: form.frequency.trim() || null,
+      frequency_days: form.frequency_days ? Number(form.frequency_days) : null,
+      manpower_count: form.manpower_count ? Number(form.manpower_count) : null,
+      machine_count: form.machine_count ? Number(form.machine_count) : null,
+      last_done_date: form.last_done_date || null,
+      next_due_date: form.next_due_date || null,
+    });
+  };
+
+  const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
+
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        <Plus className="size-3.5 mr-1.5" />
+        Add Schedule
+      </Button>
+      <Dialog open={open} onOpenChange={(o) => !o && setOpen(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add PM Schedule</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Machine Code *</Label>
+              <Input value={form.machine_code} onChange={(e) => set("machine_code", e.target.value)} placeholder="e.g. Bale_Opener" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Department</Label>
+              <Input value={form.department} onChange={(e) => set("department", e.target.value)} placeholder="e.g. Blowroom" />
+            </div>
+            <div className="space-y-1 col-span-2">
+              <Label className="text-xs">Work Description *</Label>
+              <Input value={form.task_description} onChange={(e) => set("task_description", e.target.value)} placeholder="e.g. General Cleaning" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Frequency (label)</Label>
+              <Input value={form.frequency} onChange={(e) => set("frequency", e.target.value)} placeholder="e.g. 1 Month" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Frequency (days)</Label>
+              <Input type="number" value={form.frequency_days} onChange={(e) => set("frequency_days", e.target.value)} placeholder="30" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Manpower Count</Label>
+              <Input type="number" value={form.manpower_count} onChange={(e) => set("manpower_count", e.target.value)} placeholder="2" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Machine Count</Label>
+              <Input type="number" value={form.machine_count} onChange={(e) => set("machine_count", e.target.value)} placeholder="6" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Last Done</Label>
+              <Input type="date" value={form.last_done_date} onChange={(e) => set("last_done_date", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Next Due</Label>
+              <Input type="date" value={form.next_due_date} onChange={(e) => set("next_due_date", e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={submit} disabled={mut.isPending}>
+              {mut.isPending ? "Adding…" : "Add Schedule"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
