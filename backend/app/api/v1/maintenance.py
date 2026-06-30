@@ -172,15 +172,22 @@ async def get_schedules(
         stmt = stmt.offset((page - 1) * page_size).limit(page_size)
         result = await db.execute(stmt)
         items = result.scalars().all()
+        # Serialize row-by-row so a single bad row can't blank the whole list.
+        data = []
+        for item in items:
+            try:
+                data.append(ScheduleOut.model_validate(item).model_dump())
+            except Exception as row_err:
+                logger.error(f"maintenance.schedules serialize error id={getattr(item, 'id', '?')}: {row_err}")
         return {
             "total": total,
             "page": page,
             "page_size": page_size,
             "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
-            "data": [ScheduleOut.model_validate(item).model_dump() for item in items],
+            "data": data,
         }
     except Exception as e:
-        logger.error(f"maintenance.schedules list error: {e}")
+        logger.error(f"maintenance.schedules list error: {e}", exc_info=True)
         return {"total": 0, "page": page, "page_size": page_size, "pages": 0, "data": []}
 
 
@@ -544,15 +551,27 @@ async def get_manpower_summary(
         if s.machine_count:
             d["machine_count"] = s.machine_count
 
-        freq = s.frequency_days or 30
+        try:
+            freq = int(s.frequency_days) if s.frequency_days else 30
+        except (TypeError, ValueError):
+            freq = 30
+        if freq <= 0:
+            freq = 30
         machine_count = s.machine_count or 1
-        est_min = TASK_EST.get(freq, max(t for t in TASK_EST if t <= freq) if freq > 30 else 20)
+        # Estimated minutes for this frequency bucket. Guard the max() so an
+        # unusual freq can never operate on an empty sequence (→ 500): fall back
+        # to the nearest lower bucket's estimate, or 20 if none.
+        if freq in TASK_EST:
+            est_min = TASK_EST[freq]
+        else:
+            lower_keys = [t for t in TASK_EST if t <= freq]
+            est_min = TASK_EST[max(lower_keys)] if lower_keys else 20
         d["daily_workload_min"] += (est_min / freq) * machine_count
         d["task_count"] += 1
 
         if s.next_due:
             from datetime import timedelta
-            nd = s.next_due
+            nd = str(s.next_due)
             if nd < today_str:
                 d["overdue_count"] += 1
             week_end = (dt_date.today() + timedelta(days=7)).isoformat()
@@ -728,67 +747,71 @@ async def get_day_plan(
     day_map: dict[int, list] = {d: [] for d in range(1, days_in_month + 1)}
 
     for s in schedules:
-        freq = s.frequency_days or 30
-        # Determine anchor date
-        anchor = None
-        if s.next_due:
+        try:
             try:
-                anchor = dt_date.fromisoformat(s.next_due)
-            except ValueError:
-                pass
-        if anchor is None:
-            if s.last_done:
+                freq = int(s.frequency_days) if s.frequency_days else 30
+            except (TypeError, ValueError):
+                freq = 30
+            if freq <= 0:
+                freq = 30
+            # Determine anchor date
+            anchor = None
+            if s.next_due:
                 try:
-                    ld = dt_date.fromisoformat(s.last_done)
+                    anchor = dt_date.fromisoformat(str(s.next_due))
+                except ValueError:
+                    pass
+            if anchor is None and s.last_done:
+                try:
+                    ld = dt_date.fromisoformat(str(s.last_done))
                     anchor = ld + timedelta(days=freq)
                 except ValueError:
                     pass
-        if anchor is None:
-            # Default: spread tasks across month based on sl_no
-            offset = (s.sl_no or 1) % days_in_month
-            anchor = month_start + timedelta(days=offset)
+            if anchor is None:
+                # Default: spread tasks across month based on sl_no
+                offset = (s.sl_no or 1) % days_in_month
+                anchor = month_start + timedelta(days=offset)
 
-        # Walk forward/back to find all occurrences in month
-        # Start from the first occurrence at or before month_start
-        if anchor > month_end:
-            # next_due is after this month — check if freq allows earlier hit
-            diff = (anchor - month_start).days
-            steps_back = diff // freq
-            anchor = anchor - timedelta(days=steps_back * freq)
-        elif anchor < month_start:
-            # Move forward to first in-month occurrence
-            diff = (month_start - anchor).days
-            steps_fwd = (diff + freq - 1) // freq
-            anchor = anchor + timedelta(days=steps_fwd * freq)
+            # Walk forward/back to find the first occurrence at/before month_start
+            if anchor > month_end:
+                diff = (anchor - month_start).days
+                steps_back = diff // freq
+                anchor = anchor - timedelta(days=steps_back * freq)
+            elif anchor < month_start:
+                diff = (month_start - anchor).days
+                steps_fwd = (diff + freq - 1) // freq
+                anchor = anchor + timedelta(days=steps_fwd * freq)
 
-        # Collect all hits in month
-        current = anchor
-        while current <= month_end:
-            if current >= month_start:
-                day = current.day
-                # Estimated task duration
-                est_min = min(60, max(15, freq // 2)) if freq <= 30 else min(120, max(30, freq // 6))
-                day_map[day].append({
-                    "id": s.id,
-                    "machine_code": s.machine_code,
-                    "machine_line_code": s.machine_line_code,
-                    "description": s.description,
-                    "section": s.department or "General",
-                    "frequency_days": freq,
-                    "frequency_label": _freq_label(freq),
-                    "manpower_needed": s.manpower_count or 1,
-                    "machine_count": s.machine_count or 1,
-                    "lubricant_name": s.lubricant_name,
-                    "lubricant_quantity": s.lubricant_quantity,
-                    "last_done": s.last_done,
-                    "due_date": current.isoformat(),
-                    "est_min": est_min,
-                    "is_overdue": current < today,
-                    "sl_no": s.sl_no,
-                })
-            if freq >= 30:
-                break  # Only one occurrence per month for monthly+ tasks
-            current += timedelta(days=freq)
+            # Collect all hits in month
+            current = anchor
+            while current <= month_end:
+                if current >= month_start:
+                    day = current.day
+                    est_min = min(60, max(15, freq // 2)) if freq <= 30 else min(120, max(30, freq // 6))
+                    day_map[day].append({
+                        "id": s.id,
+                        "machine_code": s.machine_code,
+                        "machine_line_code": s.machine_line_code,
+                        "description": s.description,
+                        "section": s.department or "General",
+                        "frequency_days": freq,
+                        "frequency_label": _freq_label(freq),
+                        "manpower_needed": s.manpower_count or 1,
+                        "machine_count": s.machine_count or 1,
+                        "lubricant_name": s.lubricant_name,
+                        "lubricant_quantity": s.lubricant_quantity,
+                        "last_done": s.last_done,
+                        "due_date": current.isoformat(),
+                        "est_min": est_min,
+                        "is_overdue": current < today,
+                        "sl_no": s.sl_no,
+                    })
+                if freq >= 30:
+                    break  # Only one occurrence per month for monthly+ tasks
+                current += timedelta(days=freq)
+        except Exception as row_err:
+            logger.error(f"maintenance.day-plan skip schedule id={getattr(s, 'id', '?')}: {row_err}")
+            continue
 
     # Build day list
     days_out = []
