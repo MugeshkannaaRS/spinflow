@@ -162,10 +162,15 @@ async def get_schedules(
             if mill_check.scalar_one_or_none():
                 effective_mill_id = mill_id
 
-    # Use mill_id directly on the schedule for scoping — avoids dependency on machines table
+    # Use mill_id directly on the schedule for scoping — avoids dependency on machines table.
+    # Single-mill ERP: also include rows with NULL mill_id (legacy/imported rows
+    # whose mill wasn't set) so they're not invisible.
     stmt = select(MaintenanceSchedule)
     if effective_mill_id:
-        stmt = stmt.where(MaintenanceSchedule.mill_id == effective_mill_id)
+        stmt = stmt.where(
+            (MaintenanceSchedule.mill_id == effective_mill_id)
+            | (MaintenanceSchedule.mill_id.is_(None))
+        )
     try:
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = (await db.execute(count_stmt)).scalar() or 0
@@ -242,13 +247,42 @@ def _parse_freq(frequency_str: str) -> int:
 @router.post("/maintenance/schedules/bulk", response_model=BulkResponse)
 async def bulk_create_schedules(
     req: ScheduleBulkCreate,
+    mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
     if len(req.items) > MAX_BATCH:
         raise HTTPException(400, detail=f"Maximum {MAX_BATCH} items per batch")
     scope = await get_mill_scope(current_user, db)
-    mill_id = scope.get("mill_id")
+    role_code = scope.get("role", "")
+    # Resolve the mill the rows belong to. CRITICAL: this must match how the
+    # GET /schedules endpoint scopes reads, otherwise imported rows are stored
+    # under one mill_id and the list filters by another → "imported but empty".
+    effective_mill_id = scope.get("mill_id")
+    # Honor an explicit ?mill_id= from the UI (the schedules list passes it),
+    # validating it belongs to the user's company for non-super-admins.
+    if mill_id:
+        if role_code == "SUPER_ADMIN":
+            effective_mill_id = mill_id
+        else:
+            mill_check = await db.execute(
+                select(Mill).where(
+                    Mill.id == mill_id,
+                    Mill.company_id == current_user.company_id,
+                )
+            )
+            if mill_check.scalar_one_or_none():
+                effective_mill_id = mill_id
+    # Fall back to the company's mill if scope didn't yield one (e.g. a
+    # company-level owner account whose user.mill_id is unset).
+    if not effective_mill_id and current_user.company_id:
+        first_mill = await db.execute(
+            select(Mill).where(Mill.company_id == current_user.company_id).limit(1)
+        )
+        m = first_mill.scalar_one_or_none()
+        if m:
+            effective_mill_id = str(m.id)
+    mill_id = effective_mill_id
     created = 0
     skipped = 0
     errors: List[str] = []
@@ -524,7 +558,10 @@ async def get_manpower_summary(
 
     stmt = select(MaintenanceSchedule).where(MaintenanceSchedule.is_active == True)
     if effective_mill_id:
-        stmt = stmt.where(MaintenanceSchedule.mill_id == effective_mill_id)
+        stmt = stmt.where(
+            (MaintenanceSchedule.mill_id == effective_mill_id)
+            | (MaintenanceSchedule.mill_id.is_(None))
+        )
 
     result = await db.execute(stmt)
     schedules = result.scalars().all()
@@ -737,7 +774,10 @@ async def get_day_plan(
     if section:
         stmt = stmt.where(MaintenanceSchedule.department == section)
     if effective_mill_id:
-        stmt = stmt.where(MaintenanceSchedule.mill_id == effective_mill_id)
+        stmt = stmt.where(
+            (MaintenanceSchedule.mill_id == effective_mill_id)
+            | (MaintenanceSchedule.mill_id.is_(None))
+        )
     result = await db.execute(stmt)
     schedules = result.scalars().all()
 
