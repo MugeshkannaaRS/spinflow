@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import {
   Select,
   SelectContent,
@@ -59,6 +59,7 @@ import {
   Clock,
   TrendingUp,
   CalendarCheck,
+  CalendarDays,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
@@ -2049,6 +2050,17 @@ function DayPlanView() {
   const todayDay = today.getMonth() + 1 === month && today.getFullYear() === year
     ? today.getDate() : -1;
 
+  // Auto-scroll to today's row once the plan loads (list view, current month).
+  useEffect(() => {
+    if (!planQ.isLoading && todayDay > 0 && viewMode === "list") {
+      const el = document.getElementById(`day-${todayDay}`);
+      if (el) {
+        const t = setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 250);
+        return () => clearTimeout(t);
+      }
+    }
+  }, [planQ.isLoading, todayDay, viewMode]);
+
   return (
     <div className="space-y-4">
       {/* Controls */}
@@ -2114,6 +2126,55 @@ function DayPlanView() {
           })}
         </div>
       )}
+
+      {/* Today's Tasks — surfaced at the top when viewing the current month */}
+      {!planQ.isLoading && todayDay > 0 && (() => {
+        const td = days.find((d: any) => d.day === todayDay);
+        const tasks = td?.tasks ?? [];
+        const bySection: Record<string, number> = {};
+        for (const t of tasks) bySection[t.section] = (bySection[t.section] || 0) + 1;
+        return (
+          <Card className="border-blue-400 bg-blue-50/40 dark:bg-blue-950/20">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CalendarDays className="size-4 text-blue-600" />
+                <span className="font-semibold text-sm">Today — {monthNames[month - 1]} {todayDay}, {year}</span>
+                {tasks.length === 0 ? (
+                  <Badge variant="outline" className="ml-auto text-xs">No PM tasks due today</Badge>
+                ) : (
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {tasks.length} tasks · {td?.total_manpower_needed ?? 0} persons · {Math.round((td?.total_est_min ?? 0) / 60 * 10) / 10}h est.
+                  </span>
+                )}
+              </div>
+              {tasks.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {Object.entries(bySection).sort().map(([sec, n]) => {
+                    const col = secColor(sec);
+                    return (
+                      <span key={sec} className={`rounded-md px-2 py-1 text-xs font-medium border ${col.bg} ${col.border}`}>
+                        {sec} ({n})
+                      </span>
+                    );
+                  })}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-xs ml-1"
+                    onClick={() => {
+                      setViewMode("list");
+                      setExpandedDays((p) => ({ ...p, [todayDay]: true }));
+                      document.getElementById(`day-${todayDay}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }}
+                  >
+                    View today's tasks
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Loading skeleton */}
       {planQ.isLoading && (
@@ -2197,9 +2258,10 @@ function DayPlanView() {
             return (
               <Card
                 key={d.day}
+                id={`day-${d.day}`}
                 className={cn(
-                  "border transition-all",
-                  isToday ? "border-blue-400 shadow-sm" : "border-border",
+                  "border transition-all scroll-mt-24",
+                  isToday ? "border-blue-400 shadow-sm ring-1 ring-blue-300" : "border-border",
                   overdue && !isToday ? "border-red-200" : "",
                 )}
               >
@@ -2383,6 +2445,61 @@ function ManpowerPlanView({
           </Card>
         ))}
       </div>
+
+      {/* Combined per-department summary — everything at a glance */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Department Summary</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-xs text-muted-foreground">
+                <tr>
+                  <th className="text-left font-medium px-4 py-2">Department</th>
+                  <th className="text-right font-medium px-3 py-2">Persons</th>
+                  <th className="text-right font-medium px-3 py-2">Machines</th>
+                  <th className="text-right font-medium px-3 py-2">PM Tasks</th>
+                  <th className="text-right font-medium px-3 py-2">Mc/Person</th>
+                  <th className="text-right font-medium px-3 py-2">Utilisation</th>
+                  <th className="text-right font-medium px-3 py-2">Overdue</th>
+                  <th className="text-right font-medium px-4 py-2">Due/Week</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {[...depts].sort((a, b) => (b.utilisation_pct ?? 0) - (a.utilisation_pct ?? 0)).map((d: any) => {
+                  const util = d.utilisation_pct ?? 0;
+                  const utilColor = util >= 100 ? "text-red-600" : util >= 75 ? "text-amber-600" : "text-green-600";
+                  return (
+                    <tr key={d.department} className="hover:bg-muted/20">
+                      <td className="px-4 py-2 font-medium">{d.department}</td>
+                      <td className="px-3 py-2 text-right">{d.manpower ?? "—"}</td>
+                      <td className="px-3 py-2 text-right">{d.machine_count ?? "—"}</td>
+                      <td className="px-3 py-2 text-right">{d.task_count ?? "—"}</td>
+                      <td className="px-3 py-2 text-right">{d.machines_per_person ?? "—"}</td>
+                      <td className={cn("px-3 py-2 text-right font-semibold", utilColor)}>{util}%</td>
+                      <td className={cn("px-3 py-2 text-right", (d.overdue_count ?? 0) > 0 && "text-red-600 font-medium")}>{d.overdue_count ?? 0}</td>
+                      <td className="px-4 py-2 text-right">{d.due_this_week ?? 0}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot className="bg-muted/30 text-xs font-semibold border-t">
+                <tr>
+                  <td className="px-4 py-2">Total</td>
+                  <td className="px-3 py-2 text-right">{totalPersons}</td>
+                  <td className="px-3 py-2 text-right">{depts.reduce((s, d) => s + (d.machine_count ?? 0), 0)}</td>
+                  <td className="px-3 py-2 text-right">{depts.reduce((s, d) => s + (d.task_count ?? 0), 0)}</td>
+                  <td className="px-3 py-2 text-right">—</td>
+                  <td className="px-3 py-2 text-right">—</td>
+                  <td className="px-3 py-2 text-right">{overdueTotal}</td>
+                  <td className="px-4 py-2 text-right">{dueWeekTotal}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Per-department cards */}
       {depts.map((dept: any) => {

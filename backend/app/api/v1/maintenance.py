@@ -563,8 +563,12 @@ async def get_manpower_summary(
             | (MaintenanceSchedule.mill_id.is_(None))
         )
 
-    result = await db.execute(stmt)
-    schedules = result.scalars().all()
+    try:
+        result = await db.execute(stmt)
+        schedules = result.scalars().all()
+    except Exception as e:
+        logger.error(f"maintenance.manpower-summary query error: {e}", exc_info=True)
+        return {"departments": [], "total_schedules": 0}
 
     today_str = dt_date.today().isoformat()
     dept_data: dict = {}
