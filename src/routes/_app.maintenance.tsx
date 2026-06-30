@@ -340,21 +340,24 @@ function MaintenancePage() {
   const maintQ = useQuery({
     queryKey: ["maintenance-tasks", millId],
     queryFn: maintenanceApi.getTasks,
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
     retry: 1,
     enabled: !!millId,
   });
   const schedulesQ = useQuery({
     queryKey: ["maintenance-schedules", millId],
     queryFn: maintenanceApi.getSchedules,
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
     retry: 1,
     enabled: !!millId,
   });
   const paramsQ = useQuery({
     queryKey: ["machine-parameters", millId],
     queryFn: maintenanceApi.getParameters,
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
     retry: 1,
     enabled: !!millId,
   });
@@ -374,10 +377,20 @@ function MaintenancePage() {
   const manpowerQ = useQuery({
     queryKey: ["maintenance", "manpower-summary"],
     queryFn: maintenanceApi.getManpowerSummary,
-    staleTime: 120_000,
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
     retry: 1,
     enabled: !!millId,
   });
+
+  // Refetch everything in the maintenance module at once (used by the page Refresh).
+  const refreshAll = () => {
+    qc.invalidateQueries({ queryKey: ["maintenance-tasks"] });
+    qc.invalidateQueries({ queryKey: ["maintenance-schedules"] });
+    qc.invalidateQueries({ queryKey: ["machine-parameters"] });
+    qc.invalidateQueries({ queryKey: ["maintenance"] });
+    qc.invalidateQueries({ queryKey: ["mill-calendar"] });
+  };
 
   const machineColConfig = useColumnConfig("maintenance_machines");
 
@@ -458,57 +471,36 @@ function MaintenancePage() {
       <PageHeader
         title="Maintenance"
         subtitle="Breakdown logging, preventive maintenance, technician tracking & MTTR/MTBF"
-        onRefresh={() => qc.invalidateQueries({ queryKey: ["maintenance-tasks"] })}
-        isRefreshing={maintQ.isFetching}
+        onRefresh={refreshAll}
+        isRefreshing={maintQ.isFetching || schedulesQ.isFetching || manpowerQ.isFetching}
       />
       <AccessGuard module="maintenance">
         <div className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
           <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">
-                  Open Tasks
-                </div>
-                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <AlertTriangle className="size-5 text-destructive" />
-                  {openTasks}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">
-                  In Progress
-                </div>
-                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <Activity className="size-5 text-warning" />
-                  {inProgress}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">
-                  Completed Today
-                </div>
-                <div className="text-2xl font-semibold mt-2 flex items-center gap-2">
-                  <CheckCircle2 className="size-5 text-success" />
-                  {completedToday}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-5">
-                <div className="text-xs uppercase text-muted-foreground font-medium">
-                  Total Downtime
-                </div>
-                <div className="text-2xl font-semibold mt-2">{totalDownTime} min</div>
-              </CardContent>
-            </Card>
+            {[
+              { label: "Open Tasks", value: openTasks, icon: <AlertTriangle className="size-5" />, accent: "text-rose-600", ring: "bg-rose-100 dark:bg-rose-950/40", bar: "bg-rose-500" },
+              { label: "In Progress", value: inProgress, icon: <Activity className="size-5" />, accent: "text-amber-600", ring: "bg-amber-100 dark:bg-amber-950/40", bar: "bg-amber-500" },
+              { label: "Completed Today", value: completedToday, icon: <CheckCircle2 className="size-5" />, accent: "text-emerald-600", ring: "bg-emerald-100 dark:bg-emerald-950/40", bar: "bg-emerald-500" },
+              { label: "PM Schedules", value: schedules.length, icon: <CalendarCheck className="size-5" />, accent: "text-blue-600", ring: "bg-blue-100 dark:bg-blue-950/40", bar: "bg-blue-500", sub: `${totalDownTime} min downtime` },
+            ].map((k) => (
+              <Card key={k.label} className="relative overflow-hidden">
+                <div className={cn("absolute left-0 top-0 h-full w-1", k.bar)} />
+                <CardContent className="p-5 pl-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-xs uppercase text-muted-foreground font-medium tracking-wide">{k.label}</div>
+                      <div className="text-3xl font-bold mt-1.5 leading-none">{k.value}</div>
+                      {k.sub && <div className="text-[11px] text-muted-foreground mt-1.5">{k.sub}</div>}
+                    </div>
+                    <div className={cn("rounded-lg p-2", k.ring, k.accent)}>{k.icon}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
 
           <Tabs defaultValue="tasks">
-            <TabsList>
+            <TabsList className="w-full justify-start overflow-x-auto flex-nowrap">
               <TabsTrigger value="tasks">Maintenance Tasks</TabsTrigger>
               <TabsTrigger value="calendar">
                 PM Calendar
@@ -2055,7 +2047,8 @@ function DayPlanView() {
   const planQ = useQuery({
     queryKey: ["maintenance", "day-plan", year, month, section],
     queryFn: () => maintenanceApi.getDayPlan(month, year, section === "all" ? undefined : section),
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
     retry: 1,
   });
 
@@ -2488,21 +2481,39 @@ function DayPlanView() {
                   <div className="border-t">
                     {Object.entries(bySection).map(([sec, tasks]) => {
                       const col = secColor(sec);
+                      const machineList = Array.from(new Set((tasks as any[]).map((t: any) => t.machine_code).filter(Boolean)));
                       return (
                         <div key={sec} className={`${col.bg} border-b last:border-b-0`}>
-                          <div className={`px-4 py-1.5 border-b ${col.border} flex items-center gap-2`}>
+                          <div className={`px-4 py-1.5 border-b ${col.border} flex items-center gap-2 flex-wrap`}>
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded ${col.badge}`}>{sec}</span>
                             <span className="text-xs text-muted-foreground">{tasks.length} tasks · {tasks.reduce((a: number, t: any) => a + t.manpower_needed, 0)} persons</span>
+                            {machineList.length > 0 && (
+                              <span className="text-[10px] text-muted-foreground ml-auto flex items-center gap-1 flex-wrap">
+                                <Wrench className="size-3" />
+                                {machineList.slice(0, 6).map((mc) => (
+                                  <span key={mc as string} className="font-mono bg-white/60 dark:bg-black/20 border border-border/50 rounded px-1">{mc as string}</span>
+                                ))}
+                                {machineList.length > 6 && <span>+{machineList.length - 6}</span>}
+                              </span>
+                            )}
                           </div>
                           <div className="divide-y divide-border/50">
                             {tasks.map((t: any) => (
                               <div key={t.id} className="px-4 py-2.5 flex items-start gap-3">
-                                {/* Machine/Line */}
-                                <div className="flex-shrink-0 min-w-[90px]">
-                                  <div className="text-xs font-mono font-semibold text-foreground">{t.machine_code}</div>
-                                  {t.machine_line_code && (
-                                    <div className="text-[10px] text-muted-foreground font-mono">{t.machine_line_code}</div>
-                                  )}
+                                {/* Machine / Line / count */}
+                                <div className="flex-shrink-0 min-w-[110px]">
+                                  <div className="text-xs font-mono font-semibold text-foreground inline-flex items-center gap-1 bg-muted/60 border border-border/50 rounded px-1.5 py-0.5">
+                                    <Wrench className="size-3 text-muted-foreground" />
+                                    {t.machine_code || "—"}
+                                  </div>
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    {t.machine_line_code && (
+                                      <span className="text-[10px] text-muted-foreground font-mono">{t.machine_line_code}</span>
+                                    )}
+                                    {t.machine_count > 1 && (
+                                      <span className="text-[10px] text-blue-600">×{t.machine_count}</span>
+                                    )}
+                                  </div>
                                 </div>
                                 {/* Task description */}
                                 <div className="flex-1 min-w-0">
@@ -2774,7 +2785,11 @@ function ImportScheduleDialog() {
         onClose={() => setOpen(false)}
         tableName="maintenance_schedules"
         endpoint="/maintenance/schedules/bulk"
-        onSuccess={() => qc.invalidateQueries({ queryKey: ["maintenance-schedules"] })}
+        onSuccess={() => {
+          qc.invalidateQueries({ queryKey: ["maintenance-schedules"] });
+          qc.invalidateQueries({ queryKey: ["maintenance", "manpower-summary"] });
+          qc.invalidateQueries({ queryKey: ["maintenance", "day-plan"] });
+        }}
         title="Import PM Schedules"
       />
     </>
