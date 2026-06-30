@@ -32,7 +32,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/ui/DataTable";
 import type { ColDef } from "@/components/ui/DataTable";
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useMemo } from "react";
 import {
   Select,
   SelectContent,
@@ -2050,17 +2050,6 @@ function DayPlanView() {
   const todayDay = today.getMonth() + 1 === month && today.getFullYear() === year
     ? today.getDate() : -1;
 
-  // Auto-scroll to today's row once the plan loads (list view, current month).
-  useEffect(() => {
-    if (!planQ.isLoading && todayDay > 0 && viewMode === "list") {
-      const el = document.getElementById(`day-${todayDay}`);
-      if (el) {
-        const t = setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "center" }), 250);
-        return () => clearTimeout(t);
-      }
-    }
-  }, [planQ.isLoading, todayDay, viewMode]);
-
   return (
     <div className="space-y-4">
       {/* Controls */}
@@ -2164,7 +2153,6 @@ function DayPlanView() {
                     onClick={() => {
                       setViewMode("list");
                       setExpandedDays((p) => ({ ...p, [todayDay]: true }));
-                      document.getElementById(`day-${todayDay}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
                     }}
                   >
                     View today's tasks
