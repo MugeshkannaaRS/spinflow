@@ -12,7 +12,7 @@ from app.db.session import get_db
 logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
-from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter, PMEntryLog, PMActivityConfig
+from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter, PMEntryLog, PMActivityConfig, MaintenanceHolidayCalendar
 from app.models.production import Machine
 from app.models.masters import Mill
 from app.schemas.maintenance import (
@@ -785,6 +785,22 @@ async def get_day_plan(
     result = await db.execute(stmt)
     schedules = result.scalars().all()
 
+    # Fetch the mill's holiday calendar for this month → {date_iso: (day_type, persons_on_leave)}
+    holiday_map: dict = {}
+    try:
+        hstmt = select(MaintenanceHolidayCalendar).where(
+            MaintenanceHolidayCalendar.date.like(f"{y}-{m:02d}-%")
+        )
+        if effective_mill_id:
+            hstmt = hstmt.where(
+                (MaintenanceHolidayCalendar.mill_id == effective_mill_id)
+                | (MaintenanceHolidayCalendar.mill_id.is_(None))
+            )
+        for h in (await db.execute(hstmt)).scalars().all():
+            holiday_map[h.date] = (h.day_type, h.persons_on_leave or 0, h.note)
+    except Exception as e:
+        logger.error(f"day-plan holiday fetch error: {e}")
+
     # For each schedule, compute all due dates in the month
     # A task is "due on day D" if next_due falls in that month,
     # or if frequency_days is short enough to recur (weekly/daily)
@@ -857,22 +873,55 @@ async def get_day_plan(
             logger.error(f"maintenance.day-plan skip schedule id={getattr(s, 'id', '?')}: {row_err}")
             continue
 
+    # Total maintenance manpower available on a normal working day (sum of the
+    # distinct per-department manpower). Used to compute capacity per day.
+    base_manpower = 0
+    seen_dept = {}
+    for s in schedules:
+        d = s.department or "General"
+        if s.manpower_count and d not in seen_dept:
+            seen_dept[d] = s.manpower_count
+    base_manpower = sum(seen_dept.values()) or 1
+    SHIFT_MIN = 450  # 7.5h per person
+
     # Build day list
     days_out = []
     for day in range(1, days_in_month + 1):
         date_obj = dt_date(y, m, day)
+        date_iso = date_obj.isoformat()
         tasks = day_map[day]
         total_mp = sum(t["manpower_needed"] for t in tasks)
         total_min = sum(t["est_min"] for t in tasks)
+
+        # Capacity adjustment from the holiday calendar
+        day_type, on_leave, holiday_note = "working", 0, None
+        if date_iso in holiday_map:
+            day_type, on_leave, holiday_note = holiday_map[date_iso]
+        avail_persons = max(0, base_manpower - (on_leave or 0))
+        capacity_factor = 0.0 if day_type == "holiday" else (0.5 if day_type == "half_day" else 1.0)
+        avail_min = avail_persons * SHIFT_MIN * capacity_factor
+        # Load = required minutes / available minutes
+        load_pct = round((total_min / avail_min) * 100, 1) if avail_min > 0 else (100.0 if total_min > 0 else 0)
+        overloaded = avail_min > 0 and total_min > avail_min
+        is_holiday = day_type == "holiday"
+
         days_out.append({
             "day": day,
-            "date": date_obj.isoformat(),
+            "date": date_iso,
             "weekday": date_obj.strftime("%a"),
             "tasks": sorted(tasks, key=lambda t: (t["section"], t["machine_code"])),
             "total_tasks": len(tasks),
             "total_manpower_needed": total_mp,
             "total_est_min": total_min,
-            "load_pct": round((total_min / (total_mp * 450)) * 100, 1) if total_mp > 0 else 0,
+            "load_pct": load_pct,
+            # capacity / calendar info
+            "day_type": day_type,
+            "is_holiday": is_holiday,
+            "persons_on_leave": on_leave or 0,
+            "available_persons": avail_persons,
+            "available_min": round(avail_min),
+            "overloaded": overloaded,
+            "holiday_note": holiday_note,
         })
 
     # Section summary for the month
@@ -1108,3 +1157,108 @@ async def upsert_activity_config(
         "activities": row.activities or [],
         "ac_units": row.ac_units or [],
     }
+
+
+# ---------------------------------------------------------------------------
+# HOLIDAY CALENDAR — mill-customizable holidays / half-days / leave counts
+# ---------------------------------------------------------------------------
+
+@router.get("/maintenance/holidays")
+async def list_holidays(
+    year: Optional[int] = Query(None),
+    mill_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance")),
+):
+    """List holiday-calendar entries for the mill (optionally a single year)."""
+    scope = await get_mill_scope(current_user, db)
+    effective_mill_id = scope.get("mill_id")
+    if mill_id and scope.get("role") == "SUPER_ADMIN":
+        effective_mill_id = mill_id
+
+    stmt = select(MaintenanceHolidayCalendar)
+    if effective_mill_id:
+        stmt = stmt.where(
+            (MaintenanceHolidayCalendar.mill_id == effective_mill_id)
+            | (MaintenanceHolidayCalendar.mill_id.is_(None))
+        )
+    if year:
+        stmt = stmt.where(MaintenanceHolidayCalendar.date.like(f"{year}-%"))
+    try:
+        rows = (await db.execute(stmt.order_by(MaintenanceHolidayCalendar.date))).scalars().all()
+    except Exception as e:
+        logger.error(f"maintenance.holidays list error: {e}")
+        rows = []
+    return {
+        "data": [
+            {
+                "id": r.id,
+                "date": r.date,
+                "day_type": r.day_type,
+                "persons_on_leave": r.persons_on_leave or 0,
+                "note": r.note,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.post("/maintenance/holidays")
+async def upsert_holiday(
+    payload: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance", write=True)),
+):
+    """Create or update a holiday-calendar entry (unique per mill_id + date)."""
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id")
+    date_str = str(payload.get("date") or "").strip()
+    if not date_str:
+        raise HTTPException(400, detail="date is required (YYYY-MM-DD)")
+
+    stmt = select(MaintenanceHolidayCalendar).where(MaintenanceHolidayCalendar.date == date_str)
+    if mill_id:
+        stmt = stmt.where(MaintenanceHolidayCalendar.mill_id == mill_id)
+    row = (await db.execute(stmt)).scalar_one_or_none()
+
+    def _as_int(v):
+        try:
+            return int(v) if v not in (None, "") else 0
+        except (TypeError, ValueError):
+            return 0
+
+    if row:
+        row.day_type = payload.get("day_type", row.day_type)
+        row.persons_on_leave = _as_int(payload.get("persons_on_leave", row.persons_on_leave))
+        row.note = payload.get("note", row.note)
+    else:
+        row = MaintenanceHolidayCalendar(
+            mill_id=mill_id,
+            date=date_str,
+            day_type=payload.get("day_type", "holiday"),
+            persons_on_leave=_as_int(payload.get("persons_on_leave")),
+            note=payload.get("note"),
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(row)
+    await db.commit()
+    return {"id": row.id, "date": row.date, "day_type": row.day_type,
+            "persons_on_leave": row.persons_on_leave or 0, "note": row.note}
+
+
+@router.delete("/maintenance/holidays/{holiday_id}")
+async def delete_holiday(
+    holiday_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(MaintenanceHolidayCalendar).where(MaintenanceHolidayCalendar.id == holiday_id)
+    if scope.get("mill_id"):
+        stmt = stmt.where(MaintenanceHolidayCalendar.mill_id == scope["mill_id"])
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, detail="Holiday entry not found")
+    await db.delete(row)
+    await db.commit()
+    return {"message": "deleted", "id": holiday_id}

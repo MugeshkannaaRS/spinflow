@@ -88,6 +88,28 @@ class PMEntryLog(TimestampMixin, Base):
     data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
 
 
+class MaintenanceHolidayCalendar(Base):
+    """
+    Mill-customizable maintenance calendar — marks dates as holiday / half-day,
+    and records how many maintenance staff are on leave that day. The Day Plan
+    reads these to adjust available manpower capacity.
+
+    day_type: 'holiday'  → 0 capacity that day
+              'half_day'  → 50% capacity
+              'working'   → normal (used to override a default weekly-off if needed)
+    persons_on_leave: extra staff unavailable that day (subtracted from capacity)
+    """
+    __tablename__ = "maintenance_holiday_calendar"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)  # YYYY-MM-DD
+    day_type: Mapped[str] = mapped_column(String(20), nullable=False, default="holiday")
+    persons_on_leave: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
+    note: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class PMActivityConfig(Base):
     """
     Editable per-section activity lists for PM entry forms.

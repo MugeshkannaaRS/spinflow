@@ -325,6 +325,12 @@ export const maintenanceApi = {
     api.get("/maintenance/activity-config").then((r) => r.data.data as any[]),
   upsertActivityConfig: (section: string, payload: any) =>
     api.put(`/maintenance/activity-config/${encodeURIComponent(section)}`, payload).then((r) => r.data),
+  getHolidays: (year?: number) =>
+    api.get(`/maintenance/holidays${year ? `?year=${year}` : ""}`).then((r) => r.data.data as any[]),
+  upsertHoliday: (payload: { date: string; day_type: string; persons_on_leave?: number; note?: string }) =>
+    api.post("/maintenance/holidays", payload).then((r) => r.data),
+  deleteHoliday: (id: string) =>
+    api.delete(`/maintenance/holidays/${id}`).then((r) => r.data),
 };
 
 // Dashboard

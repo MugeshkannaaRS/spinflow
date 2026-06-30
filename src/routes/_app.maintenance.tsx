@@ -2,6 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { mastersApi, maintenanceApi, productionApi, exportApi } from "@/lib/api-service";
 import { api } from "@/lib/api";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { exportToExcel, exportToPdf } from "@/lib/export-utils";
 import { ExportDateRangeButton } from "@/components/ui/ExportDateRangeButton";
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
@@ -2013,6 +2020,125 @@ function loadColor(pct: number) {
   return "bg-green-400";
 }
 
+// Holiday / half-day / leave calendar manager for the mill.
+function HolidaysDialog({ year, onChanged }: { year: number; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  const [form, setForm] = useState({ date: "", day_type: "holiday", persons_on_leave: "", note: "" });
+
+  const holidaysQ = useQuery({
+    queryKey: ["maintenance", "holidays", year],
+    queryFn: () => maintenanceApi.getHolidays(year),
+    enabled: open,
+    staleTime: 30_000,
+  });
+
+  const upsert = useMutation({
+    mutationFn: (p: any) => maintenanceApi.upsertHoliday(p),
+    onSuccess: () => {
+      toast.success("Calendar updated");
+      qc.invalidateQueries({ queryKey: ["maintenance", "holidays"] });
+      onChanged();
+      setForm({ date: "", day_type: "holiday", persons_on_leave: "", note: "" });
+    },
+    onError: () => toast.error("Could not save"),
+  });
+
+  const del = useMutation({
+    mutationFn: (id: string) => maintenanceApi.deleteHoliday(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["maintenance", "holidays"] });
+      onChanged();
+    },
+  });
+
+  const items: any[] = holidaysQ.data ?? [];
+
+  const submit = () => {
+    if (!form.date) { toast.error("Pick a date"); return; }
+    upsert.mutate({
+      date: form.date,
+      day_type: form.day_type,
+      persons_on_leave: form.persons_on_leave ? Number(form.persons_on_leave) : 0,
+      note: form.note || undefined,
+    });
+  };
+
+  const typeLabel = (t: string) => t === "half_day" ? "Half-day" : t === "working" ? "Working" : "Holiday";
+
+  return (
+    <>
+      <Button size="sm" variant="outline" className="h-8 px-3 text-xs" onClick={() => setOpen(true)}>
+        <CalendarDays className="size-3.5 mr-1" /> Holidays
+      </Button>
+      <Dialog open={open} onOpenChange={(o) => !o && setOpen(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Maintenance Calendar — Holidays & Leave</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {/* Add / update form */}
+            <div className="grid grid-cols-2 gap-2 items-end border rounded-lg p-3 bg-muted/20">
+              <div className="space-y-1">
+                <Label className="text-xs">Date</Label>
+                <Input type="date" value={form.date} onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Type</Label>
+                <Select value={form.day_type} onValueChange={(v) => setForm((p) => ({ ...p, day_type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="holiday">Holiday (no work)</SelectItem>
+                    <SelectItem value="half_day">Half-day</SelectItem>
+                    <SelectItem value="working">Working (override)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Persons on leave</Label>
+                <Input type="number" min="0" value={form.persons_on_leave} onChange={(e) => setForm((p) => ({ ...p, persons_on_leave: e.target.value }))} placeholder="0" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Note</Label>
+                <Input value={form.note} onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))} placeholder="e.g. Pongal" />
+              </div>
+              <div className="col-span-2 flex justify-end">
+                <Button size="sm" onClick={submit} disabled={upsert.isPending}>
+                  {upsert.isPending ? "Saving…" : "Save Entry"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Existing entries */}
+            <div className="max-h-64 overflow-y-auto border rounded-lg divide-y">
+              {items.length === 0 ? (
+                <div className="py-8 text-center text-xs text-muted-foreground">No calendar entries for {year}.</div>
+              ) : items.map((h) => (
+                <div key={h.id} className="flex items-center gap-2 px-3 py-2 text-xs">
+                  <span className="font-medium w-24">{h.date}</span>
+                  <Badge variant="outline" className={cn(
+                    "text-[10px]",
+                    h.day_type === "holiday" && "border-rose-300 text-rose-700",
+                    h.day_type === "half_day" && "border-amber-300 text-amber-700",
+                  )}>{typeLabel(h.day_type)}</Badge>
+                  {(h.persons_on_leave ?? 0) > 0 && <span className="text-muted-foreground">{h.persons_on_leave} on leave</span>}
+                  {h.note && <span className="text-muted-foreground truncate">· {h.note}</span>}
+                  <Button size="sm" variant="ghost" className="ml-auto h-6 w-6 p-0 text-red-500" onClick={() => del.mutate(h.id)}>
+                    <Trash2 className="size-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function DayPlanView() {
   const today = new Date();
   const [month, setMonth] = useState(today.getMonth() + 1);
@@ -2050,6 +2176,113 @@ function DayPlanView() {
   const todayDay = today.getMonth() + 1 === month && today.getFullYear() === year
     ? today.getDate() : -1;
 
+  const monthLabel = `${monthNames[month - 1]}_${year}`;
+
+  // Flatten the plan into one row per (day, task) for the full-plan export.
+  function flatRows() {
+    const out: any[] = [];
+    for (const d of days) {
+      for (const t of d.tasks ?? []) {
+        out.push({
+          date: d.date,
+          weekday: d.weekday,
+          day_status: d.day_type === "holiday" ? "Holiday" : d.day_type === "half_day" ? "Half-day" : "Working",
+          section: t.section,
+          machine_code: t.machine_code,
+          machine_line_code: t.machine_line_code ?? "",
+          machine_count: t.machine_count ?? 1,
+          description: t.description,
+          frequency: t.frequency_label,
+          manpower_needed: t.manpower_needed,
+          est_min: t.est_min,
+          overdue: t.is_overdue ? "Yes" : "",
+        });
+      }
+    }
+    return out;
+  }
+
+  const planColumns = [
+    { key: "date", label: "Date" },
+    { key: "weekday", label: "Day" },
+    { key: "day_status", label: "Status" },
+    { key: "section", label: "Section" },
+    { key: "machine_code", label: "Machine" },
+    { key: "machine_line_code", label: "Line" },
+    { key: "machine_count", label: "Mc Count" },
+    { key: "description", label: "Work Description" },
+    { key: "frequency", label: "Frequency" },
+    { key: "manpower_needed", label: "Persons" },
+    { key: "est_min", label: "Est. Min" },
+    { key: "overdue", label: "Overdue" },
+  ];
+
+  async function exportPlan(fmt: "excel" | "pdf") {
+    const rows = flatRows();
+    if (rows.length === 0) { toast.error("No tasks to export"); return; }
+    const opts = {
+      filename: `PM_Day_Plan_${monthLabel}`,
+      title: `PM Day Plan — ${monthNames[month - 1]} ${year}`,
+      subtitle: section === "all" ? "All sections" : `Section: ${section}`,
+      columns: planColumns,
+      rows,
+    };
+    try {
+      if (fmt === "excel") await exportToExcel(opts);
+      else await exportToPdf(opts);
+    } catch (e) { toast.error("Export failed"); }
+  }
+
+  // Per-day printable cards: one block per day with its tasks.
+  async function exportDayCards(fmt: "excel" | "pdf") {
+    const activeDays = days.filter((d: any) => d.total_tasks > 0);
+    if (activeDays.length === 0) { toast.error("No tasks to export"); return; }
+    if (fmt === "excel") {
+      // One sheet-friendly flat layout with day separators
+      const rows: any[] = [];
+      for (const d of activeDays) {
+        rows.push({ date: `${d.date} (${d.weekday})`, machine_code: `— ${d.total_tasks} tasks, ${d.total_manpower_needed} persons, ${d.day_type !== "working" ? d.day_type : "working"} —`, description: "", section: "", manpower_needed: "", est_min: "" });
+        for (const t of d.tasks) rows.push({ date: "", section: t.section, machine_code: t.machine_code + (t.machine_line_code ? ` / ${t.machine_line_code}` : ""), description: t.description, manpower_needed: t.manpower_needed, est_min: t.est_min });
+      }
+      await exportToExcel({
+        filename: `PM_DayCards_${monthLabel}`,
+        columns: [
+          { key: "date", label: "Date" },
+          { key: "section", label: "Section" },
+          { key: "machine_code", label: "Machine" },
+          { key: "description", label: "Work Description" },
+          { key: "manpower_needed", label: "Persons" },
+          { key: "est_min", label: "Est. Min" },
+        ],
+        rows,
+      });
+      return;
+    }
+    // PDF: a page per day using jsPDF
+    try {
+      const mod: any = await import("jspdf");
+      await import("jspdf-autotable");
+      const { jsPDF } = mod;
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      activeDays.forEach((d: any, idx: number) => {
+        if (idx > 0) doc.addPage();
+        doc.setFontSize(14);
+        doc.text(`PM Job Card — ${d.date} (${d.weekday})`, 14, 18);
+        doc.setFontSize(10);
+        const status = d.day_type === "holiday" ? "HOLIDAY" : d.day_type === "half_day" ? "HALF-DAY" : "Working day";
+        doc.text(`${status}  |  ${d.total_tasks} tasks  |  ${d.total_manpower_needed} persons needed  |  ${Math.round(d.total_est_min / 60 * 10) / 10}h est.${(d.persons_on_leave ?? 0) > 0 ? `  |  ${d.persons_on_leave} on leave` : ""}`, 14, 25);
+        (doc as any).autoTable({
+          startY: 30,
+          head: [["Section", "Machine", "Line", "Work Description", "Persons", "Min"]],
+          body: d.tasks.map((t: any) => [t.section, t.machine_code, t.machine_line_code ?? "", t.description, String(t.manpower_needed), String(t.est_min)]),
+          styles: { fontSize: 8, cellPadding: 1.5 },
+          headStyles: { fillColor: [37, 99, 235] },
+        });
+      });
+      doc.save(`PM_DayCards_${monthLabel}.pdf`);
+    } catch (e) { toast.error("PDF export failed"); }
+  }
+
   return (
     <div className="space-y-4">
       {/* Controls */}
@@ -2078,8 +2311,26 @@ function DayPlanView() {
               </SelectContent>
             </Select>
 
-            {/* View toggle */}
-            <div className="flex gap-1 ml-auto">
+            <div className="flex gap-1 ml-auto items-center">
+              {/* Holidays manager */}
+              <HolidaysDialog year={year} onChanged={() => planQ.refetch()} />
+
+              {/* Export menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="h-8 px-3 text-xs">
+                    <Download className="size-3.5 mr-1" /> Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => exportPlan("excel")}>Full plan — Excel</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportPlan("pdf")}>Full plan — PDF</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportDayCards("pdf")}>Per-day cards — PDF</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => exportDayCards("excel")}>Per-day cards — Excel</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* View toggle */}
               <Button
                 size="sm" variant={viewMode === "list" ? "default" : "outline"}
                 onClick={() => setViewMode("list")} className="h-8 px-3 text-xs"
@@ -2276,10 +2527,30 @@ function DayPlanView() {
                       <span className="text-xs text-muted-foreground">{d.total_manpower_needed} persons needed</span>
                       <span className="text-xs text-muted-foreground">·</span>
                       <span className="text-xs text-muted-foreground">{Math.round(d.total_est_min / 60 * 10) / 10}h est.</span>
+                      {d.day_type === "holiday" && (
+                        <Badge className="text-[10px] px-1.5 py-0 bg-rose-600 hover:bg-rose-600">
+                          Holiday{d.holiday_note ? ` · ${d.holiday_note}` : ""}
+                        </Badge>
+                      )}
+                      {d.day_type === "half_day" && (
+                        <Badge className="text-[10px] px-1.5 py-0 bg-amber-500 hover:bg-amber-500">Half-day</Badge>
+                      )}
+                      {(d.persons_on_leave ?? 0) > 0 && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">{d.persons_on_leave} on leave</Badge>
+                      )}
+                      {d.overloaded && (
+                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Over capacity</Badge>
+                      )}
                       {overdue && (
                         <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Overdue</Badge>
                       )}
                     </div>
+                    {(d.day_type !== "working" || (d.persons_on_leave ?? 0) > 0) && (
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        {d.available_persons} of capacity available
+                        {d.available_min != null && ` · ${Math.round(d.available_min / 60 * 10) / 10}h capacity`}
+                      </div>
+                    )}
                     {/* Section chips */}
                     <div className="flex gap-1 mt-1 flex-wrap">
                       {Object.entries(bySection).map(([sec, tasks]) => {
