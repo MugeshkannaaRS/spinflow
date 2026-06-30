@@ -88,26 +88,34 @@ class PMEntryLog(TimestampMixin, Base):
     data: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True, default=dict)
 
 
-class MaintenanceHolidayCalendar(Base):
+class MillCalendar(Base):
     """
-    Mill-customizable maintenance calendar — marks dates as holiday / half-day,
-    and records how many maintenance staff are on leave that day. The Day Plan
-    reads these to adjust available manpower capacity.
+    Universal mill calendar — one source of truth for holidays / half-days /
+    leave, shared across modules (PM Day Plan, payroll, attendance, etc.).
 
-    day_type: 'holiday'  → 0 capacity that day
-              'half_day'  → 50% capacity
-              'working'   → normal (used to override a default weekly-off if needed)
-    persons_on_leave: extra staff unavailable that day (subtracted from capacity)
+    Two kinds of rows:
+      * Specific-date entry: date='YYYY-MM-DD', day_type in
+        ('holiday','half_day','working'), optional persons_on_leave + note.
+      * Weekly-off rule: date='WEEKLY', weekly_off = 0..6 (Mon=0 … Sun=6),
+        meaning that weekday is a recurring off-day every week.
+
+    day_type: 'holiday' → 0 capacity, 'half_day' → 50%, 'working' → normal override
+    persons_on_leave: staff unavailable that day (subtracted from capacity)
     """
-    __tablename__ = "maintenance_holiday_calendar"
+    __tablename__ = "mill_calendar"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     mill_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
-    date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)  # YYYY-MM-DD
+    date: Mapped[str] = mapped_column(String(10), nullable=False, index=True)  # YYYY-MM-DD or 'WEEKLY'
     day_type: Mapped[str] = mapped_column(String(20), nullable=False, default="holiday")
     persons_on_leave: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, default=0)
+    weekly_off: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 0=Mon..6=Sun
     note: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+# Backwards-compat alias (old name used in earlier imports/migrations)
+MaintenanceHolidayCalendar = MillCalendar
 
 
 class PMActivityConfig(Base):

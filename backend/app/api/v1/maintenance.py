@@ -12,7 +12,7 @@ from app.db.session import get_db
 logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
-from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter, PMEntryLog, PMActivityConfig, MaintenanceHolidayCalendar
+from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter, PMEntryLog, PMActivityConfig, MillCalendar
 from app.models.production import Machine
 from app.models.masters import Mill
 from app.schemas.maintenance import (
@@ -785,21 +785,23 @@ async def get_day_plan(
     result = await db.execute(stmt)
     schedules = result.scalars().all()
 
-    # Fetch the mill's holiday calendar for this month → {date_iso: (day_type, persons_on_leave)}
-    holiday_map: dict = {}
+    # Fetch the mill calendar: specific-date entries for this month + weekly-off rules.
+    holiday_map: dict = {}          # date_iso -> (day_type, persons_on_leave, note)
+    weekly_off_days: set = set()    # weekday ints (0=Mon..6=Sun) that are recurring off
     try:
-        hstmt = select(MaintenanceHolidayCalendar).where(
-            MaintenanceHolidayCalendar.date.like(f"{y}-{m:02d}-%")
-        )
+        cstmt = select(MillCalendar)
         if effective_mill_id:
-            hstmt = hstmt.where(
-                (MaintenanceHolidayCalendar.mill_id == effective_mill_id)
-                | (MaintenanceHolidayCalendar.mill_id.is_(None))
+            cstmt = cstmt.where(
+                (MillCalendar.mill_id == effective_mill_id)
+                | (MillCalendar.mill_id.is_(None))
             )
-        for h in (await db.execute(hstmt)).scalars().all():
-            holiday_map[h.date] = (h.day_type, h.persons_on_leave or 0, h.note)
+        for h in (await db.execute(cstmt)).scalars().all():
+            if h.date == "WEEKLY" and h.weekly_off is not None:
+                weekly_off_days.add(int(h.weekly_off))
+            elif h.date.startswith(f"{y}-{m:02d}-"):
+                holiday_map[h.date] = (h.day_type, h.persons_on_leave or 0, h.note)
     except Exception as e:
-        logger.error(f"day-plan holiday fetch error: {e}")
+        logger.error(f"day-plan calendar fetch error: {e}")
 
     # For each schedule, compute all due dates in the month
     # A task is "due on day D" if next_due falls in that month,
@@ -893,10 +895,13 @@ async def get_day_plan(
         total_mp = sum(t["manpower_needed"] for t in tasks)
         total_min = sum(t["est_min"] for t in tasks)
 
-        # Capacity adjustment from the holiday calendar
+        # Capacity adjustment from the mill calendar.
+        # Priority: specific-date entry > weekly-off rule > normal working day.
         day_type, on_leave, holiday_note = "working", 0, None
         if date_iso in holiday_map:
             day_type, on_leave, holiday_note = holiday_map[date_iso]
+        elif date_obj.weekday() in weekly_off_days:
+            day_type, holiday_note = "holiday", "Weekly off"
         avail_persons = max(0, base_manpower - (on_leave or 0))
         capacity_factor = 0.0 if day_type == "holiday" else (0.5 if day_type == "half_day" else 1.0)
         avail_min = avail_persons * SHIFT_MIN * capacity_factor
@@ -1176,16 +1181,16 @@ async def list_holidays(
     if mill_id and scope.get("role") == "SUPER_ADMIN":
         effective_mill_id = mill_id
 
-    stmt = select(MaintenanceHolidayCalendar)
+    stmt = select(MillCalendar)
     if effective_mill_id:
         stmt = stmt.where(
-            (MaintenanceHolidayCalendar.mill_id == effective_mill_id)
-            | (MaintenanceHolidayCalendar.mill_id.is_(None))
+            (MillCalendar.mill_id == effective_mill_id)
+            | (MillCalendar.mill_id.is_(None))
         )
     if year:
-        stmt = stmt.where(MaintenanceHolidayCalendar.date.like(f"{year}-%"))
+        stmt = stmt.where(MillCalendar.date.like(f"{year}-%"))
     try:
-        rows = (await db.execute(stmt.order_by(MaintenanceHolidayCalendar.date))).scalars().all()
+        rows = (await db.execute(stmt.order_by(MillCalendar.date))).scalars().all()
     except Exception as e:
         logger.error(f"maintenance.holidays list error: {e}")
         rows = []
@@ -1196,6 +1201,7 @@ async def list_holidays(
                 "date": r.date,
                 "day_type": r.day_type,
                 "persons_on_leave": r.persons_on_leave or 0,
+                "weekly_off": r.weekly_off,
                 "note": r.note,
             }
             for r in rows
@@ -1216,9 +1222,9 @@ async def upsert_holiday(
     if not date_str:
         raise HTTPException(400, detail="date is required (YYYY-MM-DD)")
 
-    stmt = select(MaintenanceHolidayCalendar).where(MaintenanceHolidayCalendar.date == date_str)
+    stmt = select(MillCalendar).where(MillCalendar.date == date_str)
     if mill_id:
-        stmt = stmt.where(MaintenanceHolidayCalendar.mill_id == mill_id)
+        stmt = stmt.where(MillCalendar.mill_id == mill_id)
     row = (await db.execute(stmt)).scalar_one_or_none()
 
     def _as_int(v):
@@ -1227,23 +1233,33 @@ async def upsert_holiday(
         except (TypeError, ValueError):
             return 0
 
+    def _opt_int(v):
+        try:
+            return int(v) if v not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+
+    weekly_off = _opt_int(payload.get("weekly_off"))
+
     if row:
         row.day_type = payload.get("day_type", row.day_type)
         row.persons_on_leave = _as_int(payload.get("persons_on_leave", row.persons_on_leave))
+        row.weekly_off = weekly_off if "weekly_off" in payload else row.weekly_off
         row.note = payload.get("note", row.note)
     else:
-        row = MaintenanceHolidayCalendar(
+        row = MillCalendar(
             mill_id=mill_id,
             date=date_str,
             day_type=payload.get("day_type", "holiday"),
             persons_on_leave=_as_int(payload.get("persons_on_leave")),
+            weekly_off=weekly_off,
             note=payload.get("note"),
             created_at=datetime.now(timezone.utc),
         )
         db.add(row)
     await db.commit()
     return {"id": row.id, "date": row.date, "day_type": row.day_type,
-            "persons_on_leave": row.persons_on_leave or 0, "note": row.note}
+            "persons_on_leave": row.persons_on_leave or 0, "weekly_off": row.weekly_off, "note": row.note}
 
 
 @router.delete("/maintenance/holidays/{holiday_id}")
@@ -1253,9 +1269,9 @@ async def delete_holiday(
     current_user: User = Depends(require_module("maintenance", write=True)),
 ):
     scope = await get_mill_scope(current_user, db)
-    stmt = select(MaintenanceHolidayCalendar).where(MaintenanceHolidayCalendar.id == holiday_id)
+    stmt = select(MillCalendar).where(MillCalendar.id == holiday_id)
     if scope.get("mill_id"):
-        stmt = stmt.where(MaintenanceHolidayCalendar.mill_id == scope["mill_id"])
+        stmt = stmt.where(MillCalendar.mill_id == scope["mill_id"])
     row = (await db.execute(stmt)).scalar_one_or_none()
     if not row:
         raise HTTPException(404, detail="Holiday entry not found")
