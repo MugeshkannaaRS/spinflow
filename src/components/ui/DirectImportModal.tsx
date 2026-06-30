@@ -354,10 +354,15 @@ export function DirectImportModal({
     let lastErr: any;
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
-        res = await api.post(`${endpoint}?mill_id=${millId ?? ""}`, {
-          items,
-          mill_id: millId,
-        });
+        res = await api.post(
+          `${endpoint}?mill_id=${millId ?? ""}`,
+          {
+            items,
+            mill_id: millId,
+          },
+          // Bulk inserts on a cold dyno can exceed the default 60s; give them room.
+          { timeout: 180000 },
+        );
         break;
       } catch (err: any) {
         lastErr = err;
