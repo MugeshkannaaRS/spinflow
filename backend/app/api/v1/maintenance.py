@@ -803,6 +803,31 @@ async def get_day_plan(
     except Exception as e:
         logger.error(f"day-plan calendar fetch error: {e}")
 
+    # Determine which days in this month are NON-WORKING (holiday or weekly-off).
+    # Half-days stay working (reduced capacity); an explicit 'working' entry
+    # overrides a weekly-off. Tasks that fall on a non-working day are carried
+    # forward to the next working day — the frequency/recurrence never changes.
+    non_working: set = set()
+    for dd in range(1, days_in_month + 1):
+        d_iso = dt_date(y, m, dd).isoformat()
+        wd = dt_date(y, m, dd).weekday()
+        if d_iso in holiday_map:
+            dtp = holiday_map[d_iso][0]
+            if dtp == "holiday":
+                non_working.add(dd)
+            # 'working' / 'half_day' → stays a working day
+        elif wd in weekly_off_days:
+            non_working.add(dd)
+
+    def _next_working_day(dd: int) -> Optional[int]:
+        """Next working day-of-month at/after dd, or None if it spills past month end."""
+        cur = dd
+        while cur <= days_in_month:
+            if cur not in non_working:
+                return cur
+            cur += 1
+        return None
+
     # For each schedule, compute all due dates in the month
     # A task is "due on day D" if next_due falls in that month,
     # or if frequency_days is short enough to recur (weekly/daily)
@@ -848,26 +873,35 @@ async def get_day_plan(
             current = anchor
             while current <= month_end:
                 if current >= month_start:
-                    day = current.day
-                    est_min = min(60, max(15, freq // 2)) if freq <= 30 else min(120, max(30, freq // 6))
-                    day_map[day].append({
-                        "id": s.id,
-                        "machine_code": s.machine_code,
-                        "machine_line_code": s.machine_line_code,
-                        "description": s.description,
-                        "section": s.department or "General",
-                        "frequency_days": freq,
-                        "frequency_label": _freq_label(freq),
-                        "manpower_needed": s.manpower_count or 1,
-                        "machine_count": s.machine_count or 1,
-                        "lubricant_name": s.lubricant_name,
-                        "lubricant_quantity": s.lubricant_quantity,
-                        "last_done": s.last_done,
-                        "due_date": current.isoformat(),
-                        "est_min": est_min,
-                        "is_overdue": current < today,
-                        "sl_no": s.sl_no,
-                    })
+                    due_day = current.day
+                    # If the due day is a non-working day (holiday / weekly-off),
+                    # carry the task forward to the next working day. Frequency is
+                    # unchanged — only the execution date shifts.
+                    placed_day = due_day if due_day not in non_working else _next_working_day(due_day)
+                    if placed_day is not None:
+                        shifted = placed_day != due_day
+                        placed_date = dt_date(y, m, placed_day)
+                        est_min = min(60, max(15, freq // 2)) if freq <= 30 else min(120, max(30, freq // 6))
+                        day_map[placed_day].append({
+                            "id": s.id,
+                            "machine_code": s.machine_code,
+                            "machine_line_code": s.machine_line_code,
+                            "description": s.description,
+                            "section": s.department or "General",
+                            "frequency_days": freq,
+                            "frequency_label": _freq_label(freq),
+                            "manpower_needed": s.manpower_count or 1,
+                            "machine_count": s.machine_count or 1,
+                            "lubricant_name": s.lubricant_name,
+                            "lubricant_quantity": s.lubricant_quantity,
+                            "last_done": s.last_done,
+                            "due_date": placed_date.isoformat(),
+                            "original_due": current.isoformat(),
+                            "shifted": shifted,
+                            "est_min": est_min,
+                            "is_overdue": placed_date < today,
+                            "sl_no": s.sl_no,
+                        })
                 if freq >= 30:
                     break  # Only one occurrence per month for monthly+ tasks
                 current += timedelta(days=freq)

@@ -2415,7 +2415,7 @@ function DayPlanView() {
       {/* List view — day-by-day expandable */}
       {!planQ.isLoading && viewMode === "list" && (
         <div className="space-y-2">
-          {days.filter((d: any) => d.total_tasks > 0).map((d: any) => {
+          {days.filter((d: any) => d.total_tasks > 0 || d.day_type === "holiday").map((d: any) => {
             const isToday = d.day === todayDay;
             const isExpanded = expandedDays[d.day] ?? (d.day === todayDay);
             const overdue = d.tasks.some((t: any) => t.is_overdue);
@@ -2554,6 +2554,11 @@ function DayPlanView() {
                                   <div className="text-xs text-foreground leading-snug">{t.description}</div>
                                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                                     <span className="text-[10px] text-muted-foreground">{t.frequency_label}</span>
+                                    {t.shifted && t.original_due && (
+                                      <span className="text-[10px] text-indigo-700 bg-indigo-50 dark:bg-indigo-950/30 px-1.5 rounded inline-flex items-center gap-0.5">
+                                        ↪ moved from {new Date(t.original_due + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short" })} (off day)
+                                      </span>
+                                    )}
                                     {t.lubricant_name && (
                                       <span className="text-[10px] text-amber-700 bg-amber-50 px-1.5 rounded">
                                         🛢 {t.lubricant_name} {t.lubricant_quantity}
