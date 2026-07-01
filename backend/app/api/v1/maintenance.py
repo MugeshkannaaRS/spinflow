@@ -12,7 +12,7 @@ from app.db.session import get_db
 logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
-from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter, PMEntryLog, PMActivityConfig, MillCalendar
+from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter, PMEntryLog, PMActivityConfig, MillCalendar, MaintenanceDeptManpower
 from app.models.production import Machine
 from app.models.masters import Mill
 from app.schemas.maintenance import (
@@ -622,17 +622,51 @@ async def get_manpower_summary(
             if today_str <= nd <= month_end:
                 d["due_this_month"] += 1
 
+    # Per-department manpower overrides (persons/machines/shift-hours/leader/notes).
+    # Overrides WIN over schedule-derived values, and can add departments that
+    # have no schedules yet.
+    overrides: dict = {}
+    try:
+        ostmt = select(MaintenanceDeptManpower)
+        if effective_mill_id:
+            ostmt = ostmt.where(
+                (MaintenanceDeptManpower.mill_id == effective_mill_id)
+                | (MaintenanceDeptManpower.mill_id.is_(None))
+            )
+        for o in (await db.execute(ostmt)).scalars().all():
+            overrides[o.department] = o
+    except Exception as e:
+        logger.error(f"manpower-summary overrides fetch error: {e}")
+
+    # Ensure override-only departments still appear
+    for dept, o in overrides.items():
+        if dept not in dept_data:
+            dept_data[dept] = {
+                "department": dept, "manpower": 1, "machine_count": 1, "task_count": 0,
+                "daily_workload_min": 0.0, "overdue_count": 0, "due_this_week": 0, "due_this_month": 0,
+            }
+
     summary = []
     for dept, d in dept_data.items():
-        capacity = d["manpower"] * SHIFT_MIN
+        o = overrides.get(dept)
+        manpower = (o.persons if o and o.persons else None) or d["manpower"]
+        machine_count = (o.machines if o and o.machines else None) or d["machine_count"]
+        shift_hrs = (o.shift_hours if o and o.shift_hours else None) or 7.5
+        shift_min = shift_hrs * 60
+        capacity = manpower * shift_min
         utilisation = round((d["daily_workload_min"] / capacity) * 100, 1) if capacity > 0 else 0
-        machines_per_person = round(d["machine_count"] / d["manpower"], 1) if d["manpower"] > 0 else 0
+        machines_per_person = round(machine_count / manpower, 1) if manpower > 0 else 0
         summary.append({
             **d,
-            "shift_hrs": 7.5,
-            "capacity_min": capacity,
+            "manpower": manpower,
+            "machine_count": machine_count,
+            "shift_hrs": shift_hrs,
+            "capacity_min": round(capacity),
             "utilisation_pct": utilisation,
             "machines_per_person": machines_per_person,
+            "leader": o.leader if o else None,
+            "notes": o.notes if o else None,
+            "is_overridden": o is not None,
         })
     summary.sort(key=lambda x: x["department"])
     return {"departments": summary, "total_schedules": len(schedules)}
@@ -1312,3 +1346,112 @@ async def delete_holiday(
     await db.delete(row)
     await db.commit()
     return {"message": "deleted", "id": holiday_id}
+
+
+# ---------------------------------------------------------------------------
+# DEPARTMENT MANPOWER OVERRIDES (Manpower Plan — edit/add persons/machines/etc.)
+# ---------------------------------------------------------------------------
+
+@router.get("/maintenance/dept-manpower")
+async def list_dept_manpower(
+    mill_id: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance")),
+):
+    scope = await get_mill_scope(current_user, db)
+    effective_mill_id = scope.get("mill_id")
+    if mill_id and scope.get("role") == "SUPER_ADMIN":
+        effective_mill_id = mill_id
+    stmt = select(MaintenanceDeptManpower)
+    if effective_mill_id:
+        stmt = stmt.where(
+            (MaintenanceDeptManpower.mill_id == effective_mill_id)
+            | (MaintenanceDeptManpower.mill_id.is_(None))
+        )
+    try:
+        rows = (await db.execute(stmt.order_by(MaintenanceDeptManpower.department))).scalars().all()
+    except Exception as e:
+        logger.error(f"dept-manpower list error: {e}")
+        rows = []
+    return {
+        "data": [
+            {
+                "id": r.id, "department": r.department, "persons": r.persons,
+                "machines": r.machines, "shift_hours": r.shift_hours,
+                "leader": r.leader, "notes": r.notes,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.post("/maintenance/dept-manpower")
+async def upsert_dept_manpower(
+    payload: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance", write=True)),
+):
+    """Create or update the manpower override for a department (unique per mill+dept)."""
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id")
+    dept = str(payload.get("department") or "").strip()
+    if not dept:
+        raise HTTPException(400, detail="department is required")
+
+    def _int(v):
+        try:
+            return int(v) if v not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+
+    def _float(v):
+        try:
+            return float(v) if v not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+
+    stmt = select(MaintenanceDeptManpower).where(MaintenanceDeptManpower.department == dept)
+    if mill_id:
+        stmt = stmt.where(MaintenanceDeptManpower.mill_id == mill_id)
+    row = (await db.execute(stmt)).scalar_one_or_none()
+
+    if row:
+        if "persons" in payload: row.persons = _int(payload.get("persons"))
+        if "machines" in payload: row.machines = _int(payload.get("machines"))
+        if "shift_hours" in payload: row.shift_hours = _float(payload.get("shift_hours"))
+        if "leader" in payload: row.leader = payload.get("leader")
+        if "notes" in payload: row.notes = payload.get("notes")
+        row.updated_at = datetime.now(timezone.utc)
+    else:
+        row = MaintenanceDeptManpower(
+            mill_id=mill_id, department=dept,
+            persons=_int(payload.get("persons")),
+            machines=_int(payload.get("machines")),
+            shift_hours=_float(payload.get("shift_hours")),
+            leader=payload.get("leader"),
+            notes=payload.get("notes"),
+            updated_at=datetime.now(timezone.utc),
+        )
+        db.add(row)
+    await db.commit()
+    return {"id": row.id, "department": row.department, "persons": row.persons,
+            "machines": row.machines, "shift_hours": row.shift_hours,
+            "leader": row.leader, "notes": row.notes}
+
+
+@router.delete("/maintenance/dept-manpower/{item_id}")
+async def delete_dept_manpower(
+    item_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(MaintenanceDeptManpower).where(MaintenanceDeptManpower.id == item_id)
+    if scope.get("mill_id"):
+        stmt = stmt.where(MaintenanceDeptManpower.mill_id == scope["mill_id"])
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, detail="Not found")
+    await db.delete(row)
+    await db.commit()
+    return {"message": "deleted", "id": item_id}

@@ -118,6 +118,27 @@ class MillCalendar(Base):
 MaintenanceHolidayCalendar = MillCalendar
 
 
+class MaintenanceDeptManpower(Base):
+    """
+    Per-department maintenance manpower override. When present for a department,
+    these values WIN over whatever the imported schedules implied — so users can
+    correct persons/machines/shift-hours without re-importing, and re-importing
+    schedules won't wipe the corrections.
+    One row per (mill_id, department).
+    """
+    __tablename__ = "maintenance_dept_manpower"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    department: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    persons: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    machines: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    shift_hours: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    leader: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class PMActivityConfig(Base):
     """
     Editable per-section activity lists for PM entry forms.

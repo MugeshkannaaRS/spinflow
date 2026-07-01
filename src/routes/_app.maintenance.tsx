@@ -712,8 +712,19 @@ function MaintenancePage() {
                           },
                           {
                             key: "machine_code",
-                            label: schedColConfig.getLabel("machine_code"),
+                            label: "Machine",
                             className: "font-mono text-xs",
+                            render: (s: any) => (
+                              <div className="flex flex-col">
+                                <span className="font-mono text-xs font-semibold">{s.machine_code || "—"}</span>
+                                {(s.machine_line_code || (s.machine_count ?? 0) > 1) && (
+                                  <span className="text-[10px] text-muted-foreground font-mono">
+                                    {s.machine_line_code || ""}
+                                    {(s.machine_count ?? 0) > 1 ? `${s.machine_line_code ? " · " : ""}×${s.machine_count}` : ""}
+                                  </span>
+                                )}
+                              </div>
+                            ),
                           },
                           {
                             key: "description",
@@ -2608,6 +2619,96 @@ function DayPlanView() {
   );
 }
 
+// Edit/Add per-department manpower (persons, machines, shift hours, leader, notes).
+function DeptManpowerDialog({ mode, dept }: { mode: "add" | "edit"; dept?: any }) {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  const [form, setForm] = useState({
+    department: dept?.department ?? "",
+    persons: dept?.manpower != null ? String(dept.manpower) : "",
+    machines: dept?.machine_count != null ? String(dept.machine_count) : "",
+    shift_hours: dept?.shift_hrs != null ? String(dept.shift_hrs) : "7.5",
+    leader: dept?.leader ?? "",
+    notes: dept?.notes ?? "",
+  });
+
+  const mut = useMutation({
+    mutationFn: (p: any) => maintenanceApi.upsertDeptManpower(p),
+    onSuccess: () => {
+      toast.success("Manpower updated");
+      qc.invalidateQueries({ queryKey: ["maintenance", "manpower-summary"] });
+      qc.invalidateQueries({ queryKey: ["maintenance", "day-plan"] });
+      setOpen(false);
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Failed to save"),
+  });
+
+  const submit = () => {
+    if (!form.department.trim()) { toast.error("Department name required"); return; }
+    mut.mutate({
+      department: form.department.trim(),
+      persons: form.persons ? Number(form.persons) : null,
+      machines: form.machines ? Number(form.machines) : null,
+      shift_hours: form.shift_hours ? Number(form.shift_hours) : null,
+      leader: form.leader.trim() || undefined,
+      notes: form.notes.trim() || undefined,
+    });
+  };
+  const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
+
+  return (
+    <>
+      {mode === "add" ? (
+        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setOpen(true)}>
+          <Plus className="size-3.5 mr-1" /> Add Department
+        </Button>
+      ) : (
+        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setOpen(true)}>
+          <Pencil className="size-3.5 text-muted-foreground" />
+        </Button>
+      )}
+      <Dialog open={open} onOpenChange={(o) => !o && setOpen(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{mode === "add" ? "Add Department Manpower" : `Edit — ${dept?.department}`}</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-1">
+            <div className="space-y-1 col-span-2">
+              <Label className="text-xs">Department</Label>
+              <Input value={form.department} onChange={(e) => set("department", e.target.value)} disabled={mode === "edit"} placeholder="e.g. Ringframe" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Persons (manpower)</Label>
+              <Input type="number" min="0" value={form.persons} onChange={(e) => set("persons", e.target.value)} placeholder="2" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Machines covered</Label>
+              <Input type="number" min="0" value={form.machines} onChange={(e) => set("machines", e.target.value)} placeholder="33" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Shift hours</Label>
+              <Input type="number" step="0.5" min="0" value={form.shift_hours} onChange={(e) => set("shift_hours", e.target.value)} placeholder="7.5" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Leader</Label>
+              <Input value={form.leader} onChange={(e) => set("leader", e.target.value)} placeholder="optional" />
+            </div>
+            <div className="space-y-1 col-span-2">
+              <Label className="text-xs">Notes</Label>
+              <Input value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder="optional" />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">These values override the imported schedule data for capacity/utilisation and won't be wiped by re-import.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={submit} disabled={mut.isPending}>{mut.isPending ? "Saving…" : "Save"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function ManpowerPlanView({
   summary,
   schedulesByDept,
@@ -2667,8 +2768,9 @@ function ManpowerPlanView({
 
       {/* Combined per-department summary — everything at a glance */}
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
           <CardTitle className="text-sm">Department Summary</CardTitle>
+          <DeptManpowerDialog mode="add" />
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -2682,7 +2784,8 @@ function ManpowerPlanView({
                   <th className="text-right font-medium px-3 py-2">Mc/Person</th>
                   <th className="text-right font-medium px-3 py-2">Utilisation</th>
                   <th className="text-right font-medium px-3 py-2">Overdue</th>
-                  <th className="text-right font-medium px-4 py-2">Due/Week</th>
+                  <th className="text-right font-medium px-3 py-2">Due/Week</th>
+                  <th className="text-right font-medium px-4 py-2 w-16">Edit</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -2691,14 +2794,20 @@ function ManpowerPlanView({
                   const utilColor = util >= 100 ? "text-red-600" : util >= 75 ? "text-amber-600" : "text-green-600";
                   return (
                     <tr key={d.department} className="hover:bg-muted/20">
-                      <td className="px-4 py-2 font-medium">{d.department}</td>
+                      <td className="px-4 py-2 font-medium">
+                        {d.department}
+                        {d.is_overridden && <span className="ml-1.5 text-[9px] uppercase text-blue-600 bg-blue-50 dark:bg-blue-950/30 px-1 rounded align-middle">edited</span>}
+                      </td>
                       <td className="px-3 py-2 text-right">{d.manpower ?? "—"}</td>
                       <td className="px-3 py-2 text-right">{d.machine_count ?? "—"}</td>
                       <td className="px-3 py-2 text-right">{d.task_count ?? "—"}</td>
                       <td className="px-3 py-2 text-right">{d.machines_per_person ?? "—"}</td>
                       <td className={cn("px-3 py-2 text-right font-semibold", utilColor)}>{util}%</td>
                       <td className={cn("px-3 py-2 text-right", (d.overdue_count ?? 0) > 0 && "text-red-600 font-medium")}>{d.overdue_count ?? 0}</td>
-                      <td className="px-4 py-2 text-right">{d.due_this_week ?? 0}</td>
+                      <td className="px-3 py-2 text-right">{d.due_this_week ?? 0}</td>
+                      <td className="px-4 py-2 text-right">
+                        <DeptManpowerDialog mode="edit" dept={d} />
+                      </td>
                     </tr>
                   );
                 })}
@@ -2712,7 +2821,8 @@ function ManpowerPlanView({
                   <td className="px-3 py-2 text-right">—</td>
                   <td className="px-3 py-2 text-right">—</td>
                   <td className="px-3 py-2 text-right">{overdueTotal}</td>
-                  <td className="px-4 py-2 text-right">{dueWeekTotal}</td>
+                  <td className="px-3 py-2 text-right">{dueWeekTotal}</td>
+                  <td className="px-4 py-2"></td>
                 </tr>
               </tfoot>
             </table>
