@@ -12,7 +12,6 @@ Run this BEFORE deploying to staging/production.
 import os
 import sys
 import argparse
-import subprocess
 from pathlib import Path
 
 

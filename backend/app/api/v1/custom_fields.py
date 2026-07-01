@@ -9,7 +9,7 @@ from sqlalchemy import select
 from typing import List, Optional
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope
 from app.models.user import User
 from app.models.custom_fields import CustomFieldDefinition
 from app.schemas.custom_fields import (

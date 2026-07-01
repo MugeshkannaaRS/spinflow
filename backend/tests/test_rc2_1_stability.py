@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy import select, text, event
+from sqlalchemy import text
 
 from app.db.base import Base
 from app.models.billing import (

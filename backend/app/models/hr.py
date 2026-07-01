@@ -1,5 +1,5 @@
 from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Numeric, Date, UniqueConstraint
-from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
+from sqlalchemy.orm import Mapped, mapped_column, validates
 from datetime import datetime, date
 from typing import Optional
 from app.db.base import Base, TimestampMixin, generate_uuid

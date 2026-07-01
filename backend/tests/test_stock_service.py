@@ -4,7 +4,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.error_handler import SpinFlowException
 from app.services.stock_service import StockLedgerService
 from app.services.sales_service import SalesOrderService
-from app.models.stock import StockBalance, SalesOrder, SalesOrderLine
 from app.models.inventory import Lot, Warehouse
 from app.models.user import User
 

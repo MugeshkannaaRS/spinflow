@@ -1,16 +1,15 @@
 import logging
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import List, Optional
+from typing import Optional
 from datetime import datetime
-import math
 import statistics as stats_lib
 
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
-from app.core.deps import get_current_user, require_module, log_audit, get_mill_scope
+from app.core.deps import require_module, log_audit, get_mill_scope
 from app.models.user import User
 from app.models.purchase import Supplier, CottonPurchase, GRNEntry, CottonBale
 from app.models.masters import Mill
@@ -513,7 +512,6 @@ async def create_grn(
 # DELETE endpoints
 # ---------------------------------------------------------------------------
 
-from fastapi import status as http_status
 
 @router.delete("/purchase/purchases/{purchase_id}")
 async def delete_purchase(

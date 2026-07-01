@@ -1,12 +1,11 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_, asc, desc, update as sa_update
+from sqlalchemy import select, func, or_, asc, desc
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from typing import List, Optional, Any, Dict
 from datetime import datetime, timezone, date as date_type
 from pydantic import BaseModel
-from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -16,19 +15,18 @@ class AttendanceImportRequest(BaseModel):
 
 import uuid as _uuid
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module, log_audit, get_mill_scope
+from app.core.deps import require_module, log_audit, get_mill_scope
 from app.models.user import User
 from app.models.hr import Employee, Attendance, Leave, MonthlyPayroll, EmployeeCustomField, EmployeeCustomValue
 from app.models.masters import Mill, Department, Company, MillSettings
 from app.schemas.hr import (
     EmployeeCreate, EmployeeOut, EmployeeUpdate,
-    AttendanceCreate, AttendanceOut, AttendanceBulkCreate, AttendanceSummary,
-    LeaveRequestCreate, LeaveRequestOut, LeaveActionRequest,
+    AttendanceCreate, AttendanceOut, AttendanceBulkCreate, LeaveRequestCreate, LeaveRequestOut, LeaveActionRequest,
     EmployeeBulkCreate, EmployeeBulkResponse, ImportErrorDetail,
     PayrollBulkCreate, PayrollBulkResponse,
-    MonthlyPayrollCreate, MonthlyPayrollOut, MonthlyPayrollUpdate,
-    MonthlyPayrollListResponse, PayrollCalculateRequest, PayrollFinalizeRequest,
-    CustomFieldOut, EmployeeDetailOut, CustomValueOut,
+    MonthlyPayrollOut, MonthlyPayrollUpdate,
+    PayrollCalculateRequest, PayrollFinalizeRequest,
+    EmployeeDetailOut,
 )
 
 router = APIRouter()
@@ -602,7 +600,7 @@ async def bulk_create_employees(
                 await db.flush()
                 for f in new_fields:
                     existing_field_names[f.field_name] = f
-    except Exception as exc:
+    except Exception:
         logger.warning("Failed to pre-fetch/pre-create custom fields (will skip custom values for this import, transaction preserved)")
 
     # ── Assign GLOBAL serial numbers sorted by department ─────────────────

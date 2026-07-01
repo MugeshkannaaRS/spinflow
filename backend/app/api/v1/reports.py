@@ -1,11 +1,12 @@
-from datetime import datetime, timezone, timedelta
+import logging
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope
 from app.models.user import User
 from app.models.production import Machine, ProductionEntry
 from app.models.quality import QualityTest
@@ -13,8 +14,8 @@ from app.models.dispatch import Dispatch
 from app.models.accounts import Invoice
 from app.models.purchase import CottonPurchase
 from app.models.hr import Employee, Attendance, Leave, MonthlyPayroll
-from app.models.inventory import Lot
-from app.models.masters import Mill
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 

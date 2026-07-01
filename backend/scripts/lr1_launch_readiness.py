@@ -15,24 +15,21 @@ import time
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any
-from passlib.context import CryptContext
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy import select, func, text
-from sqlalchemy.orm import selectinload
+from sqlalchemy import select
 
 from app.core.config import settings
 from app.db.base import Base
 from app.models.user import User, Role
 from app.models.masters import Company, CompanyModule, Mill, Department
 from app.models.billing import (
-    SubscriptionPlan, CompanySubscription, BillingInvoice, BillingPayment,
-    SubscriptionChangeRequest, ModulePricing,
+    SubscriptionPlan, CompanySubscription, BillingPayment,
+    SubscriptionChangeRequest,
 )
 from app.models.hr import Employee
-from app.models.audit import AuditLog
 import os
 from app.core.security import hash_password
 DEFAULT_PWD = os.environ.get("SEED_USER_PASSWORD", "Pilot@1234")
@@ -382,7 +379,7 @@ async def test_user_lifecycle(db: AsyncSession, company_ids: list[str], role_ids
         start = time.time()
         u = User(
             id=str(uuid.uuid4()),
-            name=f"LR-Test-User",
+            name="LR-Test-User",
             email=f"lr-test-{uuid.uuid4().hex[:4]}@test.com",
     password_hash=DEFAULT_PWD_HASH,
     role_id=mo_role.id,
@@ -498,8 +495,6 @@ async def test_billing_lifecycle(db: AsyncSession, company_ids: list[str], role_
 
     # 2. Purchase overage
     try:
-        from app.api.v1.billing import company_purchase_overage
-        from app.schemas.billing import PurchaseOverageRequest
         # Skip direct API call; simulate via service
         extra_amt = float(target_plan.additional_user_cost or 99)
         sub.extra_users = (sub.extra_users or 0) + 5
@@ -770,7 +765,7 @@ async def verify_permission_guards(db: AsyncSession, company_ids: list[str], rol
     try:
         await check_company_scope(op_user, co.id)
         metrics.error(phase, "MACHINE_OPERATOR accessed billing", "Should have 403'd")
-    except HTTPException as e:
+    except HTTPException:
         metrics.workflow("perm_op_billing_blocked", "passed", "MACHINE_OPERATOR blocked from billing")
 
 
@@ -858,7 +853,7 @@ async def main():
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2, default=str)
 
-    print(f"\n=== LR-1 Results ===")
+    print("\n=== LR-1 Results ===")
     print(f"  Errors: {report['total_errors']}")
     print(f"  Slow queries: {report['total_slow_queries']}")
     print(f"  Workflows executed: {report['total_workflows']}")

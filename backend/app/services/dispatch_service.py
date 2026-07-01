@@ -1,12 +1,10 @@
 from typing import Optional, List
 from datetime import datetime, timezone
-from fastapi import HTTPException, status
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
 from app.services.base import BaseService
 from app.models.dispatch import Dispatch, DispatchItem, Vehicle, QRScan
 from app.models.inventory import Lot
-from app.models.user import User
 from app.core.error_handler import SpinFlowException, ErrorCode
 from app.services.stock_service import StockLedgerService
 

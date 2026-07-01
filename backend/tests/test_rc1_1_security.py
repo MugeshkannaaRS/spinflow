@@ -12,17 +12,15 @@ Verifies:
 """
 
 import uuid
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import HTTPException
 
-from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest
-from app.models.masters import Company, CompanyModule, Mill
+from app.models.billing import SubscriptionPlan, CompanySubscription, BillingInvoice, SubscriptionChangeRequest
+from app.models.masters import Company, Mill
 from app.models.user import User, Role
-from app.services.pricing_service import PricingService
-from app.services.billing_invoice_service import InvoiceService
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
@@ -415,8 +413,6 @@ async def test_admin_create_user(session: AsyncSession):
     await session.flush()
 
     # Simulate the request body
-    from fastapi import Request
-    from app.api.v1.admin import create_user
 
     # We can't easily call create_user without a real Request,
     # but we can verify the guards work by checking role_code

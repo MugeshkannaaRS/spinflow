@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import IntegrityError

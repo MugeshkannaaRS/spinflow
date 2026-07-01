@@ -5,13 +5,11 @@ import os
 import io
 import zipfile
 import uuid
-from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, select
+from sqlalchemy import text
 
-from app.models.retention import BackupJob
 
 logger = logging.getLogger(__name__)
 

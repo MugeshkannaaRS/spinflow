@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, field_validator, model_validator, computed_field
-from typing import Optional, List
+from pydantic import BaseModel, Field, model_validator, computed_field
+from typing import Optional
 from datetime import datetime
 
 

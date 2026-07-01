@@ -2,7 +2,7 @@ from sqlalchemy import String, Boolean, Integer, DateTime, ForeignKey, Text, JSO
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 from typing import Optional
-from app.db.base import Base, TimestampMixin, generate_uuid
+from app.db.base import Base, generate_uuid
 
 
 class MillMaster(Base):

@@ -2,14 +2,12 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, delete
+from sqlalchemy import select, delete
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime, timezone
 
 from app.db.session import get_db
 from app.core.deps import get_current_user, get_mill_scope

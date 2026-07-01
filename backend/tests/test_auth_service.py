@@ -2,7 +2,7 @@ import uuid
 import pytest
 from datetime import datetime, timezone, timedelta
 from app.core.error_handler import SpinFlowException, ErrorCode
-from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
+from app.core.security import hash_password, verify_password
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 

@@ -1,7 +1,6 @@
 """Test masters schemas - GSTIN validation and numeric coercion."""
 
 import re
-from typing import Optional
 
 
 def validate_gstin(v):

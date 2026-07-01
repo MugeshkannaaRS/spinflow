@@ -7,10 +7,8 @@ from app.models.user import User
 from app.models.audit import AuditLog
 from app.models.masters import Company, Mill
 from app.core.access import resolve_access
-from app.core.rbac import SYSTEM_MODULES, is_dashboard_only
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-import uuid
 
 
 def _extract_ip(request: Request) -> str:

@@ -16,20 +16,17 @@ Endpoints:
   POST   /admin/nudges/seed                      — seed default nudges
   POST   /admin/tours/seed                       — seed default tours
 """
-from fastapi import APIRouter, Depends, Query, HTTPException, status as http_status
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional
 from datetime import datetime, timezone, timedelta
 from app.db.session import get_db
 from app.core.deps import get_current_user
-from app.core.security import hash_password
 from app.models.user import User
 from app.models.masters import Company
 from app.models.billing import CompanySubscription
-from app.models.demo import DemoEnvironment, ProductTour, TourProgress, Nudge
 from app.services.demo_service import DemoService, TourService, EngagementService, JourneyService, NudgeService
-from app.services.customer_success_service import OnboardingProgressService
 from app.services.command_center_service import CommandCenterService
 from pydantic import BaseModel, EmailStr, Field
 

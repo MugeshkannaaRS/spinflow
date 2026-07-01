@@ -1,9 +1,9 @@
-from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Enum as SAEnum, Date, Numeric, JSON, func, UniqueConstraint
+from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Numeric, JSON, func, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
-from datetime import datetime, date
+from datetime import datetime
 from typing import Optional
-from app.db.base import Base, TimestampMixin, SoftDeleteMixin, generate_uuid
+from app.db.base import Base, TimestampMixin, generate_uuid
 import enum
 
 

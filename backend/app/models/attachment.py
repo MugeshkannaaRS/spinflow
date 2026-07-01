@@ -1,6 +1,6 @@
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Text, func
+from sqlalchemy import String, Integer, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
-from datetime import datetime, timezone
+from datetime import datetime
 from app.db.base import Base, generate_uuid
 
 

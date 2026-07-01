@@ -115,7 +115,6 @@ MT_TEST_MATRIX = [
 @pytest.mark.asyncio
 async def test_approval_cross_company_blocked(method, path, client, db_session):
     """Users from company A MUST NOT access approval requests from company B."""
-    from app.models.governance import ApprovalWorkflow, ApprovalRequest
 
     # Find two different companies with approval data
     workflows = (
@@ -137,7 +136,6 @@ async def test_approval_cross_company_blocked(method, path, client, db_session):
         pytest.skip(f"No approval request for company {company_b}")
 
     # Authenticate as a user from company A
-    from app.models.user import User
     user_a = (
         await db_session.execute(
             text("SELECT * FROM users WHERE company_id = :company_id AND role_id != (SELECT id FROM roles WHERE code = 'SUPER_ADMIN') LIMIT 1"),
@@ -164,7 +162,6 @@ async def test_approval_cross_company_blocked(method, path, client, db_session):
 async def test_backup_restore_returns_501(client, db_session):
     """Backup restore endpoint must return 501 (not implemented)."""
     from app.core.deps import get_current_user
-    from app.models.user import User
     admin = (
         await db_session.execute(
             text("SELECT u.* FROM users u JOIN roles r ON u.role_id = r.id WHERE r.code = 'SUPER_ADMIN' LIMIT 1")

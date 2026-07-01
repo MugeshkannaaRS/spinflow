@@ -13,8 +13,6 @@ import asyncio
 import time
 import os
 import sys
-from datetime import datetime, timezone
-from typing import Optional
 
 # Ensure backend is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -23,15 +21,13 @@ import os
 from app.core.security import hash_password
 SEED_ADMIN_PWD = os.environ.get("SEED_ADMIN_PASSWORD", "Admin@1234")
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from app.core.config import settings
 from app.core.rbac import ROLES
-from app.core.module_registry import ALL_MODULE_CODES
 from app.models.user import Role, User
-from app.models.billing import SubscriptionPlan, ModulePricing
-from app.db.base import Base
+from app.models.billing import SubscriptionPlan
 
 
 class StagingSeeder:

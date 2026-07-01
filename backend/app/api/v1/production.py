@@ -7,7 +7,7 @@ from sqlalchemy import select, func, cast, Integer, nullslast
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
-from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope
 from app.models.user import User
 from app.models.production import Machine, Shift, ProductionEntry, DowntimeLog, OperatorGroup, MachineGroup, LearnerAllocation, LearnerAllocationEntry
 from app.models.masters import Mill, Department, YarnCount
@@ -90,7 +90,6 @@ async def get_machines(
             query = query.where(Machine.id == "no-match")
     elif machine_group_ids or machine_group_id:
         # Machine Groups: support single ID (machine_group_id) or multi (machine_group_ids csv)
-        from sqlalchemy import or_
         raw_ids = []
         if machine_group_ids:
             raw_ids = [x.strip() for x in machine_group_ids.split(",") if x.strip()]

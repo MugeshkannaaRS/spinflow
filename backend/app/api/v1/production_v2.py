@@ -7,11 +7,11 @@ from datetime import datetime, timezone
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response as FastAPIResponse
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope
 from app.models.user import User
 from app.models.masters import Mill
 from app.models.production import DowntimeLog
@@ -29,7 +29,7 @@ from app.models.mixing import MixingChangeLog
 from app.schemas.production_v2 import (
     DatalogStopCodeOut, DatalogStopCodeCreate, DatalogStopCodeUpdate,
     WasteEntryCreate, WasteEntryBulkCreate, WasteEntryOut,
-    RFManpowerCreate, RFManpowerBulkCreate, RFManpowerOut,
+    RFManpowerBulkCreate, RFManpowerOut,
     ManpowerCategoryCreate, ManpowerCategoryUpdate, ManpowerCategoryOut,
     MixingFibreRowCreate, MixingFibreRowOut,
     RF_CATEGORY_LABELS,

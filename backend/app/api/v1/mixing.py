@@ -7,11 +7,11 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope
 from app.models.user import User
 from app.models.masters import Mill
 from app.models.mixing import (

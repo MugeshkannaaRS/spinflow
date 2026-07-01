@@ -6,7 +6,7 @@ from typing import Optional
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
-from app.core.deps import get_current_user, require_module
+from app.core.deps import require_module
 from app.models.user import User
 from app.services.trip_service import TripService
 from app.schemas.lotrac import (

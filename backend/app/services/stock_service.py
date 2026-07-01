@@ -1,12 +1,11 @@
 from typing import Optional, List, Tuple, Dict
 from datetime import datetime, timezone
-from sqlalchemy import select, func, and_, or_, text
+from sqlalchemy import select, func, and_, or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import selectinload
 from app.services.base import BaseService
 from app.models.stock import StockLedger, StockBalance
 from app.models.inventory import Lot, Warehouse
-from app.models.masters import Mill, YarnCount
+from app.models.masters import YarnCount
 from app.core.error_handler import SpinFlowException, ErrorCode
 
 

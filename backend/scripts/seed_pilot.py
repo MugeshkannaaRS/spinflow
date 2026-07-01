@@ -20,18 +20,16 @@ import argparse
 import asyncio
 import os
 import random
-import sys
 import time
 from collections import defaultdict
 from datetime import date, datetime, timedelta
-from typing import Any
 
-from sqlalchemy import select, func, text
+from sqlalchemy import select, text
 
 from app.core.security import hash_password
 from app.db.session import async_session_factory
 from app.models.dispatch import Dispatch
-from app.models.hr import Attendance, Employee, MonthlyPayroll
+from app.models.hr import Attendance, Employee
 from app.models.inventory import Lot, Warehouse
 from app.models.masters import (
     Company, CompanyModule, Customer, Department, MasterVehicle, Mill, MillSettings,
@@ -909,7 +907,7 @@ async def main():
     parser.add_argument("--force", action="store_true", help="Drop existing pilot data first")
     args = parser.parse_args()
 
-    print(f"SpinFlow ERP — Pilot Data Seeding")
+    print("SpinFlow ERP — Pilot Data Seeding")
     print(f"Targets: {', '.join(f'{k}={v}' for k, v in TARGETS.items())}")
     print(f"Force mode: {args.force}")
     print()

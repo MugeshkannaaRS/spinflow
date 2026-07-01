@@ -102,8 +102,8 @@ def main():
     print(f"{'='*60}")
     print(f"   Migrations:  {'✓' if ok else '✗'}")
     print(f"   Demo data:   {'✓' if not args.skip_seed else 'skipped'}")
-    print(f"\n   Login: admin@mill.spinflow")
-    print(f"   (password from SEED_ADMIN_PASSWORD or default)")
+    print("\n   Login: admin@mill.spinflow")
+    print("   (password from SEED_ADMIN_PASSWORD or default)")
 
 
 if __name__ == "__main__":

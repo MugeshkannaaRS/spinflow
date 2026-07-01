@@ -9,7 +9,6 @@ Tests that:
 
 import pytest
 from decimal import Decimal
-from sqlalchemy import select
 
 from app.models.billing import SubscriptionPlan, CompanySubscription
 from app.models.masters import Company

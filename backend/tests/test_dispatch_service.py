@@ -1,14 +1,12 @@
-import uuid
 import pytest
 from app.core.error_handler import SpinFlowException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.models.dispatch import Dispatch, DispatchItem, Vehicle, QRScan
+from app.models.dispatch import Dispatch
 from app.models.inventory import Lot
 from app.services.dispatch_service import DispatchService
 from app.services.stock_service import StockLedgerService
-from datetime import datetime, timezone
 
 
 class TestCreateDispatch:

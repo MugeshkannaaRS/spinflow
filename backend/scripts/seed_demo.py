@@ -6,9 +6,8 @@ Seeds realistic demo data for Arafath Spinning Mills presentation
 import os
 import random
 import asyncio
-from datetime import datetime, timedelta, date
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import timedelta, date
+from sqlalchemy import select
 
 from app.db.session import async_session_factory as AsyncSessionLocal
 from app.models.masters import Company, Mill, Department, Customer

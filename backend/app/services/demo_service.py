@@ -10,22 +10,18 @@ Services:
 """
 import logging
 import random
-import string
 from datetime import datetime, timedelta, date, timezone
 from typing import Optional
-from sqlalchemy import select, func, or_, and_
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.security import hash_password
 from app.models.demo import DemoEnvironment, ProductTour, TourProgress, Nudge
-from app.models.user import User, Role
+from app.models.user import User
 from app.models.masters import Company, Mill, Department
 from app.models.hr import Employee
 from app.models.production import Machine, Shift, ProductionEntry
 from app.models.inventory import InventoryItem, Lot
 from app.models.quality import QualityTest
-from app.models.dispatch import Dispatch
-from app.models.billing import CompanySubscription, SubscriptionPlan
-from app.models.alerts import AlertEvent
+from app.models.billing import CompanySubscription
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +149,6 @@ class DemoDataGenerator:
 
     async def generate(self, mill_id: str, days: int = 30) -> int:
         """Generate synthetic data for one mill. Returns count of items created."""
-        from app.db.base import generate_uuid
         total = 0
 
         # Get company_id from mill

@@ -10,14 +10,14 @@ import uuid as _uuid
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
-from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope
 from app.models.user import User
 from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter, PMEntryLog, PMActivityConfig, MillCalendar, MaintenanceDeptManpower, MaintenanceDeptMap
 from app.models.production import Machine
 from app.models.masters import Mill
 from app.schemas.maintenance import (
     MaintenanceCreate, MaintenanceOut, MaintenanceUpdate,
-    MaintenanceListResponse, ScheduleCreate, ScheduleOut,
+    ScheduleCreate, ScheduleOut,
     ScheduleBulkCreate, ParameterBulkCreate, BulkResponse, MachineParameterOut,
 )
 

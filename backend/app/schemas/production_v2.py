@@ -1,7 +1,7 @@
 """Schemas for DatalogStopCode, WasteEntry, RFManpowerPlan, ManpowerCategory, MixingChangeFibreRow."""
 from pydantic import BaseModel, Field
 from typing import Optional, List, Any, Dict
-from datetime import datetime, time
+from datetime import datetime
 
 # ------------------------------------------------------------------ #
 # DATALOG Stop Codes                                                   #

@@ -1,6 +1,6 @@
 from __future__ import annotations
 import logging
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Any, Dict
@@ -9,14 +9,13 @@ from pydantic import BaseModel
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
-from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope
 from app.models.user import User
 from app.models.quality import QualityApproval, LabReport, QualityTest
 from app.models.inventory import Lot
 from app.models.masters import Mill
 from app.schemas.quality import (
     QualityTestResponse, QualityTestCreate,
-    QualityApprovalResponse, QualityApprovalAction,
 )
 from app.schemas.inventory import LotOut
 from app.services.quality_service import QualityService
@@ -333,7 +332,6 @@ async def list_approvals(
     lot_ids = list({a.lot_id for a in approvals if a.lot_id})
     reports_by_lot: Dict[str, Optional[LabReport]] = {}
     if lot_ids:
-        from sqlalchemy import desc as sa_desc
         latest_sub = (
             select(LabReport.lot_id, func.max(LabReport.created_at).label("max_created"))
             .where(LabReport.lot_id.in_(lot_ids))
@@ -396,7 +394,7 @@ async def approve_or_reject_approval(
     approval = result.scalar_one_or_none()
 
     if not approval:
-        from app.core.error_handler import SpinFlowException, ErrorCode
+        from app.core.error_handler import SpinFlowException
         raise SpinFlowException.not_found("Quality approval")
 
     from datetime import datetime, timezone

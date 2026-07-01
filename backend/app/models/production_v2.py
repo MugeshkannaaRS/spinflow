@@ -5,13 +5,13 @@ MachineWasteTypeTemplate (migration 051)
 """
 from sqlalchemy import (
     String, Float, Integer, Boolean, DateTime, ForeignKey,
-    Text, Time, UniqueConstraint, func, Numeric
+    Text, UniqueConstraint, func
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
-from datetime import datetime, time
+from datetime import datetime
 from typing import Optional
-from app.db.base import Base, TimestampMixin, generate_uuid
+from app.db.base import Base, generate_uuid
 
 
 class DatalogStopCode(Base):

@@ -2,7 +2,6 @@
 
 import logging
 import time
-from typing import Optional
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncEngine

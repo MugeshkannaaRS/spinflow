@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List
-from datetime import datetime
 
 
 class SalesOrderLineCreate(BaseModel):

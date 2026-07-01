@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import List, Optional
+from typing import Optional
 import hmac
 import hashlib
 import json
 import base64
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module, log_audit
+from app.core.deps import require_module
 from app.core.config import settings
 from app.models.user import User
 from app.models.inventory import Lot

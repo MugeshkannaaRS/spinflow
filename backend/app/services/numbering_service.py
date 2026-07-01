@@ -7,7 +7,7 @@ race conditions even under concurrent requests.
 from __future__ import annotations
 import logging
 
-from sqlalchemy import select, update
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.mill_config import NumberingSequence

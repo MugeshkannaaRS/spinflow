@@ -6,7 +6,6 @@ Create Date: 2026-06-21
 """
 from typing import Union
 from alembic import op
-import sqlalchemy as sa
 
 revision: str = "043"
 down_revision: Union[str, None] = "042"

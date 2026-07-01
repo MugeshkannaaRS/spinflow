@@ -1,10 +1,10 @@
 import logging
-from datetime import date as date_type, datetime, timedelta, timezone
+from datetime import date as date_type, timedelta
 from typing import Optional, List, Dict, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, case
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
-from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice
+from app.models.billing import SubscriptionPlan, CompanySubscription, BillingInvoice
 from app.models.masters import Company, Mill, CompanyModule
 from app.models.user import User
 

@@ -1,16 +1,12 @@
-import os
-import shutil
 import uuid
-import struct
 from pathlib import Path
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import Optional, List
+from typing import List
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module, log_audit, get_mill_scope
-from app.core.config import settings
+from app.core.deps import require_module, log_audit, get_mill_scope
 from app.core.limiter import limiter
 from app.models.attachment import DocumentAttachment
 from app.models.user import User

@@ -1,9 +1,8 @@
 """Invoice generation service — auto-generates subscription, prorated, and overage invoices."""
 
 import logging
-from datetime import datetime, timedelta, timezone, date
-from decimal import Decimal
-from typing import Optional, List, Dict, Tuple
+from datetime import datetime, timedelta, timezone
+from typing import List, Dict, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -12,11 +11,8 @@ from app.models.billing import (
     CompanySubscription,
     SubscriptionPlan,
     ModulePricing,
-    OveragePricing,
 )
-from app.models.masters import Company, Mill
-from app.models.user import User
-from app.models.hr import Employee
+from app.models.masters import Company
 from app.core.deps import log_audit
 
 logger = logging.getLogger(__name__)

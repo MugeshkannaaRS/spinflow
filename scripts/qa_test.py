@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """SpinFlow ERP — Full QA Test Suite"""
-import subprocess, json, sys, time, os
+import subprocess, json, time, os
 from datetime import datetime, timedelta
 
 BASE = "http://localhost:8000/api/v1"

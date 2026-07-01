@@ -1,4 +1,4 @@
-from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, Enum as SAEnum
+from sqlalchemy import String, Float, DateTime, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 from typing import Optional

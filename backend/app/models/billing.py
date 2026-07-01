@@ -1,7 +1,7 @@
-from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, JSON, Numeric, func, UniqueConstraint
+from sqlalchemy import String, Integer, Boolean, DateTime, ForeignKey, Text, JSON, Numeric, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 from app.db.base import Base, TimestampMixin, generate_uuid
 
 

@@ -1,17 +1,10 @@
-import uuid
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.error_handler import SpinFlowException
 from app.services.masters_service import MastersService
 from app.schemas.masters import (
-    CompanyCreate, CompanyUpdate, CompanyOut,
-    MillCreate, MillUpdate, MillOut,
-    DepartmentCreate, DepartmentUpdate, DepartmentOut,
-    YarnCountCreate, YarnCountUpdate, YarnCountOut,
-    CustomerCreate, CustomerUpdate, CustomerOut,
-    MasterVehicleCreate, MasterVehicleUpdate, MasterVehicleOut,
-    RouteCreate, RouteUpdate, RouteOut,
+    CompanyCreate, MillCreate, DepartmentCreate, YarnCountCreate, CustomerCreate, MasterVehicleCreate,
 )
 from app.models.masters import Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route
 

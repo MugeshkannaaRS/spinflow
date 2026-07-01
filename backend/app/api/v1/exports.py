@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, Query, HTTPException, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
+from typing import Optional
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module, get_mill_scope, log_audit
+from app.core.deps import require_module, get_mill_scope, log_audit
 from app.core.limiter import limiter
 from app.models.user import User
 from app.models.production import ProductionEntry, Machine, OperatorGroup, MachineGroup
@@ -18,7 +19,6 @@ from app.models.stores import SpareIssue
 from app.models.inventory import Lot
 from app.models.hr import Attendance, Employee
 from app.models.masters import Mill
-from app.services.production_service import ProductionService
 from app.services.payroll_service import PayrollService
 from app.services.pdf_export import production_report as pdf_production, payslip as pdf_payslip, dispatch_summary as pdf_dispatch
 from app.services.excel_export import production_report as xlsx_production, payroll_report as xlsx_payroll, gst_report as xlsx_gst

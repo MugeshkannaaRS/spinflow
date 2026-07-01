@@ -1,4 +1,4 @@
-from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, Text, func
+from sqlalchemy import String, Float, Integer, Boolean, DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin, generate_uuid
 from datetime import datetime

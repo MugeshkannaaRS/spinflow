@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from sqlalchemy.orm import selectinload
 from typing import Dict, Optional
 from datetime import datetime
@@ -22,16 +22,13 @@ from app.models.masters import Company, CompanyModule, Mill, MillSettings, Compa
 from app.models.hr import Employee
 from app.models.billing import CompanySubscription, SubscriptionPlan
 from app.models.audit import AuditLog
-from app.models.deletion_log import DeletionLog
 from app.core.error_handler import SpinFlowException
 from app.services.deletion_service import CompanyDeletionService
 from app.services.stats_service import StatsService
 from app.services.onboarding_service import OnboardingService
 from app.services.command_center_service import CommandCenterService
 from app.models.governance import PermissionSet, SecurityPolicy, CompanyBranding, ApprovalWorkflow, ApprovalStep, ApprovalRequest, ApprovalAction
-from app.models.retention import RetentionPolicy, BackupJob, BackupRestore, HealthCheckResult, Incident
-from app.models.platform import StorageUsage, ApiUsage
-from app.models.billing import AddonPricing
+from app.models.retention import RetentionPolicy, BackupJob, HealthCheckResult, Incident
 from app.schemas.onboarding import OnboardingRequest, OnboardingResult
 from sqlalchemy import update as sa_update
 
@@ -62,7 +59,7 @@ async def get_company_modules(
         return {mod: module_map.get(mod, False) for mod in ALL_MODULE_KEYS}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         return {mod: False for mod in ALL_MODULE_KEYS}
 
 
@@ -974,7 +971,7 @@ async def update_user_restrictions(
     await log_audit(
         db, current_user.id, role_code_audit,
         "update_user_restrictions", "user", user_id,
-        f"Module restrictions updated",
+        "Module restrictions updated",
         old_value=str(old_value), new_value=str(new_restrictions),
     )
     return {"message": "User module restrictions updated", "module_restrictions": new_restrictions}
@@ -1093,9 +1090,7 @@ async def admin_dashboard(
     if role_code != "SUPER_ADMIN":
         raise HTTPException(status_code=403, detail="Super Admin only")
 
-    from sqlalchemy import and_ as _and, distinct
     from app.models.masters import CompanyModule
-    from app.models.billing import CompanySubscription
 
     try:
         # Batch aggregate queries — 4 queries total regardless of company count
@@ -1789,7 +1784,7 @@ async def update_permission_set(company_id: str, ps_id: str, body: dict, current
         ps.is_active = body["is_active"]
     await db.commit()
     await log_audit(db, current_user.id, "SUPER_ADMIN", "permission_set_updated", "governance", ps_id,
-                    f"Updated permission set", company_id=company_id, module="admin")
+                    "Updated permission set", company_id=company_id, module="admin")
     return {"success": True}
 
 
@@ -1836,7 +1831,7 @@ async def update_security_policy(company_id: str, body: dict, current_user: User
             setattr(policy, field, body[field])
     await db.commit()
     await log_audit(db, current_user.id, "SUPER_ADMIN", "security_policy_updated", "governance", company_id,
-                    f"Updated security policy", company_id=company_id, module="admin")
+                    "Updated security policy", company_id=company_id, module="admin")
     return {"success": True}
 
 
@@ -1881,7 +1876,7 @@ async def update_company_branding(company_id: str, body: dict, current_user: Use
     b.updated_by = current_user.id
     await db.commit()
     await log_audit(db, current_user.id, "SUPER_ADMIN", "branding_updated", "governance", company_id,
-                    f"Updated branding", company_id=company_id, module="admin")
+                    "Updated branding", company_id=company_id, module="admin")
     return {"success": True}
 
 
@@ -2421,7 +2416,6 @@ async def platform_health_status(current_user: User = Depends(get_current_user),
     if role_code != "SUPER_ADMIN":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only SUPER_ADMIN can view platform health")
     from app.core.observability import check_database, check_redis
-    from datetime import datetime, timezone
 
     components = {}
 
@@ -2454,7 +2448,6 @@ async def platform_health_status(current_user: User = Depends(get_current_user),
 
     # Background jobs
     try:
-        from sqlalchemy import text as _t
         expiry_count = (await db.execute(
             select(func.count()).select_from(text("company_subscriptions"))
             .where(text("status IN ('expired', 'grace_period')"))

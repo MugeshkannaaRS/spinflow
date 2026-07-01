@@ -1,11 +1,10 @@
 from io import BytesIO
 from typing import Optional
 from reportlab.lib.pagesizes import A4
-from reportlab.lib.units import mm, cm
+from reportlab.lib.units import mm
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from app.core.column_labels import get_column_label
 
 
@@ -170,8 +169,6 @@ def invoice_pdf(invoice, company_name: str) -> bytes:
     from reportlab.lib import colors
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_RIGHT
-    from datetime import datetime
 
     buf = BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=15*mm, bottomMargin=15*mm, leftMargin=15*mm, rightMargin=15*mm)

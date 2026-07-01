@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from app.core.config import settings
 from app.models.user import Role, User
 from app.models.masters import Company
-from app.models.billing import CompanySubscription, BillingInvoice, BillingPayment, SubscriptionPlan
+from app.models.billing import CompanySubscription, BillingPayment, SubscriptionPlan
 from app.core.rbac import ROLES
 
 

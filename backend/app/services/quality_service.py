@@ -1,9 +1,8 @@
 from typing import Optional, List, Dict
 from datetime import datetime, timezone, timedelta
-from fastapi import HTTPException, status
 from sqlalchemy import select, func, and_
 from app.services.base import BaseService
-from app.models.quality import QualityTest, LabReport, QualityApproval
+from app.models.quality import QualityTest
 from app.models.inventory import Lot
 from app.core.error_handler import SpinFlowException, ErrorCode
 from app.services.stock_service import StockLedgerService

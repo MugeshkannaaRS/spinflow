@@ -14,10 +14,10 @@ from app.core.error_handler import SpinFlowException
 from app.core.module_registry import ALL_MODULE_CODES
 from app.core.security import hash_password
 from app.models.masters import Company, CompanyModule, Mill, Department
-from app.models.billing import SubscriptionPlan, CompanySubscription
+from app.models.billing import CompanySubscription
 from app.models.user import User, Role
 from app.models.audit import AuditLog
-from app.schemas.onboarding import OnboardingRequest, OnboardingResult, OnboardingMill, OnboardingOwner
+from app.schemas.onboarding import OnboardingRequest, OnboardingResult
 from app.services.pricing_service import PricingService
 
 logger = logging.getLogger("spinflow")

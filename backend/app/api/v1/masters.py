@@ -4,7 +4,7 @@ import logging
 import uuid as _uuid_mod
 from datetime import date as _date, datetime as _datetime, timedelta as _timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, update as _sa_update, insert as _sa_insert
+from sqlalchemy import select, func, update as _sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, model_validator
@@ -28,7 +28,7 @@ from app.models.masters import (
     Company, Mill, Department, YarnCount, Customer, MasterVehicle, Route,
 )
 from app.models.production import Machine
-from app.models.mill_config import MillRecordValue, MillCustomField
+from app.models.mill_config import MillRecordValue
 from app.core.error_handler import SpinFlowException
 
 router = APIRouter()
@@ -1201,7 +1201,6 @@ async def mill_owner_create_mill(
     """Create a new mill under the current user's company.
     MILL_OWNER and SUPER_ADMIN only.
     """
-    from app.core.deps import get_mill_scope
     role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
     if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
         raise HTTPException(status_code=403, detail="Mill Owner or Super Admin only")

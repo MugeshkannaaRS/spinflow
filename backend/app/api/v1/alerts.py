@@ -15,8 +15,8 @@ Endpoints:
 """
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc, and_, extract, case
-from typing import Optional, List
+from sqlalchemy import select, func, desc, extract, case
+from typing import Optional
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 

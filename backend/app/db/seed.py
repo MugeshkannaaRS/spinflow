@@ -85,8 +85,8 @@ async def seed():
             await db.flush()
             import sys
             print("WARNING: Superadmin account created", file=sys.stderr)
-            print(f"  Email: admin@mill.spinflow", file=sys.stderr)
-            print(f"  Password: [set via SUPERADMIN_PASSWORD env var]", file=sys.stderr)
+            print("  Email: admin@mill.spinflow", file=sys.stderr)
+            print("  Password: [set via SUPERADMIN_PASSWORD env var]", file=sys.stderr)
             print("  Change this password immediately after first login.", file=sys.stderr)
 
         await db.commit()

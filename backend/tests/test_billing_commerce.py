@@ -2,26 +2,21 @@
 import uuid
 import pytest
 import pytest_asyncio
-from datetime import datetime, timezone, timedelta, date
-from decimal import Decimal
-from unittest.mock import AsyncMock, patch
+from datetime import datetime, timezone, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 from app.models.billing import (
-    SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, BillingPayment, OveragePricing,
+    SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, BillingPayment,
 )
-from app.models.masters import Company, Mill, CompanyModule
-from app.models.user import User, UserSession
-from app.models.hr import Employee
+from app.models.masters import Company, Mill
+from app.models.user import User
 from app.models.user import Role
 from app.services.billing_invoice_service import InvoiceService
 from app.services.payment_service import PaymentService
 from app.services.overdue_service import OverdueService
-from app.services.pricing_service import PricingService
 from app.core.module_registry import ALL_MODULE_CODES
-from app.core.deps import log_audit
 
 
 # ── Helpers ──────────────────────────────────────────────

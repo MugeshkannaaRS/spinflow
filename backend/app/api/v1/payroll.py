@@ -1,19 +1,19 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from typing import List, Optional
+from sqlalchemy import select
+from typing import Optional
 
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
-from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope
 from app.models.user import User
-from app.models.payroll import PayrollMonth, PayslipEntry
+from app.models.payroll import PayrollMonth
 from app.models.hr import Employee
 from app.models.masters import Mill
 from app.schemas.payroll import (
-    PayrollProcessRequest, PayrollMonthOut, PayslipOut, PayrollSummaryRow,
+    PayrollProcessRequest,
 )
 from app.services.payroll_service import PayrollService
 

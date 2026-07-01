@@ -11,7 +11,6 @@ Every API endpoint uses resolve_access() — no exceptions except SUPER_ADMIN.
 """
 
 from dataclasses import dataclass
-from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.user import User, UserModuleAccess

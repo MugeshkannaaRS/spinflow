@@ -1,7 +1,6 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, Query
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from typing import Set, Dict
 import json
-import asyncio
 from datetime import datetime
 
 from app.core.security import decode_token

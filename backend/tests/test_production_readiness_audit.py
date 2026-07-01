@@ -21,18 +21,17 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 from app.models.masters import Company, CompanyModule, Mill, Department
-from app.models.user import User, Role, UserSession
+from app.models.user import User, Role
 from app.models.billing import SubscriptionPlan, CompanySubscription, ModulePricing
 from app.models.audit import AuditLog
-from app.core.module_registry import ALL_MODULE_CODES, CORE_MODULE_CODES, ADDON_MODULE_CODES, SYSTEM_MODULE_CODES
+from app.core.module_registry import ALL_MODULE_CODES, SYSTEM_MODULE_CODES
 from app.core.error_handler import SpinFlowException
 from app.services.onboarding_service import OnboardingService, DEFAULT_DEPARTMENTS
 from app.services.pricing_service import PricingService
 from app.schemas.onboarding import OnboardingRequest, OnboardingMill, OnboardingOwner
-from app.core.security import hash_password
 
 
 # ═══════════════════════════════════════════════════════════
@@ -427,7 +426,7 @@ class Test5Security:
     def test_no_duplicate_modules_in_registry(self):
         """Module registry must not have duplicate codes."""
         codes = ALL_MODULE_CODES
-        assert len(codes) == len(set(codes)), f"Duplicate module codes found in registry"
+        assert len(codes) == len(set(codes)), "Duplicate module codes found in registry"
 
 
 # ═══════════════════════════════════════════════════════════
@@ -684,19 +683,16 @@ class Test10Scorecard:
 
     def test_plan_seed_completeness(self):
         """Seed_default_plans must cover all registry modules."""
-        from app.services.pricing_service import PricingService
         assert True
         self._pass("data_integrity", "Plan seed module coverage (now uses ALL_MODULE_CODES)")
 
     def test_user_limit_consolidated(self):
         """User limits should come from Company.max_users (single source)."""
-        from app.api.v1 import users
         assert True
         self._pass("licensing", "User limits consolidated to Company.max_users")
 
     def test_plan_change_syncs_modules(self):
         """Plan change approval must sync CompanyModule records."""
-        from app.api.v1.billing import review_change_request
         assert True
         self._pass("billing", "Plan change syncs CompanyModule records")
 

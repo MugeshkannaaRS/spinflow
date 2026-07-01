@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timedelta, date
 from typing import Optional
 
-from sqlalchemy import select, update, func
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alerts import (
@@ -281,7 +281,6 @@ async def check_and_fire_billing_alerts(db: AsyncSession) -> int:
     """Compare each company's current usage to plan limits.
     Fires alerts at 80%, 90%, 100% thresholds. Returns count fired."""
     from app.models.billing import CompanySubscription, SubscriptionPlan
-    from app.models.masters import Company
     from app.models.alerts import UsageSnapshot
     from sqlalchemy import or_
 
@@ -718,7 +717,6 @@ _ESCALATION_POLICIES = [
 async def seed_escalation_policies(db: AsyncSession, company_id: Optional[str] = None) -> int:
     """Seed escalation policies. company_id=None seeds global (NULL) policies.
     Idempotent — skips existing rows."""
-    from sqlalchemy import and_
 
     seeded = 0
     for policy_def in _ESCALATION_POLICIES:

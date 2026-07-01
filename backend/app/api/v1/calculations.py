@@ -14,30 +14,21 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.core.deps import get_current_user, require_module
+from app.core.deps import require_module
 from app.models.user import User
 from app.core.spinning_calculations import (
     # Count conversion
     convert_count,
-    ne_to_tex, ne_to_nm, ne_to_denier, ne_to_grex,
-    tex_to_ne, nm_to_ne, denier_to_ne,
-    # Yarn length
-    yarn_length_meters, yarn_length_yards, yarn_length_from_tex,
-    # Draft
-    actual_draft_indirect, actual_draft_direct, mechanical_draft,
-    # TPI / twist
-    tpi_from_tm, tpi_from_speed, twist_multiplier_from_tpi,
+    actual_draft_indirect, actual_draft_direct, tpi_from_tm, tpi_from_speed, twist_multiplier_from_tpi,
     tpm_from_tpi, front_roller_surface_speed,
     # Quality metrics
-    cleaning_efficiency, waste_extraction_pct, beats_per_inch,
+    cleaning_efficiency, beats_per_inch,
     cv_percent, u_percent_approx, actual_hank_ne,
-    csp, tenacity_cN_per_tex, splice_efficiency_pct,
+    csp, splice_efficiency_pct,
     # Machine calculators
     calculate_ring_frame, calculate_simplex, calculate_draw_frame,
     calculate_blow_room, calculate_carding,
-    production_scutcher_kg_hr, production_card_kg_hr,
     production_lap_former, production_comber,
-    production_ring_frame_total_kg,
 )
 
 logger = logging.getLogger(__name__)

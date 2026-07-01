@@ -1,6 +1,6 @@
 import logging
 import hmac
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Header, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, func
@@ -22,10 +22,9 @@ from app.core.email import send_otp_email
 from app.core.limiter import limiter
 from app.models.user import User, Role, UserSession, UserModuleAccess
 from app.schemas.auth import (
-    LoginRequest, LoginResponse, TokenResponse, RefreshRequest,
+    LoginResponse, TokenResponse, RefreshRequest,
     UserResponse, ChangePasswordRequest, ForgotPasswordRequest,
-    ResetPasswordRequest, VerifyOTPRequest, OTPResetRequest, UserCreateRequest, UserUpdateRequest,
-    MeResponse, MillSettingsOut, CompanyInfo,
+    ResetPasswordRequest, OTPResetRequest, UserCreateRequest,
 )
 
 
@@ -41,9 +40,8 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
         samesite=samesite,
         path="/api/v1/auth/refresh",
     )
-from app.models.masters import Company, CompanyModule, MillSettings, Mill
+from app.models.masters import Company, CompanyModule, Mill
 
-from app.models.ui_config import ColumnConfig
 from pydantic import BaseModel, Field
 
 MAX_FAILED_ATTEMPTS = 5
@@ -139,7 +137,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
             )
         )
         user = result.scalar_one_or_none()
-    except Exception as e:
+    except Exception:
         logger.exception("Login DB error")
         raise HTTPException(status_code=500, detail="Login failed. Please try again.")
 
@@ -264,7 +262,7 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], requ
         )
     except SpinFlowException:
         raise
-    except Exception as e:
+    except Exception:
         logger.exception("Login post-auth error")
         raise HTTPException(status_code=500, detail="Login failed. Please try again.")
 

@@ -1,11 +1,10 @@
-import pytest
 import pytest_asyncio
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, text
+from sqlalchemy import select
 
-from app.models.masters import Company, Mill, CompanyModule
+from app.models.masters import Company, Mill
 from app.models.user import User, Role, UserSession
 from app.models.billing import CompanySubscription, SubscriptionPlan
 
@@ -138,7 +137,6 @@ class TestSuspensionCascade:
     ):
         from app.models.audit import AuditLog
         from sqlalchemy import update as sa_update
-        from sqlalchemy.orm import selectinload
 
         now = datetime.utcnow()
         test_company.is_active = False
@@ -180,7 +178,6 @@ class TestSuspensionCascade:
         super_admin_user: User,
     ):
         from sqlalchemy import update as sa_update
-        from app.models.audit import AuditLog
 
         await session.execute(
             sa_update(Mill).where(Mill.company_id == test_company.id).values(is_active=False)
@@ -200,7 +197,6 @@ class TestSuspensionCascade:
         super_admin_user: User,
     ):
         from sqlalchemy import update as sa_update
-        from app.models.audit import AuditLog
 
         users, _ = test_users_and_sessions
 
@@ -219,7 +215,6 @@ class TestSuspensionCascade:
         super_admin_user: User,
     ):
         from sqlalchemy import update as sa_update
-        from app.models.audit import AuditLog
 
         users, sessions = test_users_and_sessions
 
@@ -241,8 +236,6 @@ class TestSuspensionCascade:
         test_subscription: CompanySubscription,
         super_admin_user: User,
     ):
-        from sqlalchemy import update as sa_update
-        from app.models.audit import AuditLog
 
         sub_result = await session.execute(
             select(CompanySubscription).where(CompanySubscription.company_id == test_company.id)

@@ -1,14 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import List
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope, log_audit
 from app.core.security import hash_password
 from app.models.user import User, Role
 from app.models.masters import Company, Mill
-from app.schemas.users import UserCreate, UserOut, UserUpdate, UserListResponse, PasswordChange, UserResetPassword
+from app.schemas.users import UserCreate, UserOut, UserUpdate, UserResetPassword
 from sqlalchemy.orm import selectinload
 
 router = APIRouter()

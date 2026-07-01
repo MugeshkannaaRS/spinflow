@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
-from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope
 from app.models.user import User
 from app.models.stores import Spare, SpareIssue
 from app.models.masters import Mill

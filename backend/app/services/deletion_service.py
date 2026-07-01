@@ -9,10 +9,10 @@ from typing import Dict, Any
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, select, func
+from sqlalchemy import text, select
 
 from app.models.user import User
-from app.models.masters import Company, Mill
+from app.models.masters import Company
 from app.models.deletion_log import DeletionLog
 from app.core.deps import log_audit
 
@@ -241,14 +241,14 @@ class CompanyDeletionService:
                         key = f"{table}_via_{col}"
                         counts[key] = counts.get(key, 0) + cnt
 
-            dc = await _cq(f"SELECT COUNT(*) FROM dispatches d WHERE EXISTS (SELECT 1 FROM lots l WHERE l.id = d.lot_id AND l.mill_id = ANY(:mill_ids))")
+            dc = await _cq("SELECT COUNT(*) FROM dispatches d WHERE EXISTS (SELECT 1 FROM lots l WHERE l.id = d.lot_id AND l.mill_id = ANY(:mill_ids))")
             if dc:
                 counts["dispatches"] = dc
-                dic = await _cq(f"SELECT COUNT(*) FROM dispatch_items di WHERE EXISTS (SELECT 1 FROM dispatches d WHERE d.id = di.dispatch_id AND EXISTS (SELECT 1 FROM lots l WHERE l.id = d.lot_id AND l.mill_id = ANY(:mill_ids)))")
+                dic = await _cq("SELECT COUNT(*) FROM dispatch_items di WHERE EXISTS (SELECT 1 FROM dispatches d WHERE d.id = di.dispatch_id AND EXISTS (SELECT 1 FROM lots l WHERE l.id = d.lot_id AND l.mill_id = ANY(:mill_ids)))")
                 if dic:
                     counts["dispatch_items"] = dic
 
-            bc = await _cq(f"SELECT COUNT(*) FROM cotton_bales b WHERE EXISTS (SELECT 1 FROM bale_stock bs WHERE bs.bale_no = b.bale_number AND EXISTS (SELECT 1 FROM cotton_purchases c WHERE c.id = bs.purchase_id AND c.mill_id = ANY(:mill_ids)))")
+            bc = await _cq("SELECT COUNT(*) FROM cotton_bales b WHERE EXISTS (SELECT 1 FROM bale_stock bs WHERE bs.bale_no = b.bale_number AND EXISTS (SELECT 1 FROM cotton_purchases c WHERE c.id = bs.purchase_id AND c.mill_id = ANY(:mill_ids)))")
             if bc:
                 counts["cotton_bales"] = bc
 
@@ -264,7 +264,7 @@ class CompanyDeletionService:
         user_count = users_q.scalar() or 0
         if user_count:
             sessions_q = await self.db.execute(text(
-                f"SELECT COUNT(*) FROM user_sessions us WHERE EXISTS (SELECT 1 FROM users u WHERE u.id = us.user_id AND u.company_id = :p)"
+                "SELECT COUNT(*) FROM user_sessions us WHERE EXISTS (SELECT 1 FROM users u WHERE u.id = us.user_id AND u.company_id = :p)"
             ), {"p": c})
             sc = sessions_q.scalar() or 0
             if sc:
@@ -272,14 +272,14 @@ class CompanyDeletionService:
             counts["users"] = user_count
 
         audit_q = await self.db.execute(text(
-            f"SELECT COUNT(*) FROM audit_logs al WHERE al.user_id IN (SELECT id FROM users WHERE company_id = :p)"
+            "SELECT COUNT(*) FROM audit_logs al WHERE al.user_id IN (SELECT id FROM users WHERE company_id = :p)"
         ), {"p": c})
         ac = audit_q.scalar() or 0
         if ac:
             counts["audit_logs"] = ac
 
         qr_q = await self.db.execute(text(
-            f"SELECT COUNT(*) FROM qr_scans qs WHERE qs.entity_id IN (SELECT id FROM users WHERE company_id = :p)"
+            "SELECT COUNT(*) FROM qr_scans qs WHERE qs.entity_id IN (SELECT id FROM users WHERE company_id = :p)"
         ), {"p": c})
         qc = qr_q.scalar() or 0
         if qc:

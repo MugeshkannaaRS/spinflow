@@ -10,7 +10,7 @@ from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, Any
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope
 from app.models.user import User
 from app.models.masters import Mill
 from app.models.production import Machine
@@ -699,8 +699,7 @@ async def quality_forms_summary(
 # schema per form.
 # ═══════════════════════════════════════════════════════════════════
 
-from typing import Dict, Type
-from sqlalchemy.orm import DeclarativeBase
+from typing import Dict
 
 # Route slug → SQLAlchemy model
 _V2_MODEL_MAP: Dict[str, Any] = {

@@ -1,15 +1,16 @@
 import logging
-from fastapi import APIRouter, Depends, Query, HTTPException, status, Body
+from fastapi import APIRouter, Depends, Query, HTTPException, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, asc, desc
-from typing import List, Optional, Any, Dict
+from datetime import datetime, timezone
+from typing import Optional, Any, Dict
 
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
-from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope
 from app.models.user import User
-from app.models.dispatch import Dispatch, DispatchItem
+from app.models.dispatch import Dispatch
 from app.models.lotrac import Trip
 from app.models.inventory import Lot
 from app.models.masters import Mill, Customer, MasterVehicle

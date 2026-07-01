@@ -13,14 +13,14 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func, or_, update
-from typing import List, Optional
+from typing import Optional
 from pydantic import BaseModel
 from datetime import datetime, date
 import io
 import csv
 
 from app.db.session import get_db
-from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope
 from app.models.user import User
 from app.models.audit import AuditLog
 

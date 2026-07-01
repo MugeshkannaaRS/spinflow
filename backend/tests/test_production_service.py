@@ -1,11 +1,10 @@
-import uuid
 import pytest
 from datetime import datetime, timezone
 from app.core.error_handler import SpinFlowException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.production import ProductionEntry, Machine, DowntimeLog
+from app.models.production import Machine
 from app.services.production_service import ProductionService
 from app.schemas.production import ProductionEntryCreate
 

@@ -1,8 +1,6 @@
-import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.error_handler import SpinFlowException, ErrorCode
-from app.models.lotrac import Trip, TripItem
 from app.models.inventory import InventoryBag
 from app.services.trip_service import TripService
 from app.core.qr_signing import verify_qr_payload

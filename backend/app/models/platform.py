@@ -1,5 +1,5 @@
 """Wave 5 — Platform-level tracking models (storage, API usage)."""
-from sqlalchemy import String, Integer, BigInteger, Boolean, DateTime, ForeignKey, func
+from sqlalchemy import String, Integer, BigInteger, DateTime, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 from typing import Optional

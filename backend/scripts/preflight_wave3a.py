@@ -206,7 +206,7 @@ CHECKS = [
 
 
 async def run():
-    print(f"\nConnecting to DB …")
+    print("\nConnecting to DB …")
     try:
         conn = await asyncpg.connect(DSN, ssl="require" if "supabase" in DSN else None)
     except Exception as e:

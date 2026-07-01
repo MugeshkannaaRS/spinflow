@@ -4,14 +4,11 @@ Single aggregated KPI endpoint consolidating data from billing, stats,
 users, and platform tracking into one response.
 """
 import logging
-from typing import Dict, List, Optional
-from datetime import datetime, timezone, timedelta
+from typing import Dict, List
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, text
 
-from app.models.billing import CompanySubscription, BillingInvoice
-from app.models.masters import Company
-from app.models.user import UserSession
 from app.services.billing_service import BillingService
 
 logger = logging.getLogger(__name__)

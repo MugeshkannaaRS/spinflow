@@ -2,9 +2,8 @@
 
 PermissionSet, SecurityPolicy, CompanyBranding, ApprovalWorkflow (Phase 4).
 """
-from sqlalchemy import String, Integer, Boolean, DateTime, ForeignKey, Text, JSON, func
+from sqlalchemy import String, Integer, Boolean, ForeignKey, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from datetime import datetime
 from typing import Optional
 from app.db.base import Base, TimestampMixin, generate_uuid
 

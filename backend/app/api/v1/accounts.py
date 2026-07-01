@@ -2,19 +2,18 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import List, Optional, Any, Dict
+from typing import Optional, Any, Dict
 from datetime import datetime, timezone, date
 
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
-from app.core.deps import get_current_user, require_module, get_mill_scope
+from app.core.deps import require_module, get_mill_scope
 from app.models.user import User
 from app.models.accounts import Invoice, Payment
 from app.models.masters import Mill, Customer
 from app.schemas.accounts import (
-    InvoiceCreate, InvoiceOut, InvoiceListResponse,
-    PaymentCreate, PaymentOut, AccountsSummary,
+    InvoiceCreate, InvoiceOut, PaymentCreate, PaymentOut,
 )
 from app.services.accounts_service import AccountsService
 

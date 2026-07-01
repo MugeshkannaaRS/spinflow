@@ -1,7 +1,7 @@
 from typing import Optional, List
 from datetime import datetime, timezone, date
 import random
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from app.services.base import BaseService
 from app.models.stock import SalesOrder, SalesOrderLine

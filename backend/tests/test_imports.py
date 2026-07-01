@@ -1,6 +1,5 @@
 """Test import mappings error handling."""
 
-import json
 
 
 class TestImportMappings:

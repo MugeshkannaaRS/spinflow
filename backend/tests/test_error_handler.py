@@ -1,9 +1,7 @@
 from datetime import datetime
-from unittest.mock import patch
-import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.core.error_handler import SpinFlowException, ErrorCode, register_error_handlers
 from app.core.config import settings

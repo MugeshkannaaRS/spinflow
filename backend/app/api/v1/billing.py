@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -15,20 +15,19 @@ from app.core.limiter import limiter
 from app.models.user import User
 from app.models.masters import Company, CompanyModule, Mill
 from app.models.hr import Employee
-from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest, BillingPayment, OveragePricing, AddonPricing
+from app.models.billing import SubscriptionPlan, ModulePricing, CompanySubscription, BillingInvoice, SubscriptionChangeRequest, AddonPricing
 from app.services.pricing_service import PricingService
 from app.services.billing_service import BillingService
 from app.services.billing_invoice_service import InvoiceService
 from app.services.payment_service import PaymentService
 from app.services.overdue_service import OverdueService
 from app.schemas.billing import (
-    ModulePricingOut, SubscriptionPlanOut, PlanCreate, PlanUpdate,
-    CompanyCostOut, CompanySubscriptionOut, UpdateSubscriptionRequest, SetCompanyPlanRequest,
-    InvoiceLineItem, InvoiceOut, ChangeRequestOut, ChangeRequestCreate, ChangeRequestReview,
-    CompanyBillingRow, StatusUpdateBody, ModuleToggleBody,
-    BillingSummaryOut, SubscriptionRowOut, InvoiceRowOut, PaymentRowOut, AnalyticsOut,
-    PaymentCreate, PaymentOut, InvoiceDetailOut, PurchaseOverageRequest, PurchaseOverageResult,
-    AutoInvoiceResult, OverdueWorkflowResult, BillingDashboardOut, SubscriptionRowEnriched,
+    SubscriptionPlanOut, PlanCreate, PlanUpdate,
+    SetCompanyPlanRequest,
+    InvoiceOut, ChangeRequestOut, ChangeRequestCreate, ChangeRequestReview,
+    StatusUpdateBody, ModuleToggleBody,
+    BillingSummaryOut, PaymentCreate, PaymentOut, InvoiceDetailOut, PurchaseOverageRequest, PurchaseOverageResult,
+    AutoInvoiceResult, OverdueWorkflowResult, BillingDashboardOut,
 )
 
 logger = logging.getLogger(__name__)
@@ -706,7 +705,7 @@ async def billing_webhook(
 # SUPER ADMIN: Revenue Control Panel endpoints
 # ═══════════════════════════════════════════════════════════════════
 
-from datetime import date as date_type, timedelta
+from datetime import date as date_type
 
 
 @router.get("/admin/billing/summary", response_model=BillingSummaryOut)

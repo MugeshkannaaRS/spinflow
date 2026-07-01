@@ -6,8 +6,7 @@ from typing import AsyncGenerator
 import httpx
 import pytest
 import pytest_asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import event
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.types import TypeDecorator, TEXT
 
@@ -54,11 +53,8 @@ from sqlalchemy.dialects.sqlite import base as sqlite_base  # noqa: E402
 if not hasattr(sqlite_base.SQLiteTypeCompiler, "visit_JSONB"):
     sqlite_base.SQLiteTypeCompiler.visit_JSONB = lambda self, type_, **kw: "TEXT"
 from app.models.user import User, Role
-from app.models.production import Machine, Shift, MachineStatus
+from app.models.production import Machine, Shift
 from app.models.inventory import Lot, Warehouse, InventoryBag
-from app.models.dispatch import Vehicle
-from app.models.stock import StockLedger, StockBalance, SalesOrder, SalesOrderLine
-from app.models.masters import Mill, Customer, MasterVehicle, Route
 from app.services.stock_service import StockLedgerService
 from app.services.sales_service import SalesOrderService
 from app.services.trip_service import TripService

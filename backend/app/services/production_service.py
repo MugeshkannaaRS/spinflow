@@ -1,11 +1,8 @@
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
-from fastapi import HTTPException, status
 from sqlalchemy import select, func, and_
-from sqlalchemy.orm import selectinload
 from app.services.base import BaseService
-from app.models.production import Machine, ProductionEntry, DowntimeLog, Shift
-from app.models.user import User
+from app.models.production import Machine, ProductionEntry, DowntimeLog
 from app.schemas.production import ProductionEntryCreate, ProductionBulkCreate, ProductionBulkResponse
 from app.core.error_handler import SpinFlowException, ErrorCode
 

@@ -2,19 +2,17 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from typing import List, Optional
-from datetime import datetime, timezone
+from typing import Optional
 
 from app.db.session import get_db
 
 logger = logging.getLogger(__name__)
-from app.core.deps import get_current_user, require_module, log_audit, get_mill_scope
+from app.core.deps import require_module, log_audit, get_mill_scope
 from app.models.user import User
 from app.models.inventory import Lot, StockMovement, Warehouse
 from app.models.masters import Mill
 from app.schemas.inventory import (
-    LotCreate, LotOut, LotListResponse,
-    WarehouseCreate, WarehouseOut,
+    LotCreate, LotOut, WarehouseCreate, WarehouseOut,
     StockMovementCreate, StockMovementOut,
 )
 
@@ -258,7 +256,6 @@ async def create_warehouse(
 # DELETE endpoints
 # ---------------------------------------------------------------------------
 
-from fastapi import HTTPException as _HTTPException
 
 @router.delete("/inventory/lots/{lot_id}")
 async def delete_lot(

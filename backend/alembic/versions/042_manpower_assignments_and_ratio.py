@@ -10,8 +10,6 @@ Adds two columns to rf_manpower_plan:
 """
 from typing import Union
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB
 
 revision: str = "042"
 down_revision: Union[str, None] = "041"
