@@ -2099,6 +2099,7 @@ function DayPlanView() {
           section: t.section,
           machine_code: t.machine_code,
           machine_line_code: t.machine_line_code ?? "",
+          machine_no: (t.machine_count ?? 1) > 1 ? `Mc 1-${t.machine_count}` : (t.machine_line_code || "Mc 1"),
           machine_count: t.machine_count ?? 1,
           description: t.description,
           frequency: t.frequency_label,
@@ -2117,7 +2118,7 @@ function DayPlanView() {
     { key: "day_status", label: "Status" },
     { key: "section", label: "Section" },
     { key: "machine_code", label: "Machine" },
-    { key: "machine_line_code", label: "Line" },
+    { key: "machine_no", label: "Machine No." },
     { key: "machine_count", label: "Mc Count" },
     { key: "description", label: "Work Description" },
     { key: "frequency", label: "Frequency" },
@@ -2182,8 +2183,8 @@ function DayPlanView() {
         doc.text(`${status}  |  ${d.total_tasks} tasks  |  ${d.total_manpower_needed} persons needed  |  ${Math.round(d.total_est_min / 60 * 10) / 10}h est.${(d.persons_on_leave ?? 0) > 0 ? `  |  ${d.persons_on_leave} on leave` : ""}`, 14, 25);
         (doc as any).autoTable({
           startY: 30,
-          head: [["Section", "Machine", "Line", "Work Description", "Persons", "Min"]],
-          body: d.tasks.map((t: any) => [t.section, t.machine_code, t.machine_line_code ?? "", t.description, String(t.manpower_needed), String(t.est_min)]),
+          head: [["Section", "Machine", "Machine No.", "Work Description", "Persons", "Min"]],
+          body: d.tasks.map((t: any) => [t.section, t.machine_code, (t.machine_count > 1 ? `Mc 1-${t.machine_count}` : (t.machine_line_code ?? "Mc 1")), t.description, String(t.manpower_needed), String(t.est_min)]),
           styles: { fontSize: 8, cellPadding: 1.5 },
           headStyles: { fillColor: [37, 99, 235] },
         });
@@ -2211,8 +2212,8 @@ function DayPlanView() {
       doc.text(`${status}  |  ${d.total_tasks} tasks  |  ${d.total_manpower_needed} persons needed  |  ${Math.round(d.total_est_min / 60 * 10) / 10}h est.${(d.persons_on_leave ?? 0) > 0 ? `  |  ${d.persons_on_leave} on leave` : ""}`, 14, 25);
       (doc as any).autoTable({
         startY: 30,
-        head: [["Section", "Machine", "Line", "Work Description", "Persons", "Min"]],
-        body: d.tasks.map((t: any) => [t.section, t.machine_code, t.machine_line_code ?? "", t.description, String(t.manpower_needed), String(t.est_min)]),
+        head: [["Section", "Machine", "Machine No.", "Work Description", "Persons", "Min"]],
+        body: d.tasks.map((t: any) => [t.section, t.machine_code, (t.machine_count > 1 ? `Mc 1-${t.machine_count}` : (t.machine_line_code ?? "Mc 1")), t.description, String(t.manpower_needed), String(t.est_min)]),
         styles: { fontSize: 8, cellPadding: 1.5 },
         headStyles: { fillColor: [37, 99, 235] },
       });
@@ -2546,17 +2547,22 @@ function DayPlanView() {
                             {tasks.map((t: any) => (
                               <div key={t.id} className="px-4 py-2.5 flex items-start gap-3">
                                 {/* Machine / Line / count */}
-                                <div className="flex-shrink-0 min-w-[110px]">
+                                <div className="flex-shrink-0 min-w-[130px]">
                                   <div className="text-xs font-mono font-semibold text-foreground inline-flex items-center gap-1 bg-muted/60 border border-border/50 rounded px-1.5 py-0.5">
                                     <Wrench className="size-3 text-muted-foreground" />
                                     {t.machine_code || "—"}
                                   </div>
-                                  <div className="flex items-center gap-1 mt-0.5">
+                                  <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                                     {t.machine_line_code && (
                                       <span className="text-[10px] text-muted-foreground font-mono">{t.machine_line_code}</span>
                                     )}
                                     {t.machine_count > 1 && (
-                                      <span className="text-[10px] text-blue-600">×{t.machine_count}</span>
+                                      <span className="text-[10px] text-blue-700 bg-blue-50 dark:bg-blue-950/30 font-mono rounded px-1">
+                                        Mc 1–{t.machine_count}
+                                      </span>
+                                    )}
+                                    {t.machine_count > 1 && (
+                                      <span className="text-[10px] text-muted-foreground">({t.machine_count} m/c)</span>
                                     )}
                                   </div>
                                 </div>
