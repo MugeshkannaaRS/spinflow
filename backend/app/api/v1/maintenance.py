@@ -819,6 +819,43 @@ async def get_day_plan(
     result = await db.execute(stmt)
     schedules = result.scalars().all()
 
+    # Fetch the REAL machines for this mill from the Machines master, so tasks
+    # show actual machine numbers/codes instead of a fabricated range. Group by
+    # department (lowercased) and also index by exact machine code.
+    machines_by_dept: dict = {}
+    machines_by_code: dict = {}
+    try:
+        mstmt = select(
+            Machine.code, Machine.name, Machine.machine_number,
+            Machine.line_code, Machine.department, Machine.machine_type,
+        )
+        if effective_mill_id:
+            mstmt = mstmt.where(Machine.mill_id == effective_mill_id)
+        for mrow in (await db.execute(mstmt)).all():
+            code, name, mno, lcode, mdept, mtype = mrow
+            label = mno or lcode or code  # prefer real machine number, then line code, then code
+            entry = {"code": code, "label": label, "name": name}
+            for key in filter(None, [ (mdept or "").strip().lower(), (mtype or "").strip().lower() ]):
+                machines_by_dept.setdefault(key, []).append(entry)
+            if code:
+                machines_by_code[code.strip().lower()] = entry
+    except Exception as e:
+        logger.error(f"day-plan machines fetch error: {e}")
+
+    def _machines_for(schedule) -> list:
+        """Real machine labels for a schedule: exact code match first, else by
+        department/type. Returns [] when the master has no matching machines."""
+        mc = (schedule.machine_code or "").strip().lower()
+        if mc in machines_by_code:
+            return [machines_by_code[mc]["label"]]
+        dept = (schedule.department or "").strip().lower()
+        if dept in machines_by_dept:
+            return [e["label"] for e in machines_by_dept[dept]]
+        # machine_code may itself name a department/type (e.g. "Autoconer")
+        if mc in machines_by_dept:
+            return [e["label"] for e in machines_by_dept[mc]]
+        return []
+
     # Fetch the mill calendar: specific-date entries for this month + weekly-off rules.
     holiday_map: dict = {}          # date_iso -> (day_type, persons_on_leave, note)
     weekly_off_days: set = set()    # weekday ints (0=Mon..6=Sun) that are recurring off
@@ -869,6 +906,8 @@ async def get_day_plan(
 
     for s in schedules:
         try:
+            # Real machine numbers/codes for this schedule (from Machines master).
+            machine_labels = _machines_for(s)
             try:
                 freq = int(s.frequency_days) if s.frequency_days else 30
             except (TypeError, ValueError):
@@ -926,6 +965,8 @@ async def get_day_plan(
                             "frequency_label": _freq_label(freq),
                             "manpower_needed": s.manpower_count or 1,
                             "machine_count": s.machine_count or 1,
+                            "machines": machine_labels,          # real machine numbers/codes from master
+                            "machines_registered": len(machine_labels),
                             "lubricant_name": s.lubricant_name,
                             "lubricant_quantity": s.lubricant_quantity,
                             "last_done": s.last_done,

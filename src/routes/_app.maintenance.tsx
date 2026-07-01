@@ -2099,7 +2099,9 @@ function DayPlanView() {
           section: t.section,
           machine_code: t.machine_code,
           machine_line_code: t.machine_line_code ?? "",
-          machine_no: (t.machine_count ?? 1) > 1 ? `Mc 1-${t.machine_count}` : (t.machine_line_code || "Mc 1"),
+          machine_no: Array.isArray(t.machines) && t.machines.length > 0
+            ? t.machines.join(", ")
+            : (t.machine_line_code || `${t.machine_count ?? 1} machine(s) — not registered`),
           machine_count: t.machine_count ?? 1,
           description: t.description,
           frequency: t.frequency_label,
@@ -2184,7 +2186,7 @@ function DayPlanView() {
         (doc as any).autoTable({
           startY: 30,
           head: [["Section", "Machine", "Machine No.", "Work Description", "Persons", "Min"]],
-          body: d.tasks.map((t: any) => [t.section, t.machine_code, (t.machine_count > 1 ? `Mc 1-${t.machine_count}` : (t.machine_line_code ?? "Mc 1")), t.description, String(t.manpower_needed), String(t.est_min)]),
+          body: d.tasks.map((t: any) => [t.section, t.machine_code, (Array.isArray(t.machines) && t.machines.length > 0 ? t.machines.join(", ") : (t.machine_line_code ?? `${t.machine_count} m/c (not registered)`)), t.description, String(t.manpower_needed), String(t.est_min)]),
           styles: { fontSize: 8, cellPadding: 1.5 },
           headStyles: { fillColor: [37, 99, 235] },
         });
@@ -2213,7 +2215,7 @@ function DayPlanView() {
       (doc as any).autoTable({
         startY: 30,
         head: [["Section", "Machine", "Machine No.", "Work Description", "Persons", "Min"]],
-        body: d.tasks.map((t: any) => [t.section, t.machine_code, (t.machine_count > 1 ? `Mc 1-${t.machine_count}` : (t.machine_line_code ?? "Mc 1")), t.description, String(t.manpower_needed), String(t.est_min)]),
+        body: d.tasks.map((t: any) => [t.section, t.machine_code, (Array.isArray(t.machines) && t.machines.length > 0 ? t.machines.join(", ") : (t.machine_line_code ?? `${t.machine_count} m/c (not registered)`)), t.description, String(t.manpower_needed), String(t.est_min)]),
         styles: { fontSize: 8, cellPadding: 1.5 },
         headStyles: { fillColor: [37, 99, 235] },
       });
@@ -2547,22 +2549,28 @@ function DayPlanView() {
                             {tasks.map((t: any) => (
                               <div key={t.id} className="px-4 py-2.5 flex items-start gap-3">
                                 {/* Machine / Line / count */}
-                                <div className="flex-shrink-0 min-w-[130px]">
+                                <div className="flex-shrink-0 min-w-[150px] max-w-[190px]">
                                   <div className="text-xs font-mono font-semibold text-foreground inline-flex items-center gap-1 bg-muted/60 border border-border/50 rounded px-1.5 py-0.5">
                                     <Wrench className="size-3 text-muted-foreground" />
                                     {t.machine_code || "—"}
                                   </div>
                                   <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                                    {t.machine_line_code && (
+                                    {Array.isArray(t.machines) && t.machines.length > 0 ? (
+                                      <>
+                                        {t.machines.slice(0, 8).map((mn: string, i: number) => (
+                                          <span key={i} className="text-[10px] text-blue-700 bg-blue-50 dark:bg-blue-950/30 font-mono rounded px-1">{mn}</span>
+                                        ))}
+                                        {t.machines.length > 8 && (
+                                          <span className="text-[10px] text-muted-foreground">+{t.machines.length - 8} more</span>
+                                        )}
+                                      </>
+                                    ) : t.machine_line_code ? (
                                       <span className="text-[10px] text-muted-foreground font-mono">{t.machine_line_code}</span>
-                                    )}
-                                    {t.machine_count > 1 && (
-                                      <span className="text-[10px] text-blue-700 bg-blue-50 dark:bg-blue-950/30 font-mono rounded px-1">
-                                        Mc 1–{t.machine_count}
+                                    ) : (
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {t.machine_count > 1 ? `${t.machine_count} machines` : "1 machine"}
+                                        <span className="text-amber-600 ml-1" title="No machines registered in Masters for this type">· not registered</span>
                                       </span>
-                                    )}
-                                    {t.machine_count > 1 && (
-                                      <span className="text-[10px] text-muted-foreground">({t.machine_count} m/c)</span>
                                     )}
                                   </div>
                                 </div>
