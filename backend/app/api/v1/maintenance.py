@@ -1528,7 +1528,11 @@ async def list_holidays(
             | (MillCalendar.mill_id.is_(None))
         )
     if year:
-        stmt = stmt.where(MillCalendar.date.like(f"{year}-%"))
+        # Include the recurring weekly-off rule (date == "WEEKLY") in every year,
+        # otherwise the year filter hides it and the UI can't show the saved value.
+        stmt = stmt.where(
+            MillCalendar.date.like(f"{year}-%") | (MillCalendar.date == "WEEKLY")
+        )
     try:
         rows = (await db.execute(stmt.order_by(MillCalendar.date))).scalars().all()
     except Exception as e:
