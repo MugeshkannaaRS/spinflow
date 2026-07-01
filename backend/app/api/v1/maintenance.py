@@ -1060,14 +1060,45 @@ async def get_day_plan(
             cur += 1
         return None
 
-    # For each schedule, compute all due dates in the month
-    # A task is "due on day D" if next_due falls in that month,
-    # or if frequency_days is short enough to recur (weekly/daily)
-    day_map: dict[int, list] = {d: [] for d in range(1, days_in_month + 1)}
+    SHIFT_MIN = 450  # 7.5h per person (used as the per-person daily minutes base)
 
+    # ---- Per-department manpower + shift (override wins, else schedule value) ----
+    dept_manpower: dict = {}
+    try:
+        omp = select(MaintenanceDeptManpower)
+        if effective_mill_id:
+            omp = omp.where(
+                (MaintenanceDeptManpower.mill_id == effective_mill_id)
+                | (MaintenanceDeptManpower.mill_id.is_(None))
+            )
+        for o in (await db.execute(omp)).scalars().all():
+            dept_manpower[o.department] = {
+                "persons": o.persons or None,
+                "shift_min": (o.shift_hours * 60) if o.shift_hours else None,
+            }
+    except Exception as e:
+        logger.error(f"day-plan dept manpower fetch error: {e}")
+    for s in schedules:
+        d = s.department or "General"
+        if s.manpower_count and d not in dept_manpower:
+            dept_manpower.setdefault(d, {})["persons"] = s.manpower_count
+
+    def _dept_persons(dept: str) -> int:
+        info = dept_manpower.get(dept) or {}
+        return info.get("persons") or 1
+
+    def _dept_shift_min(dept: str) -> float:
+        info = dept_manpower.get(dept) or {}
+        return info.get("shift_min") or SHIFT_MIN
+
+    def _per_machine_min(freq: int) -> int:
+        return min(60, max(15, freq // 2)) if freq <= 30 else min(120, max(30, freq // 6))
+
+    # ---- Phase 1: collect task occurrences (each is N machine-work-units) ----
+    # occ = dict with schedule fields + due_day + machines list + per_machine_min
+    occ_by_dept: dict = {}
     for s in schedules:
         try:
-            # Real machine numbers/codes for this schedule (from Machines master).
             machine_labels = _machines_for(s)
             try:
                 freq = int(s.frequency_days) if s.frequency_days else 30
@@ -1075,7 +1106,6 @@ async def get_day_plan(
                 freq = 30
             if freq <= 0:
                 freq = 30
-            # Determine anchor date
             anchor = None
             if s.next_due:
                 try:
@@ -1089,72 +1119,112 @@ async def get_day_plan(
                 except ValueError:
                     pass
             if anchor is None:
-                # Default: spread tasks across month based on sl_no
                 offset = (s.sl_no or 1) % days_in_month
                 anchor = month_start + timedelta(days=offset)
-
-            # Walk forward/back to find the first occurrence at/before month_start
             if anchor > month_end:
                 diff = (anchor - month_start).days
-                steps_back = diff // freq
-                anchor = anchor - timedelta(days=steps_back * freq)
+                anchor = anchor - timedelta(days=(diff // freq) * freq)
             elif anchor < month_start:
                 diff = (month_start - anchor).days
-                steps_fwd = (diff + freq - 1) // freq
-                anchor = anchor + timedelta(days=steps_fwd * freq)
+                anchor = anchor + timedelta(days=((diff + freq - 1) // freq) * freq)
 
-            # Collect all hits in month
+            # units = one per real machine, else machine_count placeholder units
+            n_units = len(machine_labels) if machine_labels else (s.machine_count or 1)
+            unit_labels = machine_labels if machine_labels else [s.machine_code] * n_units
+
+            dept = s.department or "General"
             current = anchor
             while current <= month_end:
                 if current >= month_start:
                     due_day = current.day
-                    # If the due day is a non-working day (holiday / weekly-off),
-                    # carry the task forward to the next working day. Frequency is
-                    # unchanged — only the execution date shifts.
                     placed_day = due_day if due_day not in non_working else _next_working_day(due_day)
                     if placed_day is not None:
-                        shifted = placed_day != due_day
-                        placed_date = dt_date(y, m, placed_day)
-                        est_min = min(60, max(15, freq // 2)) if freq <= 30 else min(120, max(30, freq // 6))
-                        day_map[placed_day].append({
-                            "id": s.id,
-                            "machine_code": s.machine_code,
-                            "machine_line_code": s.machine_line_code,
-                            "description": s.description,
-                            "section": s.department or "General",
-                            "frequency_days": freq,
-                            "frequency_label": _freq_label(freq),
-                            "manpower_needed": s.manpower_count or 1,
-                            "machine_count": s.machine_count or 1,
-                            "machines": machine_labels,          # real machine numbers/codes from master
-                            "machines_registered": len(machine_labels),
-                            "lubricant_name": s.lubricant_name,
-                            "lubricant_quantity": s.lubricant_quantity,
-                            "last_done": s.last_done,
-                            "due_date": placed_date.isoformat(),
+                        occ_by_dept.setdefault(dept, []).append({
+                            "sched": s, "freq": freq, "due_day": placed_day,
                             "original_due": current.isoformat(),
-                            "shifted": shifted,
-                            "est_min": est_min,
-                            "is_overdue": placed_date < today,
-                            "sl_no": s.sl_no,
+                            "shifted": placed_day != due_day,
+                            "units": list(unit_labels),
+                            "per_min": _per_machine_min(freq),
+                            "machines_registered": len(machine_labels),
                         })
                 if freq >= 30:
-                    break  # Only one occurrence per month for monthly+ tasks
+                    break
                 current += timedelta(days=freq)
         except Exception as row_err:
-            logger.error(f"maintenance.day-plan skip schedule id={getattr(s, 'id', '?')}: {row_err}")
+            logger.error(f"maintenance.day-plan occ error id={getattr(s, 'id', '?')}: {row_err}")
             continue
 
-    # Total maintenance manpower available on a normal working day (sum of the
-    # distinct per-department manpower). Used to compute capacity per day.
-    base_manpower = 0
-    seen_dept = {}
-    for s in schedules:
-        d = s.department or "General"
-        if s.manpower_count and d not in seen_dept:
-            seen_dept[d] = s.manpower_count
-    base_manpower = sum(seen_dept.values()) or 1
-    SHIFT_MIN = 450  # 7.5h per person
+    # ---- Phase 2: distribute each department's work across working days by capacity ----
+    from collections import deque, defaultdict
+    day_map: dict[int, list] = {d: [] for d in range(1, days_in_month + 1)}
+
+    def _day_capacity(dept: str, day: int) -> float:
+        if day in non_working:
+            return 0.0
+        persons = _dept_persons(dept)
+        shift_min = _dept_shift_min(dept)
+        iso = dt_date(y, m, day).isoformat()
+        factor, on_leave = 1.0, 0
+        if iso in holiday_map:
+            dtp, on_leave, _n = holiday_map[iso]
+            if dtp == "half_day":
+                factor = 0.5
+        return max(0, persons - (on_leave or 0)) * shift_min * factor
+
+    for dept, occ_list in occ_by_dept.items():
+        due_by_day: dict = defaultdict(list)
+        for occ in occ_list:
+            due_by_day[occ["due_day"]].append(occ)
+        backlog: deque = deque()  # (machine_label, per_min, occ)
+        for day in range(1, days_in_month + 1):
+            # release occurrences due today into the backlog
+            for occ in due_by_day.get(day, []):
+                for mac in occ["units"]:
+                    backlog.append((mac, occ["per_min"], occ))
+            remaining = _day_capacity(dept, day)
+            if remaining <= 0:
+                continue  # holiday/weekly-off: work carries forward
+            # fill day up to capacity (FIFO); stop when the next unit no longer fits
+            day_assign: dict = defaultdict(list)  # id(occ) -> [machine labels]
+            occ_ref: dict = {}
+            while backlog and remaining >= backlog[0][1]:
+                mac, pmin, occ = backlog.popleft()
+                day_assign[id(occ)].append(mac)
+                occ_ref[id(occ)] = occ
+                remaining -= pmin
+            # build one task entry per occurrence assigned today
+            for oid, macs in day_assign.items():
+                occ = occ_ref[oid]
+                s = occ["sched"]
+                placed_date = dt_date(y, m, day)
+                day_map[day].append({
+                    "id": f"{s.id}-{day}",
+                    "machine_code": s.machine_code,
+                    "machine_line_code": s.machine_line_code,
+                    "description": s.description,
+                    "section": s.department or "General",
+                    "frequency_days": occ["freq"],
+                    "frequency_label": _freq_label(occ["freq"]),
+                    "manpower_needed": _dept_persons(dept),
+                    "machine_count": len(macs),
+                    "machines": macs,                       # only the machines done THIS day
+                    "machines_registered": occ["machines_registered"],
+                    "total_machines": len(occ["units"]),    # full count for the task occurrence
+                    "lubricant_name": s.lubricant_name,
+                    "lubricant_quantity": s.lubricant_quantity,
+                    "last_done": s.last_done,
+                    "due_date": placed_date.isoformat(),
+                    "original_due": occ["original_due"],
+                    "shifted": occ["shifted"],
+                    "est_min": len(macs) * occ["per_min"],   # real work minutes for this day's machines
+                    "per_machine_min": occ["per_min"],
+                    "is_overdue": placed_date < today,
+                    "sl_no": s.sl_no,
+                })
+        # anything still in backlog spilled past month end — it continues next month.
+
+    # Base manpower for the whole-department capacity readouts on each day.
+    base_manpower = sum(_dept_persons(d) for d in occ_by_dept.keys()) or 1
 
     # Build day list
     days_out = []

@@ -2539,11 +2539,16 @@ function DayPlanView() {
                                   <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                                     {Array.isArray(t.machines) && t.machines.length > 0 ? (
                                       <>
-                                        {t.machines.slice(0, 8).map((mn: string, i: number) => (
+                                        {t.machines.slice(0, 6).map((mn: string, i: number) => (
                                           <span key={i} className="text-[10px] text-blue-700 bg-blue-50 dark:bg-blue-950/30 font-mono rounded px-1">{mn}</span>
                                         ))}
-                                        {t.machines.length > 8 && (
-                                          <span className="text-[10px] text-muted-foreground">+{t.machines.length - 8} more</span>
+                                        {t.machines.length > 6 && (
+                                          <span className="text-[10px] text-muted-foreground">+{t.machines.length - 6}</span>
+                                        )}
+                                        {t.total_machines != null && t.total_machines > t.machines.length && (
+                                          <span className="text-[10px] text-indigo-600 font-medium" title="Machines done this day; the rest continue on following days">
+                                            · {t.machines.length} of {t.total_machines}
+                                          </span>
                                         )}
                                       </>
                                     ) : t.machine_line_code ? (
