@@ -1247,87 +1247,65 @@ function utilisationColor(pct: number): string {
 }
 
 function DayWisePlanTable({ dept, schedules }: { dept: string; schedules: any[] }) {
-  // Build day-wise plan: tasks grouped by frequency → spread across calendar days
-  const SHIFT_MIN = 450;
-  const TASK_EST: Record<number, number> = { 30:20,60:25,90:30,120:35,180:45,365:90,730:180,912:240,1095:300,1460:360,1825:480 };
-  const manpower = schedules[0]?.manpower_count ?? 1;
-  const machineCount = schedules[0]?.machine_count ?? 1;
-  const machPerPerson = Math.ceil(machineCount / manpower);
+  // Real, data-driven breakdown of this department's PM tasks by frequency.
+  // No fabricated day-by-day machine ranges — the actual day-wise plan (with
+  // real machines, calendar, holidays) lives in the Day Plan tab.
+  const freqLabel = (d: number) => {
+    if (d <= 1) return "Daily";
+    if (d <= 7) return "Weekly";
+    if (d <= 15) return "Fortnightly";
+    if (d <= 31) return "Monthly";
+    if (d <= 92) return "Quarterly";
+    if (d <= 186) return "6-Monthly";
+    if (d <= 366) return "Yearly";
+    return `Every ${Math.round(d / 365)}Y`;
+  };
 
-  // Monthly tasks only (freq=30) are the ones that happen every month
-  const monthlyTasks = schedules.filter(s => (s.frequency_days ?? 30) === 30);
-  const sixMonthlyTasks = schedules.filter(s => (s.frequency_days ?? 30) === 180);
-  const yearlyTasks = schedules.filter(s => (s.frequency_days ?? 30) === 365);
-
-  const dayPlan: Array<{ day: number; person: string; machines: string; tasks: string; estMin: number; taskType: string }> = [];
-
-  if (monthlyTasks.length > 0) {
-    const minPerPerson = monthlyTasks.reduce((s, t) => s + (TASK_EST[30] ?? 20), 0);
-    const daysNeeded = Math.ceil((minPerPerson * machineCount / manpower) / (SHIFT_MIN * 0.85));
-    for (let d = 1; d <= daysNeeded; d++) {
-      const startMc = (d - 1) * machPerPerson * manpower + 1;
-      const endMc = Math.min(d * machPerPerson * manpower, machineCount);
-      dayPlan.push({
-        day: d,
-        person: `All ${manpower} persons`,
-        machines: `Mc ${startMc}–${endMc}`,
-        tasks: `Monthly PM (${monthlyTasks.length} tasks/mc)`,
-        estMin: Math.min(minPerPerson * machPerPerson, SHIFT_MIN * 0.85),
-        taskType: "monthly",
-      });
-    }
+  // Group real schedules by their real frequency
+  const groups: Record<number, any[]> = {};
+  for (const s of schedules) {
+    const f = s.frequency_days ?? 30;
+    (groups[f] = groups[f] || []).push(s);
   }
+  const rows = Object.keys(groups)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map((f) => ({
+      freq: f,
+      label: freqLabel(f),
+      count: groups[f].length,
+      machines: [...new Set(groups[f].map((s: any) => s.machine_code).filter(Boolean))],
+    }));
 
   return (
     <div className="mt-3 rounded-md border overflow-hidden text-xs">
       <table className="w-full">
         <thead className="bg-muted/60">
           <tr>
-            <th className="text-left px-3 py-2 font-medium">Day</th>
-            <th className="text-left px-3 py-2 font-medium">Who</th>
+            <th className="text-left px-3 py-2 font-medium">Frequency</th>
+            <th className="text-right px-3 py-2 font-medium">PM Tasks</th>
             <th className="text-left px-3 py-2 font-medium">Machines</th>
-            <th className="text-left px-3 py-2 font-medium">Tasks</th>
-            <th className="text-left px-3 py-2 font-medium">Est. Time</th>
-            <th className="text-left px-3 py-2 font-medium">Shift Util</th>
           </tr>
         </thead>
         <tbody>
-          {dayPlan.length === 0 ? (
-            <tr><td colSpan={6} className="px-3 py-4 text-center text-muted-foreground">No monthly tasks scheduled</td></tr>
+          {rows.length === 0 ? (
+            <tr><td colSpan={3} className="px-3 py-4 text-center text-muted-foreground">No PM tasks in this department</td></tr>
           ) : (
-            dayPlan.map((row, i) => {
-              const util = Math.round((row.estMin / SHIFT_MIN) * 100);
-              return (
-                <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-muted/20"}>
-                  <td className="px-3 py-2 font-semibold">Day {row.day}</td>
-                  <td className="px-3 py-2">{row.person}</td>
-                  <td className="px-3 py-2 font-mono">{row.machines}</td>
-                  <td className="px-3 py-2">{row.tasks}</td>
-                  <td className="px-3 py-2">{Math.round(row.estMin)} min ({(row.estMin/60).toFixed(1)}h)</td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                        <div className="h-2 bg-blue-500 rounded-full" style={{ width: `${Math.min(util, 100)}%` }} />
-                      </div>
-                      <span className={utilisationColor(util)}>{util}%</span>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })
+            rows.map((r, i) => (
+              <tr key={i} className={i % 2 === 0 ? "bg-background" : "bg-muted/20"}>
+                <td className="px-3 py-2 font-semibold">{r.label} <span className="text-muted-foreground font-normal">({r.freq}d)</span></td>
+                <td className="px-3 py-2 text-right">{r.count}</td>
+                <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                  {r.machines.slice(0, 5).join(", ")}{r.machines.length > 5 ? ` +${r.machines.length - 5}` : ""}
+                </td>
+              </tr>
+            ))
           )}
         </tbody>
       </table>
-      {sixMonthlyTasks.length > 0 && (
-        <div className="px-3 py-2 border-t bg-muted/30 text-xs text-muted-foreground">
-          <span className="font-medium">6-Monthly block:</span> {sixMonthlyTasks.length} tasks — schedule on Day 1 of months 1, 7
-        </div>
-      )}
-      {yearlyTasks.length > 0 && (
-        <div className="px-3 py-2 border-t bg-muted/30 text-xs text-muted-foreground">
-          <span className="font-medium">Yearly block:</span> {yearlyTasks.length} tasks — schedule in January or as per OEM
-        </div>
-      )}
+      <div className="px-3 py-2 border-t bg-muted/20 text-[11px] text-muted-foreground">
+        Day-wise execution with real machines & holidays is in the <span className="font-medium">Day Plan</span> tab.
+      </div>
     </div>
   );
 }

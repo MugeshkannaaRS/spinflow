@@ -684,6 +684,49 @@ async def get_manpower_summary(
             if today_str <= nd <= month_end:
                 d["due_this_month"] += 1
 
+    # Count the REAL machines per department from the Machines master, so the
+    # displayed machine count reflects actual machines (e.g. 35 Ring Frames),
+    # not whatever a schedule row happened to carry. Uses normalized name match
+    # + the mill dept-map, same as the Day Plan.
+    import re as _re2
+    def _n2(v): return _re2.sub(r"[^a-z0-9]", "", (v or "").lower())
+    real_machine_count: dict = {}
+    try:
+        mstmt2 = select(Machine.department)
+        if effective_mill_id:
+            mstmt2 = mstmt2.where(Machine.mill_id == effective_mill_id)
+        mdepts = [r[0] for r in (await db.execute(mstmt2)).all() if r[0]]
+        # count machines per normalized machine-department
+        norm_counts: dict = {}
+        for md in mdepts:
+            norm_counts[_n2(md)] = norm_counts.get(_n2(md), 0) + 1
+        # dept map: schedule dept -> [machine dept]
+        dmap: dict = {}
+        dmst = select(MaintenanceDeptMap)
+        if effective_mill_id:
+            dmst = dmst.where(
+                (MaintenanceDeptMap.mill_id == effective_mill_id)
+                | (MaintenanceDeptMap.mill_id.is_(None))
+            )
+        for dm in (await db.execute(dmst)).scalars().all():
+            dmap.setdefault((dm.schedule_dept or "").strip().lower(), []).append(dm.machine_dept)
+        # resolve a real count for each schedule department
+        for dept in list(dept_data.keys()):
+            n = _n2(dept)
+            cnt = 0
+            mapped = dmap.get(dept.strip().lower())
+            if mapped:
+                for md in mapped:
+                    cnt += norm_counts.get(_n2(md), 0)
+            else:
+                for nd, c in norm_counts.items():
+                    if nd == n or nd.startswith(n) or n.startswith(nd):
+                        cnt += c
+            if cnt > 0:
+                real_machine_count[dept] = cnt
+    except Exception as e:
+        logger.error(f"manpower-summary real machine count error: {e}")
+
     # Per-department manpower overrides (persons/machines/shift-hours/leader/notes).
     # Overrides WIN over schedule-derived values, and can add departments that
     # have no schedules yet.
@@ -712,7 +755,8 @@ async def get_manpower_summary(
     for dept, d in dept_data.items():
         o = overrides.get(dept)
         manpower = (o.persons if o and o.persons else None) or d["manpower"]
-        machine_count = (o.machines if o and o.machines else None) or d["machine_count"]
+        # machine count precedence: explicit override > real machines from master > schedule value
+        machine_count = (o.machines if o and o.machines else None) or real_machine_count.get(dept) or d["machine_count"]
         shift_hrs = (o.shift_hours if o and o.shift_hours else None) or 7.5
         shift_min = shift_hrs * 60
         capacity = manpower * shift_min
