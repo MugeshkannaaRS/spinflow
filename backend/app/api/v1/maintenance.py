@@ -12,7 +12,7 @@ from app.db.session import get_db
 logger = logging.getLogger(__name__)
 from app.core.deps import get_current_user, require_module, get_mill_scope
 from app.models.user import User
-from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter, PMEntryLog, PMActivityConfig, MillCalendar, MaintenanceDeptManpower
+from app.models.maintenance import MaintenanceLog, MaintenanceSchedule, Technician, MachineParameter, PMEntryLog, PMActivityConfig, MillCalendar, MaintenanceDeptManpower, MaintenanceDeptMap
 from app.models.production import Machine
 from app.models.masters import Mill
 from app.schemas.maintenance import (
@@ -443,6 +443,68 @@ async def update_schedule(
     return schedule
 
 
+@router.patch("/maintenance/schedules/{schedule_id}", response_model=ScheduleOut)
+async def patch_schedule(
+    schedule_id: str,
+    payload: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance", write=True)),
+):
+    """Row-wise edit of a PM schedule — accepts any subset of editable fields
+    (lubricant, qty, manpower, machine count, department, dates, etc.). Only the
+    keys present in the payload are updated."""
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(MaintenanceSchedule).where(MaintenanceSchedule.id == schedule_id)
+    if scope.get("mill_id"):
+        stmt = stmt.where(MaintenanceSchedule.mill_id == scope["mill_id"])
+    schedule = (await db.execute(stmt)).scalar_one_or_none()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+
+    def _int(v):
+        try:
+            return int(v) if v not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+
+    def _float(v):
+        try:
+            return float(v) if v not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+
+    def _str(v, n):
+        return (str(v).strip()[:n] if v not in (None, "") else None)
+
+    # str fields (clip to column length)
+    str_fields = {
+        "machine_code": 50, "description": None, "department": 100,
+        "lubricant_name": 200, "lubricant_quantity": 100, "machine_line_code": 100,
+        "last_done": 10, "next_due": 10, "last_grinding_date": 10, "type": 50,
+    }
+    for f, ln in str_fields.items():
+        if f in payload:
+            setattr(schedule, f, str(payload[f]).strip()[: (ln or 10_000)] if payload[f] not in (None, "") else None)
+    for f in ("frequency_days", "manpower_count", "machine_count", "sl_no", "grinding_freq_days"):
+        if f in payload:
+            setattr(schedule, f, _int(payload[f]))
+    for f in ("opening_dia_mm", "current_dia_mm"):
+        if f in payload:
+            setattr(schedule, f, _float(payload[f]))
+    if "is_active" in payload:
+        v = payload["is_active"]
+        schedule.is_active = v if isinstance(v, bool) else str(v).lower() in ("1", "true", "yes")
+    # frequency label -> resolve to days if frequency_days not explicitly given
+    if "frequency" in payload and "frequency_days" not in payload:
+        fd = _parse_freq(str(payload.get("frequency") or ""))
+        if fd:
+            schedule.frequency_days = fd
+
+    await db.flush()
+    await db.commit()
+    return schedule
+
+
 @router.get("/maintenance/parameters")
 async def get_parameters(
     machine_code: Optional[str] = Query(None),
@@ -842,18 +904,73 @@ async def get_day_plan(
     except Exception as e:
         logger.error(f"day-plan machines fetch error: {e}")
 
+    import re as _re
+
+    def _norm(v: str) -> str:
+        return _re.sub(r"[^a-z0-9]", "", (v or "").lower())
+
+    # Build a normalized department index so "Blow Room" ~ "Blowroom",
+    # "Ring Frame" ~ "Ringframe" etc. match without hardcoding each variant.
+    machines_by_norm_dept: dict = {}
+    for dept_key, entries in machines_by_dept.items():
+        machines_by_norm_dept.setdefault(_norm(dept_key), []).extend(entries)
+
+    # Mill-editable department mapping: {schedule_dept(lower) -> [machine_dept, ...]}
+    dept_map: dict = {}
+    try:
+        dmstmt = select(MaintenanceDeptMap)
+        if effective_mill_id:
+            dmstmt = dmstmt.where(
+                (MaintenanceDeptMap.mill_id == effective_mill_id)
+                | (MaintenanceDeptMap.mill_id.is_(None))
+            )
+        for dm in (await db.execute(dmstmt)).scalars().all():
+            dept_map.setdefault((dm.schedule_dept or "").strip().lower(), []).append(dm.machine_dept)
+    except Exception as e:
+        logger.error(f"day-plan dept-map fetch error: {e}")
+
     def _machines_for(schedule) -> list:
-        """Real machine labels for a schedule: exact code match first, else by
-        department/type. Returns [] when the master has no matching machines."""
+        """Real machine labels for a schedule, resolved from the Machines master.
+        Order: exact machine code → exact/normalized department → normalized
+        prefix (e.g. 'Blowroom' matches 'Blow Room-A'). [] if none registered."""
+        seen = set()
+
+        def _uniq(entries):
+            out = []
+            for e in entries:
+                if e["label"] not in seen:
+                    seen.add(e["label"])
+                    out.append(e["label"])
+            return out
+
         mc = (schedule.machine_code or "").strip().lower()
         if mc in machines_by_code:
             return [machines_by_code[mc]["label"]]
-        dept = (schedule.department or "").strip().lower()
-        if dept in machines_by_dept:
-            return [e["label"] for e in machines_by_dept[dept]]
-        # machine_code may itself name a department/type (e.g. "Autoconer")
-        if mc in machines_by_dept:
-            return [e["label"] for e in machines_by_dept[mc]]
+
+        # 1) Explicit mill mapping wins: schedule dept -> machine dept(s)
+        sdept = (schedule.department or "").strip().lower()
+        if sdept in dept_map:
+            mapped = []
+            for md in dept_map[sdept]:
+                mapped.extend(machines_by_norm_dept.get(_norm(md), []))
+            if mapped:
+                return _uniq(mapped)
+
+        # 2) Fall back to normalized name matching
+        candidates = [c for c in [schedule.department, schedule.machine_code] if c]
+        for cand in candidates:
+            ncand = _norm(cand)
+            if not ncand:
+                continue
+            # Gather ALL machine departments that match this candidate — exact
+            # OR prefix either way (so 'Blowroom' picks up 'Blow Room',
+            # 'Blow Room-A' and 'Blow Room-B' together).
+            matched = []
+            for ndept, entries in machines_by_norm_dept.items():
+                if ndept == ncand or ndept.startswith(ncand) or ncand.startswith(ndept):
+                    matched.extend(entries)
+            if matched:
+                return _uniq(matched)
         return []
 
     # Fetch the mill calendar: specific-date entries for this month + weekly-off rules.
@@ -1490,6 +1607,106 @@ async def delete_dept_manpower(
     stmt = select(MaintenanceDeptManpower).where(MaintenanceDeptManpower.id == item_id)
     if scope.get("mill_id"):
         stmt = stmt.where(MaintenanceDeptManpower.mill_id == scope["mill_id"])
+    row = (await db.execute(stmt)).scalar_one_or_none()
+    if not row:
+        raise HTTPException(404, detail="Not found")
+    await db.delete(row)
+    await db.commit()
+    return {"message": "deleted", "id": item_id}
+
+
+# ---------------------------------------------------------------------------
+# DEPARTMENT MAPPING (schedule dept -> machine-master dept) for real machines
+# ---------------------------------------------------------------------------
+
+@router.get("/maintenance/dept-map")
+async def get_dept_map(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance")),
+):
+    """Returns the dept mappings, plus the distinct schedule + machine
+    departments in the system so the UI can offer dropdowns."""
+    scope = await get_mill_scope(current_user, db)
+    effective_mill_id = scope.get("mill_id")
+
+    mstmt = select(MaintenanceDeptMap)
+    if effective_mill_id:
+        mstmt = mstmt.where(
+            (MaintenanceDeptMap.mill_id == effective_mill_id)
+            | (MaintenanceDeptMap.mill_id.is_(None))
+        )
+    try:
+        maps = (await db.execute(mstmt.order_by(MaintenanceDeptMap.schedule_dept))).scalars().all()
+    except Exception as e:
+        logger.error(f"dept-map list error: {e}")
+        maps = []
+
+    # distinct schedule departments
+    sstmt = select(MaintenanceSchedule.department).distinct()
+    if effective_mill_id:
+        sstmt = sstmt.where(
+            (MaintenanceSchedule.mill_id == effective_mill_id)
+            | (MaintenanceSchedule.mill_id.is_(None))
+        )
+    sched_depts = sorted({r[0] for r in (await db.execute(sstmt)).all() if r[0]})
+
+    # distinct machine departments
+    dstmt = select(Machine.department).distinct()
+    if effective_mill_id:
+        dstmt = dstmt.where(Machine.mill_id == effective_mill_id)
+    machine_depts = sorted({r[0] for r in (await db.execute(dstmt)).all() if r[0]})
+
+    return {
+        "data": [
+            {"id": m.id, "schedule_dept": m.schedule_dept, "machine_dept": m.machine_dept}
+            for m in maps
+        ],
+        "schedule_departments": sched_depts,
+        "machine_departments": machine_depts,
+    }
+
+
+@router.post("/maintenance/dept-map")
+async def add_dept_map(
+    payload: Dict[str, Any],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    mill_id = scope.get("mill_id")
+    sched = str(payload.get("schedule_dept") or "").strip()
+    machine = str(payload.get("machine_dept") or "").strip()
+    if not sched or not machine:
+        raise HTTPException(400, detail="schedule_dept and machine_dept are required")
+    # avoid duplicate pairing
+    stmt = select(MaintenanceDeptMap).where(
+        MaintenanceDeptMap.schedule_dept == sched,
+        MaintenanceDeptMap.machine_dept == machine,
+    )
+    if mill_id:
+        stmt = stmt.where(MaintenanceDeptMap.mill_id == mill_id)
+    existing = (await db.execute(stmt)).scalar_one_or_none()
+    if existing:
+        return {"id": existing.id, "schedule_dept": sched, "machine_dept": machine}
+    row = MaintenanceDeptMap(
+        mill_id=mill_id, schedule_dept=sched, machine_dept=machine,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(row)
+    await db.commit()
+    return {"id": row.id, "schedule_dept": sched, "machine_dept": machine}
+
+
+@router.delete("/maintenance/dept-map/{item_id}")
+async def delete_dept_map(
+    item_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("maintenance", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(MaintenanceDeptMap).where(MaintenanceDeptMap.id == item_id)
+    if scope.get("mill_id"):
+        stmt = stmt.where(MaintenanceDeptMap.mill_id == scope["mill_id"])
     row = (await db.execute(stmt)).scalar_one_or_none()
     if not row:
         raise HTTPException(404, detail="Not found")

@@ -802,17 +802,21 @@ function MaintenancePage() {
                       emptyMessage='No schedules yet. Use "Import Schedule" to upload from Excel.'
                       actions={
                         canEdit
-                          ? (s: any) =>
-                              s.is_active ? (
-                                <ConfirmDeleteButton
-                                  onConfirm={async () => {
-                                    await maintenanceApi.deleteSchedule(s.id);
-                                    qc.invalidateQueries({ queryKey: ["maintenance-schedules"] });
-                                  }}
-                                  label={`Remove PM schedule for ${s.machine_code}?`}
-                                  successMessage="Schedule removed"
-                                />
-                              ) : null
+                          ? (s: any) => (
+                              <div className="flex items-center gap-1">
+                                <EditScheduleDialog schedule={s} />
+                                {s.is_active && (
+                                  <ConfirmDeleteButton
+                                    onConfirm={async () => {
+                                      await maintenanceApi.deleteSchedule(s.id);
+                                      qc.invalidateQueries({ queryKey: ["maintenance-schedules"] });
+                                    }}
+                                    label={`Remove PM schedule for ${s.machine_code}?`}
+                                    successMessage="Schedule removed"
+                                  />
+                                )}
+                              </div>
+                            )
                           : undefined
                       }
                     />
@@ -2966,6 +2970,121 @@ function ImportScheduleDialog() {
 
 // Manual single-schedule entry — posts one item to the bulk endpoint so it
 // shares the same fields / mill scoping as the Excel import.
+// Row-wise edit of a single PM schedule. On save, syncs everywhere the data
+// is used (schedules list, manpower summary, day plan).
+function EditScheduleDialog({ schedule }: { schedule: any }) {
+  const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+  const [form, setForm] = useState({
+    machine_code: schedule.machine_code ?? "",
+    department: schedule.department ?? "",
+    description: schedule.description ?? "",
+    frequency_days: schedule.frequency_days != null ? String(schedule.frequency_days) : "",
+    lubricant_name: schedule.lubricant_name ?? "",
+    lubricant_quantity: schedule.lubricant_quantity ?? "",
+    manpower_count: schedule.manpower_count != null ? String(schedule.manpower_count) : "",
+    machine_count: schedule.machine_count != null ? String(schedule.machine_count) : "",
+    machine_line_code: schedule.machine_line_code ?? "",
+    last_done: schedule.last_done ?? "",
+    next_due: schedule.next_due ?? "",
+  });
+
+  const mut = useMutation({
+    mutationFn: (p: any) => maintenanceApi.patchSchedule(schedule.id, p),
+    onSuccess: () => {
+      toast.success("Schedule updated");
+      // Sync everywhere this data affects
+      qc.invalidateQueries({ queryKey: ["maintenance-schedules"] });
+      qc.invalidateQueries({ queryKey: ["maintenance", "manpower-summary"] });
+      qc.invalidateQueries({ queryKey: ["maintenance", "day-plan"] });
+      setOpen(false);
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.detail ?? "Failed to save"),
+  });
+
+  const submit = () => {
+    mut.mutate({
+      machine_code: form.machine_code.trim(),
+      department: form.department.trim() || null,
+      description: form.description.trim(),
+      frequency_days: form.frequency_days ? Number(form.frequency_days) : null,
+      lubricant_name: form.lubricant_name.trim() || null,
+      lubricant_quantity: form.lubricant_quantity.trim() || null,
+      manpower_count: form.manpower_count ? Number(form.manpower_count) : null,
+      machine_count: form.machine_count ? Number(form.machine_count) : null,
+      machine_line_code: form.machine_line_code.trim() || null,
+      last_done: form.last_done || null,
+      next_due: form.next_due || null,
+    });
+  };
+  const set = (k: string, v: string) => setForm((p) => ({ ...p, [k]: v }));
+
+  return (
+    <>
+      <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setOpen(true)} title="Edit">
+        <Pencil className="size-3.5 text-muted-foreground" />
+      </Button>
+      <Dialog open={open} onOpenChange={(o) => !o && setOpen(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit PM Schedule</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-1">
+            <div className="space-y-1">
+              <Label className="text-xs">Machine</Label>
+              <Input value={form.machine_code} onChange={(e) => set("machine_code", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Department</Label>
+              <Input value={form.department} onChange={(e) => set("department", e.target.value)} />
+            </div>
+            <div className="space-y-1 col-span-2">
+              <Label className="text-xs">Work Description</Label>
+              <Input value={form.description} onChange={(e) => set("description", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Frequency (days)</Label>
+              <Input type="number" value={form.frequency_days} onChange={(e) => set("frequency_days", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Machine Line Code</Label>
+              <Input value={form.machine_line_code} onChange={(e) => set("machine_line_code", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Lubricant</Label>
+              <Input value={form.lubricant_name} onChange={(e) => set("lubricant_name", e.target.value)} placeholder="e.g. Grease EP2" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Lubricant Qty</Label>
+              <Input value={form.lubricant_quantity} onChange={(e) => set("lubricant_quantity", e.target.value)} placeholder="e.g. 120 g" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Manpower</Label>
+              <Input type="number" value={form.manpower_count} onChange={(e) => set("manpower_count", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Machine Count</Label>
+              <Input type="number" value={form.machine_count} onChange={(e) => set("machine_count", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Last Done</Label>
+              <Input type="date" value={form.last_done} onChange={(e) => set("last_done", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Next Due</Label>
+              <Input type="date" value={form.next_due} onChange={(e) => set("next_due", e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button onClick={submit} disabled={mut.isPending}>{mut.isPending ? "Saving…" : "Save"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 function AddScheduleDialog() {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();

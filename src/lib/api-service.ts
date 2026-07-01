@@ -298,6 +298,8 @@ export const maintenanceApi = {
   getSchedules: () =>
     api.get("/maintenance/schedules?page_size=500").then((r: any) => extractList(r.data)),
   deleteSchedule: (id: string) => api.delete(`/maintenance/schedules/${id}`).then((r) => r.data),
+  patchSchedule: (id: string, payload: Record<string, any>) =>
+    api.patch(`/maintenance/schedules/${id}`, payload).then((r) => r.data),
   markScheduleDone: (id: string) =>
     api.patch(`/maintenance/schedules/${id}/done`).then((r) => r.data),
   bulkCreateSchedules: (data: any) =>
@@ -327,6 +329,12 @@ export const maintenanceApi = {
     api.put(`/maintenance/activity-config/${encodeURIComponent(section)}`, payload).then((r) => r.data),
   getHolidays: (year?: number) =>
     api.get(`/maintenance/holidays${year ? `?year=${year}` : ""}`).then((r) => r.data.data as any[]),
+  getDeptMap: () =>
+    api.get("/maintenance/dept-map").then((r) => r.data as { data: any[]; schedule_departments: string[]; machine_departments: string[] }),
+  addDeptMap: (schedule_dept: string, machine_dept: string) =>
+    api.post("/maintenance/dept-map", { schedule_dept, machine_dept }).then((r) => r.data),
+  deleteDeptMap: (id: string) =>
+    api.delete(`/maintenance/dept-map/${id}`).then((r) => r.data),
   getDeptManpower: () =>
     api.get("/maintenance/dept-manpower").then((r) => r.data.data as any[]),
   upsertDeptManpower: (payload: { department: string; persons?: number | null; machines?: number | null; shift_hours?: number | null; leader?: string; notes?: string }) =>

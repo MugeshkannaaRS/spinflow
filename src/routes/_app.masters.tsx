@@ -42,6 +42,7 @@ import {
 import { useState, useEffect, useMemo } from "react";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { MillCalendarManager } from "@/components/maintenance/MillCalendarManager";
+import { DeptMapManager } from "@/components/maintenance/DeptMapManager";
 import { toast } from "sonner";
 import {
   Plus,
@@ -292,7 +293,7 @@ function MastersPage() {
                   { key: "shifts", label: "Shifts" },
                   { key: "warehouses", label: "Warehouses" },
                   { key: "stop-codes", label: "Stop Codes" },
-                  { key: "calendar", label: "Calendar" },
+                  { key: "calendar", label: "Calendar & Mapping" },
                   { key: "custom-fields", label: "Custom Fields" },
                 ];
                 const isSuperAdmin = false;
@@ -557,14 +558,25 @@ function MastersPage() {
 
             <TabsContent value="calendar">
               <ErrorBoundary inline label="Calendar">
-                <div className="rounded-lg border bg-card p-4">
-                  <div className="mb-3">
-                    <h3 className="text-base font-semibold">Mill Calendar</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Set holidays, half-days, leave and the weekly off for this mill. Used across modules (e.g. PM Day Plan capacity).
-                    </p>
+                <div className="space-y-4">
+                  <div className="rounded-lg border bg-card p-4">
+                    <div className="mb-3">
+                      <h3 className="text-base font-semibold">Mill Calendar</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Set holidays, half-days, leave and the weekly off for this mill. Used across modules (e.g. PM Day Plan capacity).
+                      </p>
+                    </div>
+                    <MillCalendarManager />
                   </div>
-                  <MillCalendarManager />
+                  <div className="rounded-lg border bg-card p-4">
+                    <div className="mb-3">
+                      <h3 className="text-base font-semibold">Department → Machine Mapping</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Link PM-schedule departments to the real Machines-master departments so the Day Plan shows actual machine numbers (e.g. Autoconer → Finishing).
+                      </p>
+                    </div>
+                    <DeptMapManager />
+                  </div>
                 </div>
               </ErrorBoundary>
             </TabsContent>

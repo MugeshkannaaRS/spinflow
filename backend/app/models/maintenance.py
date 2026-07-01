@@ -118,6 +118,22 @@ class MillCalendar(Base):
 MaintenanceHolidayCalendar = MillCalendar
 
 
+class MaintenanceDeptMap(Base):
+    """
+    Maps a PM-schedule department name to a Machines-master department name, so
+    the Day Plan can resolve real machine numbers even when the two systems use
+    different names (e.g. schedule 'Autoconer' -> machine dept 'Finishing',
+    'Draw Frame'/'Simplex' -> 'D.S.C'). Mill-editable; one row per pairing.
+    """
+    __tablename__ = "maintenance_dept_map"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    mill_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    schedule_dept: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    machine_dept: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class MaintenanceDeptManpower(Base):
     """
     Per-department maintenance manpower override. When present for a department,
