@@ -247,7 +247,7 @@ async def get_audit_logs(
 async def export_audit_logs(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("audit")),
-    format: str = Query("csv", regex="^(csv|xlsx)$"),
+    format: str = Query("csv", pattern="^(csv|xlsx)$"),
     action: Optional[str] = None,
     entity: Optional[str] = None,
     entity_id: Optional[str] = None,

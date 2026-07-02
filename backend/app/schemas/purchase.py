@@ -204,3 +204,154 @@ class GRNOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ── Cotton Import (L/C consignments) ──────────────────────────────────────────
+class CottonImportCreate(BaseModel):
+    date: date
+    commercial_invoice_no: str
+    contract_no: Optional[str] = None
+    proforma_ref: Optional[str] = None
+    supplier_name: str
+    supplier_country: Optional[str] = None
+    applicant: Optional[str] = None
+    origin: Optional[str] = None
+    description: Optional[str] = None
+    crop_year: Optional[str] = None
+    grade: Optional[str] = None
+    staple: Optional[str] = None
+    micronaire: Optional[str] = None
+    strength: Optional[str] = None
+    total_bales: int = Field(default=0, ge=0)
+    gross_kg: float = 0.0
+    tare_kg: float = 0.0
+    net_kg: float = 0.0
+    equiv_lbs: float = 0.0
+    unit_price: float = 0.0
+    unit_uom: str = "cents/lb"
+    fob_usd: float = 0.0
+    freight_usd: float = 0.0
+    total_usd: float = 0.0
+    hs_code: Optional[str] = None
+    lc_no: Optional[str] = None
+    lc_date: Optional[date] = None
+    bl_no: Optional[str] = None
+    vessel: Optional[str] = None
+    shipped_from: Optional[str] = None
+    shipped_to: Optional[str] = None
+    trade_terms: Optional[str] = None
+    container_split: Optional[str] = None  # JSON string e.g. {"AAYML":6,"MSA":6}
+    status: str = "in-transit"
+    remarks: Optional[str] = None
+
+
+class CottonImportOut(BaseModel):
+    id: str
+    date: str
+    commercial_invoice_no: str
+    contract_no: Optional[str] = None
+    proforma_ref: Optional[str] = None
+    supplier_name: str
+    supplier_country: Optional[str] = None
+    applicant: Optional[str] = None
+    origin: Optional[str] = None
+    description: Optional[str] = None
+    crop_year: Optional[str] = None
+    grade: Optional[str] = None
+    staple: Optional[str] = None
+    micronaire: Optional[str] = None
+    strength: Optional[str] = None
+    total_bales: int = 0
+    gross_kg: float = 0.0
+    tare_kg: float = 0.0
+    net_kg: float = 0.0
+    equiv_lbs: float = 0.0
+    unit_price: float = 0.0
+    unit_uom: Optional[str] = None
+    fob_usd: float = 0.0
+    freight_usd: float = 0.0
+    total_usd: float = 0.0
+    hs_code: Optional[str] = None
+    lc_no: Optional[str] = None
+    lc_date: Optional[str] = None
+    bl_no: Optional[str] = None
+    vessel: Optional[str] = None
+    shipped_from: Optional[str] = None
+    shipped_to: Optional[str] = None
+    trade_terms: Optional[str] = None
+    container_split: Optional[str] = None
+    status: Optional[str] = None
+    remarks: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ── Work Orders (supplier purchase orders) ────────────────────────────────────
+class WorkOrderItemIn(BaseModel):
+    sl_no: int = 1
+    description: str
+    unit: Optional[str] = None
+    qty: float = 0.0
+    unit_price: float = 0.0
+    amount: Optional[float] = None  # computed if omitted
+
+
+class WorkOrderItemOut(BaseModel):
+    id: str
+    sl_no: int = 1
+    description: str
+    unit: Optional[str] = None
+    qty: float = 0.0
+    unit_price: float = 0.0
+    amount: float = 0.0
+
+    class Config:
+        from_attributes = True
+
+
+class WorkOrderCreate(BaseModel):
+    wo_no: str
+    date: date
+    supplier_id: Optional[str] = None
+    supplier_name: str
+    supplier_address: Optional[str] = None
+    attn_person: Optional[str] = None
+    subject: str = "Work Order"
+    currency: str = "BDT"
+    amount_in_words: Optional[str] = None
+    terms: Optional[str] = None
+    contact_person: Optional[str] = None
+    contact_phone: Optional[str] = None
+    prepared_by: Optional[str] = None
+    authorised_by: Optional[str] = None
+    status: str = "open"
+    remarks: Optional[str] = None
+    items: List[WorkOrderItemIn] = []
+
+
+class WorkOrderOut(BaseModel):
+    id: str
+    wo_no: str
+    date: str
+    supplier_id: Optional[str] = None
+    supplier_name: str
+    supplier_address: Optional[str] = None
+    attn_person: Optional[str] = None
+    subject: Optional[str] = None
+    currency: Optional[str] = None
+    net_payable: float = 0.0
+    amount_in_words: Optional[str] = None
+    terms: Optional[str] = None
+    contact_person: Optional[str] = None
+    contact_phone: Optional[str] = None
+    prepared_by: Optional[str] = None
+    authorised_by: Optional[str] = None
+    status: Optional[str] = None
+    remarks: Optional[str] = None
+    created_at: Optional[datetime] = None
+    items: List[WorkOrderItemOut] = []
+
+    class Config:
+        from_attributes = True

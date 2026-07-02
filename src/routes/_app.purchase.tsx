@@ -16,6 +16,7 @@ import {
 import { useAuth } from "@/stores/auth";
 import { useActiveMill } from "@/hooks/useActiveMill";
 import { AccessGuard } from "@/components/AccessGuard";
+import { CottonImportsTab, WorkOrdersTab } from "@/components/purchase/ProcurementTabs";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -59,6 +60,8 @@ import {
   ClipboardCheck,
   PackageOpen,
   Layers,
+  Ship,
+  ClipboardList,
   FlaskConical,
   BarChart2,
   ArrowUpFromLine,
@@ -234,6 +237,14 @@ function PurchasePage() {
               <TabsTrigger value="bales">
                 <Layers className="size-3.5 mr-1" />
                 Bale Management
+              </TabsTrigger>
+              <TabsTrigger value="imports">
+                <Ship className="size-3.5 mr-1" />
+                Imports
+              </TabsTrigger>
+              <TabsTrigger value="work-orders">
+                <ClipboardList className="size-3.5 mr-1" />
+                Work Orders
               </TabsTrigger>
             </TabsList>
 
@@ -448,6 +459,12 @@ function PurchasePage() {
             </TabsContent>
             <TabsContent value="bales">
               <BaleManagementTab canEdit={canEdit} />
+            </TabsContent>
+            <TabsContent value="imports">
+              <CottonImportsTab canEdit={canEdit} />
+            </TabsContent>
+            <TabsContent value="work-orders">
+              <WorkOrdersTab canEdit={canEdit} />
             </TabsContent>
           </Tabs>
         </div>

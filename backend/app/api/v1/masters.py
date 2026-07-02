@@ -769,7 +769,7 @@ def _extract_brand_country(row_dict: dict) -> tuple:
 @router.post("/masters/machines/bulk")
 async def bulk_create_machines(
     req: MachineBulkRequest,
-    mode: str = Query("update", regex="^(skip|update|create)$"),
+    mode: str = Query("update", pattern="^(skip|update|create)$"),
     mill_id: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_module("masters", write=True)),

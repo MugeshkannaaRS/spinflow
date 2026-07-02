@@ -11,7 +11,10 @@ from app.db.session import get_db
 logger = logging.getLogger(__name__)
 from app.core.deps import require_module, log_audit, get_mill_scope
 from app.models.user import User
-from app.models.purchase import Supplier, CottonPurchase, GRNEntry, CottonBale
+from app.models.purchase import (
+    Supplier, CottonPurchase, GRNEntry, CottonBale,
+    CottonImport, WorkOrder, WorkOrderItem,
+)
 from app.models.masters import Mill
 from app.schemas.purchase import (
     SupplierCreate, SupplierOut,
@@ -19,6 +22,8 @@ from app.schemas.purchase import (
     GRNCreate, GRNOut,
     BaleCreate, BaleOut, BaleGroupRequest, BaleGroupResponse, BaleStatsOut,
     SupplierStat, LotStat,
+    CottonImportCreate, CottonImportOut,
+    WorkOrderCreate, WorkOrderOut,
 )
 
 # MIC range [min, max] per yarn count (industry standard)
@@ -559,3 +564,199 @@ async def delete_supplier(
     await db.flush()
     await db.commit()
     return {"message": "Supplier deactivated", "id": supplier_id}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Cotton Imports (L/C consignments)
+# ══════════════════════════════════════════════════════════════════════════════
+def _import_scope_filter(stmt, scope):
+    if scope.get("mill_id"):
+        return stmt.where(CottonImport.mill_id == scope["mill_id"])
+    if scope.get("company_id"):
+        return stmt.join(Mill, CottonImport.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    return stmt
+
+
+@router.get("/purchase/imports")
+async def get_cotton_imports(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("purchase")),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = _import_scope_filter(select(CottonImport), scope).order_by(CottonImport.date.desc(), CottonImport.created_at.desc())
+    total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar() or 0
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    items = (await db.execute(stmt)).scalars().all()
+    return {
+        "total": total, "page": page, "page_size": page_size,
+        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+        "data": [CottonImportOut.model_validate(i).model_dump() for i in items],
+    }
+
+
+@router.post("/purchase/imports", response_model=CottonImportOut)
+async def create_cotton_import(
+    req: CottonImportCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("purchase", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    data = req.model_dump()
+    data["date"] = req.date.isoformat()
+    data["lc_date"] = req.lc_date.isoformat() if req.lc_date else None
+    imp = CottonImport(**data, mill_id=scope.get("mill_id"))
+    db.add(imp)
+    try:
+        await db.flush()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Import invoice '{req.commercial_invoice_no}' already exists")
+    await db.commit()
+    await db.refresh(imp)
+    role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+    await log_audit(db, current_user.id, role_code, "create", "CottonImport", imp.id,
+                    f"Cotton import {imp.commercial_invoice_no} ({imp.origin or '-'}, {imp.total_bales} bales)")
+    return imp
+
+
+@router.get("/purchase/imports/{import_id}", response_model=CottonImportOut)
+async def get_cotton_import(
+    import_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("purchase")),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = _import_scope_filter(select(CottonImport).where(CottonImport.id == import_id), scope)
+    imp = (await db.execute(stmt)).scalar_one_or_none()
+    if not imp:
+        raise HTTPException(status_code=404, detail="Import not found")
+    return imp
+
+
+@router.delete("/purchase/imports/{import_id}")
+async def delete_cotton_import(
+    import_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("purchase", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = _import_scope_filter(select(CottonImport).where(CottonImport.id == import_id), scope)
+    imp = (await db.execute(stmt)).scalar_one_or_none()
+    if not imp:
+        raise HTTPException(status_code=404, detail="Import not found")
+    await db.delete(imp)
+    await db.commit()
+    return {"message": "Import deleted", "id": import_id}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Work Orders
+# ══════════════════════════════════════════════════════════════════════════════
+def _wo_scope_filter(stmt, scope):
+    if scope.get("mill_id"):
+        return stmt.where(WorkOrder.mill_id == scope["mill_id"])
+    if scope.get("company_id"):
+        return stmt.join(Mill, WorkOrder.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    return stmt
+
+
+async def _wo_to_out(db: AsyncSession, wo: WorkOrder) -> dict:
+    items = (await db.execute(
+        select(WorkOrderItem).where(WorkOrderItem.work_order_id == wo.id).order_by(WorkOrderItem.sl_no)
+    )).scalars().all()
+    out = WorkOrderOut.model_validate(wo).model_dump()
+    out["items"] = [
+        {"id": it.id, "sl_no": it.sl_no, "description": it.description, "unit": it.unit,
+         "qty": it.qty, "unit_price": float(it.unit_price or 0), "amount": float(it.amount or 0)}
+        for it in items
+    ]
+    return out
+
+
+@router.get("/purchase/work-orders")
+async def get_work_orders(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("purchase")),
+):
+    scope = await get_mill_scope(current_user, db)
+    stmt = _wo_scope_filter(select(WorkOrder), scope).order_by(WorkOrder.date.desc(), WorkOrder.created_at.desc())
+    total = (await db.execute(select(func.count()).select_from(stmt.subquery()))).scalar() or 0
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    wos = (await db.execute(stmt)).scalars().all()
+    return {
+        "total": total, "page": page, "page_size": page_size,
+        "pages": (total + page_size - 1) // page_size if page_size > 0 else 0,
+        "data": [await _wo_to_out(db, wo) for wo in wos],
+    }
+
+
+@router.post("/purchase/work-orders", response_model=WorkOrderOut)
+async def create_work_order(
+    req: WorkOrderCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("purchase", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    net = 0.0
+    wo = WorkOrder(
+        wo_no=req.wo_no, date=req.date.isoformat(), supplier_id=req.supplier_id,
+        supplier_name=req.supplier_name, supplier_address=req.supplier_address,
+        attn_person=req.attn_person, subject=req.subject, currency=req.currency,
+        amount_in_words=req.amount_in_words, terms=req.terms,
+        contact_person=req.contact_person, contact_phone=req.contact_phone,
+        prepared_by=req.prepared_by, authorised_by=req.authorised_by,
+        status=req.status, remarks=req.remarks, mill_id=scope.get("mill_id"),
+    )
+    db.add(wo)
+    try:
+        await db.flush()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Work order '{req.wo_no}' already exists")
+    for it in req.items:
+        amount = it.amount if it.amount is not None else round((it.qty or 0) * (it.unit_price or 0), 2)
+        net += amount
+        db.add(WorkOrderItem(
+            work_order_id=wo.id, sl_no=it.sl_no, description=it.description,
+            unit=it.unit, qty=it.qty, unit_price=it.unit_price, amount=amount,
+        ))
+    wo.net_payable = net
+    await db.flush()
+    await db.commit()
+    await db.refresh(wo)
+    role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+    await log_audit(db, current_user.id, role_code, "create", "WorkOrder", wo.id,
+                    f"Work order {wo.wo_no} to {wo.supplier_name} ({wo.currency} {net})")
+    return await _wo_to_out(db, wo)
+
+
+@router.get("/purchase/work-orders/{wo_id}", response_model=WorkOrderOut)
+async def get_work_order(
+    wo_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("purchase")),
+):
+    scope = await get_mill_scope(current_user, db)
+    wo = (await db.execute(_wo_scope_filter(select(WorkOrder).where(WorkOrder.id == wo_id), scope))).scalar_one_or_none()
+    if not wo:
+        raise HTTPException(status_code=404, detail="Work order not found")
+    return await _wo_to_out(db, wo)
+
+
+@router.delete("/purchase/work-orders/{wo_id}")
+async def delete_work_order(
+    wo_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("purchase", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    wo = (await db.execute(_wo_scope_filter(select(WorkOrder).where(WorkOrder.id == wo_id), scope))).scalar_one_or_none()
+    if not wo:
+        raise HTTPException(status_code=404, detail="Work order not found")
+    await db.delete(wo)
+    await db.commit()
+    return {"message": "Work order deleted", "id": wo_id}

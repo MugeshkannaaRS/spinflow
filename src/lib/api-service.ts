@@ -219,6 +219,14 @@ export const purchaseApi = {
   getSuppliers: () => api.get("/purchase/suppliers").then((r: any) => extractList(r.data)),
   deleteSupplier: (id: string) => api.delete(`/purchase/suppliers/${id}`).then((r) => r.data),
   getGRNs: () => api.get("/purchase/grns").then((r: any) => extractList(r.data)),
+  // Cotton imports (L/C consignments)
+  getImports: () => api.get("/purchase/imports").then((r: any) => extractList(r.data)),
+  createImport: (data: any) => api.post("/purchase/imports", data).then((r) => r.data),
+  deleteImport: (id: string) => api.delete(`/purchase/imports/${id}`).then((r) => r.data),
+  // Work orders
+  getWorkOrders: () => api.get("/purchase/work-orders").then((r: any) => extractList(r.data)),
+  createWorkOrder: (data: any) => api.post("/purchase/work-orders", data).then((r) => r.data),
+  deleteWorkOrder: (id: string) => api.delete(`/purchase/work-orders/${id}`).then((r) => r.data),
 };
 
 export const baleApi = {
