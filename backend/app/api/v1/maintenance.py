@@ -904,6 +904,29 @@ async def get_day_plan(
     (based on frequency_days + last_done or next_due).
     Groups by section, then by day.
     """
+    try:
+        return await _build_day_plan(month, year, section, mill_id, db, current_user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Log the full traceback and surface the exception type/message to the
+        # (authenticated, maintenance-gated) caller so field failures are
+        # diagnosable — the generic handler otherwise hides everything.
+        logger.error(f"day-plan failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"day-plan error: {type(e).__name__}: {str(e)[:300]}",
+        )
+
+
+async def _build_day_plan(
+    month: Optional[int],
+    year: Optional[int],
+    section: Optional[str],
+    mill_id: Optional[str],
+    db: AsyncSession,
+    current_user: User,
+):
     from datetime import date as dt_date, timedelta
     import calendar as cal_mod
 
