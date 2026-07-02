@@ -69,6 +69,7 @@ import {
   CalendarDays,
   ChevronDown,
   ChevronRight,
+  Eye,
 } from "lucide-react";
 import type { MaintenanceTask, MasterMachine } from "@/lib/types";
 import * as XLSX from "xlsx";
@@ -2038,6 +2039,7 @@ function DayPlanView() {
   const [section, setSection] = useState("all");
   const [expandedDays, setExpandedDays] = useState<Record<number, boolean>>({});
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [previewDay, setPreviewDay] = useState<number | null>(null);
 
   const planQ = useQuery({
     queryKey: ["maintenance", "day-plan", year, month, section],
@@ -2070,6 +2072,8 @@ function DayPlanView() {
     ? today.getDate() : -1;
 
   const monthLabel = `${monthNames[month - 1]}_${year}`;
+
+  const previewData = previewDay != null ? days.find((d: any) => d.day === previewDay) : null;
 
   // Flatten the plan into one row per (day, task) for the full-plan export.
   function flatRows() {
@@ -2373,7 +2377,7 @@ function DayPlanView() {
                 return (
                   <div
                     key={d.day}
-                    onClick={() => { if (hasTasks) { setViewMode("list"); setExpandedDays(p => ({...p, [d.day]: true})); } }}
+                    onClick={() => { if (hasTasks || d.day_type === "holiday") setPreviewDay(d.day); }}
                     className={cn(
                       "rounded-md p-1.5 text-center cursor-pointer border min-h-[60px] transition-all",
                       isToday ? "border-blue-500 bg-blue-50 ring-1 ring-blue-400" : "border-transparent hover:border-slate-200",
@@ -2435,9 +2439,10 @@ function DayPlanView() {
                 )}
               >
                 {/* Day header — always visible */}
+                <div className="flex items-stretch">
                 <button
                   type="button"
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
+                  className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
                   onClick={() => toggleDay(d.day)}
                 >
                   {/* Date */}
@@ -2507,6 +2512,15 @@ function DayPlanView() {
 
                   <ChevronRight className={cn("size-4 text-muted-foreground flex-shrink-0 transition-transform", isExpanded && "rotate-90")} />
                 </button>
+                <button
+                  type="button"
+                  title="Quick preview"
+                  className="flex-shrink-0 px-3 flex items-center border-l hover:bg-muted/40 transition-colors text-muted-foreground hover:text-foreground"
+                  onClick={() => setPreviewDay(d.day)}
+                >
+                  <Eye className="size-4" />
+                </button>
+                </div>
 
                 {/* Expanded: tasks grouped by section */}
                 {isExpanded && (
@@ -2618,6 +2632,148 @@ function DayPlanView() {
           )}
         </div>
       )}
+
+      {/* Per-day preview dialog — quick summary without leaving the page */}
+      <Dialog open={previewDay != null} onOpenChange={(o) => !o && setPreviewDay(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          {previewData && (() => {
+            const d = previewData;
+            const isToday = d.day === todayDay;
+            const overdue = (d.tasks ?? []).some((t: any) => t.is_overdue);
+            const bySection: Record<string, any[]> = {};
+            for (const t of d.tasks ?? []) (bySection[t.section] = bySection[t.section] || []).push(t);
+            const statusLabel = d.day_type === "holiday" ? "Holiday" : d.day_type === "half_day" ? "Half-day" : "Working day";
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 flex-wrap">
+                    <CalendarDays className="size-4 text-blue-600" />
+                    {monthNames[month - 1]} {d.day}, {year}
+                    <span className="text-sm font-normal text-muted-foreground">({d.weekday})</span>
+                    {isToday && <Badge className="text-[10px] px-1.5 py-0 bg-blue-600 hover:bg-blue-600">Today</Badge>}
+                    {d.day_type === "holiday" && (
+                      <Badge className="text-[10px] px-1.5 py-0 bg-rose-600 hover:bg-rose-600">Holiday{d.holiday_note ? ` · ${d.holiday_note}` : ""}</Badge>
+                    )}
+                    {d.day_type === "half_day" && (
+                      <Badge className="text-[10px] px-1.5 py-0 bg-amber-500 hover:bg-amber-500">Half-day</Badge>
+                    )}
+                    {d.overloaded && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Over capacity</Badge>}
+                    {overdue && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Overdue</Badge>}
+                  </DialogTitle>
+                </DialogHeader>
+
+                {/* KPI strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { icon: CalendarCheck, label: "Tasks", value: d.total_tasks ?? 0 },
+                    { icon: Users, label: "Persons", value: d.total_manpower_needed ?? 0 },
+                    { icon: Clock, label: "Est. hours", value: `${Math.round((d.total_est_min ?? 0) / 60 * 10) / 10}h` },
+                    { icon: TrendingUp, label: "Load", value: `${d.load_pct ?? 0}%` },
+                  ].map((k) => (
+                    <div key={k.label} className="rounded-lg border bg-muted/30 p-2.5">
+                      <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase tracking-wide">
+                        <k.icon className="size-3" /> {k.label}
+                      </div>
+                      <div className="text-lg font-bold leading-tight mt-0.5">{k.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Capacity / leave line */}
+                {(d.day_type !== "working" || (d.persons_on_leave ?? 0) > 0 || d.overloaded) && (
+                  <div className="text-xs text-muted-foreground -mt-1">
+                    {statusLabel}
+                    {d.available_persons != null && ` · ${d.available_persons} persons available`}
+                    {d.available_min != null && ` · ${Math.round(d.available_min / 60 * 10) / 10}h capacity`}
+                    {(d.persons_on_leave ?? 0) > 0 && ` · ${d.persons_on_leave} on leave`}
+                  </div>
+                )}
+
+                {/* Section summary chips */}
+                {Object.keys(bySection).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.entries(bySection).map(([sec, tasks]) => {
+                      const col = secColor(sec);
+                      return (
+                        <span key={sec} className={`text-[11px] px-2 py-0.5 rounded font-medium ${col.badge}`}>
+                          {sec} · {tasks.length} task{tasks.length !== 1 ? "s" : ""} · {tasks.reduce((a: number, t: any) => a + t.manpower_needed, 0)}p
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Scrollable task list grouped by section */}
+                <div className="flex-1 overflow-y-auto -mx-1 px-1 space-y-3">
+                  {Object.keys(bySection).length === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      {d.day_type === "holiday" ? "Holiday — no PM tasks scheduled." : "No PM tasks due this day."}
+                    </div>
+                  ) : (
+                    Object.entries(bySection).map(([sec, tasks]) => {
+                      const col = secColor(sec);
+                      return (
+                        <div key={sec} className={`rounded-lg border ${col.border} overflow-hidden`}>
+                          <div className={`px-3 py-1.5 ${col.bg} border-b ${col.border}`}>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${col.badge}`}>{sec}</span>
+                          </div>
+                          <div className="divide-y divide-border/50">
+                            {tasks.map((t: any) => (
+                              <div key={t.id} className="px-3 py-2 flex items-start gap-2.5 text-xs">
+                                <div className="flex-shrink-0 min-w-[120px] max-w-[150px]">
+                                  <div className="font-mono font-semibold inline-flex items-center gap-1 bg-muted/60 border border-border/50 rounded px-1.5 py-0.5 text-[11px]">
+                                    <Wrench className="size-3 text-muted-foreground" />{t.machine_code || "—"}
+                                  </div>
+                                  {Array.isArray(t.machines) && t.machines.length > 0 ? (
+                                    <div className="mt-0.5 flex flex-wrap gap-1">
+                                      {t.machines.slice(0, 6).map((mn: string, i: number) => (
+                                        <span key={i} className="text-[10px] text-blue-700 bg-blue-50 dark:bg-blue-950/30 font-mono rounded px-1">{mn}</span>
+                                      ))}
+                                      {t.machines.length > 6 && <span className="text-[10px] text-muted-foreground">+{t.machines.length - 6}</span>}
+                                    </div>
+                                  ) : t.machine_line_code ? (
+                                    <div className="mt-0.5 text-[10px] text-muted-foreground font-mono">{t.machine_line_code}</div>
+                                  ) : (
+                                    <div className="mt-0.5 text-[10px] text-muted-foreground">{t.machine_count > 1 ? `${t.machine_count} machines` : "1 machine"}</div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-foreground leading-snug">{t.description}</div>
+                                  <div className="flex items-center gap-2 mt-0.5 flex-wrap text-[10px] text-muted-foreground">
+                                    <span>{t.frequency_label}</span>
+                                    {t.lubricant_name && <span className="text-amber-700 bg-amber-50 px-1 rounded">🛢 {t.lubricant_name} {t.lubricant_quantity}</span>}
+                                    {t.is_overdue && <span className="text-red-600 font-semibold">⚠ Overdue</span>}
+                                  </div>
+                                </div>
+                                <div className="flex-shrink-0 text-right">
+                                  <div className="font-semibold">{t.manpower_needed}p</div>
+                                  <div className="text-[10px] text-muted-foreground">{t.est_min}m</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                <DialogFooter className="gap-2 sm:gap-2">
+                  <Button size="sm" variant="outline" className="h-8 text-xs"
+                    onClick={() => { setViewMode("list"); setExpandedDays((p) => ({ ...p, [d.day]: true })); setPreviewDay(null); }}>
+                    Open in list
+                  </Button>
+                  {(d.total_tasks ?? 0) > 0 && (
+                    <Button size="sm" className="h-8 text-xs" onClick={() => exportSingleDay(d.day)}>
+                      <Download className="size-3.5 mr-1" /> Export day (PDF)
+                    </Button>
+                  )}
+                </DialogFooter>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
