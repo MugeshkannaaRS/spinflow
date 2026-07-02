@@ -50,6 +50,10 @@ export function MillCalendarManager({ onChanged }: { onChanged?: () => void }) {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["mill-calendar"] });
     qc.invalidateQueries({ queryKey: ["maintenance", "holidays"] });
+    // Calendar changes (weekly-offs / holidays / half-days / leave) alter
+    // working days and daily capacity — Day Plan and Manpower must refetch.
+    qc.invalidateQueries({ queryKey: ["maintenance", "day-plan"] });
+    qc.invalidateQueries({ queryKey: ["maintenance", "manpower-summary"] });
     onChanged?.();
   };
 

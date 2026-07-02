@@ -810,6 +810,8 @@ function MaintenancePage() {
                                     onConfirm={async () => {
                                       await maintenanceApi.deleteSchedule(s.id);
                                       qc.invalidateQueries({ queryKey: ["maintenance-schedules"] });
+                                      qc.invalidateQueries({ queryKey: ["maintenance", "manpower-summary"] });
+                                      qc.invalidateQueries({ queryKey: ["maintenance", "day-plan"] });
                                     }}
                                     label={`Remove PM schedule for ${s.machine_code}?`}
                                     successMessage="Schedule removed"
@@ -3096,6 +3098,7 @@ function AddScheduleDialog() {
         toast.success("Schedule added");
         qc.invalidateQueries({ queryKey: ["maintenance-schedules"] });
         qc.invalidateQueries({ queryKey: ["maintenance", "manpower-summary"] });
+        qc.invalidateQueries({ queryKey: ["maintenance", "day-plan"] });
         setOpen(false);
         setForm({
           machine_code: "",

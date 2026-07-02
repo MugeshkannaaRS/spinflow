@@ -144,6 +144,7 @@ function MastersPage() {
       .then(() => {
         toast.success("Department deactivated");
         qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
+        qcMasters.invalidateQueries({ queryKey: ["maintenance"] });
       })
       .catch(() => toast.error("Failed to deactivate department"));
   }
@@ -191,6 +192,7 @@ function MastersPage() {
   async function deleteDepartment(id: string) {
     await mastersApi.deleteDepartment(id);
     qcMasters.invalidateQueries({ queryKey: ["masters", "all"] });
+    qcMasters.invalidateQueries({ queryKey: ["maintenance"] });
   }
   async function deleteYarnCount(id: string) {
     await mastersApi.deleteYarnCount(id);
@@ -1312,6 +1314,8 @@ function DepartmentForm({ item }: { item?: Department; mills: Mill[] }) {
     onSuccess: () => {
       toast.success("Department created");
       qc.invalidateQueries({ queryKey: ["masters", "all"] });
+      // Departments feed maintenance schedules, manpower, day-plan & dept-map dropdowns
+      qc.invalidateQueries({ queryKey: ["maintenance"] });
     },
   });
   const updateM = useMutation({
@@ -1319,6 +1323,8 @@ function DepartmentForm({ item }: { item?: Department; mills: Mill[] }) {
     onSuccess: () => {
       toast.success("Department updated");
       qc.invalidateQueries({ queryKey: ["masters", "all"] });
+      // Departments feed maintenance schedules, manpower, day-plan & dept-map dropdowns
+      qc.invalidateQueries({ queryKey: ["maintenance"] });
     },
   });
 
@@ -2403,6 +2409,10 @@ function MachinesTab({
                     await productionApi.deleteMachine(m.id);
                     qc.invalidateQueries({ queryKey: ["masters", "all"] });
                     qc.invalidateQueries({ queryKey: ["machines"] });
+                    // Maintenance reads machines for machine lists, manpower counts & day-plan numbers
+                    qc.invalidateQueries({ queryKey: ["maintenance"] });
+                    qc.invalidateQueries({ queryKey: ["pm-entry-machines"] });
+                    qc.invalidateQueries({ queryKey: ["machines-carding"] });
                   }}
                   label={`Delete machine ${m.code}?`}
                   title="Delete Machine?"
@@ -2424,6 +2434,10 @@ function MachinesTab({
           setImportOpen(false);
           onImportSuccess();
           qc.invalidateQueries({ queryKey: ["machines"] });
+          // Maintenance reads machines for machine lists, manpower counts & day-plan numbers
+          qc.invalidateQueries({ queryKey: ["maintenance"] });
+          qc.invalidateQueries({ queryKey: ["pm-entry-machines"] });
+          qc.invalidateQueries({ queryKey: ["machines-carding"] });
         }}
         title="Import Machines from Excel"
       />
@@ -2443,6 +2457,10 @@ function MachinesTab({
           setEditItem(null);
           onImportSuccess();
           qc.invalidateQueries({ queryKey: ["machines"] });
+          // Maintenance reads machines for machine lists, manpower counts & day-plan numbers
+          qc.invalidateQueries({ queryKey: ["maintenance"] });
+          qc.invalidateQueries({ queryKey: ["pm-entry-machines"] });
+          qc.invalidateQueries({ queryKey: ["machines-carding"] });
         }}
       />
     </div>
