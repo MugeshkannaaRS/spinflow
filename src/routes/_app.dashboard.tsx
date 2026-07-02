@@ -27,7 +27,6 @@ import {
   Users,
   Cpu,
   TrendingUp,
-  Building2,
   AlertTriangle,
   Package,
   Truck,
@@ -92,7 +91,6 @@ function DashboardPage() {
   const { millId, millName } = useActiveMill();
   const role = user?.role ?? "";
   const isSuperAdmin = role === "SUPER_ADMIN";
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
 
   // SUPER_ADMIN → admin summary (vendor KPIs)
   const adminQ = useQuery({
@@ -108,157 +106,90 @@ function DashboardPage() {
     enabled: isSuperAdmin,
   });
 
-  // MILL_OWNER/other → mill dashboard summary
+  // Mill dashboard summary — for everyone incl. super admin (single-mill system;
+  // the backend resolves the one mill from scope when no mill_id is passed).
   const { data, isLoading, isFetching, refetch } = useQuery({
-    queryKey: ["dashboard-summary", millId],
+    queryKey: ["dashboard-summary", millId ?? "single"],
     queryFn: () =>
-      api.get("/dashboard/summary", { params: { mill_id: millId } }).then((r) => r.data),
+      api.get("/dashboard/summary", { params: millId ? { mill_id: millId } : {} }).then((r) => r.data),
     staleTime: 3 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: 2,
-    enabled: !isSuperAdmin,
   });
 
-  // ── SUPER_ADMIN: vendor admin dashboard ────────────────────────────────
+  // ── SUPER_ADMIN: single-mill administration overview ───────────────────
   if (isSuperAdmin) {
     const ad = adminQ.data ?? {};
-    const allCompanies: any[] = ad.companies ?? [];
-    const filteredCompanies =
-      statusFilter === "all" ? allCompanies : allCompanies.filter((c) => c.status === statusFilter);
+    const d: any = data ?? {};
+    const totalUsers = ad.total_users ?? d.users?.total ?? 0;
+    const machineTotal = d.machines?.total ?? d.machines?.count ?? 0;
+    const machineRunning = d.machines?.running ?? d.machines?.active ?? null;
+    const openAlerts = d.alerts?.open ?? ad.open_alerts ?? 0;
+
+    const adminLinks = [
+      { to: "/admin/users", label: "Users", desc: "Add & manage users", icon: Users },
+      { to: "/admin/roles", label: "Role Permissions", desc: "Module access per role", icon: AlertTriangle },
+      { to: "/admin/health", label: "System Health", desc: "DB, services, status", icon: Gauge },
+      { to: "/admin/backups", label: "Backups", desc: "Backup & restore", icon: Package },
+      { to: "/admin/audit", label: "Audit Logs", desc: "Activity trail", icon: TrendingUp },
+      { to: "/admin/column-config", label: "Column Config", desc: "Table columns", icon: Cpu },
+    ];
 
     return (
       <div className="flex flex-col min-h-full bg-[#f8fafc]">
         <PageHeader
           title={`${greet()}, ${user?.name ?? "Admin"}`}
-          subtitle="SpinFlow ERP · Vendor dashboard · System-wide overview"
-          onRefresh={() => adminQ.refetch()}
-          isRefreshing={adminQ.isFetching}
+          subtitle={`Single-mill administration · ${millName}`}
+          onRefresh={() => { adminQ.refetch(); refetch(); }}
+          isRefreshing={adminQ.isFetching || isFetching}
         />
         <div className="p-6 space-y-6">
-          {/* KPI row */}
+          {/* Single-mill KPI row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard label="Users" value={fmt(totalUsers)} icon={Users} iconColor="text-green-600" iconBg="bg-green-50" />
             <KpiCard
-              label="Total Companies"
-              value={fmt(ad.total_companies ?? 0)}
-              icon={Building2}
-              iconColor="text-blue-600"
-              iconBg="bg-blue-50"
+              label="Machines"
+              value={machineRunning != null ? `${fmt(machineRunning)}/${fmt(machineTotal)}` : fmt(machineTotal)}
+              icon={Cpu} iconColor="text-blue-600" iconBg="bg-blue-50"
             />
+            <KpiCard label="Departments" value={fmt(d.departments?.total ?? d.departments ?? 0)} icon={Factory} iconColor="text-cyan-600" iconBg="bg-cyan-50" />
             <KpiCard
-              label="Total Mills"
-              value={fmt(ad.total_mills ?? 0)}
-              icon={Factory}
-              iconColor="text-cyan-600"
-              iconBg="bg-cyan-50"
-            />
-            <KpiCard
-              label="Total Users"
-              value={fmt(ad.total_users ?? 0)}
-              icon={Users}
-              iconColor="text-green-600"
-              iconBg="bg-green-50"
-            />
-            <KpiCard
-              label="Over User Limit"
-              value={fmt(ad.companies_over_limit ?? 0)}
+              label="Open Alerts"
+              value={fmt(openAlerts)}
               icon={AlertTriangle}
-              iconColor={(ad.companies_over_limit ?? 0) > 0 ? "text-red-600" : "text-slate-400"}
-              iconBg={(ad.companies_over_limit ?? 0) > 0 ? "bg-red-50" : "bg-slate-50"}
+              iconColor={openAlerts > 0 ? "text-red-600" : "text-slate-400"}
+              iconBg={openAlerts > 0 ? "bg-red-50" : "bg-slate-50"}
             />
           </div>
 
-          {/* Companies table */}
-          {allCompanies.length > 0 && (
-            <div className="bg-white border border-[#e2e8f0] rounded-lg overflow-hidden">
-              <div className="px-5 py-4 border-b border-[#e2e8f0] flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-[#0f172a]">Companies</h3>
-                  <div className="flex gap-1">
-                    {(["all", "active", "suspended"] as const).map((f) => (
-                      <button
-                        key={f}
-                        onClick={() => setStatusFilter(f)}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                          statusFilter === f
-                            ? "bg-blue-600 text-white"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        }`}
-                      >
-                        {f === "all"
-                          ? `All (${allCompanies.length})`
-                          : f === "active"
-                            ? `Active (${allCompanies.filter((c) => c.status === "active").length})`
-                            : `Suspended (${allCompanies.filter((c) => c.status !== "active").length})`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <a
-                  href="/admin"
-                  className="text-xs text-blue-600 hover:underline whitespace-nowrap"
-                >
-                  Manage →
-                </a>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-[#f1f5f9] border-b border-[#e2e8f0]">
-                      {["Company", "Plan", "Status", "Mills", "Users", "Modules"].map((h) => (
-                        <th
-                          key={h}
-                          className="text-left px-4 py-3 text-[#475569] font-semibold text-xs uppercase tracking-wide"
-                        >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCompanies.map((c: any) => (
-                      <tr
-                        key={c.id}
-                        className={`border-t border-[#f1f5f9] hover:bg-[#f8fafc] transition-colors ${c.status !== "active" ? "opacity-60" : ""}`}
-                      >
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-[#0f172a]">{c.name}</div>
-                          <div className="text-[11px] text-[#94a3b8] font-mono">{c.code}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#f1f5f9] text-[#475569] font-medium uppercase">
-                            {c.plan || "starter"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${c.status === "active" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
-                          >
-                            {c.status || "active"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-[#0f172a]">{c.mills ?? 0}</td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={
-                              c.is_over_limit
-                                ? "font-semibold text-red-600"
-                                : "font-mono text-[#0f172a]"
-                            }
-                          >
-                            {c.users ?? 0}
-                            {c.max_users ? `/${c.max_users}` : ""}
-                            {c.is_over_limit && " ⚠"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-[#0f172a]">{c.modules ?? 0}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+          {/* System Administration quick-links */}
+          <div className="bg-white border border-[#e2e8f0] rounded-lg overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#e2e8f0]">
+              <h3 className="text-sm font-semibold text-[#0f172a]">System Administration</h3>
+              <p className="text-xs text-[#64748b] mt-0.5">Manage users, roles, and system settings for {millName}.</p>
             </div>
-          )}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-4">
+              {adminLinks.map((l) => (
+                <Link key={l.to} to={l.to} className="flex items-start gap-3 rounded-lg border border-[#e2e8f0] p-3 hover:bg-[#f8fafc] transition-colors">
+                  <div className="rounded-md bg-blue-50 text-blue-600 p-2"><l.icon className="size-4" /></div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-[#0f172a]">{l.label}</div>
+                    <div className="text-xs text-[#64748b] truncate">{l.desc}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Operational shortcut */}
+          <div className="bg-white border border-[#e2e8f0] rounded-lg px-5 py-4 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-[#0f172a]">Mill Operations</h3>
+              <p className="text-xs text-[#64748b] mt-0.5">Production, quality, maintenance and more — use the module tabs in the sidebar.</p>
+            </div>
+            <Link to="/maintenance" className="text-xs text-blue-600 hover:underline whitespace-nowrap">Maintenance →</Link>
+          </div>
         </div>
       </div>
     );
