@@ -63,14 +63,14 @@ from app.services.trip_service import TripService
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+# NOTE: the old custom session-scoped `event_loop` fixture was removed —
+# it is deprecated in pytest-asyncio >= 0.24 and caused the first
+# engine-initialising test to error ("could not get source code") plus
+# "Event loop is closed" teardown failures. Loop scoping is now configured
+# in pytest.ini via asyncio_default_(fixture|test)_loop_scope = session.
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def engine():
     eng = create_async_engine(TEST_DATABASE_URL, echo=False)
 

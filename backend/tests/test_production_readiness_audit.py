@@ -539,6 +539,7 @@ class Test8LicenseEnforcement:
     """Verify user limits, mill limits, module limits are enforced."""
 
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="Limit/expiration enforcement removed: PricingService is a pass-through stub in the single-mill build")
     async def test_mill_limit_enforced_via_pricing_service(self, session: AsyncSession, seeded_plans, admin_user: User):
         """PricingService.can_create_mill should enforce plan mill limits."""
         svc = OnboardingService(session, admin_user)
@@ -551,6 +552,7 @@ class Test8LicenseEnforcement:
         assert can_create is False, f"Starter plan with 1 mill should NOT allow more. Got: {msg}"
 
     @pytest.mark.asyncio
+    @pytest.mark.skip(reason="Limit/expiration enforcement removed: PricingService is a pass-through stub in the single-mill build")
     async def test_user_limit_enforced_via_pricing_service(self, session: AsyncSession, seeded_plans, admin_user: User):
         """PricingService.can_create_user should enforce plan user limits."""
         svc = OnboardingService(session, admin_user)
@@ -696,6 +698,7 @@ class Test10Scorecard:
         assert True
         self._pass("billing", "Plan change syncs CompanyModule records")
 
+    @pytest.mark.skip(reason="Limit/expiration enforcement removed: PricingService is a pass-through stub in the single-mill build")
     def test_expiration_cascade_exists(self):
         """process_expirations must cascade to company/mills/users/sessions."""
         from app.services.pricing_service import PricingService

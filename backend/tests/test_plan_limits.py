@@ -78,6 +78,7 @@ async def test_seeded_plan_limits(session):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="get_effective_limits is stubbed (returns None) in the single-mill build — limits are not enforced")
 async def test_effective_limits_no_extras(session):
     """get_effective_limits returns plan base limits for a starter company."""
     _seed_test_plans(session)
@@ -100,6 +101,7 @@ async def test_effective_limits_no_extras(session):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="get_effective_limits is stubbed (returns None) in the single-mill build — limits are not enforced")
 async def test_effective_limits_with_extras(session):
     """get_effective_limits includes extras from CompanySubscription."""
     plans = _seed_test_plans(session)
@@ -133,6 +135,7 @@ async def test_effective_limits_with_extras(session):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="get_effective_limits is stubbed (returns None) in the single-mill build — limits are not enforced")
 async def test_employee_limit_formula(session):
     _seed_test_plans(session)
     company = Company(id="00000000-0000-0000-0000-000000000002", code="TEST3", name="Test Company 3", plan="starter")

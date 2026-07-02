@@ -9,6 +9,7 @@ Verifies:
 """
 
 import uuid
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -97,56 +98,18 @@ async def test_plan_module_pricing(session: AsyncSession):
     assert len(addon) == 1
 
 
-async def test_get_plans(session: AsyncSession):
+async def test_calculate_plan_cost_stubbed(session: AsyncSession):
+    """Single-mill build: cost calculation is stubbed and returns None."""
     await _create_test_plan(session)
     svc = PricingService(session)
-    plans = await svc.get_plans()
-    assert len(plans) >= 1
+    assert await svc.calculate_plan_cost() is None
 
 
 # ── Cost Calculation ──────────────────────────────────────
-
-
-async def test_cost_calculation_base(session: AsyncSession):
-    plan = await _create_test_plan(session)
-    company = await _create_company(session)
-    svc = PricingService(session)
-    cost = await svc.calculate_company_cost(company, plan)
-    assert cost.plan_monthly == 4999
-    assert cost.included_mills == 1
-    assert cost.included_users == 5
-    assert cost.mill_count == 0
-    assert cost.user_count == 0
-    assert "production" in cost.included_modules
-    assert "quality" in cost.included_modules
-
-
-async def test_cost_with_extra_mill(session: AsyncSession):
-    plan = await _create_test_plan(session)
-    company = await _create_company(session)
-    # Create 2 mills — company should have 1 more than included
-    for i in range(2):
-        session.add(Mill(
-            id=str(uuid.uuid4()), company_id=company.id,
-            code=f"M-{i}", name=f"Mill {i}", is_active=True,
-        ))
-    await session.flush()
-    svc = PricingService(session)
-    cost = await svc.calculate_company_cost(company, plan)
-    assert cost.mill_count == 2
-    assert cost.extra_mills == 1
-    assert cost.extra_mill_cost_monthly == 1999
-
-
-async def test_cost_with_extra_users(session: AsyncSession):
-    plan = await _create_test_plan(session)
-    company = await _create_company(session)
-    for i in range(6):
-        await _create_user(session, company.id)
-    svc = PricingService(session)
-    cost = await svc.calculate_company_cost(company, plan)
-    assert cost.user_count >= 6
-    assert cost.included_users == 5
+# NOTE: calculate_company_cost / get_plans were removed when PricingService
+# was stubbed for the single-mill build (see app/services/pricing_service.py).
+# The tests below now assert the stub contract instead of the old
+# multi-tenant billing behaviour.
 
 
 # ── Mill Limit Enforcement ────────────────────────────────
@@ -163,14 +126,15 @@ async def test_can_create_mill_within_limit(session: AsyncSession):
     await session.flush()
     ok, msg = await svc.can_create_mill(company.id)
     assert ok, "Should be able to create mill within limit"
-    # Create 1 mill (at limit)
+    # Single-mill build: PricingService is a pass-through stub — limits
+    # are never enforced, so creation stays allowed even "at limit".
     session.add(Mill(
         id=str(uuid.uuid4()), company_id=company.id,
         code="M-1", name="Mill 1", is_active=True,
     ))
     await session.flush()
     ok, msg = await svc.can_create_mill(company.id)
-    assert not ok, "Should not be able to create mill when at limit"
+    assert ok, "Single-mill stub never blocks mill creation"
 
 
 # ── User Limit Enforcement ────────────────────────────────
@@ -186,11 +150,12 @@ async def test_can_create_user_within_limit(session: AsyncSession):
     await session.flush()
     ok, msg = await svc.can_create_user(company.id)
     assert ok, "Should be able to create user within limit"
-    # Fill exactly to limit
+    # Single-mill build: PricingService is a pass-through stub — limits
+    # are never enforced, so creation stays allowed even "at limit".
     for i in range(5):
         await _create_user(session, company.id)
     ok, msg = await svc.can_create_user(company.id)
-    assert not ok, "Should not be able to create user when at limit"
+    assert ok, "Single-mill stub never blocks user creation"
 
 
 # ── Module Sync ───────────────────────────────────────────
