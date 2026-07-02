@@ -65,6 +65,14 @@ def table_exists(cur, t):
     return cur.fetchone()[0] is not None
 
 
+def column_exists(cur, t, col):
+    cur.execute(
+        "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=%s AND column_name=%s",
+        (t, col),
+    )
+    return cur.fetchone() is not None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--keep", help="company id to keep")
@@ -110,6 +118,10 @@ def main():
         for tbl, where in PRE_DELETE + [COMPANY_DELETE]:
             if not table_exists(cur, tbl):
                 print(f"  · {tbl:<22} (missing — skipped)"); continue
+            # PRE_DELETE tables key off company_id; skip any that don't have it
+            # (e.g. employees is mill-scoped, not company-scoped).
+            if tbl != COMPANY_DELETE[0] and not column_exists(cur, tbl, "company_id"):
+                print(f"  · {tbl:<22} (no company_id — skipped)"); continue
             cur.execute(f"SELECT COUNT(*) FROM {tbl} WHERE {where}", params)
             n = cur.fetchone()[0]
             if n == 0:
