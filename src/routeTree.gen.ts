@@ -48,18 +48,10 @@ import { Route as AppDashboardOwnerRouteImport } from './routes/_app.dashboard.o
 import { Route as AppCompanySettingsRouteImport } from './routes/_app.company.settings'
 import { Route as AppCompanyBillingRouteImport } from './routes/_app.company.billing'
 import { Route as AppAdminUsersRouteImport } from './routes/_app.admin.users'
-import { Route as AppAdminSalesRouteImport } from './routes/_app.admin.sales'
 import { Route as AppAdminRolesRouteImport } from './routes/_app.admin.roles'
-import { Route as AppAdminPlansRouteImport } from './routes/_app.admin.plans'
-import { Route as AppAdminOrganizationsRouteImport } from './routes/_app.admin.organizations'
-import { Route as AppAdminModulesRouteImport } from './routes/_app.admin.modules'
-import { Route as AppAdminMillsRouteImport } from './routes/_app.admin.mills'
-import { Route as AppAdminLimitsRouteImport } from './routes/_app.admin.limits'
 import { Route as AppAdminIncidentsRouteImport } from './routes/_app.admin.incidents'
 import { Route as AppAdminHealthRouteImport } from './routes/_app.admin.health'
-import { Route as AppAdminCompaniesRouteImport } from './routes/_app.admin.companies'
 import { Route as AppAdminColumnConfigRouteImport } from './routes/_app.admin.column-config'
-import { Route as AppAdminBillingRouteImport } from './routes/_app.admin.billing'
 import { Route as AppAdminBackupsRouteImport } from './routes/_app.admin.backups'
 import { Route as AppAdminAuditRouteImport } from './routes/_app.admin.audit'
 import { Route as AppAdminArchiveRouteImport } from './routes/_app.admin.archive'
@@ -69,15 +61,6 @@ import { Route as AppAdminAlertsRouteImport } from './routes/_app.admin.alerts'
 import { Route as AppAdminAlertOpsRouteImport } from './routes/_app.admin.alert-ops'
 import { Route as AppProductionLearnerAllocationIdRouteImport } from './routes/_app.production.learner-allocation.$id'
 import { Route as AppProductionLearnerAllocationViewIdRouteImport } from './routes/_app.production.learner-allocation-view.$id'
-import { Route as AppAdminCompaniesOnboardRouteImport } from './routes/_app.admin.companies.onboard'
-import { Route as AppAdminCompaniesCompanyIdRouteImport } from './routes/_app.admin.companies.$companyId'
-import { Route as AppAdminBillingUpgradeRequestsRouteImport } from './routes/_app.admin.billing.upgrade-requests'
-import { Route as AppAdminBillingSubscriptionsRouteImport } from './routes/_app.admin.billing.subscriptions'
-import { Route as AppAdminBillingPlansRouteImport } from './routes/_app.admin.billing.plans'
-import { Route as AppAdminBillingPaymentsRouteImport } from './routes/_app.admin.billing.payments'
-import { Route as AppAdminBillingInvoicesRouteImport } from './routes/_app.admin.billing.invoices'
-import { Route as AppAdminBillingCommandCenterRouteImport } from './routes/_app.admin.billing.command-center'
-import { Route as AppAdminBillingAnalyticsRouteImport } from './routes/_app.admin.billing.analytics'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -275,39 +258,9 @@ const AppAdminUsersRoute = AppAdminUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => AppAdminRoute,
 } as any)
-const AppAdminSalesRoute = AppAdminSalesRouteImport.update({
-  id: '/sales',
-  path: '/sales',
-  getParentRoute: () => AppAdminRoute,
-} as any)
 const AppAdminRolesRoute = AppAdminRolesRouteImport.update({
   id: '/roles',
   path: '/roles',
-  getParentRoute: () => AppAdminRoute,
-} as any)
-const AppAdminPlansRoute = AppAdminPlansRouteImport.update({
-  id: '/plans',
-  path: '/plans',
-  getParentRoute: () => AppAdminRoute,
-} as any)
-const AppAdminOrganizationsRoute = AppAdminOrganizationsRouteImport.update({
-  id: '/organizations',
-  path: '/organizations',
-  getParentRoute: () => AppAdminRoute,
-} as any)
-const AppAdminModulesRoute = AppAdminModulesRouteImport.update({
-  id: '/modules',
-  path: '/modules',
-  getParentRoute: () => AppAdminRoute,
-} as any)
-const AppAdminMillsRoute = AppAdminMillsRouteImport.update({
-  id: '/mills',
-  path: '/mills',
-  getParentRoute: () => AppAdminRoute,
-} as any)
-const AppAdminLimitsRoute = AppAdminLimitsRouteImport.update({
-  id: '/limits',
-  path: '/limits',
   getParentRoute: () => AppAdminRoute,
 } as any)
 const AppAdminIncidentsRoute = AppAdminIncidentsRouteImport.update({
@@ -320,19 +273,9 @@ const AppAdminHealthRoute = AppAdminHealthRouteImport.update({
   path: '/health',
   getParentRoute: () => AppAdminRoute,
 } as any)
-const AppAdminCompaniesRoute = AppAdminCompaniesRouteImport.update({
-  id: '/companies',
-  path: '/companies',
-  getParentRoute: () => AppAdminRoute,
-} as any)
 const AppAdminColumnConfigRoute = AppAdminColumnConfigRouteImport.update({
   id: '/column-config',
   path: '/column-config',
-  getParentRoute: () => AppAdminRoute,
-} as any)
-const AppAdminBillingRoute = AppAdminBillingRouteImport.update({
-  id: '/billing',
-  path: '/billing',
   getParentRoute: () => AppAdminRoute,
 } as any)
 const AppAdminBackupsRoute = AppAdminBackupsRouteImport.update({
@@ -382,57 +325,6 @@ const AppProductionLearnerAllocationViewIdRoute =
     path: '/learner-allocation-view/$id',
     getParentRoute: () => AppProductionRoute,
   } as any)
-const AppAdminCompaniesOnboardRoute =
-  AppAdminCompaniesOnboardRouteImport.update({
-    id: '/onboard',
-    path: '/onboard',
-    getParentRoute: () => AppAdminCompaniesRoute,
-  } as any)
-const AppAdminCompaniesCompanyIdRoute =
-  AppAdminCompaniesCompanyIdRouteImport.update({
-    id: '/$companyId',
-    path: '/$companyId',
-    getParentRoute: () => AppAdminCompaniesRoute,
-  } as any)
-const AppAdminBillingUpgradeRequestsRoute =
-  AppAdminBillingUpgradeRequestsRouteImport.update({
-    id: '/upgrade-requests',
-    path: '/upgrade-requests',
-    getParentRoute: () => AppAdminBillingRoute,
-  } as any)
-const AppAdminBillingSubscriptionsRoute =
-  AppAdminBillingSubscriptionsRouteImport.update({
-    id: '/subscriptions',
-    path: '/subscriptions',
-    getParentRoute: () => AppAdminBillingRoute,
-  } as any)
-const AppAdminBillingPlansRoute = AppAdminBillingPlansRouteImport.update({
-  id: '/plans',
-  path: '/plans',
-  getParentRoute: () => AppAdminBillingRoute,
-} as any)
-const AppAdminBillingPaymentsRoute = AppAdminBillingPaymentsRouteImport.update({
-  id: '/payments',
-  path: '/payments',
-  getParentRoute: () => AppAdminBillingRoute,
-} as any)
-const AppAdminBillingInvoicesRoute = AppAdminBillingInvoicesRouteImport.update({
-  id: '/invoices',
-  path: '/invoices',
-  getParentRoute: () => AppAdminBillingRoute,
-} as any)
-const AppAdminBillingCommandCenterRoute =
-  AppAdminBillingCommandCenterRouteImport.update({
-    id: '/command-center',
-    path: '/command-center',
-    getParentRoute: () => AppAdminBillingRoute,
-  } as any)
-const AppAdminBillingAnalyticsRoute =
-  AppAdminBillingAnalyticsRouteImport.update({
-    id: '/analytics',
-    path: '/analytics',
-    getParentRoute: () => AppAdminBillingRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -474,33 +366,16 @@ export interface FileRoutesByFullPath {
   '/admin/archive': typeof AppAdminArchiveRoute
   '/admin/audit': typeof AppAdminAuditRoute
   '/admin/backups': typeof AppAdminBackupsRoute
-  '/admin/billing': typeof AppAdminBillingRouteWithChildren
   '/admin/column-config': typeof AppAdminColumnConfigRoute
-  '/admin/companies': typeof AppAdminCompaniesRouteWithChildren
   '/admin/health': typeof AppAdminHealthRoute
   '/admin/incidents': typeof AppAdminIncidentsRoute
-  '/admin/limits': typeof AppAdminLimitsRoute
-  '/admin/mills': typeof AppAdminMillsRoute
-  '/admin/modules': typeof AppAdminModulesRoute
-  '/admin/organizations': typeof AppAdminOrganizationsRoute
-  '/admin/plans': typeof AppAdminPlansRoute
   '/admin/roles': typeof AppAdminRolesRoute
-  '/admin/sales': typeof AppAdminSalesRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/company/billing': typeof AppCompanyBillingRoute
   '/company/settings': typeof AppCompanySettingsRoute
   '/dashboard/owner': typeof AppDashboardOwnerRoute
   '/production/learner-allocation': typeof AppProductionLearnerAllocationRouteWithChildren
   '/production/learner-allocations': typeof AppProductionLearnerAllocationsRoute
-  '/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
-  '/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
-  '/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
-  '/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
-  '/admin/billing/plans': typeof AppAdminBillingPlansRoute
-  '/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
-  '/admin/billing/upgrade-requests': typeof AppAdminBillingUpgradeRequestsRoute
-  '/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
-  '/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
   '/production/learner-allocation-view/$id': typeof AppProductionLearnerAllocationViewIdRoute
   '/production/learner-allocation/$id': typeof AppProductionLearnerAllocationIdRoute
 }
@@ -544,33 +419,16 @@ export interface FileRoutesByTo {
   '/admin/archive': typeof AppAdminArchiveRoute
   '/admin/audit': typeof AppAdminAuditRoute
   '/admin/backups': typeof AppAdminBackupsRoute
-  '/admin/billing': typeof AppAdminBillingRouteWithChildren
   '/admin/column-config': typeof AppAdminColumnConfigRoute
-  '/admin/companies': typeof AppAdminCompaniesRouteWithChildren
   '/admin/health': typeof AppAdminHealthRoute
   '/admin/incidents': typeof AppAdminIncidentsRoute
-  '/admin/limits': typeof AppAdminLimitsRoute
-  '/admin/mills': typeof AppAdminMillsRoute
-  '/admin/modules': typeof AppAdminModulesRoute
-  '/admin/organizations': typeof AppAdminOrganizationsRoute
-  '/admin/plans': typeof AppAdminPlansRoute
   '/admin/roles': typeof AppAdminRolesRoute
-  '/admin/sales': typeof AppAdminSalesRoute
   '/admin/users': typeof AppAdminUsersRoute
   '/company/billing': typeof AppCompanyBillingRoute
   '/company/settings': typeof AppCompanySettingsRoute
   '/dashboard/owner': typeof AppDashboardOwnerRoute
   '/production/learner-allocation': typeof AppProductionLearnerAllocationRouteWithChildren
   '/production/learner-allocations': typeof AppProductionLearnerAllocationsRoute
-  '/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
-  '/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
-  '/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
-  '/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
-  '/admin/billing/plans': typeof AppAdminBillingPlansRoute
-  '/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
-  '/admin/billing/upgrade-requests': typeof AppAdminBillingUpgradeRequestsRoute
-  '/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
-  '/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
   '/production/learner-allocation-view/$id': typeof AppProductionLearnerAllocationViewIdRoute
   '/production/learner-allocation/$id': typeof AppProductionLearnerAllocationIdRoute
 }
@@ -616,33 +474,16 @@ export interface FileRoutesById {
   '/_app/admin/archive': typeof AppAdminArchiveRoute
   '/_app/admin/audit': typeof AppAdminAuditRoute
   '/_app/admin/backups': typeof AppAdminBackupsRoute
-  '/_app/admin/billing': typeof AppAdminBillingRouteWithChildren
   '/_app/admin/column-config': typeof AppAdminColumnConfigRoute
-  '/_app/admin/companies': typeof AppAdminCompaniesRouteWithChildren
   '/_app/admin/health': typeof AppAdminHealthRoute
   '/_app/admin/incidents': typeof AppAdminIncidentsRoute
-  '/_app/admin/limits': typeof AppAdminLimitsRoute
-  '/_app/admin/mills': typeof AppAdminMillsRoute
-  '/_app/admin/modules': typeof AppAdminModulesRoute
-  '/_app/admin/organizations': typeof AppAdminOrganizationsRoute
-  '/_app/admin/plans': typeof AppAdminPlansRoute
   '/_app/admin/roles': typeof AppAdminRolesRoute
-  '/_app/admin/sales': typeof AppAdminSalesRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
   '/_app/company/billing': typeof AppCompanyBillingRoute
   '/_app/company/settings': typeof AppCompanySettingsRoute
   '/_app/dashboard/owner': typeof AppDashboardOwnerRoute
   '/_app/production/learner-allocation': typeof AppProductionLearnerAllocationRouteWithChildren
   '/_app/production/learner-allocations': typeof AppProductionLearnerAllocationsRoute
-  '/_app/admin/billing/analytics': typeof AppAdminBillingAnalyticsRoute
-  '/_app/admin/billing/command-center': typeof AppAdminBillingCommandCenterRoute
-  '/_app/admin/billing/invoices': typeof AppAdminBillingInvoicesRoute
-  '/_app/admin/billing/payments': typeof AppAdminBillingPaymentsRoute
-  '/_app/admin/billing/plans': typeof AppAdminBillingPlansRoute
-  '/_app/admin/billing/subscriptions': typeof AppAdminBillingSubscriptionsRoute
-  '/_app/admin/billing/upgrade-requests': typeof AppAdminBillingUpgradeRequestsRoute
-  '/_app/admin/companies/$companyId': typeof AppAdminCompaniesCompanyIdRoute
-  '/_app/admin/companies/onboard': typeof AppAdminCompaniesOnboardRoute
   '/_app/production/learner-allocation-view/$id': typeof AppProductionLearnerAllocationViewIdRoute
   '/_app/production/learner-allocation/$id': typeof AppProductionLearnerAllocationIdRoute
 }
@@ -688,33 +529,16 @@ export interface FileRouteTypes {
     | '/admin/archive'
     | '/admin/audit'
     | '/admin/backups'
-    | '/admin/billing'
     | '/admin/column-config'
-    | '/admin/companies'
     | '/admin/health'
     | '/admin/incidents'
-    | '/admin/limits'
-    | '/admin/mills'
-    | '/admin/modules'
-    | '/admin/organizations'
-    | '/admin/plans'
     | '/admin/roles'
-    | '/admin/sales'
     | '/admin/users'
     | '/company/billing'
     | '/company/settings'
     | '/dashboard/owner'
     | '/production/learner-allocation'
     | '/production/learner-allocations'
-    | '/admin/billing/analytics'
-    | '/admin/billing/command-center'
-    | '/admin/billing/invoices'
-    | '/admin/billing/payments'
-    | '/admin/billing/plans'
-    | '/admin/billing/subscriptions'
-    | '/admin/billing/upgrade-requests'
-    | '/admin/companies/$companyId'
-    | '/admin/companies/onboard'
     | '/production/learner-allocation-view/$id'
     | '/production/learner-allocation/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -758,33 +582,16 @@ export interface FileRouteTypes {
     | '/admin/archive'
     | '/admin/audit'
     | '/admin/backups'
-    | '/admin/billing'
     | '/admin/column-config'
-    | '/admin/companies'
     | '/admin/health'
     | '/admin/incidents'
-    | '/admin/limits'
-    | '/admin/mills'
-    | '/admin/modules'
-    | '/admin/organizations'
-    | '/admin/plans'
     | '/admin/roles'
-    | '/admin/sales'
     | '/admin/users'
     | '/company/billing'
     | '/company/settings'
     | '/dashboard/owner'
     | '/production/learner-allocation'
     | '/production/learner-allocations'
-    | '/admin/billing/analytics'
-    | '/admin/billing/command-center'
-    | '/admin/billing/invoices'
-    | '/admin/billing/payments'
-    | '/admin/billing/plans'
-    | '/admin/billing/subscriptions'
-    | '/admin/billing/upgrade-requests'
-    | '/admin/companies/$companyId'
-    | '/admin/companies/onboard'
     | '/production/learner-allocation-view/$id'
     | '/production/learner-allocation/$id'
   id:
@@ -829,33 +636,16 @@ export interface FileRouteTypes {
     | '/_app/admin/archive'
     | '/_app/admin/audit'
     | '/_app/admin/backups'
-    | '/_app/admin/billing'
     | '/_app/admin/column-config'
-    | '/_app/admin/companies'
     | '/_app/admin/health'
     | '/_app/admin/incidents'
-    | '/_app/admin/limits'
-    | '/_app/admin/mills'
-    | '/_app/admin/modules'
-    | '/_app/admin/organizations'
-    | '/_app/admin/plans'
     | '/_app/admin/roles'
-    | '/_app/admin/sales'
     | '/_app/admin/users'
     | '/_app/company/billing'
     | '/_app/company/settings'
     | '/_app/dashboard/owner'
     | '/_app/production/learner-allocation'
     | '/_app/production/learner-allocations'
-    | '/_app/admin/billing/analytics'
-    | '/_app/admin/billing/command-center'
-    | '/_app/admin/billing/invoices'
-    | '/_app/admin/billing/payments'
-    | '/_app/admin/billing/plans'
-    | '/_app/admin/billing/subscriptions'
-    | '/_app/admin/billing/upgrade-requests'
-    | '/_app/admin/companies/$companyId'
-    | '/_app/admin/companies/onboard'
     | '/_app/production/learner-allocation-view/$id'
     | '/_app/production/learner-allocation/$id'
   fileRoutesById: FileRoutesById
@@ -1143,53 +933,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminUsersRouteImport
       parentRoute: typeof AppAdminRoute
     }
-    '/_app/admin/sales': {
-      id: '/_app/admin/sales'
-      path: '/sales'
-      fullPath: '/admin/sales'
-      preLoaderRoute: typeof AppAdminSalesRouteImport
-      parentRoute: typeof AppAdminRoute
-    }
     '/_app/admin/roles': {
       id: '/_app/admin/roles'
       path: '/roles'
       fullPath: '/admin/roles'
       preLoaderRoute: typeof AppAdminRolesRouteImport
-      parentRoute: typeof AppAdminRoute
-    }
-    '/_app/admin/plans': {
-      id: '/_app/admin/plans'
-      path: '/plans'
-      fullPath: '/admin/plans'
-      preLoaderRoute: typeof AppAdminPlansRouteImport
-      parentRoute: typeof AppAdminRoute
-    }
-    '/_app/admin/organizations': {
-      id: '/_app/admin/organizations'
-      path: '/organizations'
-      fullPath: '/admin/organizations'
-      preLoaderRoute: typeof AppAdminOrganizationsRouteImport
-      parentRoute: typeof AppAdminRoute
-    }
-    '/_app/admin/modules': {
-      id: '/_app/admin/modules'
-      path: '/modules'
-      fullPath: '/admin/modules'
-      preLoaderRoute: typeof AppAdminModulesRouteImport
-      parentRoute: typeof AppAdminRoute
-    }
-    '/_app/admin/mills': {
-      id: '/_app/admin/mills'
-      path: '/mills'
-      fullPath: '/admin/mills'
-      preLoaderRoute: typeof AppAdminMillsRouteImport
-      parentRoute: typeof AppAdminRoute
-    }
-    '/_app/admin/limits': {
-      id: '/_app/admin/limits'
-      path: '/limits'
-      fullPath: '/admin/limits'
-      preLoaderRoute: typeof AppAdminLimitsRouteImport
       parentRoute: typeof AppAdminRoute
     }
     '/_app/admin/incidents': {
@@ -1206,25 +954,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminHealthRouteImport
       parentRoute: typeof AppAdminRoute
     }
-    '/_app/admin/companies': {
-      id: '/_app/admin/companies'
-      path: '/companies'
-      fullPath: '/admin/companies'
-      preLoaderRoute: typeof AppAdminCompaniesRouteImport
-      parentRoute: typeof AppAdminRoute
-    }
     '/_app/admin/column-config': {
       id: '/_app/admin/column-config'
       path: '/column-config'
       fullPath: '/admin/column-config'
       preLoaderRoute: typeof AppAdminColumnConfigRouteImport
-      parentRoute: typeof AppAdminRoute
-    }
-    '/_app/admin/billing': {
-      id: '/_app/admin/billing'
-      path: '/billing'
-      fullPath: '/admin/billing'
-      preLoaderRoute: typeof AppAdminBillingRouteImport
       parentRoute: typeof AppAdminRoute
     }
     '/_app/admin/backups': {
@@ -1290,108 +1024,8 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProductionLearnerAllocationViewIdRouteImport
       parentRoute: typeof AppProductionRoute
     }
-    '/_app/admin/companies/onboard': {
-      id: '/_app/admin/companies/onboard'
-      path: '/onboard'
-      fullPath: '/admin/companies/onboard'
-      preLoaderRoute: typeof AppAdminCompaniesOnboardRouteImport
-      parentRoute: typeof AppAdminCompaniesRoute
-    }
-    '/_app/admin/companies/$companyId': {
-      id: '/_app/admin/companies/$companyId'
-      path: '/$companyId'
-      fullPath: '/admin/companies/$companyId'
-      preLoaderRoute: typeof AppAdminCompaniesCompanyIdRouteImport
-      parentRoute: typeof AppAdminCompaniesRoute
-    }
-    '/_app/admin/billing/upgrade-requests': {
-      id: '/_app/admin/billing/upgrade-requests'
-      path: '/upgrade-requests'
-      fullPath: '/admin/billing/upgrade-requests'
-      preLoaderRoute: typeof AppAdminBillingUpgradeRequestsRouteImport
-      parentRoute: typeof AppAdminBillingRoute
-    }
-    '/_app/admin/billing/subscriptions': {
-      id: '/_app/admin/billing/subscriptions'
-      path: '/subscriptions'
-      fullPath: '/admin/billing/subscriptions'
-      preLoaderRoute: typeof AppAdminBillingSubscriptionsRouteImport
-      parentRoute: typeof AppAdminBillingRoute
-    }
-    '/_app/admin/billing/plans': {
-      id: '/_app/admin/billing/plans'
-      path: '/plans'
-      fullPath: '/admin/billing/plans'
-      preLoaderRoute: typeof AppAdminBillingPlansRouteImport
-      parentRoute: typeof AppAdminBillingRoute
-    }
-    '/_app/admin/billing/payments': {
-      id: '/_app/admin/billing/payments'
-      path: '/payments'
-      fullPath: '/admin/billing/payments'
-      preLoaderRoute: typeof AppAdminBillingPaymentsRouteImport
-      parentRoute: typeof AppAdminBillingRoute
-    }
-    '/_app/admin/billing/invoices': {
-      id: '/_app/admin/billing/invoices'
-      path: '/invoices'
-      fullPath: '/admin/billing/invoices'
-      preLoaderRoute: typeof AppAdminBillingInvoicesRouteImport
-      parentRoute: typeof AppAdminBillingRoute
-    }
-    '/_app/admin/billing/command-center': {
-      id: '/_app/admin/billing/command-center'
-      path: '/command-center'
-      fullPath: '/admin/billing/command-center'
-      preLoaderRoute: typeof AppAdminBillingCommandCenterRouteImport
-      parentRoute: typeof AppAdminBillingRoute
-    }
-    '/_app/admin/billing/analytics': {
-      id: '/_app/admin/billing/analytics'
-      path: '/analytics'
-      fullPath: '/admin/billing/analytics'
-      preLoaderRoute: typeof AppAdminBillingAnalyticsRouteImport
-      parentRoute: typeof AppAdminBillingRoute
-    }
   }
 }
-
-interface AppAdminBillingRouteChildren {
-  AppAdminBillingAnalyticsRoute: typeof AppAdminBillingAnalyticsRoute
-  AppAdminBillingCommandCenterRoute: typeof AppAdminBillingCommandCenterRoute
-  AppAdminBillingInvoicesRoute: typeof AppAdminBillingInvoicesRoute
-  AppAdminBillingPaymentsRoute: typeof AppAdminBillingPaymentsRoute
-  AppAdminBillingPlansRoute: typeof AppAdminBillingPlansRoute
-  AppAdminBillingSubscriptionsRoute: typeof AppAdminBillingSubscriptionsRoute
-  AppAdminBillingUpgradeRequestsRoute: typeof AppAdminBillingUpgradeRequestsRoute
-}
-
-const AppAdminBillingRouteChildren: AppAdminBillingRouteChildren = {
-  AppAdminBillingAnalyticsRoute: AppAdminBillingAnalyticsRoute,
-  AppAdminBillingCommandCenterRoute: AppAdminBillingCommandCenterRoute,
-  AppAdminBillingInvoicesRoute: AppAdminBillingInvoicesRoute,
-  AppAdminBillingPaymentsRoute: AppAdminBillingPaymentsRoute,
-  AppAdminBillingPlansRoute: AppAdminBillingPlansRoute,
-  AppAdminBillingSubscriptionsRoute: AppAdminBillingSubscriptionsRoute,
-  AppAdminBillingUpgradeRequestsRoute: AppAdminBillingUpgradeRequestsRoute,
-}
-
-const AppAdminBillingRouteWithChildren = AppAdminBillingRoute._addFileChildren(
-  AppAdminBillingRouteChildren,
-)
-
-interface AppAdminCompaniesRouteChildren {
-  AppAdminCompaniesCompanyIdRoute: typeof AppAdminCompaniesCompanyIdRoute
-  AppAdminCompaniesOnboardRoute: typeof AppAdminCompaniesOnboardRoute
-}
-
-const AppAdminCompaniesRouteChildren: AppAdminCompaniesRouteChildren = {
-  AppAdminCompaniesCompanyIdRoute: AppAdminCompaniesCompanyIdRoute,
-  AppAdminCompaniesOnboardRoute: AppAdminCompaniesOnboardRoute,
-}
-
-const AppAdminCompaniesRouteWithChildren =
-  AppAdminCompaniesRoute._addFileChildren(AppAdminCompaniesRouteChildren)
 
 interface AppAdminRouteChildren {
   AppAdminAlertOpsRoute: typeof AppAdminAlertOpsRoute
@@ -1401,18 +1035,10 @@ interface AppAdminRouteChildren {
   AppAdminArchiveRoute: typeof AppAdminArchiveRoute
   AppAdminAuditRoute: typeof AppAdminAuditRoute
   AppAdminBackupsRoute: typeof AppAdminBackupsRoute
-  AppAdminBillingRoute: typeof AppAdminBillingRouteWithChildren
   AppAdminColumnConfigRoute: typeof AppAdminColumnConfigRoute
-  AppAdminCompaniesRoute: typeof AppAdminCompaniesRouteWithChildren
   AppAdminHealthRoute: typeof AppAdminHealthRoute
   AppAdminIncidentsRoute: typeof AppAdminIncidentsRoute
-  AppAdminLimitsRoute: typeof AppAdminLimitsRoute
-  AppAdminMillsRoute: typeof AppAdminMillsRoute
-  AppAdminModulesRoute: typeof AppAdminModulesRoute
-  AppAdminOrganizationsRoute: typeof AppAdminOrganizationsRoute
-  AppAdminPlansRoute: typeof AppAdminPlansRoute
   AppAdminRolesRoute: typeof AppAdminRolesRoute
-  AppAdminSalesRoute: typeof AppAdminSalesRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
 }
 
@@ -1424,18 +1050,10 @@ const AppAdminRouteChildren: AppAdminRouteChildren = {
   AppAdminArchiveRoute: AppAdminArchiveRoute,
   AppAdminAuditRoute: AppAdminAuditRoute,
   AppAdminBackupsRoute: AppAdminBackupsRoute,
-  AppAdminBillingRoute: AppAdminBillingRouteWithChildren,
   AppAdminColumnConfigRoute: AppAdminColumnConfigRoute,
-  AppAdminCompaniesRoute: AppAdminCompaniesRouteWithChildren,
   AppAdminHealthRoute: AppAdminHealthRoute,
   AppAdminIncidentsRoute: AppAdminIncidentsRoute,
-  AppAdminLimitsRoute: AppAdminLimitsRoute,
-  AppAdminMillsRoute: AppAdminMillsRoute,
-  AppAdminModulesRoute: AppAdminModulesRoute,
-  AppAdminOrganizationsRoute: AppAdminOrganizationsRoute,
-  AppAdminPlansRoute: AppAdminPlansRoute,
   AppAdminRolesRoute: AppAdminRolesRoute,
-  AppAdminSalesRoute: AppAdminSalesRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
 }
 
