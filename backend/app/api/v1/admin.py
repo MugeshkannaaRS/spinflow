@@ -2680,3 +2680,56 @@ async def get_system_health(
         "module_status":     module_status,
         "recent_audit":      recent_audit,
     }
+
+
+# ---------------------------------------------------------------------------
+# MIGRATION STATUS — diagnose schema drift / boot-migration failures without
+# platform log access. SUPER_ADMIN / MILL_OWNER only.
+# ---------------------------------------------------------------------------
+
+@router.get("/admin/migration-status")
+async def get_migration_status(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    role_code = current_user.role_rel.code if current_user.role_rel else (current_user.role or "")
+    if role_code not in ("SUPER_ADMIN", "MILL_OWNER"):
+        raise HTTPException(status_code=403, detail="Insufficient permission")
+
+    out: dict = {}
+    try:
+        ver = (await db.execute(text("SELECT version_num FROM alembic_version"))).scalars().all()
+        out["alembic_version"] = ver
+    except Exception as e:
+        await db.rollback()
+        out["alembic_version"] = f"error: {type(e).__name__}"
+
+    # Presence checks for recently-added tables/columns
+    checks = {
+        "maintenance_dept_map (table)":
+            "SELECT 1 FROM information_schema.tables WHERE table_name = 'maintenance_dept_map'",
+        "maintenance_dept_manpower (table)":
+            "SELECT 1 FROM information_schema.tables WHERE table_name = 'maintenance_dept_manpower'",
+        "mill_calendar.weekly_off (column)":
+            "SELECT 1 FROM information_schema.columns WHERE table_name = 'mill_calendar' AND column_name = 'weekly_off'",
+        "machines.machine_number (column)":
+            "SELECT 1 FROM information_schema.columns WHERE table_name = 'machines' AND column_name = 'machine_number'",
+        "maintenance_schedule.machine_line_code (column)":
+            "SELECT 1 FROM information_schema.columns WHERE table_name = 'maintenance_schedule' AND column_name = 'machine_line_code'",
+    }
+    results = {}
+    for label, sql in checks.items():
+        try:
+            results[label] = bool((await db.execute(text(sql))).first())
+        except Exception as e:
+            await db.rollback()
+            results[label] = f"error: {type(e).__name__}"
+    out["schema_checks"] = results
+
+    # Boot-time alembic log persisted by start.py
+    try:
+        with open("/tmp/alembic_boot.log") as fh:
+            out["boot_migration_log"] = fh.read()[-4000:]
+    except OSError:
+        out["boot_migration_log"] = None
+    return out

@@ -121,6 +121,28 @@ async def _seed(session: AsyncSession):
     await session.flush()
 
 
+async def test_day_plan_survives_missing_dept_map_table(client, session, maint_user):
+    """Live regression: maintenance_dept_map didn't exist (migration 066 not
+    applied). The dept-map fetch failed -> db.rollback() expired the loaded
+    schedules -> attribute access raised MissingGreenlet -> 500 on every
+    day-plan request. Schedules are now snapshotted into plain objects."""
+    from sqlalchemy import text as sa_text
+
+    from app.core.deps import get_current_user
+    from app.main import app as fastapi_app
+
+    await _seed(session)
+    # Simulate the un-migrated live DB: drop the optional table.
+    await session.execute(sa_text("DROP TABLE maintenance_dept_map"))
+    fastapi_app.dependency_overrides[get_current_user] = lambda: maint_user
+    try:
+        r = await client.get(f"/api/v1/maintenance/day-plan?mill_id={MILL}&year=2026&month=7")
+        assert r.status_code == 200, r.text[:1200]
+        assert r.json()["total_schedule_count"] == 408
+    finally:
+        fastapi_app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_day_plan_returns_200_with_live_shaped_data(client, session, maint_user):
     from app.core.deps import get_current_user
     from app.main import app as fastapi_app

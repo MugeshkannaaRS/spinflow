@@ -953,7 +953,33 @@ async def _build_day_plan(
             | (MaintenanceSchedule.mill_id.is_(None))
         )
     result = await db.execute(stmt)
-    schedules = result.scalars().all()
+    _sched_rows = result.scalars().all()
+
+    # Snapshot schedules into detached plain objects IMMEDIATELY. Later
+    # fallback blocks may call db.rollback() (e.g. when an optional table
+    # like maintenance_dept_map doesn't exist yet), which expires all loaded
+    # ORM instances — any subsequent attribute access would then raise
+    # MissingGreenlet (sync lazy refresh inside an async context). Plain
+    # objects are immune to session expiry.
+    from types import SimpleNamespace
+    schedules = [
+        SimpleNamespace(
+            id=s.id,
+            machine_code=s.machine_code,
+            machine_line_code=s.machine_line_code,
+            frequency_days=s.frequency_days,
+            description=s.description,
+            department=s.department,
+            manpower_count=s.manpower_count,
+            machine_count=s.machine_count,
+            sl_no=s.sl_no,
+            next_due=s.next_due,
+            last_done=s.last_done,
+            lubricant_name=s.lubricant_name,
+            lubricant_quantity=s.lubricant_quantity,
+        )
+        for s in _sched_rows
+    ]
 
     # Fetch the REAL machines for this mill from the Machines master, so tasks
     # show actual machine numbers/codes instead of a fabricated range. Group by

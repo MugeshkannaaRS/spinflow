@@ -27,16 +27,28 @@ def run_migrations() -> None:
             text=True,
             timeout=300,
         )
+        log = (
+            f"rc={result.returncode}\n--- stdout ---\n{result.stdout[-4000:]}"
+            f"\n--- stderr ---\n{result.stderr[-4000:]}"
+        )
         if result.returncode == 0:
             print("[start] alembic upgrade head: OK", flush=True)
         else:
-            print(
-                f"[start] alembic upgrade head FAILED (rc={result.returncode}):\n"
-                f"{result.stdout[-2000:]}\n{result.stderr[-2000:]}",
-                flush=True,
-            )
+            print(f"[start] alembic upgrade head FAILED:\n{log}", flush=True)
+        # Persist for the /admin/migration-status endpoint so migration
+        # failures are diagnosable without platform log access.
+        try:
+            with open("/tmp/alembic_boot.log", "w") as fh:
+                fh.write(log)
+        except OSError:
+            pass
     except Exception as exc:  # noqa: BLE001 — never block boot on migration errors
         print(f"[start] alembic upgrade head raised: {exc}", flush=True)
+        try:
+            with open("/tmp/alembic_boot.log", "w") as fh:
+                fh.write(f"raised: {exc}")
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":
