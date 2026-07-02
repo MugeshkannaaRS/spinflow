@@ -368,6 +368,15 @@ def _get_default_columns(table_name: str) -> list[ColumnConfigSchema]:
     ])
 
 
+def _default_config(table_name: str, mill_id: str) -> dict:
+    """Fallback response: default columns for a table (same shape as the success path)."""
+    return {
+        "table": table_name,
+        "mill_id": mill_id,
+        "columns": [d.model_dump() for d in _get_default_columns(table_name)],
+    }
+
+
 def _build_column_response(col_defs: list[dict], dropdown_map: dict) -> list[ColumnConfigSchema]:
     result = []
     for c in col_defs:

@@ -726,6 +726,7 @@ async def get_manpower_summary(
                 real_machine_count[dept] = cnt
     except Exception as e:
         logger.error(f"manpower-summary real machine count error: {e}")
+        await db.rollback()  # clear aborted PG transaction so later queries work
 
     # Per-department manpower overrides (persons/machines/shift-hours/leader/notes).
     # Overrides WIN over schedule-derived values, and can add departments that
@@ -744,6 +745,7 @@ async def get_manpower_summary(
             overrides[(o.department or "").strip().lower()] = o
     except Exception as e:
         logger.error(f"manpower-summary overrides fetch error: {e}")
+        await db.rollback()  # clear aborted PG transaction so later queries work
 
     # Ensure override-only departments still appear (use the override's own label)
     existing_norm = {d.strip().lower() for d in dept_data.keys()}
@@ -814,6 +816,7 @@ async def maintenance_page_init(
         result["machines"] = [{"id": r.id, "code": r.code, "name": r.name} for r in mach_rows]
     except Exception as e:
         logger.error(f"maintenance.page-init machines error: {e}")
+        await db.rollback()  # clear aborted PG transaction so later queries work
         result["machines"] = []
     try:
         tech_rows = await db.execute(
@@ -951,6 +954,7 @@ async def get_day_plan(
                 machines_by_code[code.strip().lower()] = entry
     except Exception as e:
         logger.error(f"day-plan machines fetch error: {e}")
+        await db.rollback()  # clear aborted PG transaction so later queries work
 
     import re as _re
 
@@ -976,6 +980,9 @@ async def get_day_plan(
             dept_map.setdefault((dm.schedule_dept or "").strip().lower(), []).append(dm.machine_dept)
     except Exception as e:
         logger.error(f"day-plan dept-map fetch error: {e}")
+        # Roll back — a failed query aborts the PG transaction and every
+        # subsequent query would raise InFailedSQLTransaction (500).
+        await db.rollback()
 
     def _machines_for(schedule) -> list:
         """Real machine labels for a schedule, resolved from the Machines master.
@@ -1763,6 +1770,9 @@ async def get_dept_map(
         maps = (await db.execute(mstmt.order_by(MaintenanceDeptMap.schedule_dept))).scalars().all()
     except Exception as e:
         logger.error(f"dept-map list error: {e}")
+        # Roll back — a failed query aborts the PG transaction and every
+        # subsequent query would raise InFailedSQLTransaction (500).
+        await db.rollback()
         maps = []
 
     # distinct schedule departments
