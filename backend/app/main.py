@@ -211,6 +211,67 @@ async def _apply_migration_040_raw() -> None:
     logger.info("migration 039+040 raw SQL fallback: done")
 
 
+async def _apply_migrations_064_066_raw() -> None:
+    """Idempotent raw DDL for migrations 064-066 (maintenance calendar,
+    dept manpower, dept map). Alembic is disabled at startup because the
+    Supabase transaction-mode pooler hangs its advisory locks, so new
+    migrations must be mirrored here (same pattern as 039/040 above).
+    Also stamps alembic_version to 066 so the version table reflects the
+    actual schema (their own remedy per the MIGRATION FATAL hint)."""
+    from sqlalchemy import text
+    from app.db.session import engine as _engine
+    async with _engine.begin() as conn:
+        # migration 064 — mill_calendar
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS mill_calendar (
+                id VARCHAR(36) PRIMARY KEY,
+                mill_id VARCHAR(36),
+                date VARCHAR(10) NOT NULL,
+                day_type VARCHAR(20) NOT NULL DEFAULT 'holiday',
+                persons_on_leave INTEGER DEFAULT 0,
+                weekly_off INTEGER,
+                note VARCHAR(200),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+        """))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_mill_calendar_mill_id ON mill_calendar (mill_id)"))
+        # migration 065 — maintenance_dept_manpower
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS maintenance_dept_manpower (
+                id VARCHAR(36) PRIMARY KEY,
+                mill_id VARCHAR(36),
+                department VARCHAR(100) NOT NULL,
+                persons INTEGER,
+                machines INTEGER,
+                shift_hours FLOAT,
+                leader VARCHAR(200),
+                notes VARCHAR(300),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+        """))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_mdm_mill_id ON maintenance_dept_manpower (mill_id)"))
+        # migration 066 — maintenance_dept_map
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS maintenance_dept_map (
+                id VARCHAR(36) PRIMARY KEY,
+                mill_id VARCHAR(36),
+                schedule_dept VARCHAR(100) NOT NULL,
+                machine_dept VARCHAR(100) NOT NULL,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            )
+        """))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_mdmap_mill_id ON maintenance_dept_map (mill_id)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_mdmap_sched ON maintenance_dept_map (schedule_dept)"))
+        # stamp version — only move FORWARD from 063/064/065
+        await conn.execute(text("""
+            UPDATE alembic_version SET version_num = '066_maintenance_dept_map'
+            WHERE version_num IN ('063_drop_import_mappings',
+                                  '064_maintenance_holiday_calendar',
+                                  '065_maintenance_dept_manpower')
+        """))
+    logger.info("migrations 064-066 raw SQL fallback: done")
+
+
 async def _background_init():
     global _app_started, _app_init_error
     try:
@@ -222,6 +283,9 @@ async def _background_init():
         logger.info("START step 1b: ensure migration 040 DDL")
         await _apply_migration_040_raw()
         logger.info("END step 1b: migration 040 DDL confirmed")
+        logger.info("START step 1c: ensure migrations 064-066 DDL")
+        await _apply_migrations_064_066_raw()
+        logger.info("END step 1c: migrations 064-066 DDL confirmed")
 
         from app.db.session import get_db
         from app.services.alert_service import seed_default_rules, seed_escalation_policies
