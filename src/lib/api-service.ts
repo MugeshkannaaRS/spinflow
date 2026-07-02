@@ -209,6 +209,8 @@ export const dispatchApi = {
   createTrip: (data: any) => api.post("/dispatch/trips", data).then((r) => r.data),
   dispatchTrip: (id: string) => api.put(`/dispatch/trips/${id}/dispatch`).then((r) => r.data),
   deliverTrip: (id: string) => api.put(`/dispatch/trips/${id}/deliver`).then((r) => r.data),
+  updateDocuments: (id: string, data: any) =>
+    api.put(`/dispatch/orders/${id}/documents`, data).then((r) => r.data),
 };
 
 // Purchase
@@ -222,10 +224,12 @@ export const purchaseApi = {
   // Cotton imports (L/C consignments)
   getImports: () => api.get("/purchase/imports").then((r: any) => extractList(r.data)),
   createImport: (data: any) => api.post("/purchase/imports", data).then((r) => r.data),
+  updateImport: (id: string, data: any) => api.put(`/purchase/imports/${id}`, data).then((r) => r.data),
   deleteImport: (id: string) => api.delete(`/purchase/imports/${id}`).then((r) => r.data),
   // Work orders
   getWorkOrders: () => api.get("/purchase/work-orders").then((r: any) => extractList(r.data)),
   createWorkOrder: (data: any) => api.post("/purchase/work-orders", data).then((r) => r.data),
+  updateWorkOrder: (id: string, data: any) => api.put(`/purchase/work-orders/${id}`, data).then((r) => r.data),
   deleteWorkOrder: (id: string) => api.delete(`/purchase/work-orders/${id}`).then((r) => r.data),
 };
 

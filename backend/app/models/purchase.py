@@ -175,6 +175,7 @@ class WorkOrder(TimestampMixin, Base):
     prepared_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     authorised_by: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="open")                 # open/delivered/paid/cancelled
+    for_machine: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)  # machine this WO is for (maintenance link)
     remarks: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
@@ -189,6 +190,8 @@ class WorkOrderItem(Base):
     qty: Mapped[float] = mapped_column(Float, default=0)
     unit_price: Mapped[float] = mapped_column(Numeric(16, 2), default=0)
     amount: Mapped[float] = mapped_column(Numeric(16, 2), default=0)
+    spare_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)      # link to stores.Spare
+    spare_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
 
 class GRNEntry(TimestampMixin, Base):

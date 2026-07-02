@@ -36,6 +36,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Truck, ClipboardList, Loader2, MapPin, Plus } from "lucide-react";
 import { ConfirmDeleteButton } from "@/components/ui/ConfirmDeleteButton";
+import { DispatchDocsButton } from "@/components/dispatch/DispatchDocuments";
 import { useColumnConfig } from "@/hooks/useColumnConfig";
 import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -373,27 +374,24 @@ function DispatchPage() {
                       exportTitle="Dispatch Records"
                     />
                   }
-                  actions={
-                    canEdit
-                      ? (o: any) =>
-                          o.status === "pending" ||
-                          o.status === "draft" ||
-                          o.status === "created" ? (
-                            <ConfirmDeleteButton
-                              onConfirm={async () => {
-                                await dispatchApi.deleteOrder(o.id);
-                                queryClient.invalidateQueries({ queryKey: ["dispatch-orders"] });
-                              }}
-                              label={`Cancel order ${o.order_no}? This cannot be undone.`}
-                              title="Cancel Order?"
-                              confirmText="Cancel Order"
-                              successMessage="Order cancelled"
-                            />
-                          ) : (
-                            <></>
-                          )
-                      : undefined
-                  }
+                  actions={(o: any) => (
+                    <div className="flex items-center gap-1">
+                      <DispatchDocsButton order={o} canEdit={canEdit} />
+                      {canEdit &&
+                        (o.status === "pending" || o.status === "draft" || o.status === "created") && (
+                          <ConfirmDeleteButton
+                            onConfirm={async () => {
+                              await dispatchApi.deleteOrder(o.id);
+                              queryClient.invalidateQueries({ queryKey: ["dispatch-orders"] });
+                            }}
+                            label={`Cancel order ${o.order_no}? This cannot be undone.`}
+                            title="Cancel Order?"
+                            confirmText="Cancel Order"
+                            successMessage="Order cancelled"
+                          />
+                        )}
+                    </div>
+                  )}
                 />
               </ErrorBoundary>
             </TabsContent>

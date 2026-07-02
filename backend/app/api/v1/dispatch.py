@@ -17,6 +17,7 @@ from app.models.masters import Mill, Customer, MasterVehicle
 from app.models.inventory import Warehouse
 from app.schemas.dispatch import (
     DispatchResponse, DispatchCreate, DispatchStatusUpdate, QRScanRequest,
+    DispatchDocUpdate,
 )
 from app.schemas.lotrac import TripOut
 from app.services.dispatch_service import DispatchService
@@ -448,3 +449,28 @@ async def delete_dispatch_order(
     await db.flush()
     await db.commit()
     return {"message": "Dispatch order cancelled", "id": dispatch_id}
+
+
+@router.put("/dispatch/orders/{dispatch_id}/documents", response_model=DispatchResponse)
+async def update_dispatch_documents(
+    dispatch_id: str,
+    req: DispatchDocUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("dispatch", write=True)),
+):
+    """Set the Delivery Challan / Gate Pass / Weight Report fields on a dispatch."""
+    scope = await get_mill_scope(current_user, db)
+    stmt = select(Dispatch).where(Dispatch.id == dispatch_id)
+    if scope.get("mill_id"):
+        stmt = stmt.where(Dispatch.mill_id == scope["mill_id"])
+    elif scope.get("company_id"):
+        stmt = stmt.join(Mill, Dispatch.mill_id == Mill.id).where(Mill.company_id == scope["company_id"])
+    order = (await db.execute(stmt)).scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Dispatch order not found")
+    for k, v in req.model_dump(exclude_unset=True).items():
+        setattr(order, k, v)
+    await db.flush()
+    await db.commit()
+    await db.refresh(order)
+    return order

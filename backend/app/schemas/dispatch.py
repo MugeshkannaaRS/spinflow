@@ -17,9 +17,40 @@ class DispatchResponse(BaseModel):
     status: str
     scanned_by: Optional[str] = None
     approved_by: Optional[str] = None
+    total_bags: Optional[int] = None
+    total_weight_kg: Optional[float] = None
+    # Document fields
+    consignee_address: Optional[str] = None
+    item_specification: Optional[str] = None
+    material_description: Optional[str] = None
+    grade: Optional[str] = None
+    unit: Optional[str] = None
+    pi_do_no: Optional[str] = None
+    gross_weight_kg: Optional[float] = None
+    tare_weight_kg: Optional[float] = None
+    weight_serial: Optional[str] = None
+    gate_pass_no: Optional[str] = None
+    prepared_by: Optional[str] = None
+    remarks: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class DispatchDocUpdate(BaseModel):
+    consignee_address: Optional[str] = None
+    item_specification: Optional[str] = None
+    material_description: Optional[str] = None
+    grade: Optional[str] = None
+    unit: Optional[str] = None
+    pi_do_no: Optional[str] = None
+    total_bags: Optional[int] = None
+    gross_weight_kg: Optional[float] = None
+    tare_weight_kg: Optional[float] = None
+    weight_serial: Optional[str] = None
+    gate_pass_no: Optional[str] = None
+    prepared_by: Optional[str] = None
+    remarks: Optional[str] = None
 
 
 class DispatchCreate(BaseModel):

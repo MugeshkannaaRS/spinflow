@@ -296,6 +296,8 @@ class WorkOrderItemIn(BaseModel):
     qty: float = 0.0
     unit_price: float = 0.0
     amount: Optional[float] = None  # computed if omitted
+    spare_id: Optional[str] = None
+    spare_code: Optional[str] = None
 
 
 class WorkOrderItemOut(BaseModel):
@@ -306,6 +308,8 @@ class WorkOrderItemOut(BaseModel):
     qty: float = 0.0
     unit_price: float = 0.0
     amount: float = 0.0
+    spare_id: Optional[str] = None
+    spare_code: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -327,6 +331,7 @@ class WorkOrderCreate(BaseModel):
     prepared_by: Optional[str] = None
     authorised_by: Optional[str] = None
     status: str = "open"
+    for_machine: Optional[str] = None
     remarks: Optional[str] = None
     items: List[WorkOrderItemIn] = []
 
@@ -349,6 +354,7 @@ class WorkOrderOut(BaseModel):
     prepared_by: Optional[str] = None
     authorised_by: Optional[str] = None
     status: Optional[str] = None
+    for_machine: Optional[str] = None
     remarks: Optional[str] = None
     created_at: Optional[datetime] = None
     items: List[WorkOrderItemOut] = []

@@ -651,6 +651,37 @@ async def delete_cotton_import(
     return {"message": "Import deleted", "id": import_id}
 
 
+@router.put("/purchase/imports/{import_id}", response_model=CottonImportOut)
+async def update_cotton_import(
+    import_id: str,
+    req: CottonImportCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("purchase", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    imp = (await db.execute(
+        _import_scope_filter(select(CottonImport).where(CottonImport.id == import_id), scope)
+    )).scalar_one_or_none()
+    if not imp:
+        raise HTTPException(status_code=404, detail="Import not found")
+    data = req.model_dump()
+    data["date"] = req.date.isoformat()
+    data["lc_date"] = req.lc_date.isoformat() if req.lc_date else None
+    for k, v in data.items():
+        setattr(imp, k, v)
+    try:
+        await db.flush()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Import invoice '{req.commercial_invoice_no}' already exists")
+    await db.commit()
+    await db.refresh(imp)
+    role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+    await log_audit(db, current_user.id, role_code, "update", "CottonImport", imp.id,
+                    f"Cotton import {imp.commercial_invoice_no} updated")
+    return imp
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Work Orders
 # ══════════════════════════════════════════════════════════════════════════════
@@ -669,7 +700,8 @@ async def _wo_to_out(db: AsyncSession, wo: WorkOrder) -> dict:
     out = WorkOrderOut.model_validate(wo).model_dump()
     out["items"] = [
         {"id": it.id, "sl_no": it.sl_no, "description": it.description, "unit": it.unit,
-         "qty": it.qty, "unit_price": float(it.unit_price or 0), "amount": float(it.amount or 0)}
+         "qty": it.qty, "unit_price": float(it.unit_price or 0), "amount": float(it.amount or 0),
+         "spare_id": it.spare_id, "spare_code": it.spare_code}
         for it in items
     ]
     return out
@@ -709,7 +741,8 @@ async def create_work_order(
         amount_in_words=req.amount_in_words, terms=req.terms,
         contact_person=req.contact_person, contact_phone=req.contact_phone,
         prepared_by=req.prepared_by, authorised_by=req.authorised_by,
-        status=req.status, remarks=req.remarks, mill_id=scope.get("mill_id"),
+        status=req.status, for_machine=req.for_machine, remarks=req.remarks,
+        mill_id=scope.get("mill_id"),
     )
     db.add(wo)
     try:
@@ -723,6 +756,7 @@ async def create_work_order(
         db.add(WorkOrderItem(
             work_order_id=wo.id, sl_no=it.sl_no, description=it.description,
             unit=it.unit, qty=it.qty, unit_price=it.unit_price, amount=amount,
+            spare_id=it.spare_id, spare_code=it.spare_code,
         ))
     wo.net_payable = net
     await db.flush()
@@ -760,3 +794,48 @@ async def delete_work_order(
     await db.delete(wo)
     await db.commit()
     return {"message": "Work order deleted", "id": wo_id}
+
+
+@router.put("/purchase/work-orders/{wo_id}", response_model=WorkOrderOut)
+async def update_work_order(
+    wo_id: str,
+    req: WorkOrderCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_module("purchase", write=True)),
+):
+    scope = await get_mill_scope(current_user, db)
+    wo = (await db.execute(_wo_scope_filter(select(WorkOrder).where(WorkOrder.id == wo_id), scope))).scalar_one_or_none()
+    if not wo:
+        raise HTTPException(status_code=404, detail="Work order not found")
+    # Header
+    for field in ("wo_no", "supplier_id", "supplier_name", "supplier_address", "attn_person",
+                  "subject", "currency", "amount_in_words", "terms", "contact_person",
+                  "contact_phone", "prepared_by", "authorised_by", "status", "for_machine", "remarks"):
+        setattr(wo, field, getattr(req, field))
+    wo.date = req.date.isoformat()
+    # Replace items
+    old = (await db.execute(select(WorkOrderItem).where(WorkOrderItem.work_order_id == wo.id))).scalars().all()
+    for it in old:
+        await db.delete(it)
+    await db.flush()
+    net = 0.0
+    for it in req.items:
+        amount = it.amount if it.amount is not None else round((it.qty or 0) * (it.unit_price or 0), 2)
+        net += amount
+        db.add(WorkOrderItem(
+            work_order_id=wo.id, sl_no=it.sl_no, description=it.description,
+            unit=it.unit, qty=it.qty, unit_price=it.unit_price, amount=amount,
+            spare_id=it.spare_id, spare_code=it.spare_code,
+        ))
+    wo.net_payable = net
+    try:
+        await db.flush()
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"Work order '{req.wo_no}' already exists")
+    await db.commit()
+    await db.refresh(wo)
+    role_code = current_user.role_rel.code if current_user.role_rel else "UNKNOWN"
+    await log_audit(db, current_user.id, role_code, "update", "WorkOrder", wo.id,
+                    f"Work order {wo.wo_no} updated")
+    return await _wo_to_out(db, wo)
