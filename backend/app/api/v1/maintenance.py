@@ -739,21 +739,25 @@ async def get_manpower_summary(
                 | (MaintenanceDeptManpower.mill_id.is_(None))
             )
         for o in (await db.execute(ostmt)).scalars().all():
-            overrides[o.department] = o
+            # key by normalized (case/space-insensitive) department so overrides
+            # always match the schedule department regardless of casing.
+            overrides[(o.department or "").strip().lower()] = o
     except Exception as e:
         logger.error(f"manpower-summary overrides fetch error: {e}")
 
-    # Ensure override-only departments still appear
-    for dept, o in overrides.items():
-        if dept not in dept_data:
-            dept_data[dept] = {
-                "department": dept, "manpower": 1, "machine_count": 1, "task_count": 0,
+    # Ensure override-only departments still appear (use the override's own label)
+    existing_norm = {d.strip().lower() for d in dept_data.keys()}
+    for nkey, o in overrides.items():
+        if nkey not in existing_norm:
+            label = o.department
+            dept_data[label] = {
+                "department": label, "manpower": 1, "machine_count": 1, "task_count": 0,
                 "daily_workload_min": 0.0, "overdue_count": 0, "due_this_week": 0, "due_this_month": 0,
             }
 
     summary = []
     for dept, d in dept_data.items():
-        o = overrides.get(dept)
+        o = overrides.get((dept or "").strip().lower())
         manpower = (o.persons if o and o.persons else None) or d["manpower"]
         # machine count precedence: explicit override > real machines from master > schedule value
         machine_count = (o.machines if o and o.machines else None) or real_machine_count.get(dept) or d["machine_count"]
@@ -1686,10 +1690,12 @@ async def upsert_dept_manpower(
         except (TypeError, ValueError):
             return None
 
-    stmt = select(MaintenanceDeptManpower).where(MaintenanceDeptManpower.department == dept)
+    # Match existing case-insensitively so "AC Plant" and "Ac Plant" don't
+    # create duplicate rows — update the first match found.
+    stmt = select(MaintenanceDeptManpower).where(func.lower(MaintenanceDeptManpower.department) == dept.lower())
     if mill_id:
         stmt = stmt.where(MaintenanceDeptManpower.mill_id == mill_id)
-    row = (await db.execute(stmt)).scalar_one_or_none()
+    row = (await db.execute(stmt)).scalars().first()
 
     if row:
         if "persons" in payload: row.persons = _int(payload.get("persons"))
@@ -1796,14 +1802,14 @@ async def add_dept_map(
     machine = str(payload.get("machine_dept") or "").strip()
     if not sched or not machine:
         raise HTTPException(400, detail="schedule_dept and machine_dept are required")
-    # avoid duplicate pairing
+    # avoid duplicate pairing (case-insensitive on both sides)
     stmt = select(MaintenanceDeptMap).where(
-        MaintenanceDeptMap.schedule_dept == sched,
-        MaintenanceDeptMap.machine_dept == machine,
+        func.lower(MaintenanceDeptMap.schedule_dept) == sched.lower(),
+        func.lower(MaintenanceDeptMap.machine_dept) == machine.lower(),
     )
     if mill_id:
         stmt = stmt.where(MaintenanceDeptMap.mill_id == mill_id)
-    existing = (await db.execute(stmt)).scalar_one_or_none()
+    existing = (await db.execute(stmt)).scalars().first()
     if existing:
         return {"id": existing.id, "schedule_dept": sched, "machine_dept": machine}
     row = MaintenanceDeptMap(
